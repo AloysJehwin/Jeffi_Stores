@@ -1,9 +1,0 @@
-.counter_pos {margin:70px auto; width:545px; border:1px solid #CCC; background:#EEE; padding:10px; border-radius:5px}
-.counter_pos1 {margin:20px auto; width:525px; }
-.cntSeparator {font-size: 50px;margin: 24px 0px;color: #000; font-family:Georgia, "Times New Roman", Times, serif;}
-.counter_desc{ position:relative; overflow:hidden; font-size:16px; font-weight:bold; line-height:1.2em; padding:5px 0 0 15px;}
-.counter_desc div{ width:104px; text-align:center; float:left;}
-.counter_desc .days {margin-left:10px;}
-.counter_desc .hours {margin-left:45px;}
-.counter_desc .minutes {margin-left:23px;}
-.counter_desc .seconds {margin-left:12px;}
