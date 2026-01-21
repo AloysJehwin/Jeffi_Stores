@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-0 p-0 m-0 box-border;
+  }
+
+  body {
+    @apply antialiased font-sans;
+  }
+
+  h1 {
+    @apply font-bebas;
+  }
+}
+
+/* Legacy styles for existing pages - will be migrated to Tailwind */
+.penguin-logo {
+  width: 50px;
+}
+
+.head-section {
+  background-color: rgba(255, 251, 240, 1);
+}
+
+#text-style {
+  color: rgba(250, 190, 76, 1);
+  font-size: 80px;
+}
+
+.text-style2 {
+  font-size: 80px;
+  color: rgba(54, 57, 88, 1);
+}
+
+.penguin-catagory {
+  color: rgba(54, 57, 88, 1);
+}
+
+.penguin-card-img {
+  padding: 5%;
+  background-color: rgba(241, 241, 241, 1);
+  margin: 4% auto;
+  border-radius: 1em;
+}
+
+.penguin-info {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 10%;
+}
+
+.penguin-card-border {
+  border-radius: 1em;
+  background-color: white;
+  border: 0;
+}
+
+.price-text-style {
+  color: rgba(250, 190, 76, 1);
+  font-weight: bold;
+}
+
+.penguin-card-footer {
+  background-color: white;
+  border: 0;
+}
+
+.penguin-btn {
+  background-color: rgba(164, 188, 70, 1);
+  color: white;
+}
+
+.footer-section {
+  background-color: hsla(72, 47%, 51%, 0.486);
+  padding: 3% 1% 1% 1%;
+}
