@@ -7,8 +7,37 @@
     @apply border-0 p-0 m-0 box-border;
   }
 
+  html {
+    @apply bg-gray-50;
+    height: 100%;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
   body {
-    @apply antialiased font-sans;
+    @apply antialiased font-sans bg-gray-50;
+    min-height: 100vh;
+    height: 100%;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgb(249 250 251);
+    z-index: -9999;
+  }
+
+  #__next {
+    @apply bg-gray-50;
+    min-height: 100vh;
   }
 
   h1 {
