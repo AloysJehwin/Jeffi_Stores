@@ -21,16 +21,16 @@ export async function middleware(request: NextRequest) {
     const clientCert = request.headers.get('x-client-cert')
     const certVerified = request.headers.get('x-client-cert-verified')
 
+    // Check certificate in both dev and production
+    // In development, you need to run HTTPS server with client cert verification
     // In production with proper proxy/CDN, these headers will be set
-    if (process.env.NODE_ENV === 'production') {
-      if (!clientCert || certVerified !== 'SUCCESS') {
-        return new NextResponse('Client certificate required', {
-          status: 403,
-          headers: {
-            'Content-Type': 'text/plain',
-          },
-        })
-      }
+    if (!clientCert || certVerified !== 'SUCCESS') {
+      return new NextResponse('Client certificate required', {
+        status: 403,
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+      })
     }
 
     // Rewrite to admin app
@@ -41,11 +41,16 @@ export async function middleware(request: NextRequest) {
 
   // Admin path authentication check
   if (isAdminPath) {
-    // Allow access to login page without authentication
+    // Allow access to login page without JWT (but still check cert if needed)
     if (pathname === '/admin/login') {
       console.log('⚠️  Login page, allowing access')
       const response = NextResponse.next()
       response.headers.set('x-pathname', pathname)
+      // Add cert status for login page to display
+      const clientCert = request.headers.get('x-client-cert')
+      const certVerified = request.headers.get('x-client-cert-verified')
+      const hasValidCert = clientCert && certVerified === 'SUCCESS'
+      response.headers.set('x-cert-status', hasValidCert ? 'valid' : 'invalid')
       return response
     }
 

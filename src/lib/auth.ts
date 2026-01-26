@@ -118,18 +118,16 @@ export async function createAdminUser(userData: {
 
 // Verify client certificate (called from middleware)
 export function verifyClientCertificate(certHeader: string | undefined, certVerified: string | undefined) {
-  // In production with Nginx/Cloudflare, these headers will be set
   // certHeader: X-Client-Cert (PEM format)
   // certVerified: X-Client-Cert-Verified (SUCCESS/FAILED)
-
-  if (process.env.NODE_ENV !== 'production') {
-    // Development mode - skip cert check but log warning
-    console.warn('⚠️  Development mode: Certificate check bypassed')
-    return { valid: true, warning: 'Development mode' }
-  }
+  // These headers are set by Nginx/Cloudflare in production or custom HTTPS server in development
 
   if (!certHeader || certVerified !== 'SUCCESS') {
-    return { valid: false, error: 'Invalid or missing client certificate' }
+    return { 
+      valid: false, 
+      error: 'Invalid or missing client certificate',
+      details: 'Please install the client certificate (client-cert.p12) in your browser'
+    }
   }
 
   // Additional certificate validation can be added here

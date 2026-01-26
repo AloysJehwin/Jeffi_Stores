@@ -28,12 +28,26 @@ export default function AdminLogin() {
     }
     checkSession()
 
-    if (process.env.NODE_ENV === 'production') {
-      setCertStatus('verified')
-    } else {
-      setCertStatus('development')
+    // Check if client certificate is installed by making a test request
+    const checkCertificate = async () => {
+      try {
+        const response = await fetch('/api/admin/check-session')
+        const certStatus = response.headers.get('x-cert-status')
+        
+        if (certStatus === 'valid') {
+          setCertStatus('verified')
+        } else {
+          // Check if running on localhost
+          const isLocalhost = window.location.hostname === 'localhost' || 
+                             window.location.hostname === '127.0.0.1'
+          setCertStatus(isLocalhost ? 'development' : 'checking')
+        }
+      } catch (err) {
+        setCertStatus('checking')
+      }
     }
-  }, [])
+    checkCertificate()
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
