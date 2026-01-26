@@ -6,7 +6,7 @@ import bcrypt from 'bcrypt'
  */
 
 // Verify admin credentials
-export async function verifyAdminCredentials(username, password) {
+export async function verifyAdminCredentials(username: string, password: string) {
   try {
     const { data: admin, error } = await supabaseAdmin
       .from('admins')
@@ -68,7 +68,15 @@ export async function verifyAdminCredentials(username, password) {
 }
 
 // Create new admin user
-export async function createAdminUser(userData) {
+export async function createAdminUser(userData: {
+  email: string
+  first_name: string
+  last_name: string
+  phone?: string
+  username: string
+  password: string
+  role?: string
+}) {
   try {
     // Hash password
     const passwordHash = await bcrypt.hash(userData.password, 10)
@@ -104,12 +112,12 @@ export async function createAdminUser(userData) {
     return { success: true, admin }
   } catch (error) {
     console.error('Create admin error:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: (error as Error).message }
   }
 }
 
 // Verify client certificate (called from middleware)
-export function verifyClientCertificate(certHeader, certVerified) {
+export function verifyClientCertificate(certHeader: string | undefined, certVerified: string | undefined) {
   // In production with Nginx/Cloudflare, these headers will be set
   // certHeader: X-Client-Cert (PEM format)
   // certVerified: X-Client-Cert-Verified (SUCCESS/FAILED)
@@ -131,10 +139,10 @@ export function verifyClientCertificate(certHeader, certVerified) {
 }
 
 // Check if user has admin role
-export function hasAdminRole(session, requiredRole = 'admin') {
+export function hasAdminRole(session: any, requiredRole: string = 'admin') {
   if (!session?.admin) return false
 
-  const roleHierarchy = {
+  const roleHierarchy: Record<string, number> = {
     super_admin: 3,
     admin: 2,
     moderator: 1,
@@ -147,7 +155,7 @@ export function hasAdminRole(session, requiredRole = 'admin') {
 }
 
 // Session management helpers
-export function createSessionToken(admin) {
+export function createSessionToken(admin: any) {
   // This will be handled by JWT or secure cookies
   return {
     id: admin.id,
@@ -159,7 +167,7 @@ export function createSessionToken(admin) {
   }
 }
 
-export function isSessionValid(session) {
+export function isSessionValid(session: any) {
   if (!session || !session.exp) return false
   return Date.now() < session.exp
 }

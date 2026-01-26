@@ -9,6 +9,7 @@ export interface JWTPayload {
   adminId: string
   username: string
   role: string
+  [key: string]: any  // Index signature to match jose's JWTPayload type
 }
 
 export async function generateToken(payload: JWTPayload): Promise<string> {
