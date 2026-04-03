@@ -31,6 +31,7 @@ interface CartContextType {
   updateQuantity: (cartItemId: string, quantity: number) => Promise<void>
   refreshCart: () => Promise<void>
   getCartTotal: () => number
+  clearCart: () => void
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -41,10 +42,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const fetchCart = async () => {
     try {
+      console.log('Fetching cart...')
       const response = await fetch('/api/cart')
       if (response.ok) {
         const data = await response.json()
+        console.log('Cart data received:', data)
         setCartItems(data.items || [])
+      } else {
+        console.error('Cart fetch failed:', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Failed to fetch cart:', error)
@@ -125,6 +130,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }, 0)
   }
 
+  const clearCart = () => {
+    setCartItems([])
+  }
+
   const cartCount = cartItems.reduce((count, item) => count + item.quantity, 0)
 
   return (
@@ -138,6 +147,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQuantity,
         refreshCart,
         getCartTotal,
+        clearCart,
       }}
     >
       {children}

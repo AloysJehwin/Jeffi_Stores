@@ -1,14 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { cookies } from 'next/headers'
+import { jwtVerify } from 'jose'
+import { getUserIdForSession } from '@/lib/guest-user'
+
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
 
 // Get cart items for a user
 export async function GET(request: NextRequest) {
   try {
-    const userId = cookies().get('user_id')?.value
+    const cookieStore = await cookies()
+    let sessionId = cookieStore.get('session_id')?.value
+    let authUserId: string | undefined
 
-    if (!userId) {
-      return NextResponse.json({ items: [], total: 0 })
+    // Check if user is authenticated
+    const authToken = cookieStore.get('auth_token')?.value
+    if (authToken) {
+      try {
+        const { payload } = await jwtVerify(authToken, JWT_SECRET)
+        authUserId = payload.userId as string
+      } catch (error) {
+        // Invalid token, continue as guest
+      }
+    }
+
+    // Get user ID (creates guest user if needed)
+    const userId = await getUserIdForSession(sessionId, authUserId)
+
+    // Update session cookie if it was created
+    if (!sessionId && !authUserId) {
+      sessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      cookieStore.set('session_id', sessionId, {
+        maxAge: 30 * 24 * 60 * 60,
+        path: '/',
+      })
     }
 
     const { data: cartItems, error } = await supabaseAdmin
@@ -48,28 +73,29 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { productId, quantity = 1 } = body
 
-    let userId = cookies().get('user_id')?.value
+    const cookieStore = await cookies()
+    let sessionId = cookieStore.get('session_id')?.value
+    let authUserId: string | undefined
 
-    // Create guest user if doesn't exist
-    if (!userId) {
-      // Create a guest user in the database
-      const { data: guestUser, error: userError } = await supabaseAdmin
-        .from('users')
-        .insert({
-          email: `guest_${Date.now()}_${Math.random().toString(36).substring(7)}@guest.local`,
-          first_name: 'Guest',
-          is_active: true
-        })
-        .select('id')
-        .single()
-
-      if (userError || !guestUser) {
-        return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
+    // Check if user is authenticated
+    const authToken = cookieStore.get('auth_token')?.value
+    if (authToken) {
+      try {
+        const { payload } = await jwtVerify(authToken, JWT_SECRET)
+        authUserId = payload.userId as string
+      } catch (error) {
+        // Invalid token, continue as guest
       }
+    }
 
-      userId = guestUser.id
-      cookies().set('user_id', guestUser.id, {
-        maxAge: 30 * 24 * 60 * 60, // 30 days
+    // Get user ID (creates guest user if needed)
+    const userId = await getUserIdForSession(sessionId, authUserId)
+
+    // Update session cookie if it was created
+    if (!sessionId && !authUserId) {
+      sessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
+      cookieStore.set('session_id', sessionId, {
+        maxAge: 30 * 24 * 60 * 60,
         path: '/',
       })
     }
@@ -150,9 +176,9 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { cartItemId, quantity } = body
 
-    const userId = cookies().get('user_id')?.value
+    const sessionId = cookies().get('session_id')?.value
 
-    if (!userId) {
+    if (!sessionId) {
       return NextResponse.json({ error: 'Session not found' }, { status: 401 })
     }
 
@@ -161,7 +187,7 @@ export async function PATCH(request: NextRequest) {
       .from('cart_items')
       .select('*, products(stock_quantity)')
       .eq('id', cartItemId)
-      .eq('user_id', userId)
+      .eq('user_id', sessionId)
       .single()
 
     if (!cartItem) {
@@ -194,9 +220,9 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const cartItemId = searchParams.get('id')
 
-    const userId = cookies().get('user_id')?.value
+    const sessionId = cookies().get('session_id')?.value
 
-    if (!userId) {
+    if (!sessionId) {
       return NextResponse.json({ error: 'Session not found' }, { status: 401 })
     }
 
@@ -204,7 +230,7 @@ export async function DELETE(request: NextRequest) {
       .from('cart_items')
       .delete()
       .eq('id', cartItemId)
-      .eq('user_id', userId)
+      .eq('user_id', sessionId)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

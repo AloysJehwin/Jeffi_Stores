@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase'
 import ProductImageGallery from '@/components/visitor/ProductImageGallery'
 import ProductActions from '@/components/visitor/ProductActions'
+import ProductReviews from '@/components/visitor/ProductReviews'
 
 async function getProductBySlug(slug: string) {
   const { data, error } = await supabaseAdmin
@@ -220,6 +221,9 @@ export default async function ProductDetailPage({
             </div>
           )}
         </div>
+
+        {/* Product Reviews */}
+        <ProductReviews productId={product.id} productName={product.name} />
 
         {/* Related Products */}
         {relatedProducts.length > 0 && (

@@ -38,7 +38,23 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
         throw new Error('Failed to update order')
       }
 
-      setSuccess('Order updated successfully')
+      const data = await response.json()
+      
+      let successMessage = 'Order updated successfully'
+      if (data.notifications) {
+        const emailsSent = []
+        if (data.notifications.statusEmailSent) {
+          emailsSent.push('order status')
+        }
+        if (data.notifications.paymentEmailSent) {
+          emailsSent.push('payment status')
+        }
+        if (emailsSent.length > 0) {
+          successMessage += `. Email notification sent for ${emailsSent.join(' and ')} update.`
+        }
+      }
+
+      setSuccess(successMessage)
       router.refresh()
     } catch (err) {
       setError('Failed to update order. Please try again.')

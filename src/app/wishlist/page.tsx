@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
+import { useToast } from '@/contexts/ToastContext'
 
 interface WishlistItem {
   id: string
@@ -26,6 +27,7 @@ export default function WishlistPage() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { addToCart } = useCart()
+  const { showToast, showConfirm } = useToast()
   const [addingToCart, setAddingToCart] = useState<Set<string>>(new Set())
 
   const fetchWishlist = async () => {
@@ -47,27 +49,35 @@ export default function WishlistPage() {
   }, [])
 
   const handleRemove = async (productId: string) => {
-    if (confirm('Remove this item from wishlist?')) {
-      try {
-        const response = await fetch(`/api/wishlist?productId=${productId}`, {
-          method: 'DELETE',
-        })
-        if (response.ok) {
-          await fetchWishlist()
+    showConfirm({
+      title: 'Remove from Wishlist',
+      message: 'Are you sure you want to remove this item from your wishlist?',
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/wishlist?productId=${productId}`, {
+            method: 'DELETE',
+          })
+          if (response.ok) {
+            await fetchWishlist()
+            showToast('Item removed from wishlist', 'success')
+          }
+        } catch (error) {
+          showToast('Failed to remove item', 'error')
         }
-      } catch (error) {
-        alert('Failed to remove item')
-      }
-    }
+      },
+    })
   }
 
   const handleAddToCart = async (productId: string) => {
     setAddingToCart(prev => new Set(prev).add(productId))
     try {
       await addToCart(productId, 1)
-      alert('Item added to cart!')
+      showToast('Item added to cart!', 'success')
     } catch (error: any) {
-      alert(error.message || 'Failed to add to cart')
+      showToast(error.message || 'Failed to add to cart', 'error')
     } finally {
       setAddingToCart(prev => {
         const newSet = new Set(prev)

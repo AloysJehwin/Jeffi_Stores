@@ -145,7 +145,10 @@ export async function getOrder(id: string) {
       order_items (
         *,
         products (id, name, sku)
-      )
+      ),
+      shipping_address:addresses!shipping_address_id (*),
+      billing_address:addresses!billing_address_id (*),
+      payments (*)
     `)
     .eq('id', id)
     .single()

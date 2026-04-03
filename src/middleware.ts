@@ -41,13 +41,25 @@ export async function middleware(request: NextRequest) {
 
   // Admin path authentication check
   if (isAdminPath) {
-    // First, check for client certificate on ALL admin routes
+    // Allow login page without certificate check
+    if (pathname === '/admin/login') {
+      console.log('⚠️  Login page access, allowing without certificate check')
+      const response = NextResponse.next()
+      response.headers.set('x-pathname', pathname)
+      return response
+    }
+
+    // For other admin routes, check for client certificate
     const clientCert = request.headers.get('x-client-cert')
     const certVerified = request.headers.get('x-client-cert-verified')
     const hasValidCert = clientCert && certVerified === 'SUCCESS'
 
-    // Require certificate for all admin routes
-    if (!hasValidCert) {
+    // In development (localhost), skip certificate requirement
+    const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:') || 
+                       hostname === '127.0.0.1' || hostname.startsWith('127.0.0.1:')
+
+    // Require certificate for all admin routes (except in development)
+    if (!hasValidCert && !isLocalhost) {
       console.log('🔒 No valid client certificate, blocking admin access')
       return new NextResponse('Client certificate required for admin access', {
         status: 403,
@@ -55,15 +67,6 @@ export async function middleware(request: NextRequest) {
           'Content-Type': 'text/plain',
         },
       })
-    }
-
-    // Certificate is valid, allow access to login page without JWT
-    if (pathname === '/admin/login') {
-      console.log('⚠️  Login page with valid certificate, allowing access')
-      const response = NextResponse.next()
-      response.headers.set('x-pathname', pathname)
-      response.headers.set('x-cert-status', 'valid')
-      return response
     }
 
     // Check for valid JWT token in cookie

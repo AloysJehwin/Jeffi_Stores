@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useCart } from '@/contexts/CartContext'
+import { useToast } from '@/contexts/ToastContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 
 interface ProductActionsProps {
@@ -13,8 +15,11 @@ interface ProductActionsProps {
 
 export default function ProductActions({ productId, productName, sku, stockQuantity }: ProductActionsProps) {
   const { addToCart } = useCart()
+  const { showToast, showConfirm } = useToast()
+  const { user } = useAuth()
   const router = useRouter()
   const [isAddingToCart, setIsAddingToCart] = useState(false)
+  const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false)
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [quantity, setQuantity] = useState(1)
@@ -41,15 +46,31 @@ export default function ProductActions({ productId, productName, sku, stockQuant
     setIsAddingToCart(true)
     try {
       await addToCart(productId, quantity)
-      alert('Item added to cart!')
+      showToast('Item added to cart!', 'success')
     } catch (error: any) {
-      alert(error.message || 'Failed to add to cart')
+      console.error('Add to cart error:', error)
+      showToast(error.message || 'Failed to add to cart', 'error')
     } finally {
       setIsAddingToCart(false)
     }
   }
 
   const handleToggleWishlist = async () => {
+    // Check if user is logged in for wishlist
+    if (!user) {
+      showConfirm({
+        title: 'Sign In Required',
+        message: 'Please sign in to save items to your wishlist and access them anytime.',
+        confirmText: 'Sign In',
+        cancelText: 'Maybe Later',
+        type: 'info',
+        onConfirm: () => {
+          router.push(`/login?redirect=/products/${productName.toLowerCase().replace(/\s+/g, '-')}`)
+        },
+      })
+      return
+    }
+
     setIsAddingToWishlist(true)
     try {
       if (isInWishlist) {
@@ -60,10 +81,10 @@ export default function ProductActions({ productId, productName, sku, stockQuant
 
         if (response.ok) {
           setIsInWishlist(false)
-          alert('Removed from wishlist')
+          showToast('Removed from wishlist', 'success')
         } else {
           const data = await response.json()
-          alert(data.message || 'Failed to remove from wishlist')
+          showToast(data.message || 'Failed to remove from wishlist', 'error')
         }
       } else {
         // Add to wishlist
@@ -75,27 +96,28 @@ export default function ProductActions({ productId, productName, sku, stockQuant
 
         if (response.ok) {
           setIsInWishlist(true)
-          alert('Added to wishlist!')
+          showToast('Added to wishlist!', 'success')
         } else {
           const data = await response.json()
-          alert(data.message || 'Failed to add to wishlist')
+          showToast(data.message || 'Failed to add to wishlist', 'error')
         }
       }
     } catch (error) {
-      alert('Failed to update wishlist')
+      showToast('Failed to update wishlist', 'error')
     } finally {
       setIsAddingToWishlist(false)
     }
   }
 
   const handleBuyNow = async () => {
-    setIsAddingToCart(true)
+    setIsBuyingNow(true)
     try {
       await addToCart(productId, quantity)
       router.push('/cart')
     } catch (error: any) {
-      alert(error.message || 'Failed to add to cart')
-      setIsAddingToCart(false)
+      console.error('Buy now error:', error)
+      showToast(error.message || 'Failed to add to cart', 'error')
+      setIsBuyingNow(false)
     }
   }
 
@@ -135,13 +157,13 @@ export default function ProductActions({ productId, productName, sku, stockQuant
       <div className="space-y-3">
         <button
           onClick={handleBuyNow}
-          disabled={stockQuantity === 0 || isAddingToCart}
+          disabled={stockQuantity === 0 || isBuyingNow}
           className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
-          {isAddingToCart ? (
+          {isBuyingNow ? (
             <>
               <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-              Adding...
+              Processing...
             </>
           ) : (
             <>

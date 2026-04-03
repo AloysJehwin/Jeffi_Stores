@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 
 interface DeleteProductButtonProps {
   productId: string
@@ -11,6 +12,7 @@ interface DeleteProductButtonProps {
 export default function DeleteProductButton({ productId, productName }: DeleteProductButtonProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const { showToast } = useToast()
   const router = useRouter()
 
   async function handleDelete() {
@@ -28,7 +30,7 @@ export default function DeleteProductButton({ productId, productName }: DeletePr
       router.refresh()
       setShowConfirm(false)
     } catch (error) {
-      alert('Failed to delete product. Please try again.')
+      showToast('Failed to delete product. Please try again.', 'error')
     } finally {
       setIsDeleting(false)
     }

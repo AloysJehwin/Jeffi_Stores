@@ -83,6 +83,12 @@ export default async function AdminLayout({
                   Orders
                 </a>
                 <a
+                  href="/admin/reviews"
+                  className="hover:text-primary-500 transition-colors font-medium"
+                >
+                  Reviews
+                </a>
+                <a
                   href="/admin/settings"
                   className="hover:text-primary-500 transition-colors font-medium"
                 >

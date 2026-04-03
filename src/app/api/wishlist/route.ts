@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { cookies } from 'next/headers'
+import { verifyToken } from '@/lib/jwt'
+import { getUserIdForSession } from '@/lib/guest-user'
 
 // Get wishlist items for a user
 export async function GET(request: NextRequest) {
   try {
-    const userId = cookies().get('user_id')?.value
+    const cookieStore = await cookies()
+    const sessionId = cookieStore.get('session_id')?.value
+    const token = cookieStore.get('token')?.value
 
-    if (!userId) {
-      return NextResponse.json({ items: [] })
+    // Verify JWT token if exists
+    let authUserId: string | undefined
+    if (token) {
+      const payload = await verifyToken(token)
+      authUserId = payload?.userId
     }
+
+    // Get user ID (either authenticated or guest)
+    const userId = await getUserIdForSession(sessionId, authUserId)
 
     const { data: wishlistItems, error } = await supabaseAdmin
       .from('wishlist_items')
@@ -48,30 +58,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { productId } = body
 
-    let userId = cookies().get('user_id')?.value
+    const cookieStore = await cookies()
+    const sessionId = cookieStore.get('session_id')?.value
+    const token = cookieStore.get('token')?.value
 
-    // Create guest user if doesn't exist
-    if (!userId) {
-      const { data: guestUser, error: userError } = await supabaseAdmin
-        .from('users')
-        .insert({
-          email: `guest_${Date.now()}_${Math.random().toString(36).substring(7)}@guest.local`,
-          first_name: 'Guest',
-          is_active: true
-        })
-        .select('id')
-        .single()
-
-      if (userError || !guestUser) {
-        return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
-      }
-
-      userId = guestUser.id
-      cookies().set('user_id', guestUser.id, {
-        maxAge: 30 * 24 * 60 * 60, // 30 days
-        path: '/',
-      })
+    // Verify JWT token if exists
+    let authUserId: string | undefined
+    if (token) {
+      const payload = await verifyToken(token)
+      authUserId = payload?.userId
     }
+
+    // Get user ID (either authenticated or guest)
+    const userId = await getUserIdForSession(sessionId, authUserId)
 
     // Check if item already exists in wishlist
     const { data: existingItem } = await supabaseAdmin
@@ -110,11 +109,19 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId')
 
-    const userId = cookies().get('user_id')?.value
+    const cookieStore = await cookies()
+    const sessionId = cookieStore.get('session_id')?.value
+    const token = cookieStore.get('token')?.value
 
-    if (!userId) {
-      return NextResponse.json({ error: 'Session not found' }, { status: 401 })
+    // Verify JWT token if exists
+    let authUserId: string | undefined
+    if (token) {
+      const payload = await verifyToken(token)
+      authUserId = payload?.userId
     }
+
+    // Get user ID (either authenticated or guest)
+    const userId = await getUserIdForSession(sessionId, authUserId)
 
     const { error } = await supabaseAdmin
       .from('wishlist_items')

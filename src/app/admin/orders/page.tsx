@@ -1,6 +1,9 @@
 import Link from 'next/link'
 import { getAllOrders } from '@/lib/queries'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function OrdersPage() {
   // Middleware already verified authentication
   const orders = await getAllOrders()

@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { getOrder } from '@/lib/queries'
 import UpdateOrderStatus from '@/components/admin/UpdateOrderStatus'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function OrderDetailsPage({ params }: { params: { id: string } }) {
   const order = await getOrder(params.id).catch(() => null)
 
@@ -161,14 +164,19 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               <h2 className="text-lg font-semibold text-gray-900">Billing Address</h2>
             </div>
             <div className="p-6">
-              <div className="text-sm text-gray-900">
-                <p>{order.billing_full_name}</p>
-                <p className="mt-2">{order.billing_address_line1}</p>
-                {order.billing_address_line2 && <p>{order.billing_address_line2}</p>}
-                <p>{order.billing_city}, {order.billing_state} {order.billing_postal_code}</p>
-                <p>{order.billing_country}</p>
-                {order.billing_phone && <p className="mt-2">Phone: {order.billing_phone}</p>}
-              </div>
+              {order.billing_address ? (
+                <div className="text-sm text-gray-900">
+                  <p className="font-medium">{order.billing_address.full_name}</p>
+                  <p className="mt-2">{order.billing_address.address_line1}</p>
+                  {order.billing_address.address_line2 && <p>{order.billing_address.address_line2}</p>}
+                  {order.billing_address.landmark && <p className="text-gray-600">Landmark: {order.billing_address.landmark}</p>}
+                  <p>{order.billing_address.city}, {order.billing_address.state} {order.billing_address.postal_code}</p>
+                  <p>{order.billing_address.country || 'India'}</p>
+                  {order.billing_address.phone && <p className="mt-2">Phone: {order.billing_address.phone}</p>}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No billing address</p>
+              )}
             </div>
           </div>
 
@@ -178,14 +186,19 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               <h2 className="text-lg font-semibold text-gray-900">Shipping Address</h2>
             </div>
             <div className="p-6">
-              <div className="text-sm text-gray-900">
-                <p>{order.shipping_full_name}</p>
-                <p className="mt-2">{order.shipping_address_line1}</p>
-                {order.shipping_address_line2 && <p>{order.shipping_address_line2}</p>}
-                <p>{order.shipping_city}, {order.shipping_state} {order.shipping_postal_code}</p>
-                <p>{order.shipping_country}</p>
-                {order.shipping_phone && <p className="mt-2">Phone: {order.shipping_phone}</p>}
-              </div>
+              {order.shipping_address ? (
+                <div className="text-sm text-gray-900">
+                  <p className="font-medium">{order.shipping_address.full_name}</p>
+                  <p className="mt-2">{order.shipping_address.address_line1}</p>
+                  {order.shipping_address.address_line2 && <p>{order.shipping_address.address_line2}</p>}
+                  {order.shipping_address.landmark && <p className="text-gray-600">Landmark: {order.shipping_address.landmark}</p>}
+                  <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
+                  <p>{order.shipping_address.country || 'India'}</p>
+                  {order.shipping_address.phone && <p className="mt-2">Phone: {order.shipping_address.phone}</p>}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No shipping address</p>
+              )}
             </div>
           </div>
 
@@ -197,10 +210,6 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             <div className="p-6">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Method</span>
-                  <span className="text-gray-900 capitalize">{order.payment_method}</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-gray-600">Status</span>
                   <span className={`font-semibold ${
                     order.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'
@@ -208,11 +217,29 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                     {order.payment_status}
                   </span>
                 </div>
-                {order.transaction_id && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Transaction ID</span>
-                    <span className="text-gray-900 font-mono text-xs">{order.transaction_id}</span>
-                  </div>
+                {order.payments && order.payments.length > 0 && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Method</span>
+                      <span className="text-gray-900 capitalize">{order.payments[0].payment_method}</span>
+                    </div>
+                    {order.payments[0].transaction_id && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Transaction ID</span>
+                        <span className="text-gray-900 font-mono text-xs">{order.payments[0].transaction_id}</span>
+                      </div>
+                    )}
+                    {order.payments[0].payment_gateway && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Gateway</span>
+                        <span className="text-gray-900 capitalize">{order.payments[0].payment_gateway}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Amount</span>
+                      <span className="text-gray-900 font-semibold">Rs. {Number(order.payments[0].amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </>
                 )}
               </div>
             </div>

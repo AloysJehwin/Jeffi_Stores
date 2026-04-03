@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 
 interface DeleteCategoryButtonProps {
   categoryId: string
@@ -11,6 +12,7 @@ interface DeleteCategoryButtonProps {
 export default function DeleteCategoryButton({ categoryId, categoryName }: DeleteCategoryButtonProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const { showToast } = useToast()
   const router = useRouter()
 
   async function handleDelete() {
@@ -29,7 +31,7 @@ export default function DeleteCategoryButton({ categoryId, categoryName }: Delet
       router.refresh()
       setShowConfirm(false)
     } catch (error: any) {
-      alert(error.message || 'Failed to delete category. Please try again.')
+      showToast(error.message || 'Failed to delete category. Please try again.', 'error')
     } finally {
       setIsDeleting(false)
     }

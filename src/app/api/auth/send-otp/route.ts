@@ -1,0 +1,67 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { generateOTP, storeOTP } from '@/lib/otp'
+import { sendOTPEmail } from '@/lib/email'
+import { supabaseAdmin } from '@/lib/supabase'
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { email, isSignup } = body
+
+    if (!email) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+    }
+
+    // If signup, check if email already exists
+    if (isSignup) {
+      const { data: existingUser } = await supabaseAdmin
+        .from('users')
+        .select('id')
+        .eq('email', email.toLowerCase())
+        .single()
+
+      if (existingUser) {
+        return NextResponse.json({ error: 'Email already registered' }, { status: 400 })
+      }
+    } else {
+      // For login, check if user exists
+      const { data: existingUser } = await supabaseAdmin
+        .from('users')
+        .select('id, first_name')
+        .eq('email', email.toLowerCase())
+        .single()
+
+      if (!existingUser) {
+        return NextResponse.json({ error: 'No account found with this email' }, { status: 404 })
+      }
+    }
+
+    // Generate and store OTP
+    const otp = generateOTP()
+    storeOTP(email, otp)
+
+    // Send OTP email
+    const emailResult = await sendOTPEmail(email, otp)
+
+    if (!emailResult.success) {
+      return NextResponse.json(
+        { error: 'Failed to send OTP email. Please try again.' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      message: 'OTP sent successfully to your email',
+      email: email.toLowerCase(),
+    })
+  } catch (error) {
+    console.error('Send OTP error:', error)
+    return NextResponse.json({ error: 'Failed to send OTP' }, { status: 500 })
+  }
+}

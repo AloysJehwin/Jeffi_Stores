@@ -1,11 +1,15 @@
 'use client'
 
 import { useCart } from '@/contexts/CartContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import Link from 'next/link'
 import { useState } from 'react'
 
 export default function CartPage() {
   const { cartItems, cartCount, isLoading, removeFromCart, updateQuantity, getCartTotal } = useCart()
+  const { user } = useAuth()
+  const { showToast, showConfirm } = useToast()
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
 
   const handleQuantityChange = async (cartItemId: string, newQuantity: number) => {
@@ -15,7 +19,7 @@ export default function CartPage() {
     try {
       await updateQuantity(cartItemId, newQuantity)
     } catch (error) {
-      alert('Failed to update quantity')
+      showToast('Failed to update quantity', 'error')
     } finally {
       setUpdatingItems(prev => {
         const newSet = new Set(prev)
@@ -26,13 +30,21 @@ export default function CartPage() {
   }
 
   const handleRemove = async (cartItemId: string) => {
-    if (confirm('Remove this item from cart?')) {
-      try {
-        await removeFromCart(cartItemId)
-      } catch (error) {
-        alert('Failed to remove item')
-      }
-    }
+    showConfirm({
+      title: 'Remove from Cart',
+      message: 'Are you sure you want to remove this item from your cart?',
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          await removeFromCart(cartItemId)
+          showToast('Item removed from cart', 'success')
+        } catch (error) {
+          showToast('Failed to remove item', 'error')
+        }
+      },
+    })
   }
 
   if (isLoading) {
@@ -204,15 +216,32 @@ export default function CartPage() {
                 </div>
               </div>
 
-              <Link
-                href="/checkout"
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
-              >
-                Proceed to Checkout
-                <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
+              {user ? (
+                <Link
+                  href="/checkout"
+                  className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
+                >
+                  Proceed to Checkout
+                  <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              ) : (
+                <div className="space-y-3">
+                  <Link
+                    href="/login?redirect=/checkout"
+                    className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
+                  >
+                    Login to Checkout
+                    <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                  <p className="text-sm text-gray-600 text-center">
+                    New customer? <Link href="/signup" className="text-accent-600 hover:text-accent-700 font-medium">Create an account</Link>
+                  </p>
+                </div>
+              )}
 
               <Link
                 href="/products"

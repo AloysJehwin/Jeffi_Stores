@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import SearchBar from './SearchBar'
+import UserMenu from './UserMenu'
 import { useCart } from '@/contexts/CartContext'
 
 export default function Header() {
@@ -68,6 +69,9 @@ export default function Header() {
                 </span>
               )}
             </Link>
+
+            {/* User Menu */}
+            <UserMenu />
 
             {/* Mobile Menu Button */}
             <button className="lg:hidden p-2 text-gray-600 hover:text-accent-500">
