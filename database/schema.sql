@@ -89,8 +89,11 @@ CREATE TABLE products (
 
     -- Pricing
     base_price DECIMAL(12, 2) NOT NULL,
+    mrp DECIMAL(12, 2),
     sale_price DECIMAL(12, 2),
     wholesale_price DECIMAL(12, 2),
+    gst_percentage DECIMAL(5, 2) DEFAULT 18,
+    hsn_code VARCHAR(20),
     currency VARCHAR(10) DEFAULT 'INR',
 
     -- Inventory
@@ -255,6 +258,16 @@ CREATE TABLE orders (
     shipping_amount DECIMAL(12, 2) DEFAULT 0,
     total_amount DECIMAL(12, 2) NOT NULL,
 
+    -- GST breakdown
+    invoice_number VARCHAR(50) UNIQUE,
+    invoice_date TIMESTAMP WITH TIME ZONE,
+    taxable_amount DECIMAL(12, 2) DEFAULT 0,
+    cgst_amount DECIMAL(12, 2) DEFAULT 0,
+    sgst_amount DECIMAL(12, 2) DEFAULT 0,
+    igst_amount DECIMAL(12, 2) DEFAULT 0,
+    is_igst BOOLEAN DEFAULT FALSE,
+    buyer_gstin VARCHAR(20),
+
     -- Shipping details
     shipping_address_id UUID REFERENCES addresses(id),
     billing_address_id UUID REFERENCES addresses(id),
@@ -291,6 +304,14 @@ CREATE TABLE order_items (
     tax_amount DECIMAL(12, 2) DEFAULT 0,
     total_price DECIMAL(12, 2) NOT NULL,
 
+    -- GST breakdown per item
+    hsn_code VARCHAR(20),
+    gst_rate DECIMAL(5, 2),
+    taxable_amount DECIMAL(12, 2) DEFAULT 0,
+    cgst_amount DECIMAL(12, 2) DEFAULT 0,
+    sgst_amount DECIMAL(12, 2) DEFAULT 0,
+    igst_amount DECIMAL(12, 2) DEFAULT 0,
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -321,6 +342,18 @@ CREATE TABLE payments (
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Invoices (sequential numbering per financial year)
+CREATE TABLE invoices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    order_id UUID UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
+    invoice_number VARCHAR(50) UNIQUE NOT NULL,
+    financial_year VARCHAR(10) NOT NULL,
+    sequence_number INT NOT NULL,
+    pdf_url VARCHAR(500),
+    generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(financial_year, sequence_number)
 );
 
 -- ============================================

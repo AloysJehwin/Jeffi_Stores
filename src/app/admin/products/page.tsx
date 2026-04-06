@@ -1,13 +1,21 @@
 import Link from 'next/link'
-import { getAllProducts, getAllCategories, getAllBrands } from '@/lib/queries'
+import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
 import DeleteProductButton from '@/components/admin/DeleteProductButton'
 import ProductImage from '@/components/admin/ProductImage'
+import AdminFilters from '@/components/admin/AdminFilters'
 
-export default async function ProductsPage() {
-  // Middleware already verified authentication
-  const products = await getAllProducts()
-  const categories = await getAllCategories()
-  const brands = await getAllBrands()
+export default async function ProductsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const [products, categories, brands] = await Promise.all([
+    getFilteredProducts({
+      category_id: searchParams.category_id,
+      brand_id: searchParams.brand_id,
+      is_active: searchParams.is_active,
+      stock: searchParams.stock,
+      search: searchParams.search,
+    }),
+    getAllCategories(),
+    getAllBrands(),
+  ])
 
   return (
     <div className="p-6">
@@ -45,6 +53,40 @@ export default async function ProductsPage() {
           </p>
         </div>
       </div>
+
+      {/* Filters */}
+      <AdminFilters
+        filters={[
+          {
+            name: 'category_id',
+            label: 'Category',
+            options: (categories || []).map((c: any) => ({ value: c.id, label: c.name })),
+          },
+          {
+            name: 'brand_id',
+            label: 'Brand',
+            options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })),
+          },
+          {
+            name: 'is_active',
+            label: 'Status',
+            options: [
+              { value: 'true', label: 'Active' },
+              { value: 'false', label: 'Inactive' },
+            ],
+          },
+          {
+            name: 'stock',
+            label: 'Stock',
+            options: [
+              { value: 'low', label: 'Low Stock' },
+              { value: 'out', label: 'Out of Stock' },
+            ],
+          },
+        ]}
+        searchPlaceholder="Search by name or SKU..."
+        searchParam="search"
+      />
 
       {/* Products Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">

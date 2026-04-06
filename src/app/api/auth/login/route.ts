@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTP, deleteOTP } from '@/lib/otp'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryOne, query } from '@/lib/db'
 import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
 
@@ -25,13 +25,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('email', email.toLowerCase())
-      .single()
+    const user = await queryOne(
+      'SELECT * FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    )
 
-    if (userError || !user) {
+    if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
@@ -40,26 +39,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Update last login
-    await supabaseAdmin
-      .from('users')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', user.id)
+    await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
 
     // Migrate guest cart to user account
     const cookieStore = await cookies()
     const guestSessionId = cookieStore.get('session_id')?.value
     if (guestSessionId && guestSessionId.startsWith('guest_')) {
-      // Transfer guest cart items to user
-      await supabaseAdmin
-        .from('cart_items')
-        .update({ user_id: user.id })
-        .eq('user_id', guestSessionId)
-
-      // Transfer guest wishlist items to user
-      await supabaseAdmin
-        .from('wishlist_items')
-        .update({ user_id: user.id })
-        .eq('user_id', guestSessionId)
+      // Look up the guest user by session_id to get their UUID
+      const guestUser = await queryOne(
+        'SELECT id FROM users WHERE session_id = $1 AND is_guest = true',
+        [guestSessionId]
+      )
+      if (guestUser) {
+        // Use the DB function to merge cart and wishlist
+        await query('SELECT merge_guest_cart_to_user($1, $2)', [guestUser.id, user.id])
+      }
     }
 
     // Create JWT token

@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { query, queryCount } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/jwt'
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const admin = await authenticateAdmin(request)
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const categoryId = params.id
 
     // Check if category has products
-    const { count: productCount } = await supabaseAdmin
-      .from('products')
-      .select('*', { count: 'exact', head: true })
-      .eq('category_id', categoryId)
+    const productCount = await queryCount(
+      'SELECT COUNT(*) FROM products WHERE category_id = $1',
+      [categoryId]
+    )
 
-    if (productCount && productCount > 0) {
+    if (productCount > 0) {
       return NextResponse.json(
         { error: `Cannot delete category. It has ${productCount} product(s) assigned to it.` },
         { status: 400 }
@@ -22,12 +28,12 @@ export async function DELETE(
     }
 
     // Check if category has subcategories
-    const { count: subCategoryCount } = await supabaseAdmin
-      .from('categories')
-      .select('*', { count: 'exact', head: true })
-      .eq('parent_id', categoryId)
+    const subCategoryCount = await queryCount(
+      'SELECT COUNT(*) FROM categories WHERE parent_category_id = $1',
+      [categoryId]
+    )
 
-    if (subCategoryCount && subCategoryCount > 0) {
+    if (subCategoryCount > 0) {
       return NextResponse.json(
         { error: `Cannot delete category. It has ${subCategoryCount} subcategory(ies).` },
         { status: 400 }
@@ -35,12 +41,7 @@ export async function DELETE(
     }
 
     // Delete category
-    const { error } = await supabaseAdmin
-      .from('categories')
-      .delete()
-      .eq('id', categoryId)
-
-    if (error) throw error
+    await query('DELETE FROM categories WHERE id = $1', [categoryId])
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

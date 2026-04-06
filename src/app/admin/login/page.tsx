@@ -11,6 +11,7 @@ export default function AdminLogin() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
   const [certStatus, setCertStatus] = useState<'checking' | 'verified' | 'development'>('checking')
 
   useEffect(() => {
@@ -21,10 +22,12 @@ export default function AdminLogin() {
         const data = await response.json()
         if (data.authenticated) {
           router.push('/admin/dashboard')
+          return
         }
       } catch (err) {
         // Not logged in, stay on login page
       }
+      setCheckingSession(false)
     }
     checkSession()
 
@@ -90,6 +93,14 @@ export default function AdminLogin() {
       ...formData,
       [e.target.name]: e.target.value,
     })
+  }
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-4 border-white border-t-transparent rounded-full"></div>
+      </div>
+    )
   }
 
   return (

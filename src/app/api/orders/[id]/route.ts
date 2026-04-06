@@ -1,84 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
-import { verifyToken } from '@/lib/jwt'
-import { cookies } from 'next/headers'
+import { query, queryOne, queryMany } from '@/lib/db'
+import { authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
+import { generateOrderInvoice } from '@/lib/invoice'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('auth_token')?.value
-
-    if (!token) {
+    const authUser = await authenticateUser(request)
+    if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const payload = await verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
     const orderId = params.id
 
-    // Fetch order with items
-    const { data: order, error: orderError } = await supabaseAdmin
-      .from('orders')
-      .select(`
-        *,
-        addresses (
-          address_line1,
-          address_line2,
-          city,
-          state,
-          postal_code,
-          phone
-        )
-      `)
-      .eq('id', orderId)
-      .eq('user_id', payload.userId)
-      .single()
+    // Fetch order with address
+    const order = await queryOne(`
+      SELECT o.*,
+        (SELECT row_to_json(a) FROM (
+          SELECT full_name, address_line1, address_line2, landmark, city, state, postal_code, phone
+          FROM addresses WHERE id = o.shipping_address_id
+        ) a) AS shipping_address
+      FROM orders o
+      WHERE o.id = $1 AND o.user_id = $2
+    `, [orderId, authUser.userId])
 
-    if (orderError || !order) {
+    if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    // Fetch order items
-    const { data: orderItems, error: itemsError } = await supabaseAdmin
-      .from('order_items')
-      .select(`
-        id,
-        product_name,
-        quantity,
-        price_at_purchase
-      `)
-      .eq('order_id', orderId)
-
-    if (itemsError) {
-      return NextResponse.json({ error: 'Failed to fetch order items' }, { status: 500 })
-    }
+    // Fetch order items with product images
+    const orderItems = await queryMany(`
+      SELECT oi.id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price,
+        json_build_object('slug', p.slug, 'product_images',
+          COALESCE(
+            (SELECT json_agg(pi ORDER BY pi.display_order)
+             FROM product_images pi WHERE pi.product_id = p.id),
+            '[]'::json
+          )
+        ) AS products
+      FROM order_items oi
+      LEFT JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id = $1
+    `, [orderId])
 
     const orderDetails = {
       id: order.id,
       orderNumber: order.order_number,
+      invoiceNumber: order.invoice_number || null,
       totalAmount: parseFloat(order.total_amount),
+      subtotal: parseFloat(order.subtotal || order.total_amount),
+      taxAmount: parseFloat(order.tax_amount || '0'),
       status: order.status,
+      paymentStatus: order.payment_status,
       createdAt: order.created_at,
-      shippingAddress: {
-        addressLine1: order.addresses.address_line1,
-        addressLine2: order.addresses.address_line2,
-        city: order.addresses.city,
-        state: order.addresses.state,
-        postalCode: order.addresses.postal_code,
-        phone: order.addresses.phone,
-      },
-      items: orderItems.map(item => ({
+      notes: order.notes,
+      shippingAddress: order.shipping_address,
+      items: orderItems.map((item: any) => ({
         id: item.id,
+        productId: item.product_id,
         productName: item.product_name,
         quantity: item.quantity,
-        priceAtPurchase: parseFloat(item.price_at_purchase),
+        unitPrice: parseFloat(item.unit_price),
+        totalPrice: parseFloat(item.total_price),
+        products: item.products,
       })),
     }
 
@@ -94,63 +81,73 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const admin = await authenticateAdmin(request)
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const orderId = params.id
     const body = await request.json()
     const { status, payment_status } = body
 
     // First, get current order details and user info
-    const { data: currentOrder, error: fetchError } = await supabaseAdmin
-      .from('orders')
-      .select(`
-        order_number,
-        status,
-        payment_status,
-        total_amount,
-        user_id,
-        customer_name,
-        customer_email,
-        users (
-          email,
-          first_name,
-          last_name
-        )
-      `)
-      .eq('id', orderId)
-      .single()
+    const currentOrder = await queryOne(`
+      SELECT
+        o.order_number, o.status, o.payment_status, o.total_amount,
+        o.user_id, o.customer_name, o.customer_email,
+        json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE o.id = $1
+    `, [orderId])
 
-    if (fetchError || !currentOrder) {
-      console.error('Order fetch error:', fetchError)
+    if (!currentOrder) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    if (currentOrder.status === 'cancelled') {
+      return NextResponse.json({ error: 'Cancelled orders cannot be modified' }, { status: 400 })
     }
 
     const statusChanged = status && status !== currentOrder.status
     const paymentStatusChanged = payment_status && payment_status !== currentOrder.payment_status
 
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    }
+    const updates: string[] = ['updated_at = NOW()']
+    const values: any[] = []
+    let paramIndex = 1
 
     if (status) {
-      updateData.status = status
+      updates.push(`status = $${paramIndex}`)
+      values.push(status)
+      paramIndex++
     }
 
     if (payment_status) {
-      updateData.payment_status = payment_status
+      updates.push(`payment_status = $${paramIndex}`)
+      values.push(payment_status)
+      paramIndex++
     }
 
-    // Update the order
-    const { error: updateError } = await supabaseAdmin
-      .from('orders')
-      .update(updateData)
-      .eq('id', orderId)
+    values.push(orderId)
 
-    if (updateError) {
-      console.error('Order update error:', updateError)
-      throw updateError
+    // Update the order
+    await query(
+      `UPDATE orders SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
+      values
+    )
+
+    // Generate invoice when order moves to confirmed or processing
+    let invoicePdfBuffer: Buffer | null = null
+    if (statusChanged && (status === 'confirmed' || status === 'processing')) {
+      try {
+        invoicePdfBuffer = await generateOrderInvoice(orderId)
+      } catch (err) {
+        console.error('Failed to generate invoice:', err)
+      }
     }
 
     // Send email notifications if user exists
-    const user = Array.isArray(currentOrder.users) ? currentOrder.users[0] : currentOrder.users
+    const user = currentOrder.users
     const userEmail = user?.email || currentOrder.customer_email
     const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : currentOrder.customer_name
 
@@ -166,7 +163,8 @@ export async function PATCH(
           currentOrder.order_number,
           orderId,
           status,
-          currentOrder.status
+          currentOrder.status,
+          invoicePdfBuffer
         )
         statusEmailSent = statusResult.success
       }

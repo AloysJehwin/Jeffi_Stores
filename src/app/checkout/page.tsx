@@ -2,9 +2,12 @@
 
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import Link from 'next/link'
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+
+const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 
 export default function CheckoutPageWrapper() {
   return (
@@ -15,23 +18,28 @@ export default function CheckoutPageWrapper() {
 }
 
 function CheckoutPage() {
-  const { cartItems, cartCount, getCartTotal, clearCart, isLoading: cartLoading } = useCart()
+  const { cartItems, cartCount, getCartTotal, getCartTax, clearCart, isLoading: cartLoading } = useCart()
   const { user, isLoading: authLoading } = useAuth()
+  const { showToast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [address, setAddress] = useState<any>(null)
   const [isLoadingAddress, setIsLoadingAddress] = useState(true)
   const [notes, setNotes] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual'>(
+    isRazorpayEnabled ? 'razorpay' : 'manual'
+  )
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login?redirect=/checkout')
       return
     }
-    
+
     if (!cartLoading && cartCount === 0) {
       router.push('/cart')
       return
@@ -46,6 +54,22 @@ function CheckoutPage() {
     // Load selected address
     fetchAddress(addressId)
   }, [cartCount, user, authLoading, cartLoading, router, searchParams])
+
+  // Load Razorpay script
+  useEffect(() => {
+    if (paymentMethod !== 'razorpay') return
+    if (razorpayLoaded) return
+    if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
+      setRazorpayLoaded(true)
+      return
+    }
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    script.onload = () => setRazorpayLoaded(true)
+    script.onerror = () => setError('Failed to load payment gateway. Please try manual payment.')
+    document.body.appendChild(script)
+  }, [paymentMethod, razorpayLoaded])
 
   const fetchAddress = async (addressId: string) => {
     try {
@@ -67,6 +91,81 @@ function CheckoutPage() {
     }
   }
 
+  const verifyPayment = async (
+    razorpay_order_id: string,
+    razorpay_payment_id: string,
+    razorpay_signature: string,
+    orderId: string,
+  ) => {
+    try {
+      const response = await fetch('/api/razorpay/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Payment verification failed')
+
+      clearCart()
+      showToast('Payment successful!', 'success')
+      window.location.href = `/account/orders/${orderId}`
+    } catch (err: any) {
+      setError('Payment received but verification failed. Please contact support — your payment is safe.')
+      setIsSubmitting(false)
+    }
+  }
+
+  const initiateRazorpayPayment = async (orderId: string, totalAmount: number) => {
+    try {
+      const rzpResponse = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      })
+      const rzpData = await rzpResponse.json()
+      if (!rzpResponse.ok) throw new Error(rzpData.error || 'Failed to initiate payment')
+
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+        amount: rzpData.amount,
+        currency: rzpData.currency,
+        name: 'Jeffi Stores',
+        description: 'Order Payment',
+        order_id: rzpData.razorpayOrderId,
+        handler: async function (response: any) {
+          await verifyPayment(
+            response.razorpay_order_id,
+            response.razorpay_payment_id,
+            response.razorpay_signature,
+            orderId,
+          )
+        },
+        prefill: {
+          name: address?.full_name || '',
+          email: user?.email || '',
+          contact: address?.phone || '',
+        },
+        theme: { color: '#f97316' },
+        modal: {
+          ondismiss: function () {
+            setIsSubmitting(false)
+            setError('Payment cancelled. Your order is saved — you can retry from your order details page.')
+          },
+        },
+      }
+
+      const rzp = new (window as any).Razorpay(options)
+      rzp.on('payment.failed', function (response: any) {
+        setError(`Payment failed: ${response.error.description}. Please try again.`)
+        setIsSubmitting(false)
+      })
+      rzp.open()
+    } catch (err: any) {
+      setError(err.message)
+      setIsSubmitting(false)
+    }
+  }
+
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -79,6 +178,7 @@ function CheckoutPage() {
     }
 
     try {
+      // Step 1: Create order in DB
       const response = await fetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -95,6 +195,7 @@ function CheckoutPage() {
             phone: address.phone,
           },
           notes,
+          paymentMethod,
         }),
       })
 
@@ -104,14 +205,16 @@ function CheckoutPage() {
         throw new Error(data.error || 'Failed to create order')
       }
 
-      // Clear cart
-      clearCart()
-      
-      // Redirect to order confirmation page
-      router.push(`/account/orders/confirmation?orderId=${data.order.id}`)
+      // Step 2: Branch based on payment method
+      if (paymentMethod === 'razorpay' && data.requiresPayment) {
+        await initiateRazorpayPayment(data.order.id, parseFloat(data.order.total))
+      } else {
+        // Manual payment — cart already cleared, emails already sent
+        clearCart()
+        router.push(`/account/orders/${data.order.id}`)
+      }
     } catch (err: any) {
       setError(err.message)
-    } finally {
       setIsSubmitting(false)
     }
   }
@@ -129,6 +232,7 @@ function CheckoutPage() {
   }
 
   const total = getCartTotal()
+  const tax = getCartTax()
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -156,12 +260,12 @@ function CheckoutPage() {
 
                   return (
                     <div key={item.id} className="flex gap-4 pb-4 border-b border-gray-200 last:border-b-0">
-                      <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                      <div className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
                         {primaryImage ? (
                           <img
                             src={primaryImage.thumbnail_url}
                             alt={item.products.name}
-                            className="w-full h-full object-contain p-2"
+                            className="w-full h-full object-cover rounded-lg"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -188,7 +292,7 @@ function CheckoutPage() {
             </div>
 
             {/* Delivery Address */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Delivery Address</h2>
                 <Link
@@ -211,7 +315,7 @@ function CheckoutPage() {
             </div>
 
             {/* Order Notes */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Order Notes (Optional)</h2>
               <textarea
                 rows={4}
@@ -222,22 +326,79 @@ function CheckoutPage() {
               />
             </div>
 
-            {/* Payment Information */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-              <div className="flex gap-4">
-                <div className="flex-shrink-0">
-                  <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            {/* Payment Method */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Payment Method</h2>
+              <div className="space-y-3">
+                {isRazorpayEnabled && (
+                  <label
+                    className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                      paymentMethod === 'razorpay'
+                        ? 'border-accent-500 bg-accent-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="razorpay"
+                      checked={paymentMethod === 'razorpay'}
+                      onChange={() => setPaymentMethod('razorpay')}
+                      className="w-4 h-4 text-accent-600 focus:ring-accent-500"
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900">Pay Online</p>
+                      <p className="text-sm text-gray-600">UPI, Cards, Net Banking, Wallets</p>
+                    </div>
+                    <svg className="w-8 h-8 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                  </label>
+                )}
+                <label
+                  className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    paymentMethod === 'manual'
+                      ? 'border-accent-500 bg-accent-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="manual"
+                    checked={paymentMethod === 'manual'}
+                    onChange={() => setPaymentMethod('manual')}
+                    className="w-4 h-4 text-accent-600 focus:ring-accent-500"
+                  />
+                  <div className="flex-1">
+                    <p className="font-semibold text-gray-900">Request Manual Payment</p>
+                    <p className="text-sm text-gray-600">Our team will contact you for payment details</p>
+                  </div>
+                  <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                   </svg>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-blue-900 mb-2">Order Confirmation</h3>
-                  <p className="text-blue-800">
-                    Our team will contact you shortly to confirm your order and provide payment details.
-                  </p>
-                </div>
+                </label>
               </div>
             </div>
+
+            {/* Payment Information (manual only) */}
+            {paymentMethod === 'manual' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-blue-900 mb-2">Order Confirmation</h3>
+                    <p className="text-blue-800">
+                      Our team will contact you shortly to confirm your order and provide payment details.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Order Summary & Contact */}
@@ -250,11 +411,16 @@ function CheckoutPage() {
                   <span>Subtotal ({cartCount} items)</span>
                   <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
+                <div className="flex justify-between text-gray-500 text-sm">
+                  <span>Incl. GST</span>
+                  <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
                 <div className="border-t border-gray-200 pt-3">
                   <div className="flex justify-between text-lg font-bold text-gray-900">
                     <span>Total</span>
                     <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
+                  <p className="text-xs text-gray-400 mt-1">Price inclusive of all taxes</p>
                 </div>
               </div>
 
@@ -294,13 +460,20 @@ function CheckoutPage() {
 
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center"
+                disabled={isSubmitting || (paymentMethod === 'razorpay' && !razorpayLoaded)}
+                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isSubmitting ? (
                   <>
                     <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                    Placing Order...
+                    {paymentMethod === 'razorpay' ? 'Processing...' : 'Placing Order...'}
+                  </>
+                ) : paymentMethod === 'razorpay' ? (
+                  <>
+                    <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Pay ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </>
                 ) : (
                   <>

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
-import { jwtVerify } from 'jose'
-import { cookies } from 'next/headers'
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
+import { query, queryOne } from '@/lib/db'
+import { authenticateUser } from '@/lib/jwt'
 
 // Update address
 export async function PATCH(
@@ -11,21 +8,12 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('auth_token')?.value
-
-    if (!token) {
+    const user = await authenticateUser(request)
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let userId: string
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET)
-      userId = payload.userId as string
-    } catch (error) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
+    const userId = user.userId
     const addressId = params.id
     const body = await request.json()
     const {
@@ -42,41 +30,36 @@ export async function PATCH(
       is_default,
     } = body
 
+    // Validate and normalize phone
+    if (!phone) {
+      return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
+    }
+    const phoneDigits = phone.replace(/\D/g, '')
+    const cleanedPhone = phoneDigits.startsWith('91') && phoneDigits.length === 12 ? phoneDigits.slice(2) : phoneDigits
+    if (cleanedPhone.length !== 10) {
+      return NextResponse.json({ error: 'Enter a valid 10-digit mobile number' }, { status: 400 })
+    }
+    const normalizedPhone = `+91${cleanedPhone}`
+
     // If this is set as default, unset other defaults
     if (is_default) {
-      await supabaseAdmin
-        .from('addresses')
-        .update({ is_default: false })
-        .eq('user_id', userId)
-        .eq('address_type', address_type)
-        .neq('id', addressId)
+      await query(
+        'UPDATE addresses SET is_default = false WHERE user_id = $1 AND address_type = $2 AND id != $3',
+        [userId, address_type, addressId]
+      )
     }
 
-    const { data: address, error } = await supabaseAdmin
-      .from('addresses')
-      .update({
-        address_type,
-        full_name,
-        address_line1,
-        address_line2: address_line2 || null,
-        landmark: landmark || null,
-        city,
-        state,
-        postal_code,
-        country: country || 'India',
-        phone,
-        is_default: is_default || false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', addressId)
-      .eq('user_id', userId)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error updating address:', error)
-      return NextResponse.json({ error: 'Failed to update address' }, { status: 500 })
-    }
+    const address = await queryOne(
+      `UPDATE addresses SET
+        address_type = $1, full_name = $2, address_line1 = $3, address_line2 = $4,
+        landmark = $5, city = $6, state = $7, postal_code = $8, country = $9,
+        phone = $10, is_default = $11, updated_at = NOW()
+       WHERE id = $12 AND user_id = $13
+       RETURNING *`,
+      [address_type, full_name, address_line1, address_line2 || null,
+       landmark || null, city, state, postal_code, country || 'India',
+       normalizedPhone, is_default || false, addressId, userId]
+    )
 
     if (!address) {
       return NextResponse.json({ error: 'Address not found' }, { status: 404 })
@@ -95,67 +78,48 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('auth_token')?.value
-
-    if (!token) {
+    const user = await authenticateUser(request)
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let userId: string
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET)
-      userId = payload.userId as string
-    } catch (error) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
+    const userId = user.userId
     const addressId = params.id
 
-    // Check if address is being used by any orders
-    const { data: ordersUsingAddress, error: checkError } = await supabaseAdmin
-      .from('orders')
-      .select('id, order_number')
-      .or(`shipping_address_id.eq.${addressId},billing_address_id.eq.${addressId}`)
-      .limit(1)
+    // Check if address is the default
+    const address = await queryOne(
+      'SELECT is_default FROM addresses WHERE id = $1 AND user_id = $2',
+      [addressId, userId]
+    )
 
-    if (checkError) {
-      console.error('Error checking address usage:', checkError)
-      return NextResponse.json({ error: 'Failed to check address usage' }, { status: 500 })
+    if (!address) {
+      return NextResponse.json({ error: 'Address not found' }, { status: 404 })
     }
 
-    if (ordersUsingAddress && ordersUsingAddress.length > 0) {
+    if (address.is_default) {
       return NextResponse.json(
-        { 
-          error: 'This address cannot be deleted because it is associated with existing orders. You can edit it instead.',
-          code: 'ADDRESS_IN_USE'
-        },
+        { error: 'Default address cannot be deleted. Set another address as default first.' },
         { status: 400 }
       )
     }
 
-    const { error } = await supabaseAdmin
-      .from('addresses')
-      .delete()
-      .eq('id', addressId)
-      .eq('user_id', userId)
+    // Check if address is linked to any orders
+    const orderLink = await queryOne(
+      'SELECT id FROM orders WHERE shipping_address_id = $1 OR billing_address_id = $1 LIMIT 1',
+      [addressId]
+    )
 
-    if (error) {
-      console.error('Error deleting address:', error)
-      
-      // Handle foreign key constraint violations
-      if (error.code === '23503') {
-        return NextResponse.json(
-          { 
-            error: 'This address cannot be deleted because it is associated with existing orders.',
-            code: 'ADDRESS_IN_USE'
-          },
-          { status: 400 }
-        )
-      }
-      
-      return NextResponse.json({ error: 'Failed to delete address' }, { status: 500 })
+    if (orderLink) {
+      return NextResponse.json(
+        { error: 'This address cannot be deleted because it is associated with existing orders. You can edit it instead.' },
+        { status: 400 }
+      )
     }
+
+    await query(
+      'DELETE FROM addresses WHERE id = $1 AND user_id = $2',
+      [addressId, userId]
+    )
 
     return NextResponse.json({ message: 'Address deleted successfully' })
   } catch (error) {

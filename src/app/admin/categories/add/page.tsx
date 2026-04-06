@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories } from '@/lib/queries'
-import { supabaseAdmin } from '@/lib/supabase'
+import { query } from '@/lib/db'
 import CategoryForm from '@/components/admin/CategoryForm'
 
 async function createCategory(formData: FormData) {
@@ -17,18 +17,11 @@ async function createCategory(formData: FormData) {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
   try {
-    const { error } = await supabaseAdmin
-      .from('categories')
-      .insert({
-        name,
-        slug,
-        description,
-        parent_category_id: parentCategoryId,
-        display_order: displayOrder,
-        is_active: isActive,
-      })
-
-    if (error) throw error
+    await query(
+      `INSERT INTO categories (name, slug, description, parent_category_id, display_order, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [name, slug, description, parentCategoryId, displayOrder, isActive]
+    )
 
     // Revalidate all pages that use categories
     revalidatePath('/admin/categories')

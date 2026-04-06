@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
+import AccountSidebar from '@/components/visitor/AccountSidebar'
+import CustomSelect from '@/components/visitor/CustomSelect'
 
 interface Address {
   id: string
@@ -29,6 +30,7 @@ export default function AddressesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingAddress, setEditingAddress] = useState<Address | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [formData, setFormData] = useState({
     address_type: 'shipping',
     full_name: '',
@@ -68,6 +70,11 @@ export default function AddressesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (formData.phone.length !== 10) {
+      showToast('Enter a valid 10-digit mobile number', 'error')
+      return
+    }
+    setIsSaving(true)
     try {
       const url = editingAddress ? `/api/user/addresses/${editingAddress.id}` : '/api/user/addresses'
       const method = editingAddress ? 'PATCH' : 'POST'
@@ -101,6 +108,8 @@ export default function AddressesPage() {
       }
     } catch (error) {
       showToast('Failed to save address', 'error')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -116,7 +125,7 @@ export default function AddressesPage() {
       state: address.state,
       postal_code: address.postal_code,
       country: address.country,
-      phone: address.phone,
+      phone: (address.phone || '').replace(/^\+91/, ''),
       is_default: address.is_default,
     })
     setShowForm(true)
@@ -178,53 +187,14 @@ export default function AddressesPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <nav className="space-y-2">
-                <Link
-                  href="/account"
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Profile
-                </Link>
-                <Link
-                  href="/account/orders"
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
-                  My Orders
-                </Link>
-                <Link
-                  href="/account/addresses"
-                  className="flex items-center gap-3 px-4 py-3 bg-accent-50 text-accent-700 rounded-lg font-medium"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  My Addresses
-                </Link>
-                <Link
-                  href="/wishlist"
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  Wishlist
-                </Link>
-              </nav>
-            </div>
+            <AccountSidebar />
           </div>
 
           {/* Main Content */}
           <div className="lg:col-span-3">
             <div className="mb-6">
               <button
+                type="button"
                 onClick={() => {
                   setEditingAddress(null)
                   setFormData({
@@ -255,22 +225,18 @@ export default function AddressesPage() {
                 </h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="address_type" className="block text-sm font-medium text-gray-700 mb-2">
-                        Address Type
-                      </label>
-                      <select
-                        id="address_type"
-                        value={formData.address_type}
-                        onChange={(e) => setFormData({ ...formData, address_type: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
-                        required
-                      >
-                        <option value="shipping">Shipping</option>
-                        <option value="billing">Billing</option>
-                        <option value="both">Both</option>
-                      </select>
-                    </div>
+                    <CustomSelect
+                      id="address_type"
+                      label="Address Type"
+                      value={formData.address_type}
+                      onChange={(val) => setFormData({ ...formData, address_type: val })}
+                      required
+                      options={[
+                        { value: 'shipping', label: 'Shipping' },
+                        { value: 'billing', label: 'Billing' },
+                        { value: 'both', label: 'Both' },
+                      ]}
+                    />
                     <div>
                       <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-2">
                         Full Name
@@ -288,16 +254,27 @@ export default function AddressesPage() {
 
                   <div>
                     <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number
+                      Phone Number *
                     </label>
-                    <input
-                      id="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
-                      required
-                    />
+                    <div className="flex">
+                      <span className="inline-flex items-center px-4 py-2 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-gray-600 text-sm font-medium">
+                        +91
+                      </span>
+                      <input
+                        id="phone"
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        placeholder="98765 43210"
+                        required
+                      />
+                    </div>
+                    {formData.phone && formData.phone.length > 0 && formData.phone.length !== 10 && (
+                      <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+                    )}
                   </div>
 
                   <div>
@@ -401,17 +378,26 @@ export default function AddressesPage() {
                   <div className="flex gap-4">
                     <button
                       type="submit"
-                      className="px-6 py-3 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold"
+                      disabled={isSaving}
+                      className="px-6 py-3 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
                     >
-                      {editingAddress ? 'Update Address' : 'Save Address'}
+                      {isSaving ? (
+                        <>
+                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                          Saving...
+                        </>
+                      ) : (
+                        editingAddress ? 'Update Address' : 'Save Address'
+                      )}
                     </button>
                     <button
                       type="button"
+                      disabled={isSaving}
                       onClick={() => {
                         setShowForm(false)
                         setEditingAddress(null)
                       }}
-                      className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+                      className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -470,12 +456,14 @@ export default function AddressesPage() {
                     </div>
                     <div className="flex gap-2">
                       <button
+                        type="button"
                         onClick={() => handleEdit(address)}
                         className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
                       >
                         Edit
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDelete(address.id)}
                         className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
                       >

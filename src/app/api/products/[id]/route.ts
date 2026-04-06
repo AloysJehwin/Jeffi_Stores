@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { query, queryMany } from '@/lib/db'
 import { deleteProductImage } from '@/lib/s3'
+import { authenticateAdmin } from '@/lib/jwt'
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const admin = await authenticateAdmin(request)
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const productId = params.id
 
     // Get all images for the product
-    const { data: images } = await supabaseAdmin
-      .from('product_images')
-      .select('*')
-      .eq('product_id', productId)
+    const images = await queryMany(
+      'SELECT * FROM product_images WHERE product_id = $1',
+      [productId]
+    )
 
     // Delete images from S3
     if (images && images.length > 0) {
@@ -27,12 +33,7 @@ export async function DELETE(
     }
 
     // Delete product (images will be cascade deleted due to ON DELETE CASCADE)
-    const { error } = await supabaseAdmin
-      .from('products')
-      .delete()
-      .eq('id', productId)
-
-    if (error) throw error
+    await query('DELETE FROM products WHERE id = $1', [productId])
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

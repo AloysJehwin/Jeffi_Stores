@@ -167,12 +167,12 @@ export default function CheckoutPage() {
 
                     return (
                       <div key={item.id} className="flex gap-4 pb-4 border-b border-gray-200 last:border-b-0">
-                        <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                        <div className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
                           {primaryImage ? (
                             <img
                               src={primaryImage.thumbnail_url}
                               alt={item.products.name}
-                              className="w-full h-full object-contain p-2"
+                              className="w-full h-full object-cover rounded-lg"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">

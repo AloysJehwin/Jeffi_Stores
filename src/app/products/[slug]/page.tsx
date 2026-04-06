@@ -1,42 +1,43 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryOne, queryMany } from '@/lib/db'
 import ProductImageGallery from '@/components/visitor/ProductImageGallery'
 import ProductActions from '@/components/visitor/ProductActions'
 import ProductReviews from '@/components/visitor/ProductReviews'
 
 async function getProductBySlug(slug: string) {
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .select(`
-      *,
-      categories (id, name, slug),
-      brands (id, name, slug),
-      product_images (*)
-    `)
-    .eq('slug', slug)
-    .eq('is_active', true)
-    .single()
-
-  if (error) return null
-  return data
+  return queryOne(`
+    SELECT p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE p.slug = $1 AND p.is_active = true
+  `, [slug])
 }
 
 async function getRelatedProducts(productId: string, categoryId: string) {
-  const { data } = await supabaseAdmin
-    .from('products')
-    .select(`
-      *,
-      categories (id, name, slug),
-      brands (id, name),
-      product_images (*)
-    `)
-    .eq('category_id', categoryId)
-    .eq('is_active', true)
-    .neq('id', productId)
-    .limit(4)
-
-  return data || []
+  return queryMany(`
+    SELECT p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE p.category_id = $1 AND p.is_active = true AND p.id != $2
+    LIMIT 4
+  `, [categoryId, productId])
 }
 
 export default async function ProductDetailPage({
@@ -54,9 +55,9 @@ export default async function ProductDetailPage({
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
   const displayPrice = product.sale_price || product.base_price
-  const savings = product.sale_price ? product.base_price - product.sale_price : 0
-  const savingsPercentage = product.sale_price
-    ? Math.round(((product.base_price - product.sale_price) / product.base_price) * 100)
+  const mrp = product.mrp ? Number(product.mrp) : null
+  const mrpDiscount = mrp && mrp > Number(displayPrice)
+    ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
     : 0
 
   return (
@@ -125,22 +126,26 @@ export default async function ProductDetailPage({
                   <span className="text-4xl font-bold text-primary-600">
                     ₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  {product.sale_price && (
+                  {mrp && mrp > Number(displayPrice) && (
                     <span className="text-xl text-gray-400 line-through">
-                      ₹{Number(product.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   )}
                 </div>
-                {product.sale_price && (
-                  <div className="flex items-center gap-2">
+                {mrpDiscount > 0 && (
+                  <div className="flex items-center gap-2 mb-2">
                     <span className="bg-accent-100 text-accent-700 px-3 py-1 rounded-full text-sm font-semibold">
-                      Save {savingsPercentage}%
+                      {mrpDiscount}% off
                     </span>
                     <span className="text-sm text-gray-600">
-                      You save ₹{savings.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      You save ₹{(mrp! - Number(displayPrice)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}
+                <p className="text-xs text-gray-500">
+                  Inclusive of all taxes
+                  {product.gst_percentage ? ` (${product.gst_percentage}% GST)` : ''}
+                </p>
                 {product.wholesale_price && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <span className="text-sm text-gray-600">
@@ -233,6 +238,10 @@ export default async function ProductDetailPage({
               {relatedProducts.map((relatedProduct) => {
                 const relatedPrimaryImage = relatedProduct.product_images?.find((img: any) => img.is_primary) || relatedProduct.product_images?.[0]
                 const relatedDisplayPrice = relatedProduct.sale_price || relatedProduct.base_price
+                const relatedMrp = relatedProduct.mrp ? Number(relatedProduct.mrp) : null
+                const relatedMrpDiscount = relatedMrp && relatedMrp > Number(relatedDisplayPrice)
+                  ? Math.round(((relatedMrp - Number(relatedDisplayPrice)) / relatedMrp) * 100)
+                  : 0
 
                 return (
                   <Link
@@ -241,12 +250,12 @@ export default async function ProductDetailPage({
                     className="group"
                   >
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
-                      <div className="relative h-48 bg-gray-100">
+                      <div className="relative h-48 bg-white overflow-hidden">
                         {relatedPrimaryImage ? (
                           <img
                             src={relatedPrimaryImage.image_url}
                             alt={relatedProduct.name}
-                            className="w-full h-full object-contain p-4"
+                            className="w-full h-full object-cover"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -255,13 +264,25 @@ export default async function ProductDetailPage({
                             </svg>
                           </div>
                         )}
+                        {relatedMrpDiscount > 0 && (
+                          <div className="absolute top-2 right-2 bg-accent-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                            {relatedMrpDiscount}% off
+                          </div>
+                        )}
                       </div>
                       <div className="p-4">
                         <h3 className="font-semibold text-sm text-gray-900 mb-2 group-hover:text-accent-600 transition-colors line-clamp-2">
                           {relatedProduct.name}
                         </h3>
-                        <div className="text-lg font-bold text-primary-600">
-                          ₹{Number(relatedDisplayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-lg font-bold text-primary-600">
+                            ₹{Number(relatedDisplayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                          {relatedMrp && relatedMrp > Number(relatedDisplayPrice) && (
+                            <span className="text-xs text-gray-400 line-through">
+                              ₹{relatedMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

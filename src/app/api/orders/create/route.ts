@@ -1,67 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { jwtVerify } from 'jose'
-import { supabaseAdmin } from '@/lib/supabase'
+import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
+import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
+import { isInterState, calculateGST } from '@/lib/gst'
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
+const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
 export async function POST(request: NextRequest) {
   try {
-    // Get auth token
-    const cookieStore = await cookies()
-    const token = cookieStore.get('auth_token')?.value
-
-    if (!token) {
+    const authUser = await authenticateUser(request)
+    if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Verify JWT
-    let userId: string
-    let userEmail: string
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET)
-      userId = payload.userId as string
-      userEmail = payload.email as string
-    } catch (error) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
+    const userId = authUser.userId
 
     // Get user details
-    const { data: user } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single()
+    const user = await queryOne('SELECT * FROM users WHERE id = $1', [userId])
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     const body = await request.json()
-    const { shippingAddress, notes } = body
+    const { shippingAddress, notes, paymentMethod } = body
+    const isRazorpayPayment = paymentMethod === 'razorpay'
 
-    // Get session_id for cart
-    const sessionId = cookieStore.get('session_id')?.value || userId
+    // Get session_id for cart — use authenticated userId since orders require login
+    // The session_id cookie may still be a guest string, so always use the verified userId
+    const cartUserId = userId
 
     // Get cart items
-    const { data: cartItems, error: cartError } = await supabaseAdmin
-      .from('cart_items')
-      .select(`
-        *,
-        products (
-          id,
-          name,
-          sku,
-          base_price,
-          sale_price,
-          stock_quantity,
-          is_in_stock
-        )
-      `)
-      .eq('user_id', sessionId)
+    const cartItems = await queryMany(`
+      SELECT
+        ci.*,
+        json_build_object(
+          'id', p.id, 'name', p.name, 'sku', p.sku,
+          'base_price', p.base_price, 'sale_price', p.sale_price,
+          'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
+          'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock
+        ) AS products
+      FROM cart_items ci
+      LEFT JOIN products p ON ci.product_id = p.id
+      WHERE ci.user_id = $1
+    `, [cartUserId])
 
-    if (cartError || !cartItems || cartItems.length === 0) {
+    if (!cartItems || cartItems.length === 0) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
     }
 
@@ -76,123 +60,171 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate totals
-    const subtotal = cartItems.reduce((sum, item) => {
+    const subtotal = cartItems.reduce((sum: number, item: any) => {
       const price = item.products.sale_price || item.products.base_price
-      return sum + (price * item.quantity)
+      return sum + (parseFloat(price) * item.quantity)
     }, 0)
 
-    const total = subtotal // Can add shipping, tax later
+    // Calculate tax (back-calculated from GST-inclusive prices)
+    const taxAmount = cartItems.reduce((sum: number, item: any) => {
+      const price = item.products.sale_price || item.products.base_price
+      const gstRate = parseFloat(item.products.gst_percentage || '0')
+      const itemTotal = parseFloat(price) * item.quantity
+      const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))
+      return sum + itemTax
+    }, 0)
+
+    const total = subtotal // Prices are GST-inclusive, tax is informational
 
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
-    // Create shipping address
-    let shippingAddressId = null
-    let billingAddressId = null
-    
-    if (shippingAddress) {
-      const fullName = shippingAddress.fullName || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
-      const phone = shippingAddress.phone || user.phone || '0000000000'
-      
-      const { data: address, error: addressError } = await supabaseAdmin
-        .from('addresses')
-        .insert({
-          user_id: userId,
-          address_type: 'both', // Use for both shipping and billing
-          full_name: fullName,
-          phone: phone,
-          address_line1: shippingAddress.addressLine1,
-          address_line2: shippingAddress.addressLine2 || null,
-          landmark: shippingAddress.landmark || null,
-          city: shippingAddress.city,
-          state: shippingAddress.state,
-          postal_code: shippingAddress.postalCode,
-          country: shippingAddress.country || 'India',
-          is_default: false,
-        })
-        .select('id')
-        .single()
+    // Use a transaction for the entire order creation
+    const order = await withTransaction(async (client) => {
+      // Create shipping address
+      let shippingAddressId = null
+      let billingAddressId = null
 
-      if (!addressError && address) {
-        shippingAddressId = address.id
-        billingAddressId = address.id // Use same address for billing
-      } else {
-        console.error('Address creation error:', addressError)
+      if (shippingAddress) {
+        const fullName = shippingAddress.fullName || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
+        const phone = shippingAddress.phone || user.phone || '0000000000'
+
+        // Check if user already has this exact address
+        const existingAddress = await client.query(
+          `SELECT id FROM addresses
+           WHERE user_id = $1 AND address_line1 = $2 AND city = $3 AND postal_code = $4
+           LIMIT 1`,
+          [userId, shippingAddress.addressLine1, shippingAddress.city, shippingAddress.postalCode]
+        )
+
+        if (existingAddress.rows[0]) {
+          shippingAddressId = existingAddress.rows[0].id
+          billingAddressId = existingAddress.rows[0].id
+        } else {
+          const addressResult = await client.query(
+            `INSERT INTO addresses (user_id, address_type, full_name, phone, address_line1, address_line2, landmark, city, state, postal_code, country, is_default)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             RETURNING id`,
+            [userId, 'both', fullName, phone, shippingAddress.addressLine1,
+             shippingAddress.addressLine2 || null, shippingAddress.landmark || null,
+             shippingAddress.city, shippingAddress.state, shippingAddress.postalCode,
+             shippingAddress.country || 'India', false]
+          )
+
+          if (addressResult.rows[0]) {
+            shippingAddressId = addressResult.rows[0].id
+            billingAddressId = addressResult.rows[0].id
+          }
+        }
       }
-    }
 
-    // Create order
-    const { data: order, error: orderError } = await supabaseAdmin
-      .from('orders')
-      .insert({
-        order_number: orderNumber,
-        user_id: userId,
-        customer_email: user.email,
-        customer_phone: user.phone,
-        customer_name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-        status: 'pending',
-        payment_status: 'unpaid',
-        subtotal,
-        total_amount: total,
-        shipping_address_id: shippingAddressId,
-        billing_address_id: billingAddressId,
-        notes: notes || null,
+      // GST breakdown calculation
+      let orderTaxableAmount = 0
+      let orderCgst = 0
+      let orderSgst = 0
+      let orderIgst = 0
+      let isIGST = false
+
+      if (isGSTEnabled) {
+        // Determine IGST vs CGST/SGST based on buyer state
+        const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'
+        const buyerState = shippingAddress?.state || ''
+        isIGST = isInterState(buyerState, sellerStateCode)
+      }
+
+      // Calculate per-item GST breakdown
+      const itemsWithGST = cartItems.map((item: any) => {
+        const unitPrice = item.products.sale_price || item.products.base_price
+        const gstRate = parseFloat(item.products.gst_percentage || '0')
+        const itemTotal = parseFloat(unitPrice) * item.quantity
+
+        if (isGSTEnabled) {
+          const gst = calculateGST(itemTotal, gstRate, isIGST)
+          orderTaxableAmount += gst.taxableAmount
+          orderCgst += gst.cgst
+          orderSgst += gst.sgst
+          orderIgst += gst.igst
+          return { item, unitPrice, gstRate, itemTotal, gst }
+        }
+
+        const itemTax = Math.round((itemTotal - (itemTotal / (1 + gstRate / 100))) * 100) / 100
+        return { item, unitPrice, gstRate, itemTotal, itemTax }
       })
-      .select()
-      .single()
 
-    if (orderError || !order) {
-      console.error('Order creation error:', orderError)
-      return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
-    }
+      // Round order-level totals
+      orderTaxableAmount = Math.round(orderTaxableAmount * 100) / 100
+      orderCgst = Math.round(orderCgst * 100) / 100
+      orderSgst = Math.round(orderSgst * 100) / 100
+      orderIgst = Math.round(orderIgst * 100) / 100
 
-    // Create order items
-    const orderItems = cartItems.map(item => ({
+      // Create order
+      const orderResult = await client.query(
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, tax_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+         RETURNING *`,
+        [orderNumber, userId, user.email, user.phone,
+         `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
+         'pending', 'unpaid', subtotal, Math.round(taxAmount * 100) / 100, total, shippingAddressId, billingAddressId, notes || null,
+         isGSTEnabled ? orderTaxableAmount : 0,
+         isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST]
+      )
+
+      const createdOrder = orderResult.rows[0]
+
+      // Create order items
+      for (const { item, unitPrice, gstRate, itemTotal, gst, itemTax } of itemsWithGST) {
+        const tax = isGSTEnabled && gst ? gst.totalTax : (itemTax || 0)
+        await client.query(
+          `INSERT INTO order_items (order_id, product_id, product_name, product_sku, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+          [createdOrder.id, item.product_id, item.products.name, item.products.sku,
+           item.quantity, unitPrice, itemTotal, Math.round(tax * 100) / 100,
+           isGSTEnabled ? (item.products.hsn_code || null) : null,
+           isGSTEnabled ? gstRate : null,
+           isGSTEnabled && gst ? gst.taxableAmount : 0,
+           isGSTEnabled && gst ? gst.cgst : 0,
+           isGSTEnabled && gst ? gst.sgst : 0,
+           isGSTEnabled && gst ? gst.igst : 0]
+        )
+      }
+
+      // Update product stock
+      for (const item of cartItems) {
+        await client.query(
+          'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+          [item.quantity, item.product_id]
+        )
+      }
+
+      // Clear cart (skip for Razorpay — cleared after payment verification)
+      if (!isRazorpayPayment) {
+        await client.query('DELETE FROM cart_items WHERE user_id = $1', [cartUserId])
+      }
+
+      return createdOrder
+    })
+
+    // Build order items for email
+    const orderItems = cartItems.map((item: any) => ({
       order_id: order.id,
       product_id: item.product_id,
       product_name: item.products.name,
       product_sku: item.products.sku,
       quantity: item.quantity,
       unit_price: item.products.sale_price || item.products.base_price,
-      total_price: (item.products.sale_price || item.products.base_price) * item.quantity,
+      total_price: (parseFloat(item.products.sale_price || item.products.base_price)) * item.quantity,
     }))
 
-    const { error: itemsError } = await supabaseAdmin
-      .from('order_items')
-      .insert(orderItems)
+    // Send emails (skip for Razorpay — sent after payment verification)
+    if (!isRazorpayPayment) {
+      sendOrderConfirmationEmail(user.email, order, orderItems, null).catch(err =>
+        console.error('Failed to send order confirmation email:', err)
+      )
 
-    if (itemsError) {
-      console.error('Order items error:', itemsError)
-      // Rollback order if items creation fails
-      await supabaseAdmin.from('orders').delete().eq('id', order.id)
-      return NextResponse.json({ error: 'Failed to create order items' }, { status: 500 })
+      sendNewOrderNotification(order, orderItems, user).catch(err =>
+        console.error('Failed to send new order notification:', err)
+      )
     }
-
-    // Update product stock
-    for (const item of cartItems) {
-      await supabaseAdmin
-        .from('products')
-        .update({
-          stock_quantity: item.products.stock_quantity - item.quantity,
-          is_in_stock: (item.products.stock_quantity - item.quantity) > 0
-        })
-        .eq('id', item.product_id)
-    }
-
-    // Clear cart
-    await supabaseAdmin
-      .from('cart_items')
-      .delete()
-      .eq('user_id', sessionId)
-
-    // Send emails (don't wait for them)
-    sendOrderConfirmationEmail(user.email, order, orderItems).catch(err =>
-      console.error('Failed to send order confirmation email:', err)
-    )
-
-    sendNewOrderNotification(order, orderItems, user).catch(err =>
-      console.error('Failed to send new order notification:', err)
-    )
 
     return NextResponse.json({
       message: 'Order created successfully',
@@ -202,6 +234,7 @@ export async function POST(request: NextRequest) {
         total: order.total_amount,
         status: order.status,
       },
+      requiresPayment: isRazorpayPayment,
     })
   } catch (error) {
     console.error('Order creation error:', error)

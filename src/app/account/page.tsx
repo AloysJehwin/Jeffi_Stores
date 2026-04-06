@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import AccountSidebar from '@/components/visitor/AccountSidebar'
 
 export default function AccountPage() {
   const { user, isLoading } = useAuth()
@@ -25,13 +26,17 @@ export default function AccountPage() {
       setFormData({
         firstName: user.firstName,
         lastName: user.lastName || '',
-        phone: user.phone || '',
+        phone: (user.phone || '').replace(/^\+91/, ''),
       })
     }
   }, [user, isLoading, router])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (formData.phone && formData.phone.length !== 10) {
+      setMessage('Enter a valid 10-digit mobile number')
+      return
+    }
     setIsSaving(true)
     setMessage('')
 
@@ -79,37 +84,7 @@ export default function AccountPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <nav className="space-y-2">
-                <Link
-                  href="/account"
-                  className="flex items-center gap-3 px-4 py-3 bg-accent-50 text-accent-700 rounded-lg font-medium"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Profile
-                </Link>
-                <Link
-                  href="/account/orders"
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
-                  My Orders
-                </Link>
-                <Link
-                  href="/wishlist"
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  Wishlist
-                </Link>
-              </nav>
-            </div>
+            <AccountSidebar />
           </div>
 
           {/* Main Content */}
@@ -151,7 +126,7 @@ export default function AccountPage() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Phone</label>
-                    <p className="mt-1 text-gray-900">{user.phone || '-'}</p>
+                    <p className="mt-1 text-gray-900">{user.phone ? (user.phone.startsWith('+91') ? user.phone : `+91 ${user.phone}`) : '-'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Member Since</label>
@@ -209,34 +184,52 @@ export default function AccountPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phone Number
                     </label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                      placeholder="+91 98765 43210"
-                    />
+                    <div className="flex">
+                      <span className="inline-flex items-center px-4 py-3 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-gray-600 text-sm font-medium">
+                        +91
+                      </span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                        placeholder="98765 43210"
+                      />
+                    </div>
+                    {formData.phone && formData.phone.length > 0 && formData.phone.length !== 10 && (
+                      <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+                    )}
                   </div>
 
                   <div className="flex gap-3">
                     <button
                       type="submit"
                       disabled={isSaving}
-                      className="px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:bg-gray-300"
+                      className="px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
                     >
-                      {isSaving ? 'Saving...' : 'Save Changes'}
+                      {isSaving ? (
+                        <>
+                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Changes'
+                      )}
                     </button>
                     <button
                       type="button"
+                      disabled={isSaving}
                       onClick={() => {
                         setIsEditing(false)
                         setFormData({
                           firstName: user.firstName,
                           lastName: user.lastName || '',
-                          phone: user.phone || '',
+                          phone: (user.phone || '').replace(/^\+91/, ''),
                         })
                       }}
-                      className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors"
+                      className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold transition-colors disabled:opacity-50"
                     >
                       Cancel
                     </button>

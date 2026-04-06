@@ -77,6 +77,12 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    if (phone && phone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number')
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -272,14 +278,24 @@ export default function SignupPage() {
                 <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number
                 </label>
-                <input
-                  id="phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                  placeholder="+91 98765 43210"
-                />
+                <div className="flex">
+                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-gray-600 text-sm font-medium">
+                    +91
+                  </span>
+                  <input
+                    id="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="98765 43210"
+                  />
+                </div>
+                {phone && phone.length > 0 && phone.length !== 10 && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+                )}
               </div>
 
               <button

@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getOrder } from '@/lib/queries'
 import UpdateOrderStatus from '@/components/admin/UpdateOrderStatus'
+import CancelReview from '@/components/admin/CancelReview'
+import GenerateInvoiceButton from '@/components/admin/GenerateInvoiceButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -50,10 +52,27 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 ? 'bg-blue-100 text-blue-800'
                 : order.status === 'cancelled'
                 ? 'bg-red-100 text-red-800'
+                : order.status === 'cancel_requested'
+                ? 'bg-orange-100 text-orange-800'
                 : 'bg-yellow-100 text-yellow-800'
             }`}>
-              Status: {order.status}
+              Status: {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status}
             </span>
+            {order.invoice_number ? (
+              <a
+                href={`/api/orders/${order.id}/invoice`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 text-sm font-semibold rounded-full bg-accent-100 text-accent-800 hover:bg-accent-200 transition-colors inline-flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Invoice {order.invoice_number}
+              </a>
+            ) : (order.payment_status === 'paid' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') && (
+              <GenerateInvoiceButton orderId={order.id} />
+            )}
           </div>
         </div>
       </div>
@@ -80,7 +99,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-gray-900">
-                          Rs. {Number(item.subtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          Rs. {Number(item.total_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                     </div>
@@ -94,7 +113,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="text-gray-900">Rs. {Number(order.subtotal_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-gray-900">Rs. {Number(order.subtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 {order.discount_amount > 0 && (
                   <div className="flex justify-between text-sm">
@@ -103,7 +122,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tax</span>
+                  <span className="text-gray-600">GST (incl.)</span>
                   <span className="text-gray-900">Rs. {Number(order.tax_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -118,7 +137,20 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           </div>
 
-          {/* Update Order Status */}
+          {/* Cancellation Review */}
+          {order.status === 'cancel_requested' && (
+            <div className="bg-white rounded-lg shadow-sm border-2 border-orange-300">
+              <div className="px-6 py-4 border-b border-orange-200 bg-orange-50">
+                <h2 className="text-lg font-semibold text-orange-900">Cancellation Request</h2>
+              </div>
+              <div className="p-6">
+                <CancelReview orderId={order.id} />
+              </div>
+            </div>
+          )}
+
+          {/* Update Order Status — hidden for cancelled orders */}
+          {order.status !== 'cancelled' && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">Update Order Status</h2>
@@ -127,6 +159,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               <UpdateOrderStatus orderId={order.id} currentStatus={order.status} currentPaymentStatus={order.payment_status} />
             </div>
           </div>
+          )}
         </div>
 
         {/* Sidebar */}

@@ -13,6 +13,7 @@ interface CartItem {
     slug: string
     base_price: number
     sale_price: number | null
+    gst_percentage: number | null
     stock_quantity: number
     is_in_stock: boolean
     product_images: Array<{
@@ -31,6 +32,7 @@ interface CartContextType {
   updateQuantity: (cartItemId: string, quantity: number) => Promise<void>
   refreshCart: () => Promise<void>
   getCartTotal: () => number
+  getCartTax: () => number
   clearCart: () => void
 }
 
@@ -130,6 +132,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }, 0)
   }
 
+  const getCartTax = () => {
+    return cartItems.reduce((tax, item) => {
+      const price = item.products.sale_price || item.products.base_price
+      const gstRate = item.products.gst_percentage || 0
+      const itemTotal = price * item.quantity
+      const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))
+      return tax + itemTax
+    }, 0)
+  }
+
   const clearCart = () => {
     setCartItems([])
   }
@@ -147,6 +159,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updateQuantity,
         refreshCart,
         getCartTotal,
+        getCartTax,
         clearCart,
       }}
     >

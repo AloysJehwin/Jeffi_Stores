@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import AdminSelect from './AdminSelect'
 
 interface UpdateOrderStatusProps {
   orderId: string
@@ -80,40 +81,33 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-2">
-            Order Status
-          </label>
-          <select
-            id="status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-          >
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
+        <AdminSelect
+          id="status"
+          label="Order Status"
+          value={status}
+          onChange={(val) => setStatus(val)}
+          options={[
+            { value: 'pending', label: 'Pending' },
+            { value: 'processing', label: 'Processing' },
+            { value: 'shipped', label: 'Shipped' },
+            { value: 'delivered', label: 'Delivered' },
+            { value: 'cancel_requested', label: 'Cancel Requested' },
+            { value: 'cancelled', label: 'Cancelled' },
+          ]}
+        />
 
-        <div>
-          <label htmlFor="payment_status" className="block text-sm font-medium text-gray-700 mb-2">
-            Payment Status
-          </label>
-          <select
-            id="payment_status"
-            value={paymentStatus}
-            onChange={(e) => setPaymentStatus(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-          >
-            <option value="pending">Pending</option>
-            <option value="paid">Paid</option>
-            <option value="failed">Failed</option>
-            <option value="refunded">Refunded</option>
-          </select>
-        </div>
+        <AdminSelect
+          id="payment_status"
+          label="Payment Status"
+          value={paymentStatus}
+          onChange={(val) => setPaymentStatus(val)}
+          options={[
+            { value: 'pending', label: 'Pending' },
+            { value: 'paid', label: 'Paid' },
+            { value: 'failed', label: 'Failed' },
+            { value: 'refunded', label: 'Refunded' },
+          ]}
+        />
       </div>
 
       <button

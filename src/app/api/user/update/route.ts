@@ -1,31 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { jwtVerify } from 'jose'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY!
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
+import { queryOne } from '@/lib/db'
+import { authenticateUser } from '@/lib/jwt'
 
 export async function PATCH(request: NextRequest) {
   try {
-    // Get auth token
-    const token = cookies().get('auth_token')?.value
-
-    if (!token) {
+    const authUser = await authenticateUser(request)
+    if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Verify JWT
-    let userId: string
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET)
-      userId = payload.userId as string
-    } catch (error) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
+    const userId = authUser.userId
 
     // Get update data
     const body = await request.json()
@@ -35,21 +19,26 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'First name is required' }, { status: 400 })
     }
 
-    // Update user profile
-    const { data: updatedUser, error } = await supabaseAdmin
-      .from('users')
-      .update({
-        first_name: firstName,
-        last_name: lastName || null,
-        phone: phone || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', userId)
-      .select()
-      .single()
+    // Validate and normalize phone
+    let normalizedPhone = null
+    if (phone) {
+      const digits = phone.replace(/\D/g, '')
+      const cleaned = digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits
+      if (cleaned.length !== 10) {
+        return NextResponse.json({ error: 'Enter a valid 10-digit mobile number' }, { status: 400 })
+      }
+      normalizedPhone = `+91${cleaned}`
+    }
 
-    if (error) {
-      console.error('Error updating user:', error)
+    // Update user profile
+    const updatedUser = await queryOne(
+      `UPDATE users SET first_name = $1, last_name = $2, phone = $3, updated_at = NOW()
+       WHERE id = $4
+       RETURNING *`,
+      [firstName, lastName || null, normalizedPhone, userId]
+    )
+
+    if (!updatedUser) {
       return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
     }
 

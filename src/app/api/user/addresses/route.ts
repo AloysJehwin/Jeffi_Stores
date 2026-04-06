@@ -1,39 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
-import { jwtVerify } from 'jose'
-import { cookies } from 'next/headers'
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
+import { query, queryOne, queryMany } from '@/lib/db'
+import { authenticateUser } from '@/lib/jwt'
 
 // Get user's addresses
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('auth_token')?.value
-
-    if (!token) {
+    const user = await authenticateUser(request)
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let userId: string
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET)
-      userId = payload.userId as string
-    } catch (error) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
+    const userId = user.userId
 
-    const { data: addresses, error } = await supabaseAdmin
-      .from('addresses')
-      .select('*')
-      .eq('user_id', userId)
-      .order('is_default', { ascending: false })
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching addresses:', error)
-      return NextResponse.json({ error: 'Failed to fetch addresses' }, { status: 500 })
-    }
+    const addresses = await queryMany(
+      'SELECT * FROM addresses WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC',
+      [userId]
+    )
 
     return NextResponse.json({ addresses: addresses || [] })
   } catch (error) {
@@ -45,20 +27,12 @@ export async function GET(request: NextRequest) {
 // Create new address
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('auth_token')?.value
-
-    if (!token) {
+    const user = await authenticateUser(request)
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let userId: string
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET)
-      userId = payload.userId as string
-    } catch (error) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
+    const userId = user.userId
 
     const body = await request.json()
     const {
@@ -75,36 +49,34 @@ export async function POST(request: NextRequest) {
       is_default,
     } = body
 
+    // Validate and normalize phone
+    if (!phone) {
+      return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
+    }
+    const phoneDigits = phone.replace(/\D/g, '')
+    const cleanedPhone = phoneDigits.startsWith('91') && phoneDigits.length === 12 ? phoneDigits.slice(2) : phoneDigits
+    if (cleanedPhone.length !== 10) {
+      return NextResponse.json({ error: 'Enter a valid 10-digit mobile number' }, { status: 400 })
+    }
+    const normalizedPhone = `+91${cleanedPhone}`
+
     // If this is set as default, unset other defaults
     if (is_default) {
-      await supabaseAdmin
-        .from('addresses')
-        .update({ is_default: false })
-        .eq('user_id', userId)
-        .eq('address_type', address_type)
+      await query(
+        'UPDATE addresses SET is_default = false WHERE user_id = $1 AND address_type = $2',
+        [userId, address_type]
+      )
     }
 
-    const { data: address, error } = await supabaseAdmin
-      .from('addresses')
-      .insert({
-        user_id: userId,
-        address_type,
-        full_name,
-        address_line1,
-        address_line2: address_line2 || null,
-        landmark: landmark || null,
-        city,
-        state,
-        postal_code,
-        country: country || 'India',
-        phone,
-        is_default: is_default || false,
-      })
-      .select()
-      .single()
+    const address = await queryOne(
+      `INSERT INTO addresses (user_id, address_type, full_name, address_line1, address_line2, landmark, city, state, postal_code, country, phone, is_default)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING *`,
+      [userId, address_type, full_name, address_line1, address_line2 || null,
+       landmark || null, city, state, postal_code, country || 'India', normalizedPhone, is_default || false]
+    )
 
-    if (error) {
-      console.error('Error creating address:', error)
+    if (!address) {
       return NextResponse.json({ error: 'Failed to create address' }, { status: 500 })
     }
 

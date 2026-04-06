@@ -9,8 +9,10 @@ export interface Product {
   description: string
   short_description: string
   base_price: number
+  mrp?: number
   sale_price?: number
   wholesale_price?: number
+  gst_percentage?: number
   currency: string
   stock_quantity: number
   low_stock_threshold: number

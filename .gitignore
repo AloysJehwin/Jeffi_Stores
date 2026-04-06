@@ -35,5 +35,22 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-#database
+# Database
 /database
+
+# Temporary scripts & guides
+*.sh
+*.csv
+RDS_SECURITY_GROUP_FIX.md
+ADD_IP_TO_SECURITY_GROUP.md
+EMAIL_NOTIFICATION_SYSTEM.md
+QUICKSTART.md
+S3_SETUP_INSTRUCTIONS.md
+SECURITY_GROUP_INSTRUCTIONS.md
+
+# AWS config files
+s3-bucket-policy*.json
+
+# Business documents (keep local, don't commit)
+GST Certificate*.pdf
+INV*.pdf

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { query, queryOne, queryMany } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { jwtVerify } from 'jose'
 import { getUserIdForSession } from '@/lib/guest-user'
@@ -36,29 +36,24 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const { data: cartItems, error } = await supabaseAdmin
-      .from('cart_items')
-      .select(`
-        *,
-        products (
-          id,
-          name,
-          slug,
-          base_price,
-          sale_price,
-          stock_quantity,
-          is_in_stock,
-          product_images (
-            thumbnail_url,
-            is_primary
+    const cartItems = await queryMany(`
+      SELECT
+        ci.*,
+        json_build_object(
+          'id', p.id, 'name', p.name, 'slug', p.slug,
+          'base_price', p.base_price, 'sale_price', p.sale_price,
+          'gst_percentage', p.gst_percentage,
+          'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
+          'product_images', COALESCE(
+            (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
+             FROM product_images pi WHERE pi.product_id = p.id),
+            '[]'::json
           )
-        )
-      `)
-      .eq('user_id', userId)
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+        ) AS products
+      FROM cart_items ci
+      LEFT JOIN products p ON ci.product_id = p.id
+      WHERE ci.user_id = $1
+    `, [userId])
 
     return NextResponse.json({ items: cartItems || [] })
   } catch (error) {
@@ -101,13 +96,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Get product details
-    const { data: product, error: productError } = await supabaseAdmin
-      .from('products')
-      .select('id, base_price, sale_price, stock_quantity')
-      .eq('id', productId)
-      .single()
+    const product = await queryOne(
+      'SELECT id, base_price, sale_price, stock_quantity FROM products WHERE id = $1',
+      [productId]
+    )
 
-    if (productError || !product) {
+    if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
@@ -118,13 +112,10 @@ export async function POST(request: NextRequest) {
     const priceAtAddition = product.sale_price || product.base_price
 
     // Check if item already exists in cart
-    const { data: existingItem } = await supabaseAdmin
-      .from('cart_items')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('product_id', productId)
-      .is('variant_id', null)
-      .single()
+    const existingItem = await queryOne(
+      'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NULL',
+      [userId, productId]
+    )
 
     if (existingItem) {
       // Update quantity
@@ -134,33 +125,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
       }
 
-      const { error: updateError } = await supabaseAdmin
-        .from('cart_items')
-        .update({
-          quantity: newQuantity,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingItem.id)
-
-      if (updateError) {
-        return NextResponse.json({ error: updateError.message }, { status: 500 })
-      }
+      await query(
+        'UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2',
+        [newQuantity, existingItem.id]
+      )
 
       return NextResponse.json({ message: 'Cart updated', quantity: newQuantity })
     } else {
       // Insert new item
-      const { error: insertError } = await supabaseAdmin
-        .from('cart_items')
-        .insert({
-          user_id: userId,
-          product_id: productId,
-          quantity,
-          price_at_addition: priceAtAddition,
-        })
-
-      if (insertError) {
-        return NextResponse.json({ error: insertError.message }, { status: 500 })
-      }
+      await query(
+        'INSERT INTO cart_items (user_id, product_id, quantity, price_at_addition) VALUES ($1, $2, $3, $4)',
+        [userId, productId, quantity, priceAtAddition]
+      )
 
       return NextResponse.json({ message: 'Item added to cart' })
     }
@@ -176,36 +152,46 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { cartItemId, quantity } = body
 
-    const sessionId = cookies().get('session_id')?.value
+    const cookieStore = await cookies()
+    const sessionId = cookieStore.get('session_id')?.value
+    let authUserId: string | undefined
 
-    if (!sessionId) {
+    const authToken = cookieStore.get('auth_token')?.value
+    if (authToken) {
+      try {
+        const { payload } = await jwtVerify(authToken, JWT_SECRET)
+        authUserId = payload.userId as string
+      } catch (error) {
+        // Invalid token, continue as guest
+      }
+    }
+
+    if (!sessionId && !authUserId) {
       return NextResponse.json({ error: 'Session not found' }, { status: 401 })
     }
 
-    // Get cart item
-    const { data: cartItem } = await supabaseAdmin
-      .from('cart_items')
-      .select('*, products(stock_quantity)')
-      .eq('id', cartItemId)
-      .eq('user_id', sessionId)
-      .single()
+    const userId = await getUserIdForSession(sessionId, authUserId)
+
+    // Get cart item with product stock
+    const cartItem = await queryOne(`
+      SELECT ci.*, p.stock_quantity
+      FROM cart_items ci
+      LEFT JOIN products p ON ci.product_id = p.id
+      WHERE ci.id = $1 AND ci.user_id = $2
+    `, [cartItemId, userId])
 
     if (!cartItem) {
       return NextResponse.json({ error: 'Cart item not found' }, { status: 404 })
     }
 
-    if (cartItem.products.stock_quantity < quantity) {
+    if (cartItem.stock_quantity < quantity) {
       return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
     }
 
-    const { error } = await supabaseAdmin
-      .from('cart_items')
-      .update({ quantity, updated_at: new Date().toISOString() })
-      .eq('id', cartItemId)
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    await query(
+      'UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2',
+      [quantity, cartItemId]
+    )
 
     return NextResponse.json({ message: 'Cart updated' })
   } catch (error) {
@@ -220,21 +206,30 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const cartItemId = searchParams.get('id')
 
-    const sessionId = cookies().get('session_id')?.value
+    const cookieStore = await cookies()
+    const sessionId = cookieStore.get('session_id')?.value
+    let authUserId: string | undefined
 
-    if (!sessionId) {
+    const authToken = cookieStore.get('auth_token')?.value
+    if (authToken) {
+      try {
+        const { payload } = await jwtVerify(authToken, JWT_SECRET)
+        authUserId = payload.userId as string
+      } catch (error) {
+        // Invalid token, continue as guest
+      }
+    }
+
+    if (!sessionId && !authUserId) {
       return NextResponse.json({ error: 'Session not found' }, { status: 401 })
     }
 
-    const { error } = await supabaseAdmin
-      .from('cart_items')
-      .delete()
-      .eq('id', cartItemId)
-      .eq('user_id', sessionId)
+    const userId = await getUserIdForSession(sessionId, authUserId)
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    await query(
+      'DELETE FROM cart_items WHERE id = $1 AND user_id = $2',
+      [cartItemId, userId]
+    )
 
     return NextResponse.json({ message: 'Item removed from cart' })
   } catch (error) {

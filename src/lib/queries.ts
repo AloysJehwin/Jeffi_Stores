@@ -1,51 +1,31 @@
-import { supabaseAdmin } from './supabase'
+import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
-    // Get total products
-    const { count: totalProducts } = await supabaseAdmin
-      .from('products')
-      .select('*', { count: 'exact', head: true })
-
-    // Get total orders
-    const { count: totalOrders } = await supabaseAdmin
-      .from('orders')
-      .select('*', { count: 'exact', head: true })
-
-    // Get total revenue
-    const { data: revenueData } = await supabaseAdmin
-      .from('orders')
-      .select('total_amount')
-      .eq('payment_status', 'paid')
-
-    const totalRevenue = revenueData?.reduce((sum, order) => sum + Number(order.total_amount), 0) || 0
-
-    // Get total customers
-    const { count: totalCustomers } = await supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_active', true)
-
-    // Get low stock products
-    const { count: lowStockProducts } = await supabaseAdmin
-      .from('products')
-      .select('*', { count: 'exact', head: true })
-      .filter('stock_quantity', 'lte', 'low_stock_threshold')
-
-    // Get pending orders
-    const { count: pendingOrders } = await supabaseAdmin
-      .from('orders')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending')
+    const [
+      totalProducts,
+      totalOrders,
+      revenueResult,
+      totalCustomers,
+      lowStockProducts,
+      pendingOrders,
+    ] = await Promise.all([
+      queryCount('SELECT COUNT(*) FROM products'),
+      queryCount('SELECT COUNT(*) FROM orders'),
+      queryOne<{ total: string }>('SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE payment_status = $1', ['paid']),
+      queryCount('SELECT COUNT(*) FROM users WHERE is_active = $1', [true]),
+      queryCount('SELECT COUNT(*) FROM products WHERE stock_quantity <= low_stock_threshold'),
+      queryCount('SELECT COUNT(*) FROM orders WHERE status = $1', ['pending']),
+    ])
 
     return {
-      totalProducts: totalProducts || 0,
-      totalOrders: totalOrders || 0,
-      totalRevenue: totalRevenue || 0,
-      totalCustomers: totalCustomers || 0,
-      lowStockProducts: lowStockProducts || 0,
-      pendingOrders: pendingOrders || 0,
+      totalProducts,
+      totalOrders,
+      totalRevenue: parseFloat(revenueResult?.total || '0'),
+      totalCustomers,
+      lowStockProducts,
+      pendingOrders,
     }
   } catch (error) {
     console.error('Error fetching dashboard stats:', error)
@@ -61,98 +41,229 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 export async function getAllProducts() {
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .select(`
-      *,
-      categories (id, name, slug),
-      brands (id, name, slug),
-      product_images (*)
-    `)
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-  return data
+  const products = await queryMany(`
+    SELECT
+      p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    ORDER BY p.created_at DESC
+  `)
+  return products
 }
 
 export async function getProduct(id: string) {
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .select(`
-      *,
-      categories (id, name, slug),
-      brands (id, name, slug),
-      product_images (*)
-    `)
-    .eq('id', id)
-    .single()
+  const product = await queryOne(`
+    SELECT
+      p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE p.id = $1
+  `, [id])
 
-  if (error) throw error
-  return data
+  if (!product) throw new Error('Product not found')
+  return product
 }
 
 export async function getAllCategories() {
-  const { data, error } = await supabaseAdmin
-    .from('categories')
-    .select('*')
-    .order('display_order', { ascending: true })
-
-  if (error) throw error
-  return data
+  return queryMany('SELECT * FROM categories ORDER BY display_order ASC')
 }
 
 export async function getAllBrands() {
-  const { data, error } = await supabaseAdmin
-    .from('brands')
-    .select('*')
-    .eq('is_active', true)
-    .order('name', { ascending: true })
-
-  if (error) throw error
-  return data
+  return queryMany('SELECT * FROM brands WHERE is_active = $1 ORDER BY name ASC', [true])
 }
 
 export async function getAllOrders() {
-  const { data, error } = await supabaseAdmin
-    .from('orders')
-    .select(`
-      *,
-      users (id, email, first_name, last_name, phone)
-    `)
-    .order('created_at', { ascending: false })
+  return queryMany(`
+    SELECT
+      o.*,
+      json_build_object(
+        'id', u.id, 'email', u.email, 'first_name', u.first_name,
+        'last_name', u.last_name, 'phone', u.phone
+      ) AS users
+    FROM orders o
+    LEFT JOIN users u ON o.user_id = u.id
+    ORDER BY o.created_at DESC
+  `)
+}
 
-  if (error) throw error
-  return data
+export async function getFilteredOrders(filters: {
+  status?: string
+  payment_status?: string
+  search?: string
+}) {
+  const conditions: string[] = []
+  const params: any[] = []
+  let i = 1
+
+  if (filters.status) {
+    conditions.push(`o.status = $${i++}`)
+    params.push(filters.status)
+  }
+  if (filters.payment_status) {
+    conditions.push(`o.payment_status = $${i++}`)
+    params.push(filters.payment_status)
+  }
+  if (filters.search) {
+    conditions.push(`(o.order_number ILIKE $${i} OR o.customer_name ILIKE $${i})`)
+    params.push(`%${filters.search}%`)
+    i++
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+  return queryMany(`
+    SELECT
+      o.*,
+      json_build_object(
+        'id', u.id, 'email', u.email, 'first_name', u.first_name,
+        'last_name', u.last_name, 'phone', u.phone
+      ) AS users
+    FROM orders o
+    LEFT JOIN users u ON o.user_id = u.id
+    ${where}
+    ORDER BY o.created_at DESC
+  `, params)
+}
+
+export async function getFilteredProducts(filters: {
+  category_id?: string
+  brand_id?: string
+  is_active?: string
+  stock?: string
+  search?: string
+}) {
+  const conditions: string[] = []
+  const params: any[] = []
+  let i = 1
+
+  if (filters.category_id) {
+    conditions.push(`p.category_id = $${i++}`)
+    params.push(filters.category_id)
+  }
+  if (filters.brand_id) {
+    conditions.push(`p.brand_id = $${i++}`)
+    params.push(filters.brand_id)
+  }
+  if (filters.is_active === 'true' || filters.is_active === 'false') {
+    conditions.push(`p.is_active = $${i++}`)
+    params.push(filters.is_active === 'true')
+  }
+  if (filters.stock === 'low') {
+    conditions.push(`p.stock_quantity <= p.low_stock_threshold AND p.stock_quantity > 0`)
+  } else if (filters.stock === 'out') {
+    conditions.push(`p.stock_quantity = 0`)
+  }
+  if (filters.search) {
+    conditions.push(`(p.name ILIKE $${i} OR p.sku ILIKE $${i})`)
+    params.push(`%${filters.search}%`)
+    i++
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+  return queryMany(`
+    SELECT
+      p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    ${where}
+    ORDER BY p.created_at DESC
+  `, params)
+}
+
+export async function getFilteredCategories(filters: {
+  is_active?: string
+  type?: string
+  search?: string
+}) {
+  const conditions: string[] = []
+  const params: any[] = []
+  let i = 1
+
+  if (filters.is_active === 'true' || filters.is_active === 'false') {
+    conditions.push(`is_active = $${i++}`)
+    params.push(filters.is_active === 'true')
+  }
+  if (filters.type === 'main') {
+    conditions.push(`parent_category_id IS NULL`)
+  } else if (filters.type === 'sub') {
+    conditions.push(`parent_category_id IS NOT NULL`)
+  }
+  if (filters.search) {
+    conditions.push(`name ILIKE $${i}`)
+    params.push(`%${filters.search}%`)
+    i++
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+  return queryMany(`SELECT * FROM categories ${where} ORDER BY display_order ASC`, params)
 }
 
 export async function getRecentOrders(limit: number = 10) {
-  const { data, error } = await supabaseAdmin
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit)
-
-  if (error) throw error
-  return data
+  return queryMany('SELECT * FROM orders ORDER BY created_at DESC LIMIT $1', [limit])
 }
 
 export async function getOrder(id: string) {
-  const { data, error } = await supabaseAdmin
-    .from('orders')
-    .select(`
-      *,
-      users (id, email, first_name, last_name, phone),
-      order_items (
-        *,
-        products (id, name, sku)
-      ),
-      shipping_address:addresses!shipping_address_id (*),
-      billing_address:addresses!billing_address_id (*),
-      payments (*)
-    `)
-    .eq('id', id)
-    .single()
+  const order = await queryOne(`
+    SELECT
+      o.*,
+      json_build_object(
+        'id', u.id, 'email', u.email, 'first_name', u.first_name,
+        'last_name', u.last_name, 'phone', u.phone
+      ) AS users,
+      COALESCE(
+        (SELECT json_agg(
+          json_build_object(
+            'id', oi.id, 'order_id', oi.order_id, 'product_id', oi.product_id,
+            'product_name', oi.product_name, 'product_sku', oi.product_sku,
+            'variant_name', oi.variant_name, 'quantity', oi.quantity,
+            'unit_price', oi.unit_price, 'discount_amount', oi.discount_amount,
+            'tax_amount', oi.tax_amount, 'total_price', oi.total_price,
+            'created_at', oi.created_at,
+            'products', json_build_object('id', pr.id, 'name', pr.name, 'sku', pr.sku)
+          )
+        )
+        FROM order_items oi
+        LEFT JOIN products pr ON oi.product_id = pr.id
+        WHERE oi.order_id = o.id),
+        '[]'::json
+      ) AS order_items,
+      (SELECT row_to_json(sa) FROM addresses sa WHERE sa.id = o.shipping_address_id) AS shipping_address,
+      (SELECT row_to_json(ba) FROM addresses ba WHERE ba.id = o.billing_address_id) AS billing_address,
+      COALESCE(
+        (SELECT json_agg(pay) FROM payments pay WHERE pay.order_id = o.id),
+        '[]'::json
+      ) AS payments
+    FROM orders o
+    LEFT JOIN users u ON o.user_id = u.id
+    WHERE o.id = $1
+  `, [id])
 
-  if (error) throw error
-  return data
+  if (!order) throw new Error('Order not found')
+  return order
 }

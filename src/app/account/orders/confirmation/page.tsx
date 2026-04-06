@@ -79,7 +79,7 @@ function OrderConfirmationPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
-          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <div className="text-red-500 text-5xl mb-4">!</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Order Not Found</h1>
           <p className="text-gray-600 mb-6">{error || 'Unable to load order details'}</p>
           <Link
@@ -121,7 +121,7 @@ function OrderConfirmationPage() {
                   <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
                 </div>
                 <p className="font-semibold text-gray-900">
-                  ${(item.priceAtPurchase * item.quantity).toFixed(2)}
+                  ₹{(item.priceAtPurchase * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             ))}
@@ -131,7 +131,7 @@ function OrderConfirmationPage() {
             <div className="flex justify-between items-center">
               <span className="text-lg font-bold text-gray-900">Total</span>
               <span className="text-2xl font-bold text-accent-600">
-                ${order.totalAmount.toFixed(2)}
+                ₹{order.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
             </div>
           </div>
@@ -166,7 +166,7 @@ function OrderConfirmationPage() {
               {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
             </span>
             <span className="text-gray-600">
-              Placed on {new Date(order.createdAt).toLocaleDateString('en-US', {
+              Placed on {new Date(order.createdAt).toLocaleDateString('en-IN', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
@@ -180,7 +180,7 @@ function OrderConfirmationPage() {
         {/* Confirmation Email Notice */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
           <p className="text-blue-900 text-sm">
-            📧 A confirmation email has been sent to your email address with your order details.
+            A confirmation email has been sent to your email address with your order details.
           </p>
         </div>
 

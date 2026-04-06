@@ -1,17 +1,19 @@
 import nodemailer from 'nodemailer'
 
-// Create transporter
+// Create transporter using AWS SES SMTP
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'email-smtp.us-east-1.amazonaws.com',
+  port: 465,
+  secure: true,
   auth: {
-    user: process.env.GMAIL_USER, // Your Gmail address
-    pass: process.env.GMAIL_APP_PASSWORD, // Gmail App Password (not regular password)
+    user: process.env.SES_SMTP_USER,
+    pass: process.env.SES_SMTP_PASSWORD,
   },
 })
 
 export async function sendOTPEmail(email: string, otp: string, name?: string) {
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.GMAIL_USER}>`,
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
     to: email,
     subject: 'Your Verification Code - Jeffi Stores',
     html: `
@@ -84,7 +86,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
             <div class="otp-box">${otp}</div>
 
             <div class="info">
-              <strong>⏰ This OTP will expire in 10 minutes.</strong>
+              <strong>This OTP will expire in 10 minutes.</strong>
               <br>
               <small>Please do not share this code with anyone.</small>
             </div>
@@ -94,7 +96,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-              <p>📞 +91 89030 31299 | 📧 jeffistoress@gmail.com</p>
+                            <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
             </div>
           </div>
         </body>
@@ -114,7 +116,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
 
 export async function sendWelcomeEmail(email: string, name: string) {
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.GMAIL_USER}>`,
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
     to: email,
     subject: 'Welcome to Jeffi Stores!',
     html: `
@@ -172,7 +174,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
               <p style="color: #666;">Hardware & Tools</p>
             </div>
 
-            <h2>Welcome to Jeffi Stores! 🎉</h2>
+            <h2>Welcome to Jeffi Stores!</h2>
             <p>Hello ${name},</p>
             <p>Thank you for creating an account with us. We're excited to have you as part of the Jeffi Stores family!</p>
 
@@ -195,7 +197,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-              <p>📞 +91 89030 31299 | +91 94883 54099<br>📧 jeffistoress@gmail.com</p>
+                                          <p>Phone: +91 89030 31299 | +91 94883 54099<br>Email: jeffistoress@gmail.com</p>
             </div>
           </div>
         </body>
@@ -213,9 +215,9 @@ export async function sendWelcomeEmail(email: string, name: string) {
   }
 }
 
-export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[]) {
+export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[], invoicePdfBuffer?: Buffer | null) {
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.GMAIL_USER}>`,
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
     to: email,
     subject: `Order Confirmation - ${order.order_number}`,
     html: `
@@ -291,19 +293,23 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
               <p style="color: #666;">Hardware & Tools</p>
             </div>
 
-            <h2>✅ Order Confirmed!</h2>
+            <h2>Order Confirmed!</h2>
             <p>Hello ${order.customer_name},</p>
             <p>Thank you for your order! We've received it and our team will contact you shortly to confirm payment and delivery details.</p>
 
             <div class="order-box">
               <h3 style="margin-top: 0;">Order Details</h3>
               <p><strong>Order Number:</strong> ${order.order_number}</p>
-              <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleDateString('en-IN', { 
-                day: '2-digit', 
-                month: 'short', 
-                year: 'numeric' 
+              ${order.invoice_number ? `<p><strong>Invoice Number:</strong> ${order.invoice_number}</p>` : ''}
+              <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
               })}</p>
               <p><strong>Status:</strong> <span style="color: #f97316; font-weight: bold;">PENDING CONFIRMATION</span></p>
+              ${order.taxable_amount > 0 ? `
+              <p><strong>GSTIN:</strong> 22AQFPJ2897M1ZG</p>
+              ` : ''}
             </div>
 
             <h3>Order Items</h3>
@@ -327,11 +333,20 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
             </table>
 
             <div class="total">
+              ${order.taxable_amount > 0 ? `
+              <p style="margin: 3px 0; font-size: 14px;">Taxable Amount: ₹${Number(order.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              ${order.is_igst
+                ? `<p style="margin: 3px 0; font-size: 14px;">IGST: ₹${Number(order.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
+                : `<p style="margin: 3px 0; font-size: 14px;">CGST: ₹${Number(order.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                   <p style="margin: 3px 0; font-size: 14px;">SGST: ₹${Number(order.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
+              }
+              <hr style="border: none; border-top: 1px solid #ccc; margin: 8px 0;">
+              ` : ''}
               <h3 style="margin: 0;">Total Amount: ₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
             </div>
 
             <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
-              <h4 style="margin-top: 0;">📞 Next Steps</h4>
+              <h4 style="margin-top: 0;">Next Steps</h4>
               <p style="margin: 5px 0;">Our team will contact you within 24 hours to:</p>
               <ul style="margin: 10px 0;">
                 <li>Confirm your order details</li>
@@ -341,7 +356,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
             </div>
 
             <p>If you have any questions, feel free to contact us:</p>
-            <p>📞 +91 89030 31299 | +91 94883 54099<br>📧 jeffistoress@gmail.com</p>
+                                        <p>Phone: +91 89030 31299 | +91 94883 54099<br>Email: jeffistoress@gmail.com</p>
 
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
@@ -351,6 +366,11 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
         </body>
       </html>
     `,
+    attachments: invoicePdfBuffer ? [{
+      filename: `Invoice-${order.invoice_number || order.order_number}.pdf`,
+      content: invoicePdfBuffer,
+      contentType: 'application/pdf',
+    }] : [],
   }
 
   try {
@@ -367,9 +387,9 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], us
   const adminEmail = process.env.ADMIN_EMAIL || 'jeffistoress@gmail.com'
   
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.GMAIL_USER}>`,
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
     to: adminEmail,
-    subject: `🔔 New Order - ${order.order_number}`,
+    subject: `New Order - ${order.order_number}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -423,7 +443,7 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], us
         <body>
           <div class="container">
             <div class="alert">
-              <h2 style="margin-top: 0;">🎉 New Order Received!</h2>
+              <h2 style="margin-top: 0;">New Order Received!</h2>
               <p style="font-size: 18px; margin: 0;"><strong>Order #${order.order_number}</strong></p>
             </div>
 
@@ -471,7 +491,7 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], us
             </table>
 
             <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
-              <h4 style="margin-top: 0;">⚠️ Action Required</h4>
+              <h4 style="margin-top: 0;">Action Required</h4>
               <p>Please contact the customer within 24 hours to confirm the order and payment details.</p>
             </div>
 
@@ -504,7 +524,8 @@ export async function sendOrderStatusUpdate(
   orderNumber: string,
   orderId: string,
   newStatus: string,
-  previousStatus?: string
+  previousStatus?: string,
+  invoicePdfBuffer?: Buffer | null
 ) {
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
     pending: {
@@ -537,6 +558,11 @@ export async function sendOrderStatusUpdate(
       message: 'Your order has been cancelled. If you did not request this cancellation, please contact us immediately.',
       color: '#ef4444',
     },
+    cancel_requested: {
+      title: 'Cancellation Request Received',
+      message: 'We have received your cancellation request. Our team will review it and notify you once it is approved or rejected.',
+      color: '#f97316',
+    },
   }
 
   const statusInfo = statusMessages[newStatus] || {
@@ -546,7 +572,7 @@ export async function sendOrderStatusUpdate(
   }
 
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.GMAIL_USER}>`,
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
     to: customerEmail,
     subject: `${statusInfo.title} - Order ${orderNumber}`,
     html: `
@@ -647,20 +673,20 @@ export async function sendOrderStatusUpdate(
 
             ${newStatus === 'shipped' ? `
               <div class="info-box">
-                <h4 style="margin-top: 0;">📦 Tracking Information</h4>
+                <h4 style="margin-top: 0;">Tracking Information</h4>
                 <p>You can track your order by logging into your account.</p>
               </div>
             ` : ''}
 
             ${newStatus === 'delivered' ? `
               <div class="info-box">
-                <h4 style="margin-top: 0;">💚 Thank You!</h4>
+                <h4 style="margin-top: 0;">Thank You!</h4>
                 <p>We hope you're satisfied with your purchase. If you have any questions or concerns, please don't hesitate to contact us.</p>
               </div>
             ` : ''}
 
             <p style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders" 
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
                  class="button">
                 View Order Details
               </a>
@@ -671,12 +697,17 @@ export async function sendOrderStatusUpdate(
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-              <p>📞 +91 89030 31299 | 📧 jeffistoress@gmail.com</p>
+                            <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
             </div>
           </div>
         </body>
       </html>
     `,
+    attachments: invoicePdfBuffer ? [{
+      filename: `Invoice-${orderNumber}.pdf`,
+      content: invoicePdfBuffer,
+      contentType: 'application/pdf',
+    }] : [],
   }
 
   try {
@@ -728,7 +759,7 @@ export async function sendPaymentStatusUpdate(
   }
 
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.GMAIL_USER}>`,
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
     to: customerEmail,
     subject: `${paymentInfo.title} - Order ${orderNumber}`,
     html: `
@@ -846,27 +877,27 @@ export async function sendPaymentStatusUpdate(
 
             ${newPaymentStatus === 'paid' ? `
               <div class="info-box">
-                <h4 style="margin-top: 0;">✓ Payment Confirmed</h4>
+                <h4 style="margin-top: 0;">Payment Confirmed</h4>
                 <p>Your order will now be processed and shipped as per the delivery schedule.</p>
               </div>
             ` : ''}
 
             ${newPaymentStatus === 'pending' ? `
               <div class="info-box">
-                <h4 style="margin-top: 0;">⏳ Action Required</h4>
+                <h4 style="margin-top: 0;">Action Required</h4>
                 <p>Please complete your payment to avoid order cancellation. Contact us if you need assistance.</p>
               </div>
             ` : ''}
 
             ${newPaymentStatus === 'refunded' ? `
               <div class="info-box">
-                <h4 style="margin-top: 0;">💰 Refund Processed</h4>
+                <h4 style="margin-top: 0;">Refund Processed</h4>
                 <p>The refund has been initiated. Please allow 5-7 business days for the amount to reflect in your account.</p>
               </div>
             ` : ''}
 
             <p style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders" 
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
                  class="button">
                 View Order Details
               </a>
@@ -877,7 +908,7 @@ export async function sendPaymentStatusUpdate(
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-              <p>📞 +91 89030 31299 | 📧 jeffistoress@gmail.com</p>
+                            <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
             </div>
           </div>
         </body>
@@ -899,7 +930,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
   const adminEmail = process.env.ADMIN_EMAIL || 'aloysjehwin@gmail.com'
 
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.GMAIL_USER}>`,
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
     to: adminEmail,
     subject: `New Review Pending Approval - ${product.name}`,
     html: `
@@ -980,7 +1011,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
         <body>
           <div class="container">
             <div class="header">
-              <h1 style="margin: 0;">🔔 New Review Submitted</h1>
+              <h1 style="margin: 0;">New Review Submitted</h1>
               <p style="margin: 10px 0 0 0; opacity: 0.9;">Action Required: Pending Approval</p>
             </div>
 
@@ -1010,7 +1041,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
               ${review.is_verified_purchase ? `
               <div class="info-row">
                 <span class="info-label">Status:</span>
-                <span style="color: #28a745; font-weight: bold;">✓ Verified Purchase</span>
+                <span style="color: #28a745; font-weight: bold;">Verified Purchase</span>
               </div>
               ` : ''}
               

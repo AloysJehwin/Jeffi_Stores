@@ -14,6 +14,7 @@ interface WishlistItem {
     slug: string
     base_price: number
     sale_price: number | null
+    mrp: number | null
     stock_quantity: number
     is_in_stock: boolean
     product_images: Array<{
@@ -127,17 +128,21 @@ export default function WishlistPage() {
           {wishlistItems.map((item) => {
             const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
             const price = item.products.sale_price || item.products.base_price
+            const mrp = item.products.mrp ? Number(item.products.mrp) : null
+            const mrpDiscount = mrp && mrp > Number(price)
+              ? Math.round(((mrp - Number(price)) / mrp) * 100)
+              : 0
             const isAddingToCart = addingToCart.has(item.product_id)
 
             return (
               <div key={item.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
                 {/* Product Image */}
-                <Link href={`/products/${item.products.slug}`} className="block relative h-64 bg-gray-100">
+                <Link href={`/products/${item.products.slug}`} className="block relative h-64 bg-white overflow-hidden">
                   {primaryImage ? (
                     <img
                       src={primaryImage.thumbnail_url}
                       alt={item.products.name}
-                      className="w-full h-full object-contain p-4"
+                      className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -147,9 +152,9 @@ export default function WishlistPage() {
                     </div>
                   )}
 
-                  {item.products.sale_price && (
+                  {mrpDiscount > 0 && (
                     <div className="absolute top-4 right-4 bg-accent-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                      Sale
+                      {mrpDiscount}% off
                     </div>
                   )}
 
@@ -170,16 +175,17 @@ export default function WishlistPage() {
                     {item.products.name}
                   </Link>
 
-                  <div className="flex items-baseline gap-2 mb-4">
+                  <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-2xl font-bold text-primary-600">
-                      ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                    {item.products.sale_price && (
+                    {mrp && mrp > Number(price) && (
                       <span className="text-sm text-gray-400 line-through">
-                        ₹{item.products.base_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                     )}
                   </div>
+                  <p className="text-[10px] text-gray-400 mb-4">Inclusive of all taxes</p>
 
                   {/* Stock Status */}
                   <div className="mb-4">

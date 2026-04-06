@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { uploadProductImage } from '@/lib/s3'
+import { authenticateAdmin } from '@/lib/jwt'
 
 export async function POST(request: NextRequest) {
   try {
+    const admin = await authenticateAdmin(request)
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
     const productId = formData.get('productId') as string

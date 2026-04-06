@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
-import { supabaseAdmin } from '@/lib/supabase'
+import { query, queryOne, queryMany } from '@/lib/db'
 import ProductForm from '@/components/admin/ProductForm'
 
 async function updateProduct(productId: string, formData: FormData) {
@@ -13,8 +13,11 @@ async function updateProduct(productId: string, formData: FormData) {
   const categoryId = formData.get('category_id') as string
   const brandId = formData.get('brand_id') as string
   const basePrice = Math.round(parseFloat(formData.get('base_price') as string) * 100) / 100
+  const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
   const salePrice = formData.get('sale_price') ? Math.round(parseFloat(formData.get('sale_price') as string) * 100) / 100 : null
   const wholesalePrice = formData.get('wholesale_price') ? Math.round(parseFloat(formData.get('wholesale_price') as string) * 100) / 100 : null
+  const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
+  const hsnCode = formData.get('hsn_code') as string || null
   const stockQuantity = parseInt(formData.get('stock_quantity') as string)
   const lowStockThreshold = parseInt(formData.get('low_stock_threshold') as string)
   const weight = formData.get('weight') ? parseFloat(formData.get('weight') as string) : null
@@ -29,37 +32,29 @@ async function updateProduct(productId: string, formData: FormData) {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
   try {
-    const { error } = await supabaseAdmin
-      .from('products')
-      .update({
-        name,
-        slug,
-        sku,
-        description,
-        category_id: categoryId,
-        brand_id: brandId || null,
-        base_price: basePrice,
-        sale_price: salePrice,
-        wholesale_price: wholesalePrice,
-        stock_quantity: stockQuantity,
-        low_stock_threshold: lowStockThreshold,
-        weight,
-        dimensions,
-        is_active: isActive,
-        is_featured: isFeatured,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', productId)
-
-    if (error) throw error
+    await query(
+      `UPDATE products SET
+        name = $1, slug = $2, sku = $3, description = $4, category_id = $5,
+        brand_id = $6, base_price = $7, mrp = $8, sale_price = $9, wholesale_price = $10,
+        gst_percentage = $11, hsn_code = $12, stock_quantity = $13, low_stock_threshold = $14, weight = $15,
+        dimensions = $16, is_active = $17, is_featured = $18, updated_at = $19
+      WHERE id = $20`,
+      [
+        name, slug, sku, description, categoryId,
+        brandId || null, basePrice, mrp, salePrice, wholesalePrice,
+        gstPercentage, hsnCode, stockQuantity, lowStockThreshold, weight,
+        dimensions, isActive, isFeatured, new Date().toISOString(),
+        productId,
+      ]
+    )
 
     // Handle image changes - only if there are changes
     if (imageCount > 0 || existingImagesToKeep.length > 0) {
       // Get all existing images
-      const { data: allExistingImages } = await supabaseAdmin
-        .from('product_images')
-        .select('*')
-        .eq('product_id', productId)
+      const allExistingImages = await queryMany(
+        'SELECT * FROM product_images WHERE product_id = $1',
+        [productId]
+      )
 
       // Determine which images to delete (images not in existingImagesToKeep)
       const existingIdsToKeep = new Set(existingImagesToKeep.map((img: any) => img.id))
@@ -91,10 +86,7 @@ async function updateProduct(productId: string, formData: FormData) {
           }
 
           // Delete from database
-          await supabaseAdmin
-            .from('product_images')
-            .delete()
-            .eq('id', img.id)
+          await query('DELETE FROM product_images WHERE id = $1', [img.id])
         }
       }
 
@@ -107,21 +99,22 @@ async function updateProduct(productId: string, formData: FormData) {
           if (file) {
             const uploadResult = await uploadProductImage(file, productId)
 
-            await supabaseAdmin.from('product_images').insert({
-              product_id: productId,
-              image_url: uploadResult.url,
-              thumbnail_url: uploadResult.thumbnailUrl,
-              s3_bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
-              s3_key: uploadResult.s3Key,
-              s3_thumbnail_key: uploadResult.s3ThumbnailKey,
-              file_name: uploadResult.fileName,
-              file_size: uploadResult.fileSize,
-              mime_type: uploadResult.mimeType,
-              width: uploadResult.width,
-              height: uploadResult.height,
-              display_order: existingImagesToKeep.length + i,
-              is_primary: existingImagesToKeep.length === 0 && i === 0,
-            })
+            await query(
+              `INSERT INTO product_images (
+                product_id, image_url, thumbnail_url, s3_bucket, s3_key,
+                s3_thumbnail_key, file_name, file_size, mime_type, width,
+                height, display_order, is_primary
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+              [
+                productId, uploadResult.url, uploadResult.thumbnailUrl,
+                process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+                uploadResult.s3Key, uploadResult.s3ThumbnailKey,
+                uploadResult.fileName, uploadResult.fileSize, uploadResult.mimeType,
+                uploadResult.width, uploadResult.height,
+                existingImagesToKeep.length + i,
+                existingImagesToKeep.length === 0 && i === 0,
+              ]
+            )
           }
         }
       }
@@ -129,13 +122,10 @@ async function updateProduct(productId: string, formData: FormData) {
       // Update display order and primary status for existing images that were kept
       for (let i = 0; i < existingImagesToKeep.length; i++) {
         const img = existingImagesToKeep[i]
-        await supabaseAdmin
-          .from('product_images')
-          .update({
-            display_order: i,
-            is_primary: img.is_primary || false
-          })
-          .eq('id', img.id)
+        await query(
+          'UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3',
+          [i, img.is_primary || false, img.id]
+        )
       }
 
       // Determine which image should be primary
@@ -144,25 +134,23 @@ async function updateProduct(productId: string, formData: FormData) {
 
       if (!hasPrimaryExisting && imageCount > 0) {
         // If no existing image is primary and we have new images, make first new image primary
-        const { data: newImages } = await supabaseAdmin
-          .from('product_images')
-          .select('*')
-          .eq('product_id', productId)
-          .order('created_at', { ascending: false })
-          .limit(imageCount)
+        const newImages = await queryMany(
+          'SELECT * FROM product_images WHERE product_id = $1 ORDER BY created_at DESC LIMIT $2',
+          [productId, imageCount]
+        )
 
         if (newImages && newImages.length > 0) {
-          await supabaseAdmin
-            .from('product_images')
-            .update({ is_primary: true })
-            .eq('id', newImages[newImages.length - 1].id)
+          await query(
+            'UPDATE product_images SET is_primary = true WHERE id = $1',
+            [newImages[newImages.length - 1].id]
+          )
         }
       } else if (!hasPrimaryExisting && existingImagesToKeep.length > 0) {
         // If no primary was selected, make the first existing image primary
-        await supabaseAdmin
-          .from('product_images')
-          .update({ is_primary: true })
-          .eq('id', existingImagesToKeep[0].id)
+        await query(
+          'UPDATE product_images SET is_primary = true WHERE id = $1',
+          [existingImagesToKeep[0].id]
+        )
       }
     }
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import ImageUpload from './ImageUpload'
+import AdminSelect from './AdminSelect'
 
 interface Category {
   id: string
@@ -100,56 +101,78 @@ export default function ProductForm({ categories, brands, action, product, produ
             />
           </div>
 
-          {/* Category */}
+          {/* HSN/SAC Code */}
           <div>
-            <label htmlFor="category_id" className="block text-sm font-medium text-gray-700 mb-2">
-              Category *
+            <label htmlFor="hsn_code" className="block text-sm font-medium text-gray-700 mb-2">
+              HSN/SAC Code
             </label>
-            <select
-              id="category_id"
-              name="category_id"
-              required
-              defaultValue={product?.category_id}
+            <input
+              type="text"
+              id="hsn_code"
+              name="hsn_code"
+              defaultValue={product?.hsn_code}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-            >
-              <option value="">Select a category</option>
-              {mainCategories.map(cat => (
-                <optgroup key={cat.id} label={cat.name}>
-                  <option value={cat.id}>{cat.name}</option>
-                  {getSubcategories(cat.id).map(sub => (
-                    <option key={sub.id} value={sub.id}>
-                      &nbsp;&nbsp;{sub.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+              placeholder="e.g., 8531"
+            />
+            <p className="text-xs text-gray-500 mt-1">Required for GST invoices</p>
           </div>
+
+          {/* Category */}
+          <AdminSelect
+            id="category_id"
+            name="category_id"
+            label="Category *"
+            required
+            defaultValue={product?.category_id}
+            placeholder="Select a category"
+            options={mainCategories.flatMap(cat => [
+              { value: cat.id, label: cat.name, group: cat.name },
+              ...getSubcategories(cat.id).map(sub => ({
+                value: sub.id,
+                label: sub.name,
+                group: cat.name,
+                indent: true,
+              })),
+            ])}
+          />
 
           {/* Brand */}
+          <AdminSelect
+            id="brand_id"
+            name="brand_id"
+            label="Brand"
+            defaultValue={product?.brand_id || ''}
+            placeholder="No Brand"
+            options={[
+              { value: '', label: 'No Brand' },
+              ...brands.map(brand => ({
+                value: brand.id,
+                label: brand.name,
+              })),
+            ]}
+          />
+
+          {/* MRP */}
           <div>
-            <label htmlFor="brand_id" className="block text-sm font-medium text-gray-700 mb-2">
-              Brand
+            <label htmlFor="mrp" className="block text-sm font-medium text-gray-700 mb-2">
+              MRP (Rs.)
             </label>
-            <select
-              id="brand_id"
-              name="brand_id"
-              defaultValue={product?.brand_id || ''}
+            <input
+              type="number"
+              id="mrp"
+              name="mrp"
+              step="0.01"
+              min="0"
+              defaultValue={product?.mrp}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-            >
-              <option value="">No Brand</option>
-              {brands.map(brand => (
-                <option key={brand.id} value={brand.id}>
-                  {brand.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Maximum Retail Price"
+            />
           </div>
 
-          {/* Base Price */}
+          {/* Selling Price (base_price) */}
           <div>
             <label htmlFor="base_price" className="block text-sm font-medium text-gray-700 mb-2">
-              Base Price (Rs.) *
+              Selling Price (Rs.) *
             </label>
             <input
               type="number"
@@ -160,9 +183,25 @@ export default function ProductForm({ categories, brands, action, product, produ
               min="0"
               defaultValue={product?.base_price}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="0.00"
+              placeholder="Price incl. GST"
             />
+            <p className="text-xs text-gray-500 mt-1">GST-inclusive price the customer pays</p>
           </div>
+
+          {/* GST Rate */}
+          <AdminSelect
+            id="gst_percentage"
+            name="gst_percentage"
+            label="GST Rate *"
+            defaultValue={product?.gst_percentage != null ? String(product.gst_percentage) : '18'}
+            options={[
+              { value: '0', label: '0% GST' },
+              { value: '5', label: '5% GST' },
+              { value: '12', label: '12% GST' },
+              { value: '18', label: '18% GST' },
+              { value: '28', label: '28% GST' },
+            ]}
+          />
 
           {/* Sale Price */}
           <div>
@@ -177,7 +216,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               min="0"
               defaultValue={product?.sale_price}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="0.00 (Optional)"
+              placeholder="Discounted price (optional)"
             />
           </div>
 
@@ -194,7 +233,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               min="0"
               defaultValue={product?.wholesale_price}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="0.00 (Optional)"
+              placeholder="Bulk price (optional)"
             />
           </div>
 

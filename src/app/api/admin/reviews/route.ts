@@ -1,55 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
-import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
+import { queryMany, query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/jwt'
 
 // Get reviews for admin (all or filtered)
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('admin_token')?.value
-
-    // Verify admin is logged in
-    if (!token) {
+    const admin = await authenticateAdmin(request)
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    await verifyToken(token)
 
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get('filter') || 'pending'
 
-    let query = supabaseAdmin
-      .from('product_reviews')
-      .select(`
-        *,
-        users (
-          first_name,
-          last_name,
-          email
-        ),
-        products (
-          name,
-          slug
-        )
-      `)
+    let sql = `
+      SELECT
+        pr.*,
+        json_build_object('first_name', u.first_name, 'last_name', u.last_name, 'email', u.email) AS users,
+        json_build_object('name', p.name, 'slug', p.slug) AS products
+      FROM product_reviews pr
+      LEFT JOIN users u ON pr.user_id = u.id
+      LEFT JOIN products p ON pr.product_id = p.id
+    `
+    const params: any[] = []
 
-    // Apply filter
     if (filter === 'pending') {
-      query = query.eq('is_approved', false)
+      sql += ' WHERE pr.is_approved = $1'
+      params.push(false)
     } else if (filter === 'approved') {
-      query = query.eq('is_approved', true)
+      sql += ' WHERE pr.is_approved = $1'
+      params.push(true)
     }
-    // 'all' shows everything
 
-    query = query.order('created_at', { ascending: false })
+    sql += ' ORDER BY pr.created_at DESC'
 
-    const { data: reviews, error } = await query
-
-    if (error) {
-      console.error('Reviews fetch error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    const reviews = await queryMany(sql, params)
 
     return NextResponse.json({ reviews: reviews || [] })
   } catch (error) {
@@ -61,15 +46,10 @@ export async function GET(request: NextRequest) {
 // Approve or reject a review
 export async function PATCH(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('admin_token')?.value
-
-    // Verify admin is logged in
-    if (!token) {
+    const admin = await authenticateAdmin(request)
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    await verifyToken(token)
 
     const body = await request.json()
     const { reviewId, action } = body
@@ -79,30 +59,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'approve') {
-      // Approve the review
-      const { error } = await supabaseAdmin
-        .from('product_reviews')
-        .update({ is_approved: true, updated_at: new Date().toISOString() })
-        .eq('id', reviewId)
-
-      if (error) {
-        console.error('Review approval error:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
+      await query(
+        'UPDATE product_reviews SET is_approved = true, updated_at = NOW() WHERE id = $1',
+        [reviewId]
+      )
       return NextResponse.json({ message: 'Review approved successfully' })
     } else if (action === 'reject') {
-      // Delete the review
-      const { error } = await supabaseAdmin
-        .from('product_reviews')
-        .delete()
-        .eq('id', reviewId)
-
-      if (error) {
-        console.error('Review deletion error:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
+      await query('DELETE FROM product_reviews WHERE id = $1', [reviewId])
       return NextResponse.json({ message: 'Review deleted successfully' })
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

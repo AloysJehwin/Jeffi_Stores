@@ -1,26 +1,19 @@
 import Link from 'next/link'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryMany } from '@/lib/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 
 async function getAllCategories() {
-  const { data } = await supabaseAdmin
-    .from('categories')
-    .select('*')
-    .eq('is_active', true)
-    .order('display_order', { ascending: true })
-
-  return data || []
+  return queryMany('SELECT * FROM categories WHERE is_active = true ORDER BY display_order ASC')
 }
 
 async function getCategoryProductCounts() {
-  const { data } = await supabaseAdmin
-    .from('products')
-    .select('category_id')
-    .eq('is_active', true)
+  const rows = await queryMany<{ category_id: string; count: string }>(
+    'SELECT category_id, COUNT(*) as count FROM products WHERE is_active = true GROUP BY category_id'
+  )
 
   const counts: Record<string, number> = {}
-  data?.forEach((product) => {
-    counts[product.category_id] = (counts[product.category_id] || 0) + 1
+  rows.forEach((row) => {
+    counts[row.category_id] = parseInt(row.count, 10)
   })
 
   return counts

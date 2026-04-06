@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isOTPVerified, deleteOTP } from '@/lib/otp'
 import { sendWelcomeEmail } from '@/lib/email'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryOne } from '@/lib/db'
 import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
 
@@ -34,12 +34,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate phone if provided
+    let normalizedPhone = null
+    if (phone) {
+      const digits = phone.replace(/\D/g, '')
+      const cleaned = digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits
+      if (cleaned.length !== 10) {
+        return NextResponse.json({ error: 'Enter a valid 10-digit mobile number' }, { status: 400 })
+      }
+      normalizedPhone = `+91${cleaned}`
+    }
+
     // Check if email already exists
-    const { data: existingUser } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', email.toLowerCase())
-      .single()
+    const existingUser = await queryOne(
+      'SELECT id FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    )
 
     if (existingUser) {
       // Clean up OTP
@@ -48,21 +58,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Create user
-    const { data: newUser, error: createError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        email: email.toLowerCase(),
-        first_name: firstName,
-        last_name: lastName || null,
-        phone: phone || null,
-        is_active: true,
-        last_login: new Date().toISOString(),
-      })
-      .select()
-      .single()
+    const newUser = await queryOne(
+      `INSERT INTO users (email, first_name, last_name, phone, is_active, last_login)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       RETURNING *`,
+      [email.toLowerCase(), firstName, lastName || null, normalizedPhone, true]
+    )
 
-    if (createError || !newUser) {
-      console.error('User creation error:', createError)
+    if (!newUser) {
+      console.error('User creation failed')
       return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
     }
 

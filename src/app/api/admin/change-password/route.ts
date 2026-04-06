@@ -1,33 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryOne, query } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/jwt'
 import bcrypt from 'bcrypt'
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const sessionCookie = cookieStore.get('admin_session')
-
-    if (!sessionCookie) {
+    const admin = await authenticateAdmin(request)
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const session = JSON.parse(sessionCookie.value)
     const { currentPassword, newPassword } = await request.json()
 
     // Get admin data
-    const { data: admin, error: adminError } = await supabaseAdmin
-      .from('admins')
-      .select('password_hash')
-      .eq('id', session.adminId)
-      .single()
+    const adminData = await queryOne(
+      'SELECT password_hash FROM admins WHERE id = $1',
+      [admin.adminId]
+    )
 
-    if (adminError || !admin) {
+    if (!adminData) {
       return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
     }
 
     // Verify current password
-    const isValid = await bcrypt.compare(currentPassword, admin.password_hash)
+    const isValid = await bcrypt.compare(currentPassword, adminData.password_hash)
     if (!isValid) {
       return NextResponse.json({ error: 'Current password is incorrect' }, { status: 400 })
     }
@@ -36,15 +32,10 @@ export async function POST(request: NextRequest) {
     const newPasswordHash = await bcrypt.hash(newPassword, 10)
 
     // Update password
-    const { error: updateError } = await supabaseAdmin
-      .from('admins')
-      .update({
-        password_hash: newPasswordHash,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', session.adminId)
-
-    if (updateError) throw updateError
+    await query(
+      'UPDATE admins SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+      [newPasswordHash, admin.adminId]
+    )
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

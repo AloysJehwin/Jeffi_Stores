@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryMany } from '@/lib/db'
 
 // Mark as dynamic to prevent static generation errors
 export const dynamic = 'force-dynamic'
@@ -13,29 +13,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ products: [] })
     }
 
-    const { data: products, error } = await supabaseAdmin
-      .from('products')
-      .select(`
-        id,
-        name,
-        slug,
-        base_price,
-        sale_price,
-        product_images (
-          image_url,
-          thumbnail_url,
-          is_primary
-        )
-      `)
-      .eq('is_active', true)
-      .ilike('name', `%${query}%`)
-      .order('name', { ascending: true })
-      .limit(5)
-
-    if (error) {
-      console.error('Search error:', error)
-      return NextResponse.json({ products: [] }, { status: 500 })
-    }
+    const products = await queryMany(`
+      SELECT
+        p.id, p.name, p.slug, p.base_price, p.sale_price,
+        COALESCE(
+          (SELECT json_agg(json_build_object('image_url', pi.image_url, 'thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
+           FROM product_images pi WHERE pi.product_id = p.id),
+          '[]'::json
+        ) AS product_images
+      FROM products p
+      WHERE p.is_active = true AND p.name ILIKE $1
+      ORDER BY p.name ASC
+      LIMIT 5
+    `, [`%${query}%`])
 
     return NextResponse.json({ products: products || [] })
   } catch (error) {

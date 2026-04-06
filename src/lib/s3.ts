@@ -115,6 +115,23 @@ export async function uploadProductImage(
   }
 }
 
+export async function uploadInvoicePDF(pdfBuffer: Buffer, invoiceNumber: string, financialYear: string): Promise<string> {
+  const safeFileName = invoiceNumber.replace(/\//g, '-')
+  const s3Key = `invoices/${financialYear}/${safeFileName}.pdf`
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+      Body: pdfBuffer,
+      ContentType: 'application/pdf',
+      ContentDisposition: `inline; filename="${safeFileName}.pdf"`,
+    })
+  )
+
+  return getS3Url(s3Key)
+}
+
 export async function deleteProductImage(s3Key: string, s3ThumbnailKey: string) {
   try {
     await s3Client.send(
@@ -140,25 +157,29 @@ export async function saveProductImages(
   productId: string,
   images: { url: string; thumbnailUrl: string; s3Key: string; s3ThumbnailKey: string; fileName: string; fileSize: number; mimeType: string; width: number; height: number; altText?: string; isPrimary?: boolean }[]
 ) {
-  const { supabaseAdmin } = await import('./supabase')
+  const { query } = await import('./db')
 
   for (let i = 0; i < images.length; i++) {
     const image = images[i]
-    await supabaseAdmin.from('product_images').insert({
-      product_id: productId,
-      image_url: image.url,
-      thumbnail_url: image.thumbnailUrl,
-      s3_bucket: BUCKET_NAME,
-      s3_key: image.s3Key,
-      s3_thumbnail_key: image.s3ThumbnailKey,
-      file_name: image.fileName,
-      file_size: image.fileSize,
-      mime_type: image.mimeType,
-      width: image.width,
-      height: image.height,
-      alt_text: image.altText || '',
-      display_order: i,
-      is_primary: image.isPrimary || i === 0,
-    })
+    await query(
+      `INSERT INTO product_images (product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key, file_name, file_size, mime_type, width, height, alt_text, display_order, is_primary)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      [
+        productId,
+        image.url,
+        image.thumbnailUrl,
+        BUCKET_NAME,
+        image.s3Key,
+        image.s3ThumbnailKey,
+        image.fileName,
+        image.fileSize,
+        image.mimeType,
+        image.width,
+        image.height,
+        image.altText || '',
+        i,
+        image.isPrimary || i === 0,
+      ]
+    )
   }
 }

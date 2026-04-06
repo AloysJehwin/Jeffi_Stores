@@ -1,61 +1,63 @@
 import Link from 'next/link'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryMany } from '@/lib/db'
 import SortDropdown from '@/components/visitor/SortDropdown'
 
 async function getProducts(searchParams: any) {
-  let query = supabaseAdmin
-    .from('products')
-    .select(`
-      *,
-      categories (id, name, slug),
-      brands (id, name),
-      product_images (*)
-    `)
-    .eq('is_active', true)
+  const conditions: string[] = ['p.is_active = true']
+  const params: any[] = []
+  let paramIndex = 1
 
-  // Filter by category
   if (searchParams.category) {
-    query = query.eq('category_id', searchParams.category)
+    conditions.push(`p.category_id = $${paramIndex++}`)
+    params.push(searchParams.category)
   }
 
-  // Filter by brand
   if (searchParams.brand) {
-    query = query.eq('brand_id', searchParams.brand)
+    conditions.push(`p.brand_id = $${paramIndex++}`)
+    params.push(searchParams.brand)
   }
 
-  // Search by name
   if (searchParams.search) {
-    query = query.ilike('name', `%${searchParams.search}%`)
+    conditions.push(`p.name ILIKE $${paramIndex++}`)
+    params.push(`%${searchParams.search}%`)
   }
 
-  // Sort
   const sortBy = searchParams.sort || 'created_at'
-  const sortOrder = searchParams.order || 'desc'
-  query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+  const sortOrder = searchParams.order === 'asc' ? 'ASC' : 'DESC'
 
-  const { data } = await query
+  // Whitelist sort columns to prevent SQL injection
+  const allowedSortColumns: Record<string, string> = {
+    created_at: 'p.created_at',
+    name: 'p.name',
+    base_price: 'p.base_price',
+  }
+  const sortColumn = allowedSortColumns[sortBy] || 'p.created_at'
 
-  return data || []
+  const sql = `
+    SELECT p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY ${sortColumn} ${sortOrder}
+  `
+
+  return queryMany(sql, params)
 }
 
 async function getCategories() {
-  const { data } = await supabaseAdmin
-    .from('categories')
-    .select('id, name, slug')
-    .eq('is_active', true)
-    .order('name', { ascending: true })
-
-  return data || []
+  return queryMany('SELECT id, name, slug FROM categories WHERE is_active = true ORDER BY name ASC')
 }
 
 async function getBrands() {
-  const { data } = await supabaseAdmin
-    .from('brands')
-    .select('id, name')
-    .eq('is_active', true)
-    .order('name', { ascending: true })
-
-  return data || []
+  return queryMany('SELECT id, name FROM brands WHERE is_active = true ORDER BY name ASC')
 }
 
 export default async function ProductsPage({
@@ -85,7 +87,7 @@ export default async function ProductsPage({
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar Filters */}
           <aside className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto">
               <h2 className="font-bold text-lg text-gray-900 mb-4">Filters</h2>
 
               {/* Search */}
@@ -204,6 +206,10 @@ export default async function ProductsPage({
                 {products.map((product) => {
                   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                   const displayPrice = product.sale_price || product.base_price
+                  const mrp = product.mrp ? Number(product.mrp) : null
+                  const mrpDiscount = mrp && mrp > Number(displayPrice)
+                    ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
+                    : 0
 
                   return (
                     <Link
@@ -213,12 +219,12 @@ export default async function ProductsPage({
                     >
                       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
                         {/* Product Image */}
-                        <div className="relative h-56 bg-gray-100">
+                        <div className="relative h-56 bg-white overflow-hidden">
                           {primaryImage ? (
                             <img
                               src={primaryImage.image_url}
                               alt={product.name}
-                              className="w-full h-full object-contain p-4"
+                              className="w-full h-full object-cover"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
@@ -227,9 +233,9 @@ export default async function ProductsPage({
                               </svg>
                             </div>
                           )}
-                          {product.sale_price && (
+                          {mrpDiscount > 0 && (
                             <div className="absolute top-3 right-3 bg-accent-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                              Sale
+                              {mrpDiscount}% off
                             </div>
                           )}
                         </div>
@@ -248,16 +254,17 @@ export default async function ProductsPage({
                             )}
                           </div>
                           <div className="mt-auto">
-                            <div className="flex items-baseline gap-2 mb-3">
+                            <div className="flex items-baseline gap-2 mb-1">
                               <span className="text-xl font-bold text-primary-600">
                                 ₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </span>
-                              {product.sale_price && (
+                              {mrp && mrp > Number(displayPrice) && (
                                 <span className="text-sm text-gray-400 line-through">
-                                  ₹{Number(product.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </span>
                               )}
                             </div>
+                            <p className="text-[10px] text-gray-400 mb-3">Inclusive of all taxes</p>
                             <div className="flex items-center justify-between">
                               <span className={`text-xs font-medium ${product.stock_quantity > product.low_stock_threshold ? 'text-green-600' : 'text-orange-600'}`}>
                                 {product.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}

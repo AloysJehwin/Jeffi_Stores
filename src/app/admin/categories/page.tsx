@@ -1,10 +1,14 @@
 import Link from 'next/link'
-import { getAllCategories } from '@/lib/queries'
+import { getFilteredCategories } from '@/lib/queries'
 import DeleteCategoryButton from '@/components/admin/DeleteCategoryButton'
+import AdminFilters from '@/components/admin/AdminFilters'
 
-export default async function CategoriesPage() {
-  // Middleware already verified authentication
-  const categories = await getAllCategories()
+export default async function CategoriesPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const categories = await getFilteredCategories({
+    is_active: searchParams.is_active,
+    type: searchParams.type,
+    search: searchParams.search,
+  })
 
   // Organize categories by parent
   const mainCategories = categories?.filter(c => !c.parent_category_id) || []
@@ -45,6 +49,30 @@ export default async function CategoriesPage() {
           <p className="text-3xl font-bold text-secondary-500 mt-2">{subCategoriesCount}</p>
         </div>
       </div>
+
+      {/* Filters */}
+      <AdminFilters
+        filters={[
+          {
+            name: 'is_active',
+            label: 'Status',
+            options: [
+              { value: 'true', label: 'Active' },
+              { value: 'false', label: 'Inactive' },
+            ],
+          },
+          {
+            name: 'type',
+            label: 'Type',
+            options: [
+              { value: 'main', label: 'Main Categories' },
+              { value: 'sub', label: 'Subcategories' },
+            ],
+          },
+        ]}
+        searchPlaceholder="Search by name..."
+        searchParam="search"
+      />
 
       {/* Categories Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">

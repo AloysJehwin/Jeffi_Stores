@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import AccountSidebar from '@/components/visitor/AccountSidebar'
 
 interface OrderItem {
   id: string
@@ -45,6 +46,8 @@ export default function OrdersPage() {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null)
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -74,6 +77,23 @@ export default function OrdersPage() {
     }
   }
 
+  const handleCancelOrder = async (orderId: string) => {
+    setCancellingOrderId(orderId)
+    try {
+      const response = await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
+      if (!response.ok) {
+        const data = await response.json()
+        console.error('Cancel failed:', data.error)
+      }
+      await fetchOrders()
+    } catch (error) {
+      console.error('Failed to cancel order:', error)
+    } finally {
+      setCancellingOrderId(null)
+      setConfirmCancelId(null)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
@@ -84,6 +104,8 @@ export default function OrdersPage() {
         return 'bg-purple-100 text-purple-800'
       case 'delivered':
         return 'bg-green-100 text-green-800'
+      case 'cancel_requested':
+        return 'bg-orange-100 text-orange-800'
       case 'cancelled':
         return 'bg-red-100 text-red-800'
       default:
@@ -114,47 +136,7 @@ export default function OrdersPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <nav className="space-y-2">
-                <Link
-                  href="/account"
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Profile
-                </Link>
-                <Link
-                  href="/account/orders"
-                  className="flex items-center gap-3 px-4 py-3 bg-accent-50 text-accent-700 rounded-lg font-medium"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                  </svg>
-                  My Orders
-                </Link>
-                <Link
-                  href="/account/addresses"
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  My Addresses
-                </Link>
-                <Link
-                  href="/wishlist"
-                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                  </svg>
-                  Wishlist
-                </Link>
-              </nav>
-            </div>
+            <AccountSidebar />
           </div>
 
           {/* Main Content */}
@@ -220,7 +202,7 @@ export default function OrdersPage() {
                               order.status
                             )}`}
                           >
-                            {order.status}
+                            {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status}
                           </span>
                         </div>
                       </div>
@@ -234,12 +216,12 @@ export default function OrdersPage() {
                           
                           return (
                             <div key={item.id} className="flex gap-4">
-                              <div className="relative w-20 h-20 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden">
+                              <div className="relative w-20 h-20 flex-shrink-0 bg-white rounded-lg overflow-hidden border border-gray-200">
                                 {primaryImage ? (
                                   <img
                                     src={primaryImage.thumbnail_url}
                                     alt={item.product_name}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-cover rounded-lg"
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
@@ -279,6 +261,54 @@ export default function OrdersPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* View Details */}
+                      <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+                        <Link
+                          href={`/account/orders/${order.id}`}
+                          className="inline-flex items-center text-accent-600 hover:text-accent-700 font-medium text-sm"
+                        >
+                          View Order Details
+                          <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </Link>
+                        {(order.status === 'pending' || order.status === 'confirmed') && (
+                          confirmCancelId === order.id ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-red-700">Request cancellation?</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCancelOrder(order.id)}
+                                disabled={cancellingOrderId === order.id}
+                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center"
+                              >
+                                {cancellingOrderId === order.id ? (
+                                  <>
+                                    <div className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1"></div>
+                                    Submitting
+                                  </>
+                                ) : 'Yes'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmCancelId(null)}
+                                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-medium transition-colors"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmCancelId(order.id)}
+                              className="text-red-600 hover:text-red-700 text-sm font-medium"
+                            >
+                              Request Cancellation
+                            </button>
+                          )
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}

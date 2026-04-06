@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { jwtVerify } from 'jose'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryOne } from '@/lib/db'
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -19,13 +19,12 @@ export async function GET(request: NextRequest) {
     const { payload } = await jwtVerify(token, JWT_SECRET)
 
     // Get user from database
-    const { data: user, error } = await supabaseAdmin
-      .from('users')
-      .select('id, email, first_name, last_name, phone, created_at')
-      .eq('id', payload.userId as string)
-      .single()
+    const user = await queryOne(
+      'SELECT id, email, first_name, last_name, phone, created_at FROM users WHERE id = $1',
+      [payload.userId as string]
+    )
 
-    if (error || !user) {
+    if (!user) {
       // Invalid token or user not found
       cookies().delete('auth_token')
       return NextResponse.json({ user: null })

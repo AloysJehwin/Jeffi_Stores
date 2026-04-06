@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabase'
+import { queryOne, query } from './db'
 
 /**
  * Get or create a guest user for the current session
@@ -7,32 +7,24 @@ import { supabaseAdmin } from './supabase'
  */
 export async function getOrCreateGuestUser(sessionId: string): Promise<string> {
   // Check if there's already a guest user with this session_id
-  const { data: existingGuest } = await supabaseAdmin
-    .from('users')
-    .select('id')
-    .eq('session_id', sessionId)
-    .eq('is_guest', true)
-    .is('merged_to_user_id', null)
-    .single()
+  const existingGuest = await queryOne(
+    'SELECT id FROM users WHERE session_id = $1 AND is_guest = true AND merged_to_user_id IS NULL',
+    [sessionId]
+  )
 
   if (existingGuest) {
     return existingGuest.id
   }
 
   // Create a new guest user
-  const { data: newGuest, error } = await supabaseAdmin
-    .from('users')
-    .insert({
-      email: `guest_${sessionId}@temporary.local`,
-      first_name: 'Guest',
-      is_guest: true,
-      session_id: sessionId,
-      is_active: true,
-    })
-    .select('id')
-    .single()
+  const newGuest = await queryOne(
+    `INSERT INTO users (email, first_name, is_guest, session_id, is_active)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id`,
+    [`guest_${sessionId}@temporary.local`, 'Guest', true, sessionId, true]
+  )
 
-  if (error || !newGuest) {
+  if (!newGuest) {
     throw new Error('Failed to create guest user')
   }
 
@@ -47,16 +39,7 @@ export async function getOrCreateGuestUser(sessionId: string): Promise<string> {
 export async function mergeGuestToUser(guestUserId: string, actualUserId: string): Promise<void> {
   try {
     // Call the database function to merge cart and wishlist
-    const { error } = await supabaseAdmin.rpc('merge_guest_cart_to_user', {
-      p_guest_user_id: guestUserId,
-      p_actual_user_id: actualUserId,
-    })
-
-    if (error) {
-      console.error('Error merging guest cart:', error)
-      throw error
-    }
-
+    await query('SELECT merge_guest_cart_to_user($1, $2)', [guestUserId, actualUserId])
     console.log(`Successfully merged guest ${guestUserId} to user ${actualUserId}`)
   } catch (error) {
     console.error('Failed to merge guest cart:', error)

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
-import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
+import { query, queryOne, queryMany } from '@/lib/db'
+import { authenticateUser } from '@/lib/jwt'
 import { sendNewReviewNotification } from '@/lib/email'
 
 // Get reviews for a product
@@ -14,23 +13,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Product ID required' }, { status: 400 })
     }
 
-    const { data: reviews, error } = await supabaseAdmin
-      .from('product_reviews')
-      .select(`
-        *,
-        users (
-          first_name,
-          last_name
-        )
-      `)
-      .eq('product_id', productId)
-      .eq('is_approved', true)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Reviews fetch error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    const reviews = await queryMany(`
+      SELECT
+        pr.*,
+        json_build_object('first_name', u.first_name, 'last_name', u.last_name) AS users
+      FROM product_reviews pr
+      LEFT JOIN users u ON pr.user_id = u.id
+      WHERE pr.product_id = $1 AND pr.is_approved = true
+      ORDER BY pr.created_at DESC
+    `, [productId])
 
     return NextResponse.json({ reviews: reviews || [] })
   } catch (error) {
@@ -42,17 +33,9 @@ export async function GET(request: NextRequest) {
 // Submit a new review
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('auth_token')?.value
-
-    // Verify user is logged in
-    if (!token) {
+    const user = await authenticateUser(request)
+    if (!user) {
       return NextResponse.json({ error: 'Please login to submit a review' }, { status: 401 })
-    }
-
-    const payload = await verifyToken(token)
-    if (!payload?.userId) {
-      return NextResponse.json({ error: 'Invalid authentication' }, { status: 401 })
     }
 
     const body = await request.json()
@@ -68,77 +51,54 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already reviewed this product
-    const { data: existingReview } = await supabaseAdmin
-      .from('product_reviews')
-      .select('id')
-      .eq('product_id', productId)
-      .eq('user_id', payload.userId)
-      .single()
+    const existingReview = await queryOne(
+      'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
+      [productId, user.userId]
+    )
 
     if (existingReview) {
       return NextResponse.json({ error: 'You have already reviewed this product' }, { status: 400 })
     }
 
     // Check if user purchased this product
-    const { data: hasPurchased } = await supabaseAdmin
-      .from('order_items')
-      .select('id')
-      .eq('product_id', productId)
-      .eq('order_id', supabaseAdmin
-        .from('orders')
-        .select('id')
-        .eq('user_id', payload.userId)
-        .eq('order_status', 'delivered')
-      )
-      .limit(1)
-      .single()
+    const hasPurchased = await queryOne(`
+      SELECT oi.id FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE oi.product_id = $1 AND o.user_id = $2 AND o.status = 'delivered'
+      LIMIT 1
+    `, [productId, user.userId])
 
     // Insert review
-    const { data: review, error } = await supabaseAdmin
-      .from('product_reviews')
-      .insert({
-        product_id: productId,
-        user_id: payload.userId,
-        rating,
-        title: title || null,
-        comment,
-        is_verified_purchase: !!hasPurchased,
-        is_approved: false, // Requires admin approval
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Review insert error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    const review = await queryOne(
+      `INSERT INTO product_reviews (product_id, user_id, rating, title, comment, is_verified_purchase, is_approved)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [productId, user.userId, rating, title || null, comment, !!hasPurchased, false]
+    )
 
     // Get user and product details for email
-    const { data: user } = await supabaseAdmin
-      .from('users')
-      .select('first_name, last_name, email')
-      .eq('id', payload.userId)
-      .single()
+    const userDetails = await queryOne(
+      'SELECT first_name, last_name, email FROM users WHERE id = $1',
+      [user.userId]
+    )
 
-    const { data: product } = await supabaseAdmin
-      .from('products')
-      .select('name, slug')
-      .eq('id', productId)
-      .single()
+    const product = await queryOne(
+      'SELECT name, slug FROM products WHERE id = $1',
+      [productId]
+    )
 
     // Send email notification to admin
-    if (user && product) {
+    if (userDetails && product) {
       try {
-        await sendNewReviewNotification(review, user, product)
+        await sendNewReviewNotification(review, userDetails, product)
       } catch (emailError) {
         console.error('Failed to send review notification email:', emailError)
-        // Don't fail the request if email fails
       }
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'Review submitted successfully! It will be visible after admin approval.',
-      review 
+      review
     })
   } catch (error) {
     console.error('Review POST error:', error)

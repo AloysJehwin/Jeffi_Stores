@@ -1,17 +1,12 @@
 import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories } from '@/lib/queries'
-import { supabaseAdmin } from '@/lib/supabase'
+import { query, queryOne } from '@/lib/db'
 import CategoryForm from '@/components/admin/CategoryForm'
 
 async function getCategory(id: string) {
-  const { data, error } = await supabaseAdmin
-    .from('categories')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) throw error
+  const data = await queryOne('SELECT * FROM categories WHERE id = $1', [id])
+  if (!data) throw new Error('Category not found')
   return data
 }
 
@@ -28,20 +23,13 @@ async function updateCategory(categoryId: string, formData: FormData) {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
   try {
-    const { error } = await supabaseAdmin
-      .from('categories')
-      .update({
-        name,
-        slug,
-        description,
-        parent_category_id: parentCategoryId,
-        display_order: displayOrder,
-        is_active: isActive,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', categoryId)
-
-    if (error) throw error
+    await query(
+      `UPDATE categories SET
+        name = $1, slug = $2, description = $3, parent_category_id = $4,
+        display_order = $5, is_active = $6, updated_at = $7
+      WHERE id = $8`,
+      [name, slug, description, parentCategoryId, displayOrder, isActive, new Date().toISOString(), categoryId]
+    )
 
     // Revalidate all pages that use categories
     revalidatePath('/admin/categories')

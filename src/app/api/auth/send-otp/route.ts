@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateOTP, storeOTP } from '@/lib/otp'
 import { sendOTPEmail } from '@/lib/email'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryOne } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,22 +20,20 @@ export async function POST(request: NextRequest) {
 
     // If signup, check if email already exists
     if (isSignup) {
-      const { data: existingUser } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('email', email.toLowerCase())
-        .single()
+      const existingUser = await queryOne(
+        'SELECT id FROM users WHERE email = $1',
+        [email.toLowerCase()]
+      )
 
       if (existingUser) {
         return NextResponse.json({ error: 'Email already registered' }, { status: 400 })
       }
     } else {
       // For login, check if user exists
-      const { data: existingUser } = await supabaseAdmin
-        .from('users')
-        .select('id, first_name')
-        .eq('email', email.toLowerCase())
-        .single()
+      const existingUser = await queryOne(
+        'SELECT id, first_name FROM users WHERE email = $1',
+        [email.toLowerCase()]
+      )
 
       if (!existingUser) {
         return NextResponse.json({ error: 'No account found with this email' }, { status: 404 })

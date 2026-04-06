@@ -1,34 +1,33 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryMany } from '@/lib/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 
 async function getFeaturedProducts() {
-  const { data } = await supabaseAdmin
-    .from('products')
-    .select(`
-      *,
-      categories (id, name, slug),
-      brands (id, name),
-      product_images (*)
-    `)
-    .eq('is_featured', true)
-    .eq('is_active', true)
-    .limit(6)
-
-  return data || []
+  return queryMany(`
+    SELECT p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE p.is_featured = true AND p.is_active = true
+    LIMIT 6
+  `)
 }
 
 async function getMainCategories() {
-  const { data } = await supabaseAdmin
-    .from('categories')
-    .select('*')
-    .is('parent_category_id', null)
-    .eq('is_active', true)
-    .order('display_order', { ascending: true })
-    .limit(6)
-
-  return data || []
+  return queryMany(`
+    SELECT * FROM categories
+    WHERE parent_category_id IS NULL AND is_active = true
+    ORDER BY display_order ASC
+    LIMIT 6
+  `)
 }
 
 export default async function HomePage() {
@@ -148,6 +147,10 @@ export default async function HomePage() {
               {featuredProducts.map((product) => {
                 const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                 const displayPrice = product.sale_price || product.base_price
+                const mrp = product.mrp ? Number(product.mrp) : null
+                const mrpDiscount = mrp && mrp > Number(displayPrice)
+                  ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
+                  : 0
 
                 return (
                   <Link
@@ -157,12 +160,12 @@ export default async function HomePage() {
                   >
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
                       {/* Product Image */}
-                      <div className="relative h-64 bg-gray-100">
+                      <div className="relative h-64 bg-white overflow-hidden">
                         {primaryImage ? (
                           <img
                             src={primaryImage.image_url}
                             alt={product.name}
-                            className="w-full h-full object-contain p-4"
+                            className="w-full h-full object-cover"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -171,9 +174,9 @@ export default async function HomePage() {
                             </svg>
                           </div>
                         )}
-                        {product.sale_price && (
+                        {mrpDiscount > 0 && (
                           <div className="absolute top-4 right-4 bg-accent-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                            Sale
+                            {mrpDiscount}% off
                           </div>
                         )}
                       </div>
@@ -188,16 +191,17 @@ export default async function HomePage() {
                             Brand: {product.brands.name}
                           </p>
                         )}
-                        <div className="flex items-baseline gap-2 mb-4">
+                        <div className="flex items-baseline gap-2 mb-1">
                           <span className="text-2xl font-bold text-primary-600">
                             ₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
-                          {product.sale_price && (
+                          {mrp && mrp > Number(displayPrice) && (
                             <span className="text-sm text-gray-400 line-through">
-                              ₹{Number(product.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </span>
                           )}
                         </div>
+                        <p className="text-[10px] text-gray-400 mb-4">Inclusive of all taxes</p>
                         <div className="flex items-center justify-between">
                           <span className={`text-sm font-medium ${product.stock_quantity > product.low_stock_threshold ? 'text-green-600' : 'text-orange-600'}`}>
                             {product.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}

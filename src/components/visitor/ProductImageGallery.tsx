@@ -23,7 +23,7 @@ export default function ProductImageGallery({ images, productName }: ProductImag
 
   if (!images || images.length === 0) {
     return (
-      <div className="relative bg-gray-100 rounded-lg overflow-hidden">
+      <div className="relative bg-white rounded-xl overflow-hidden border border-gray-200">
         <div className="w-full h-96 flex items-center justify-center">
           <svg className="w-32 h-32 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -58,17 +58,17 @@ export default function ProductImageGallery({ images, productName }: ProductImag
       <div>
         {/* Main Image */}
         <div
-          className="relative bg-gray-100 rounded-lg overflow-hidden mb-4 cursor-zoom-in group"
+          className="relative bg-white rounded-xl overflow-hidden mb-4 cursor-zoom-in group border border-gray-200"
           onMouseEnter={() => setIsZoomed(true)}
           onMouseLeave={() => setIsZoomed(false)}
           onMouseMove={handleMouseMove}
           onClick={() => setShowLightbox(true)}
         >
-          <div className="w-full min-h-[500px] relative overflow-hidden flex items-center justify-center">
+          <div className="w-full aspect-square relative overflow-hidden flex items-center justify-center">
             <img
               src={currentImage.image_url}
               alt={`${productName} - Image ${selectedImageIndex + 1}`}
-              className={`max-w-full max-h-[500px] w-auto h-auto transition-transform duration-300 ${
+              className={`w-full h-full object-cover transition-transform duration-300 ${
                 isZoomed ? 'scale-150' : 'scale-100'
               }`}
               style={
@@ -95,21 +95,21 @@ export default function ProductImageGallery({ images, productName }: ProductImag
 
         {/* Thumbnail Images */}
         {images.length > 1 && (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 gap-3">
             {images.map((image, index) => (
               <div
                 key={image.id}
                 onClick={() => setSelectedImageIndex(index)}
-                className={`relative bg-gray-100 rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
+                className={`relative bg-white rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
                   index === selectedImageIndex
                     ? 'border-accent-500 ring-2 ring-accent-200'
-                    : 'border-transparent hover:border-gray-300'
+                    : 'border-gray-200 hover:border-gray-400'
                 }`}
               >
                 <img
                   src={image.thumbnail_url}
                   alt={`${productName} - Thumbnail ${index + 1}`}
-                  className="w-full h-20 object-contain p-2"
+                  className="w-full h-20 object-cover rounded-md"
                 />
               </div>
             ))}
@@ -191,7 +191,7 @@ export default function ProductImageGallery({ images, productName }: ProductImag
                   <img
                     src={image.thumbnail_url}
                     alt={`Thumbnail ${index + 1}`}
-                    className="w-full h-full object-contain bg-white p-1"
+                    className="w-full h-full object-cover"
                   />
                 </button>
               ))}

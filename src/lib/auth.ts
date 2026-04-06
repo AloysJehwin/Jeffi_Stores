@@ -1,4 +1,4 @@
-import { supabaseAdmin } from './supabase'
+import { queryOne, query } from './db'
 import bcrypt from 'bcrypt'
 
 /**
@@ -8,22 +8,19 @@ import bcrypt from 'bcrypt'
 // Verify admin credentials
 export async function verifyAdminCredentials(username: string, password: string) {
   try {
-    const { data: admin, error } = await supabaseAdmin
-      .from('admins')
-      .select(`
-        *,
-        users (
-          id,
-          email,
-          first_name,
-          last_name,
-          is_active
-        )
-      `)
-      .eq('username', username)
-      .single()
+    const admin = await queryOne(`
+      SELECT
+        a.*,
+        json_build_object(
+          'id', u.id, 'email', u.email, 'first_name', u.first_name,
+          'last_name', u.last_name, 'is_active', u.is_active
+        ) AS users
+      FROM admins a
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE a.username = $1
+    `, [username])
 
-    if (error || !admin) {
+    if (!admin) {
       return { success: false, error: 'Invalid credentials' }
     }
 
@@ -39,15 +36,8 @@ export async function verifyAdminCredentials(username: string, password: string)
     }
 
     // Update last login
-    await supabaseAdmin
-      .from('admins')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', admin.id)
-
-    await supabaseAdmin
-      .from('users')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', admin.user_id)
+    await query('UPDATE admins SET last_login = NOW() WHERE id = $1', [admin.id])
+    await query('UPDATE users SET last_login = NOW() WHERE id = $1', [admin.user_id])
 
     return {
       success: true,
@@ -82,32 +72,24 @@ export async function createAdminUser(userData: {
     const passwordHash = await bcrypt.hash(userData.password, 10)
 
     // Create user first
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        email: userData.email,
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        phone: userData.phone,
-      })
-      .select()
-      .single()
+    const user = await queryOne(
+      `INSERT INTO users (email, first_name, last_name, phone)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [userData.email, userData.first_name, userData.last_name, userData.phone || null]
+    )
 
-    if (userError) throw userError
+    if (!user) throw new Error('Failed to create user')
 
     // Create admin
-    const { data: admin, error: adminError } = await supabaseAdmin
-      .from('admins')
-      .insert({
-        user_id: user.id,
-        username: userData.username,
-        password_hash: passwordHash,
-        role: userData.role || 'admin',
-      })
-      .select()
-      .single()
+    const admin = await queryOne(
+      `INSERT INTO admins (user_id, username, password_hash, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [user.id, userData.username, passwordHash, userData.role || 'admin']
+    )
 
-    if (adminError) throw adminError
+    if (!admin) throw new Error('Failed to create admin')
 
     return { success: true, admin }
   } catch (error) {
@@ -118,20 +100,13 @@ export async function createAdminUser(userData: {
 
 // Verify client certificate (called from middleware)
 export function verifyClientCertificate(certHeader: string | undefined, certVerified: string | undefined) {
-  // certHeader: X-Client-Cert (PEM format)
-  // certVerified: X-Client-Cert-Verified (SUCCESS/FAILED)
-  // These headers are set by Nginx/Cloudflare in production or custom HTTPS server in development
-
   if (!certHeader || certVerified !== 'SUCCESS') {
-    return { 
-      valid: false, 
+    return {
+      valid: false,
       error: 'Invalid or missing client certificate',
       details: 'Please install the client certificate (client-cert.p12) in your browser'
     }
   }
-
-  // Additional certificate validation can be added here
-  // e.g., check CN, expiry, revocation list, etc.
 
   return { valid: true }
 }
@@ -154,7 +129,6 @@ export function hasAdminRole(session: any, requiredRole: string = 'admin') {
 
 // Session management helpers
 export function createSessionToken(admin: any) {
-  // This will be handled by JWT or secure cookies
   return {
     id: admin.id,
     user_id: admin.user_id,

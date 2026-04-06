@@ -1,26 +1,18 @@
-import { supabaseAdmin } from '@/lib/supabase'
+import { queryOne, queryMany } from '@/lib/db'
 import ChangePasswordForm from '@/components/admin/ChangePasswordForm'
 import { headers } from 'next/headers'
 
 async function getAdminInfo(adminId: string) {
-  const { data, error } = await supabaseAdmin
-    .from('admins')
-    .select('id, username, role, created_at, last_login, is_active')
-    .eq('id', adminId)
-    .single()
-
-  if (error) return null
-  return data
+  return queryOne(
+    'SELECT id, username, role, created_at, last_login FROM admins WHERE id = $1',
+    [adminId]
+  )
 }
 
 async function getAllAdmins() {
-  const { data, error } = await supabaseAdmin
-    .from('admins')
-    .select('id, username, role, is_active, created_at, last_login')
-    .order('created_at', { ascending: false })
-
-  if (error) return []
-  return data
+  return queryMany(
+    'SELECT id, username, role, created_at, last_login FROM admins ORDER BY created_at DESC'
+  )
 }
 
 export default async function SettingsPage() {

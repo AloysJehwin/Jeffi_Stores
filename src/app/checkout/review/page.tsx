@@ -16,7 +16,7 @@ export default function CheckoutReviewPageWrapper() {
 }
 
 function CheckoutReviewPage() {
-  const { cartItems, cartCount, getCartTotal, isLoading: cartLoading } = useCart()
+  const { cartItems, cartCount, getCartTotal, getCartTax, isLoading: cartLoading } = useCart()
   const { user, isLoading: authLoading } = useAuth()
   const { showToast } = useToast()
   const router = useRouter()
@@ -87,6 +87,7 @@ function CheckoutReviewPage() {
   }
 
   const total = getCartTotal()
+  const tax = getCartTax()
 
   return (
     <div className="bg-gray-50 min-h-screen py-8">
@@ -185,12 +186,12 @@ function CheckoutReviewPage() {
 
                   return (
                     <div key={item.id} className="flex gap-4 pb-4 border-b border-gray-200 last:border-b-0">
-                      <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                      <div className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
                         {primaryImage ? (
                           <img
                             src={primaryImage.thumbnail_url}
                             alt={item.products.name}
-                            className="w-full h-full object-contain p-2"
+                            className="w-full h-full object-cover rounded-lg"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -236,6 +237,10 @@ function CheckoutReviewPage() {
                   <span>Subtotal ({cartCount} items)</span>
                   <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
+                <div className="flex justify-between text-gray-500 text-sm">
+                  <span>Incl. GST</span>
+                  <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Delivery Charges</span>
                   <span className="text-green-600">FREE</span>
@@ -245,6 +250,7 @@ function CheckoutReviewPage() {
                     <span>Total</span>
                     <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
+                  <p className="text-xs text-gray-400 mt-1">Price inclusive of all taxes</p>
                 </div>
               </div>
 

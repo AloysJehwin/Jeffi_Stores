@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 export default function CartPage() {
-  const { cartItems, cartCount, isLoading, removeFromCart, updateQuantity, getCartTotal } = useCart()
+  const { cartItems, cartCount, isLoading, removeFromCart, updateQuantity, getCartTotal, getCartTax } = useCart()
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
@@ -79,6 +79,7 @@ export default function CartPage() {
   }
 
   const total = getCartTotal()
+  const tax = getCartTax()
   const discount = 0 // You can implement discount logic here
   const finalTotal = total - discount
 
@@ -102,12 +103,12 @@ export default function CartPage() {
                     <div className="flex gap-6">
                       {/* Product Image */}
                       <Link href={`/products/${item.products.slug}`} className="flex-shrink-0">
-                        <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden">
+                        <div className="w-24 h-24 bg-white rounded-lg overflow-hidden border border-gray-200">
                           {primaryImage ? (
                             <img
                               src={primaryImage.thumbnail_url}
                               alt={item.products.name}
-                              className="w-full h-full object-contain p-2"
+                              className="w-full h-full object-cover rounded-lg"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
@@ -155,8 +156,10 @@ export default function CartPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                               </svg>
                             </button>
-                            <span className="px-4 py-2 border-x border-gray-300 min-w-[60px] text-center">
-                              {isUpdating ? '...' : item.quantity}
+                            <span className="px-4 py-2 border-x border-gray-300 min-w-[60px] text-center flex items-center justify-center">
+                              {isUpdating ? (
+                                <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full"></div>
+                              ) : item.quantity}
                             </span>
                             <button
                               onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
@@ -202,6 +205,10 @@ export default function CartPage() {
                   <span>Subtotal ({cartCount} items)</span>
                   <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
+                <div className="flex justify-between text-gray-500 text-sm">
+                  <span>Incl. GST</span>
+                  <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount</span>
@@ -213,6 +220,7 @@ export default function CartPage() {
                     <span>Total</span>
                     <span>₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
+                  <p className="text-xs text-gray-400 mt-1">Price inclusive of all taxes</p>
                 </div>
               </div>
 

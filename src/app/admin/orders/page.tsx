@@ -1,12 +1,16 @@
 import Link from 'next/link'
-import { getAllOrders } from '@/lib/queries'
+import { getFilteredOrders } from '@/lib/queries'
+import AdminFilters from '@/components/admin/AdminFilters'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function OrdersPage() {
-  // Middleware already verified authentication
-  const orders = await getAllOrders()
+export default async function OrdersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const orders = await getFilteredOrders({
+    status: searchParams.status,
+    payment_status: searchParams.payment_status,
+    search: searchParams.search,
+  })
 
   const totalOrders = orders?.length || 0
   const pendingOrders = orders?.filter(o => o.status === 'pending').length || 0
@@ -56,6 +60,38 @@ export default async function OrdersPage() {
           Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
         </p>
       </div>
+
+      {/* Filters */}
+      <AdminFilters
+        filters={[
+          {
+            name: 'status',
+            label: 'Order Status',
+            options: [
+              { value: 'pending', label: 'Pending' },
+              { value: 'confirmed', label: 'Confirmed' },
+              { value: 'processing', label: 'Processing' },
+              { value: 'shipped', label: 'Shipped' },
+              { value: 'delivered', label: 'Delivered' },
+              { value: 'cancel_requested', label: 'Cancel Requested' },
+              { value: 'cancelled', label: 'Cancelled' },
+            ],
+          },
+          {
+            name: 'payment_status',
+            label: 'Payment Status',
+            options: [
+              { value: 'pending', label: 'Pending' },
+              { value: 'paid', label: 'Paid' },
+              { value: 'failed', label: 'Failed' },
+              { value: 'refunded', label: 'Refunded' },
+              { value: 'unpaid', label: 'Unpaid' },
+            ],
+          },
+        ]}
+        searchPlaceholder="Search by order number or customer..."
+        searchParam="search"
+      />
 
       {/* Orders Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -138,9 +174,11 @@ export default async function OrdersPage() {
                           ? 'bg-blue-100 text-blue-800'
                           : order.status === 'cancelled'
                           ? 'bg-red-100 text-red-800'
+                          : order.status === 'cancel_requested'
+                          ? 'bg-orange-100 text-orange-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {order.status}
+                        {order.status === 'cancel_requested' ? 'Cancel Requested' : order.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
