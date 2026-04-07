@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ADMIN_SCOPES } from '@/lib/scopes'
 
 interface AdminUser {
@@ -28,6 +29,7 @@ export default function AdminUserActions({
   const [loading, setLoading] = useState(false)
   const [scopes, setScopes] = useState<string[]>(admin.scopes || [])
   const [role, setRole] = useState(admin.role)
+  const router = useRouter()
 
   const isSelf = admin.id === currentAdminId
   const isSuperAdmin = admin.role === 'super_admin'
@@ -42,7 +44,7 @@ export default function AdminUserActions({
       })
       if (res.ok) {
         setEditing(false)
-        onUpdate?.()
+        onUpdate ? onUpdate() : router.refresh()
       }
     } finally {
       setLoading(false)
@@ -58,7 +60,20 @@ export default function AdminUserActions({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !admin.is_active }),
       })
-      if (res.ok) onUpdate?.()
+      if (res.ok) onUpdate ? onUpdate() : router.refresh()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Are you sure you want to delete ${admin.username}? This will revoke their certificates and permanently remove their account.`)) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/users/${admin.id}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) onUpdate ? onUpdate() : router.refresh()
     } finally {
       setLoading(false)
     }
@@ -152,6 +167,14 @@ export default function AdminUserActions({
             }`}
           >
             {admin.is_active ? 'Deactivate' : 'Activate'}
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={loading}
+            className="text-red-600 hover:text-red-700 text-xs font-medium"
+          >
+            Delete
           </button>
         </>
       )}
