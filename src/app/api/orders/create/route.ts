@@ -26,6 +26,23 @@ export async function POST(request: NextRequest) {
     const { shippingAddress, notes, paymentMethod } = body
     const isRazorpayPayment = paymentMethod === 'razorpay'
 
+    // Check for existing pending+unpaid Razorpay order to prevent duplicates
+    const existingUnpaidOrder = await queryOne(
+      `SELECT o.id, o.order_number FROM orders o
+       INNER JOIN payments p ON p.order_id = o.id AND p.payment_gateway = 'razorpay'
+       WHERE o.user_id = $1 AND o.payment_status = 'unpaid' AND o.status = 'pending'
+       ORDER BY o.created_at DESC LIMIT 1`,
+      [userId]
+    )
+
+    if (existingUnpaidOrder) {
+      return NextResponse.json({
+        error: 'You have an unpaid order. Please complete or cancel it before placing a new one.',
+        existingOrderId: existingUnpaidOrder.id,
+        existingOrderNumber: existingUnpaidOrder.order_number,
+      }, { status: 409 })
+    }
+
     // Get session_id for cart — use authenticated userId since orders require login
     // The session_id cookie may still be a guest string, so always use the verified userId
     const cartUserId = userId

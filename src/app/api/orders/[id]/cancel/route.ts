@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, query } from '@/lib/db'
+import { queryOne, queryMany, query } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderStatusUpdate } from '@/lib/email'
 
@@ -19,7 +19,7 @@ export async function POST(
 
     // Fetch order — must belong to the authenticated user
     const order = await queryOne(`
-      SELECT o.id, o.order_number, o.status, o.user_id, o.customer_name, o.customer_email,
+      SELECT o.id, o.order_number, o.status, o.payment_status, o.user_id, o.customer_name, o.customer_email,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -37,7 +37,33 @@ export async function POST(
       )
     }
 
-    // Set status to cancel_requested (admin will approve/reject)
+    // If order is pending + unpaid, cancel immediately and restore stock
+    if (order.status === 'pending' && order.payment_status === 'unpaid') {
+      const orderItems = await queryMany(
+        'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
+        [orderId]
+      )
+      for (const item of orderItems) {
+        if (item.variant_id) {
+          await query(
+            'UPDATE product_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+            [item.quantity, item.variant_id]
+          )
+        } else {
+          await query(
+            'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+            [item.quantity, item.product_id]
+          )
+        }
+      }
+      await query(
+        `UPDATE orders SET status = 'cancelled', payment_status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+        [orderId]
+      )
+      return NextResponse.json({ success: true, directCancel: true })
+    }
+
+    // Otherwise, set status to cancel_requested (admin will approve/reject)
     await query(
       `UPDATE orders SET status = 'cancel_requested', updated_at = NOW() WHERE id = $1`,
       [orderId]

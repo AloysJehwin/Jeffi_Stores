@@ -325,7 +325,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       onClick={() => setShowCancelConfirm(true)}
                       className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors"
                     >
-                      Request Cancellation
+                      {order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Cancel Order' : 'Request Cancellation'}
                     </button>
                   )}
                   {order.invoiceNumber && (
@@ -348,10 +348,21 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             {/* Cancel Confirmation Dialog */}
             {showCancelConfirm && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-                <h3 className="text-lg font-bold text-red-900 mb-2">Request cancellation for this order?</h3>
-                <p className="text-red-800 text-sm mb-4">
-                  Your cancellation request will be sent to our team for review. You will be notified once it is approved or rejected.
-                </p>
+                {order.status === 'pending' && order.paymentStatus === 'unpaid' ? (
+                  <>
+                    <h3 className="text-lg font-bold text-red-900 mb-2">Cancel this order?</h3>
+                    <p className="text-red-800 text-sm mb-4">
+                      This order will be cancelled immediately and stock will be restored. This action cannot be undone.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-bold text-red-900 mb-2">Request cancellation for this order?</h3>
+                    <p className="text-red-800 text-sm mb-4">
+                      Your cancellation request will be sent to our team for review. You will be notified once it is approved or rejected.
+                    </p>
+                  </>
+                )}
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -362,10 +373,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     {isCancelling ? (
                       <>
                         <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                        Submitting...
+                        {order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Cancelling...' : 'Submitting...'}
                       </>
                     ) : (
-                      'Yes, Request Cancellation'
+                      order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Yes, Cancel Order' : 'Yes, Request Cancellation'
                     )}
                   </button>
                   <button

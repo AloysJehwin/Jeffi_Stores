@@ -33,6 +33,8 @@ function CheckoutPage() {
     isRazorpayEnabled ? 'razorpay' : 'manual'
   )
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
+  const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
+  const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -166,6 +168,23 @@ function CheckoutPage() {
     }
   }
 
+  const handleCancelPreviousOrder = async () => {
+    if (!existingOrder) return
+    setIsCancellingPrevious(true)
+    try {
+      const response = await fetch(`/api/orders/${existingOrder.id}/cancel`, { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to cancel order')
+      setExistingOrder(null)
+      setError('')
+      showToast('Previous order cancelled. You can now place a new order.', 'success')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsCancellingPrevious(false)
+    }
+  }
+
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -200,6 +219,13 @@ function CheckoutPage() {
       })
 
       const data = await response.json()
+
+      if (response.status === 409 && data.existingOrderId) {
+        setExistingOrder({ id: data.existingOrderId, orderNumber: data.existingOrderNumber })
+        setError(data.error)
+        setIsSubmitting(false)
+        return
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create order')
@@ -241,7 +267,25 @@ function CheckoutPage() {
 
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
+            <p>{error}</p>
+            {existingOrder && (
+              <div className="flex flex-wrap gap-3 mt-3">
+                <Link
+                  href={`/account/orders/${existingOrder.id}`}
+                  className="inline-flex items-center px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Go to Order #{existingOrder.orderNumber}
+                </Link>
+                <button
+                  type="button"
+                  onClick={handleCancelPreviousOrder}
+                  disabled={isCancellingPrevious}
+                  className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-red-300"
+                >
+                  {isCancellingPrevious ? 'Cancelling...' : 'Cancel Previous Order'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
