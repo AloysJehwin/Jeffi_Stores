@@ -75,12 +75,6 @@ export async function generateClientCertificate(
     {
       name: 'subjectKeyIdentifier',
     },
-    {
-      name: 'authorityKeyIdentifier',
-      keyIdentifier: true,
-      authorityCertIssuer: true,
-      serialNumber: true,
-    },
   ])
 
   // Sign with CA private key
