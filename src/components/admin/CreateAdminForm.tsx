@@ -136,6 +136,7 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
           The .p12 certificate file has been downloaded. Save the password above — it will not be shown again.
         </p>
         <button
+          type="button"
           onClick={() => { setCertInfo(null); setIsOpen(false) }}
           className="mt-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
         >
@@ -148,6 +149,7 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
   if (!isOpen) {
     return (
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
         className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
       >
@@ -166,8 +168,9 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+          <label htmlFor="admin-first-name" className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
           <input
+            id="admin-first-name"
             type="text"
             required
             value={form.first_name}
@@ -176,8 +179,9 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+          <label htmlFor="admin-last-name" className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
           <input
+            id="admin-last-name"
             type="text"
             required
             value={form.last_name}
@@ -188,8 +192,9 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+        <label htmlFor="admin-email" className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
         <input
+          id="admin-email"
           type="email"
           required
           value={form.email}
@@ -200,8 +205,9 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+          <label htmlFor="admin-username" className="block text-sm font-medium text-gray-700 mb-1">Username *</label>
           <input
+            id="admin-username"
             type="text"
             required
             value={form.username}
@@ -210,8 +216,9 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+          <label htmlFor="admin-password" className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
           <input
+            id="admin-password"
             type="password"
             required
             minLength={8}
@@ -223,8 +230,9 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+        <label htmlFor="admin-role" className="block text-sm font-medium text-gray-700 mb-1">Role</label>
         <select
+          id="admin-role"
           value={form.role}
           onChange={e => setForm(prev => ({ ...prev, role: e.target.value }))}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-accent-500 focus:border-accent-500"

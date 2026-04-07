@@ -114,13 +114,16 @@ async function createProduct(formData: FormData) {
       }
     }
 
+    // Sync to Google Merchant Sheet (fire-and-forget, must be before redirect)
+    const { syncProductToSheet } = await import('@/lib/google-sheets')
+    syncProductToSheet(data.id).catch(err => console.error('Sheet sync error:', err))
+
     redirect('/admin/products')
   } catch (error) {
     console.error('Error creating product:', error)
     throw error
   }
 }
-
 export default async function AddProductPage() {
   const categories = await getAllCategories()
   const brands = await getAllBrands()

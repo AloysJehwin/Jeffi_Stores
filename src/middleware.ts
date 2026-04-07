@@ -63,24 +63,17 @@ export async function middleware(request: NextRequest) {
 
   // Admin path authentication check
   if (isAdminPath) {
-    // Allow login page without certificate check
-    if (pathname === '/admin/login') {
-      console.log('⚠️  Login page access, allowing without certificate check')
-      const response = NextResponse.next()
-      response.headers.set('x-pathname', pathname)
-      return response
-    }
-
-    // For other admin routes, check for client certificate
+    // For admin routes, check for client certificate
     const clientCert = request.headers.get('x-client-cert')
     const certVerified = request.headers.get('x-client-cert-verified')
     const hasValidCert = clientCert && certVerified === 'SUCCESS'
 
-    // In development (localhost), skip certificate requirement
-    const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:') || 
-                       hostname === '127.0.0.1' || hostname.startsWith('127.0.0.1:')
+    // In development (localhost) or Docker internal, skip certificate requirement
+    const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:') ||
+                       hostname === '127.0.0.1' || hostname.startsWith('127.0.0.1:') ||
+                       hostname.startsWith('app:') // Docker internal service name
 
-    // Require certificate for all admin routes (except in development)
+    // Require certificate for all admin routes including login (except in development)
     if (!hasValidCert && !isLocalhost) {
       console.log('🔒 No valid client certificate, blocking admin access')
       return new NextResponse('Client certificate required for admin access', {
@@ -89,6 +82,13 @@ export async function middleware(request: NextRequest) {
           'Content-Type': 'text/plain',
         },
       })
+    }
+
+    // Allow login page without JWT check (cert is already verified above)
+    if (pathname === '/admin/login') {
+      const response = NextResponse.next()
+      response.headers.set('x-pathname', pathname)
+      return response
     }
 
     // Check for valid JWT token in cookie

@@ -72,7 +72,7 @@ export default async function HomePage() {
             <div className="hidden md:block">
               <div className="relative h-96">
                 <img
-                  src="https://jeffi-stores-bucket.s3.us-east-1.amazonaws.com/assets/hero-hardware-tools.png"
+                  src="/images/Welcome.png"
                   alt="Hardware tools and industrial supplies"
                   className="w-full h-full object-contain drop-shadow-2xl"
                 />

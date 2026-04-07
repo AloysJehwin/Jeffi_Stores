@@ -218,6 +218,10 @@ async function updateProduct(productId: string, formData: FormData) {
       await query('DELETE FROM product_variants WHERE product_id = $1', [productId])
     }
 
+    // Sync to Google Merchant Sheet (fire-and-forget)
+    const { syncProductToSheet } = await import('@/lib/google-sheets')
+    syncProductToSheet(productId).catch(err => console.error('Sheet sync error:', err))
+
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
     redirect('/admin/products')

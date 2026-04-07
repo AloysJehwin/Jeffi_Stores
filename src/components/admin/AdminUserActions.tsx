@@ -74,6 +74,7 @@ export default function AdminUserActions({
             onChange={e => setRole(e.target.value)}
             className="border border-gray-300 rounded px-2 py-1 text-sm"
             disabled={isSuperAdmin}
+            aria-label="Role"
           >
             <option value="admin">Admin</option>
             <option value="moderator">Moderator</option>
@@ -110,6 +111,7 @@ export default function AdminUserActions({
         </div>
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={handleSave}
             disabled={loading}
             className="bg-accent-500 hover:bg-accent-600 text-white px-3 py-1 rounded text-xs font-medium"
@@ -117,6 +119,7 @@ export default function AdminUserActions({
             {loading ? 'Saving...' : 'Save'}
           </button>
           <button
+            type="button"
             onClick={() => setEditing(false)}
             className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs font-medium"
           >
@@ -132,12 +135,14 @@ export default function AdminUserActions({
       {!isSuperAdmin && !isSelf && (
         <>
           <button
+            type="button"
             onClick={() => setEditing(true)}
             className="text-accent-500 hover:text-accent-600 text-xs font-medium"
           >
             Edit
           </button>
           <button
+            type="button"
             onClick={handleToggleActive}
             disabled={loading}
             className={`text-xs font-medium ${

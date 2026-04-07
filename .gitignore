@@ -51,6 +51,12 @@ SECURITY_GROUP_INSTRUCTIONS.md
 # AWS config files
 s3-bucket-policy*.json
 
+# Google Service Account key
+jeffi-stores-*.json
+
+# Production env
+.env.production
+
 # Business documents (keep local, don't commit)
 GST Certificate*.pdf
 INV*.pdf
