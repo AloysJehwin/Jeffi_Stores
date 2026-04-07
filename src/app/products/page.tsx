@@ -41,7 +41,9 @@ async function getProducts(searchParams: any) {
         (SELECT json_agg(pi ORDER BY pi.display_order)
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
-      ) AS product_images
+      ) AS product_images,
+      COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
+      (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -205,7 +207,11 @@ export default async function ProductsPage({
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {products.map((product) => {
                   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-                  const displayPrice = product.sale_price || product.base_price
+                  const hasVariants = product.has_variants
+                  const displayPrice = hasVariants && product.variant_min_price
+                    ? product.variant_min_price
+                    : (product.sale_price || product.base_price)
+                  const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
                   const mrp = product.mrp ? Number(product.mrp) : null
                   const mrpDiscount = mrp && mrp > Number(displayPrice)
                     ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
@@ -256,7 +262,7 @@ export default async function ProductsPage({
                           <div className="mt-auto">
                             <div className="flex items-baseline gap-2 mb-1">
                               <span className="text-xl font-bold text-primary-600">
-                                ₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                {hasVariants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </span>
                               {mrp && mrp > Number(displayPrice) && (
                                 <span className="text-sm text-gray-400 line-through">
@@ -266,8 +272,8 @@ export default async function ProductsPage({
                             </div>
                             <p className="text-[10px] text-gray-400 mb-3">Inclusive of all taxes</p>
                             <div className="flex items-center justify-between">
-                              <span className={`text-xs font-medium ${product.stock_quantity > product.low_stock_threshold ? 'text-green-600' : 'text-orange-600'}`}>
-                                {product.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}
+                              <span className={`text-xs font-medium ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
                               </span>
                               <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-sm">
                                 View Details →

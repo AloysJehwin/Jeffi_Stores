@@ -1,6 +1,7 @@
 import { cookies, headers } from 'next/headers'
 import { logoutAction } from './logout-action'
 import { verifyToken } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 
 export const metadata = {
   title: 'Admin Panel - Jeffi Stores',
@@ -41,6 +42,17 @@ export default async function AdminLayout({
 
   // For all other admin pages, get session and show navigation
   const session = await getAdminSession()
+  const role = session?.role || ''
+  const scopes: string[] = session?.scopes || []
+
+  const navLinks = [
+    { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard' },
+    { href: '/admin/products', label: 'Products', scope: 'products' },
+    { href: '/admin/categories', label: 'Categories', scope: 'categories' },
+    { href: '/admin/orders', label: 'Orders', scope: 'orders' },
+    { href: '/admin/reviews', label: 'Reviews', scope: 'reviews' },
+    { href: '/admin/settings', label: 'Settings', scope: 'settings' },
+  ]
 
   return (
     <div className="min-h-screen">
@@ -58,42 +70,17 @@ export default async function AdminLayout({
             {/* Nav Links */}
             <div className="hidden md:block">
               <div className="flex items-center space-x-6">
-                <a
-                  href="/admin/dashboard"
-                  className="hover:text-primary-500 transition-colors font-medium"
-                >
-                  Dashboard
-                </a>
-                <a
-                  href="/admin/products"
-                  className="hover:text-primary-500 transition-colors font-medium"
-                >
-                  Products
-                </a>
-                <a
-                  href="/admin/categories"
-                  className="hover:text-primary-500 transition-colors font-medium"
-                >
-                  Categories
-                </a>
-                <a
-                  href="/admin/orders"
-                  className="hover:text-primary-500 transition-colors font-medium"
-                >
-                  Orders
-                </a>
-                <a
-                  href="/admin/reviews"
-                  className="hover:text-primary-500 transition-colors font-medium"
-                >
-                  Reviews
-                </a>
-                <a
-                  href="/admin/settings"
-                  className="hover:text-primary-500 transition-colors font-medium"
-                >
-                  Settings
-                </a>
+                {navLinks
+                  .filter(link => hasScope(role, scopes, link.scope))
+                  .map(link => (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      className="hover:text-primary-500 transition-colors font-medium"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
               </div>
             </div>
 

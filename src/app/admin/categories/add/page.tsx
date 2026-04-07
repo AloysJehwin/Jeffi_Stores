@@ -11,6 +11,7 @@ async function createCategory(formData: FormData) {
   const description = formData.get('description') as string || null
   const parentCategoryId = formData.get('parent_id') as string || null
   const displayOrder = parseInt(formData.get('display_order') as string)
+  const skuPrefix = (formData.get('sku_prefix') as string || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || null
   const isActive = formData.get('is_active') === 'true'
 
   // Generate slug from name
@@ -18,9 +19,9 @@ async function createCategory(formData: FormData) {
 
   try {
     await query(
-      `INSERT INTO categories (name, slug, description, parent_category_id, display_order, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [name, slug, description, parentCategoryId, displayOrder, isActive]
+      `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive]
     )
 
     // Revalidate all pages that use categories

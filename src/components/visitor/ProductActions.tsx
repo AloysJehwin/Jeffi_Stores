@@ -6,14 +6,37 @@ import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 
+interface Variant {
+  id: string
+  variant_name: string
+  sku: string
+  price: number | null
+  mrp: number | null
+  sale_price: number | null
+  wholesale_price: number | null
+  stock_quantity: number
+}
+
 interface ProductActionsProps {
   productId: string
   productName: string
   sku: string
   stockQuantity: number
+  basePrice: number
+  salePrice: number | null
+  mrp: number | null
+  gstPercentage: number | null
+  wholesalePrice: number | null
+  variants: Variant[]
+  variantType: string
+  initialSkuParam?: string
 }
 
-export default function ProductActions({ productId, productName, sku, stockQuantity }: ProductActionsProps) {
+export default function ProductActions({
+  productId, productName, sku, stockQuantity,
+  basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
+  variants, variantType, initialSkuParam,
+}: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast, showConfirm } = useToast()
   const { user } = useAuth()
@@ -23,6 +46,49 @@ export default function ProductActions({ productId, productName, sku, stockQuant
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false)
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [quantity, setQuantity] = useState(1)
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() => {
+    if (variants.length === 0) return null
+    if (initialSkuParam) {
+      const match = variants.find(v => v.sku === initialSkuParam)
+      if (match) return match.id
+    }
+    return variants[0].id
+  })
+
+  const hasVariants = variants.length > 0
+  const selectedVariant = variants.find(v => v.id === selectedVariantId)
+  const displaySku = hasVariants && selectedVariant ? selectedVariant.sku : sku
+
+  // Update URL when variant changes
+  useEffect(() => {
+    if (!hasVariants || !selectedVariant) return
+    const url = new URL(window.location.href)
+    url.searchParams.set('sku', selectedVariant.sku)
+    window.history.replaceState(null, '', url.toString())
+  }, [selectedVariantId, hasVariants, selectedVariant])
+
+  // Compute effective price, mrp, wholesale based on variant selection
+  const effectivePrice = hasVariants
+    ? (selectedVariant?.sale_price ?? selectedVariant?.price ?? salePrice ?? basePrice)
+    : (salePrice ?? basePrice)
+  const effectiveMrp = hasVariants
+    ? (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp)
+    : mrp
+  const effectiveWholesalePrice = hasVariants
+    ? (selectedVariant?.wholesale_price != null ? Number(selectedVariant.wholesale_price) : wholesalePrice)
+    : wholesalePrice
+  const effectiveStock = hasVariants
+    ? (selectedVariant?.stock_quantity ?? 0)
+    : stockQuantity
+
+  const mrpDiscount = effectiveMrp && effectiveMrp > effectivePrice
+    ? Math.round(((effectiveMrp - effectivePrice) / effectiveMrp) * 100)
+    : 0
+
+  // Reset quantity when variant changes
+  useEffect(() => {
+    setQuantity(1)
+  }, [selectedVariantId])
 
   // Check if product is in wishlist on mount
   useEffect(() => {
@@ -38,14 +104,14 @@ export default function ProductActions({ productId, productName, sku, stockQuant
         console.error('Failed to check wishlist status:', error)
       }
     }
-    
+
     checkWishlistStatus()
   }, [productId])
 
   const handleAddToCart = async () => {
     setIsAddingToCart(true)
     try {
-      await addToCart(productId, quantity)
+      await addToCart(productId, quantity, selectedVariantId || undefined)
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
       console.error('Add to cart error:', error)
@@ -56,7 +122,6 @@ export default function ProductActions({ productId, productName, sku, stockQuant
   }
 
   const handleToggleWishlist = async () => {
-    // Check if user is logged in for wishlist
     if (!user) {
       showConfirm({
         title: 'Sign In Required',
@@ -74,7 +139,6 @@ export default function ProductActions({ productId, productName, sku, stockQuant
     setIsAddingToWishlist(true)
     try {
       if (isInWishlist) {
-        // Remove from wishlist
         const response = await fetch(`/api/wishlist?productId=${productId}`, {
           method: 'DELETE',
         })
@@ -87,7 +151,6 @@ export default function ProductActions({ productId, productName, sku, stockQuant
           showToast(data.message || 'Failed to remove from wishlist', 'error')
         }
       } else {
-        // Add to wishlist
         const response = await fetch('/api/wishlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -112,7 +175,7 @@ export default function ProductActions({ productId, productName, sku, stockQuant
   const handleBuyNow = async () => {
     setIsBuyingNow(true)
     try {
-      await addToCart(productId, quantity)
+      await addToCart(productId, quantity, selectedVariantId || undefined)
       router.push('/cart')
     } catch (error: any) {
       console.error('Buy now error:', error)
@@ -123,6 +186,100 @@ export default function ProductActions({ productId, productName, sku, stockQuant
 
   return (
     <div className="space-y-4">
+      {/* Dynamic SKU */}
+      <div className="text-sm text-gray-600">
+        SKU: <span className="font-medium text-gray-900">{displaySku}</span>
+      </div>
+
+      {/* Variant Selector */}
+      {hasVariants && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select {variantType}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {variants.map((variant) => (
+              <button
+                key={variant.id}
+                type="button"
+                onClick={() => setSelectedVariantId(variant.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  selectedVariantId === variant.id
+                    ? 'bg-accent-500 text-white border-accent-500'
+                    : variant.stock_quantity > 0
+                      ? 'bg-white text-gray-700 border-gray-300 hover:border-accent-400'
+                      : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                }`}
+                disabled={variant.stock_quantity === 0}
+              >
+                {variant.variant_name}
+                {variant.stock_quantity === 0 && ' (Out of Stock)'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Price display for variant products */}
+      {hasVariants && (
+        <>
+          <div className="bg-gray-50 rounded-lg p-6">
+            <div className="flex items-baseline gap-3 mb-2">
+              <span className="text-4xl font-bold text-primary-600">
+                Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+              {effectiveMrp && effectiveMrp > effectivePrice && (
+                <span className="text-xl text-gray-400 line-through">
+                  Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              )}
+            </div>
+            {mrpDiscount > 0 && (
+              <div className="flex items-center gap-2 mb-2">
+                <span className="bg-accent-100 text-accent-700 px-3 py-1 rounded-full text-sm font-semibold">
+                  {mrpDiscount}% off
+                </span>
+                <span className="text-sm text-gray-600">
+                  You save Rs. {(effectiveMrp! - effectivePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+            <p className="text-xs text-gray-500">
+              Inclusive of all taxes
+              {gstPercentage ? ` (${gstPercentage}% GST)` : ''}
+            </p>
+            {effectiveWholesalePrice && (
+              <div className="mt-3 pt-3 border-t border-gray-200">
+                <span className="text-sm text-gray-600">
+                  Wholesale Price: <span className="font-semibold text-gray-900">Rs. {effectiveWholesalePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Stock status for variant */}
+          <div>
+            {effectiveStock > 0 ? (
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="text-green-700 font-semibold">
+                  In Stock ({effectiveStock} available)
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <span className="text-red-700 font-semibold">Out of Stock</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {/* Quantity Selector */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -142,8 +299,8 @@ export default function ProductActions({ productId, productName, sku, stockQuant
             {quantity}
           </span>
           <button
-            onClick={() => setQuantity(Math.min(stockQuantity, quantity + 1))}
-            disabled={quantity >= stockQuantity}
+            onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
+            disabled={quantity >= effectiveStock}
             className="px-4 py-2 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -157,7 +314,7 @@ export default function ProductActions({ productId, productName, sku, stockQuant
       <div className="space-y-3">
         <button
           onClick={handleBuyNow}
-          disabled={stockQuantity === 0 || isBuyingNow}
+          disabled={effectiveStock === 0 || isBuyingNow}
           className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
           {isBuyingNow ? (
@@ -177,7 +334,7 @@ export default function ProductActions({ productId, productName, sku, stockQuant
 
         <button
           onClick={handleAddToCart}
-          disabled={stockQuantity === 0 || isAddingToCart}
+          disabled={effectiveStock === 0 || isAddingToCart}
           className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
           {isAddingToCart ? (
@@ -199,8 +356,8 @@ export default function ProductActions({ productId, productName, sku, stockQuant
           onClick={handleToggleWishlist}
           disabled={isAddingToWishlist}
           className={`w-full px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-            isInWishlist 
-              ? 'bg-red-500 hover:bg-red-600 text-white' 
+            isInWishlist
+              ? 'bg-red-500 hover:bg-red-600 text-white'
               : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300'
           }`}
         >
@@ -234,7 +391,7 @@ export default function ProductActions({ productId, productName, sku, stockQuant
             Call: +91 89030 31299
           </a>
           <a
-            href={`mailto:jeffistoress@gmail.com?subject=Inquiry about ${productName}&body=Hi, I'm interested in ${productName} (SKU: ${sku}). Please provide more details.`}
+            href={`mailto:jeffistoress@gmail.com?subject=Inquiry about ${productName}&body=Hi, I'm interested in ${productName} (SKU: ${displaySku}). Please provide more details.`}
             className="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

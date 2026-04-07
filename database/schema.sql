@@ -30,9 +30,30 @@ CREATE TABLE admins (
     username VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(50) DEFAULT 'admin', -- admin, super_admin, moderator
+    scopes JSONB DEFAULT '[]'::jsonb, -- array of scope keys: dashboard, products, categories, orders, reviews, settings
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_login TIMESTAMP WITH TIME ZONE
 );
+
+-- Admin certificates (per-user client certs for mTLS)
+CREATE TABLE admin_certificates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    admin_id UUID NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+    serial_number VARCHAR(100) UNIQUE NOT NULL,
+    common_name VARCHAR(255) NOT NULL,
+    issued_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_revoked BOOLEAN DEFAULT FALSE,
+    revoked_at TIMESTAMP WITH TIME ZONE,
+    download_token VARCHAR(255) UNIQUE,
+    downloaded_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_admin_certs_admin_id ON admin_certificates(admin_id);
+CREATE INDEX idx_admin_certs_serial ON admin_certificates(serial_number);
+CREATE INDEX idx_admin_certs_download_token ON admin_certificates(download_token);
 
 -- Customer profiles
 CREATE TABLE customer_profiles (
@@ -58,6 +79,7 @@ CREATE TABLE categories (
     description TEXT,
     image_url VARCHAR(500),
     parent_category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+    sku_prefix VARCHAR(10),
     display_order INT DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -94,6 +116,8 @@ CREATE TABLE products (
     wholesale_price DECIMAL(12, 2),
     gst_percentage DECIMAL(5, 2) DEFAULT 18,
     hsn_code VARCHAR(20),
+    mpn VARCHAR(100),          -- Manufacturer Part Number (for Google Merchant)
+    gtin VARCHAR(50),          -- GTIN/EAN/barcode (for Google Merchant)
     currency VARCHAR(10) DEFAULT 'INR',
 
     -- Inventory
@@ -111,6 +135,8 @@ CREATE TABLE products (
     -- Meta
     is_featured BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
+    has_variants BOOLEAN DEFAULT FALSE,
+    variant_type VARCHAR(50), -- e.g. "Length", "Size", "Weight"
     views_count INT DEFAULT 0,
     sales_count INT DEFAULT 0,
 
@@ -162,7 +188,12 @@ CREATE TABLE product_variants (
     sku VARCHAR(100) UNIQUE NOT NULL,
     variant_name VARCHAR(255) NOT NULL,
     price DECIMAL(12, 2),
+    mrp DECIMAL(12, 2),
+    sale_price DECIMAL(12, 2),
+    wholesale_price DECIMAL(12, 2),
     stock_quantity INT DEFAULT 0,
+    mpn VARCHAR(100),          -- Manufacturer Part Number
+    gtin VARCHAR(50),          -- GTIN/EAN/barcode
     attributes JSONB, -- {"size": "M10", "length": "50mm", "grade": "8.8"}
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

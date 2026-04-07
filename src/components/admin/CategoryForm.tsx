@@ -100,6 +100,25 @@ export default function CategoryForm({ categories, action, category }: CategoryF
             </p>
           </div>
 
+          {/* SKU Prefix */}
+          <div>
+            <label htmlFor="sku_prefix" className="block text-sm font-medium text-gray-700 mb-2">
+              SKU Prefix
+            </label>
+            <input
+              type="text"
+              id="sku_prefix"
+              name="sku_prefix"
+              maxLength={10}
+              defaultValue={category?.sku_prefix || ''}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent uppercase"
+              placeholder="e.g. BOLT, NUT, WSH"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Used for auto-generating product SKUs (e.g. BOLT-001). If empty, first 3 letters of name are used.
+            </p>
+          </div>
+
           {/* Description */}
           <div className="md:col-span-2">
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">

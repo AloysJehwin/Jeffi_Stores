@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken } from './lib/jwt'
+import { getScopeForPath, hasScope } from './lib/scopes'
 
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
@@ -37,6 +38,27 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = `/admin${url.pathname}`
     return NextResponse.rewrite(url)
+  }
+
+  // Admin API path authentication and scope check
+  if (isAdminApiPath) {
+    const token = request.cookies.get('admin_token')?.value
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const payload = await verifyToken(token)
+    if (!payload) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+
+    // Check scope for API routes
+    const requiredScope = getScopeForPath(pathname)
+    if (requiredScope && !hasScope(payload.role, payload.scopes || [], requiredScope)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+
+    return NextResponse.next()
   }
 
   // Admin path authentication check
@@ -89,13 +111,24 @@ export async function middleware(request: NextRequest) {
       return response
     }
 
-    // Token is valid, allow access
+    // Token is valid, check scope-based access
+    const requiredScope = getScopeForPath(pathname)
+    if (requiredScope && !hasScope(payload.role, payload.scopes || [], requiredScope)) {
+      console.log('🚫 Insufficient scope:', payload.username, 'needs', requiredScope, 'has', payload.scopes)
+      return new NextResponse('Insufficient permissions', {
+        status: 403,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    }
+
+    // Token is valid and scope check passed, allow access
     console.log('✅ Valid JWT token, allowing access to', pathname, 'for user:', payload.username)
     const response = NextResponse.next()
     response.headers.set('x-pathname', pathname)
     response.headers.set('x-user-id', payload.adminId)
     response.headers.set('x-username', payload.username)
     response.headers.set('x-user-role', payload.role)
+    response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
     return response
   }
 

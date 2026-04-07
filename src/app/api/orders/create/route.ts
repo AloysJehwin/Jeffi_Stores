@@ -39,9 +39,17 @@ export async function POST(request: NextRequest) {
           'base_price', p.base_price, 'sale_price', p.sale_price,
           'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
           'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock
-        ) AS products
+        ) AS products,
+        CASE WHEN ci.variant_id IS NOT NULL THEN
+          json_build_object(
+            'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
+            'price', pv.price, 'sale_price', pv.sale_price,
+            'stock_quantity', pv.stock_quantity
+          )
+        ELSE NULL END AS variant
       FROM cart_items ci
       LEFT JOIN products p ON ci.product_id = p.id
+      LEFT JOIN product_variants pv ON ci.variant_id = pv.id
       WHERE ci.user_id = $1
     `, [cartUserId])
 
@@ -51,9 +59,13 @@ export async function POST(request: NextRequest) {
 
     // Check stock availability
     for (const item of cartItems) {
-      if (!item.products.is_in_stock || item.products.stock_quantity < item.quantity) {
+      const stockQty = item.variant ? item.variant.stock_quantity : item.products.stock_quantity
+      const itemName = item.variant
+        ? `${item.products.name} (${item.variant.variant_name})`
+        : item.products.name
+      if (stockQty < item.quantity) {
         return NextResponse.json(
-          { error: `${item.products.name} is out of stock or has insufficient quantity` },
+          { error: `${itemName} is out of stock or has insufficient quantity` },
           { status: 400 }
         )
       }
@@ -61,13 +73,13 @@ export async function POST(request: NextRequest) {
 
     // Calculate totals
     const subtotal = cartItems.reduce((sum: number, item: any) => {
-      const price = item.products.sale_price || item.products.base_price
+      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
       return sum + (parseFloat(price) * item.quantity)
     }, 0)
 
     // Calculate tax (back-calculated from GST-inclusive prices)
     const taxAmount = cartItems.reduce((sum: number, item: any) => {
-      const price = item.products.sale_price || item.products.base_price
+      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
       const gstRate = parseFloat(item.products.gst_percentage || '0')
       const itemTotal = parseFloat(price) * item.quantity
       const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))
@@ -134,7 +146,7 @@ export async function POST(request: NextRequest) {
 
       // Calculate per-item GST breakdown
       const itemsWithGST = cartItems.map((item: any) => {
-        const unitPrice = item.products.sale_price || item.products.base_price
+        const unitPrice = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
         const gstRate = parseFloat(item.products.gst_percentage || '0')
         const itemTotal = parseFloat(unitPrice) * item.quantity
 
@@ -175,9 +187,12 @@ export async function POST(request: NextRequest) {
       for (const { item, unitPrice, gstRate, itemTotal, gst, itemTax } of itemsWithGST) {
         const tax = isGSTEnabled && gst ? gst.totalTax : (itemTax || 0)
         await client.query(
-          `INSERT INTO order_items (order_id, product_id, product_name, product_sku, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
-          [createdOrder.id, item.product_id, item.products.name, item.products.sku,
+          `INSERT INTO order_items (order_id, product_id, variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+          [createdOrder.id, item.product_id, item.variant?.id || null,
+           item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name,
+           item.variant?.sku || item.products.sku,
+           item.variant?.variant_name || null,
            item.quantity, unitPrice, itemTotal, Math.round(tax * 100) / 100,
            isGSTEnabled ? (item.products.hsn_code || null) : null,
            isGSTEnabled ? gstRate : null,
@@ -188,12 +203,19 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Update product stock
+      // Update stock (variant stock or product stock)
       for (const item of cartItems) {
-        await client.query(
-          'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-          [item.quantity, item.product_id]
-        )
+        if (item.variant) {
+          await client.query(
+            'UPDATE product_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+            [item.quantity, item.variant.id]
+          )
+        } else {
+          await client.query(
+            'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+            [item.quantity, item.product_id]
+          )
+        }
       }
 
       // Clear cart (skip for Razorpay — cleared after payment verification)
@@ -205,15 +227,18 @@ export async function POST(request: NextRequest) {
     })
 
     // Build order items for email
-    const orderItems = cartItems.map((item: any) => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      product_name: item.products.name,
-      product_sku: item.products.sku,
-      quantity: item.quantity,
-      unit_price: item.products.sale_price || item.products.base_price,
-      total_price: (parseFloat(item.products.sale_price || item.products.base_price)) * item.quantity,
-    }))
+    const orderItems = cartItems.map((item: any) => {
+      const unitPrice = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+      return {
+        order_id: order.id,
+        product_id: item.product_id,
+        product_name: item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name,
+        product_sku: item.variant?.sku || item.products.sku,
+        quantity: item.quantity,
+        unit_price: unitPrice,
+        total_price: parseFloat(unitPrice) * item.quantity,
+      }
+    })
 
     // Send emails (skip for Razorpay — sent after payment verification)
     if (!isRazorpayPayment) {

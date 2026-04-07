@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 interface CartItem {
   id: string
   product_id: string
+  variant_id: string | null
   quantity: number
   price_at_addition: number
   products: {
@@ -21,13 +22,23 @@ interface CartItem {
       is_primary: boolean
     }>
   }
+  variant: {
+    id: string
+    variant_name: string
+    sku: string
+    price: number | null
+    mrp: number | null
+    sale_price: number | null
+    wholesale_price: number | null
+    stock_quantity: number
+  } | null
 }
 
 interface CartContextType {
   cartItems: CartItem[]
   cartCount: number
   isLoading: boolean
-  addToCart: (productId: string, quantity?: number) => Promise<void>
+  addToCart: (productId: string, quantity?: number, variantId?: string) => Promise<void>
   removeFromCart: (cartItemId: string) => Promise<void>
   updateQuantity: (cartItemId: string, quantity: number) => Promise<void>
   refreshCart: () => Promise<void>
@@ -64,12 +75,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     fetchCart()
   }, [])
 
-  const addToCart = async (productId: string, quantity = 1) => {
+  const addToCart = async (productId: string, quantity = 1, variantId?: string) => {
     try {
       const response = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, quantity }),
+        body: JSON.stringify({ productId, quantity, variantId: variantId || null }),
       })
 
       if (response.ok) {
@@ -127,14 +138,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getCartTotal = () => {
     return cartItems.reduce((total, item) => {
-      const price = item.products.sale_price || item.products.base_price
+      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
       return total + price * item.quantity
     }, 0)
   }
 
   const getCartTax = () => {
     return cartItems.reduce((tax, item) => {
-      const price = item.products.sale_price || item.products.base_price
+      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
       const gstRate = item.products.gst_percentage || 0
       const itemTotal = price * item.quantity
       const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))

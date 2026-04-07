@@ -1,24 +1,28 @@
 import { redirect } from 'next/navigation'
 import { getAllCategories, getAllBrands } from '@/lib/queries'
 import { query, queryOne } from '@/lib/db'
+import { generateProductSku, generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 
 async function createProduct(formData: FormData) {
   'use server'
 
   const name = formData.get('name') as string
-  const sku = formData.get('sku') as string
   const description = formData.get('description') as string
   const categoryId = formData.get('category_id') as string
   const brandId = formData.get('brand_id') as string
-  const basePrice = Math.round(parseFloat(formData.get('base_price') as string) * 100) / 100
+  const hasVariants = formData.get('has_variants') === 'true'
+  const variantType = formData.get('variant_type') as string || null
+  const basePrice = hasVariants ? 0 : Math.round(parseFloat(formData.get('base_price') as string) * 100) / 100
   const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
   const salePrice = formData.get('sale_price') ? Math.round(parseFloat(formData.get('sale_price') as string) * 100) / 100 : null
   const wholesalePrice = formData.get('wholesale_price') ? Math.round(parseFloat(formData.get('wholesale_price') as string) * 100) / 100 : null
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
-  const stockQuantity = parseInt(formData.get('stock_quantity') as string)
-  const lowStockThreshold = parseInt(formData.get('low_stock_threshold') as string)
+  const mpn = formData.get('mpn') as string || null
+  const gtin = formData.get('gtin') as string || null
+  const stockQuantity = hasVariants ? 0 : parseInt(formData.get('stock_quantity') as string)
+  const lowStockThreshold = hasVariants ? 0 : parseInt(formData.get('low_stock_threshold') as string)
   const weight = formData.get('weight') ? parseFloat(formData.get('weight') as string) : null
   const dimensions = formData.get('dimensions') as string || null
   const isActive = formData.get('is_active') === 'true'
@@ -28,18 +32,28 @@ async function createProduct(formData: FormData) {
   // Generate slug from name
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
+  // Auto-generate race-safe SKU
+  let sku: string
+  try {
+    sku = await generateProductSku(categoryId || null)
+  } catch {
+    sku = `PRD-${Date.now().toString(36).toUpperCase()}`
+  }
+
   try {
     const data = await queryOne(
       `INSERT INTO products (
         name, slug, sku, description, category_id, brand_id,
-        base_price, mrp, sale_price, wholesale_price, gst_percentage, hsn_code,
-        stock_quantity, low_stock_threshold, weight, dimensions, is_active, is_featured
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        base_price, mrp, sale_price, wholesale_price, gst_percentage, hsn_code, mpn, gtin,
+        stock_quantity, low_stock_threshold, weight, dimensions, is_active, is_featured,
+        has_variants, variant_type
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
       RETURNING *`,
       [
         name, slug, sku, description, categoryId, brandId || null,
-        basePrice, mrp, salePrice, wholesalePrice, gstPercentage, hsnCode,
+        basePrice, mrp, salePrice, wholesalePrice, gstPercentage, hsnCode, mpn, gtin,
         stockQuantity, lowStockThreshold, weight, dimensions, isActive, isFeatured,
+        hasVariants, variantType,
       ]
     )
 
@@ -66,6 +80,34 @@ async function createProduct(formData: FormData) {
               uploadResult.s3Key, uploadResult.s3ThumbnailKey,
               uploadResult.fileName, uploadResult.fileSize, uploadResult.mimeType,
               uploadResult.width, uploadResult.height, i, i === 0,
+            ]
+          )
+        }
+      }
+    }
+
+    // Create variants if product has variants
+    if (hasVariants) {
+      const variantsJson = formData.get('variants_json') as string
+      if (variantsJson) {
+        const variants = JSON.parse(variantsJson)
+        for (const variant of variants) {
+          if (variant._isDeleted || !variant.variant_name) continue
+          const variantSku = generateVariantSku(sku, variant.variant_name)
+          await query(
+            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, sale_price, wholesale_price, stock_quantity, mpn, gtin, is_active)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)`,
+            [
+              data.id,
+              variantSku,
+              variant.variant_name,
+              variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
+              variant.mrp ? Math.round(parseFloat(variant.mrp) * 100) / 100 : null,
+              variant.sale_price ? Math.round(parseFloat(variant.sale_price) * 100) / 100 : null,
+              variant.wholesale_price ? Math.round(parseFloat(variant.wholesale_price) * 100) / 100 : null,
+              parseInt(variant.stock_quantity) || 0,
+              variant.mpn || null,
+              variant.gtin || null,
             ]
           )
         }

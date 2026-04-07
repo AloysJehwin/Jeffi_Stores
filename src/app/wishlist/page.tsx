@@ -15,8 +15,11 @@ interface WishlistItem {
     base_price: number
     sale_price: number | null
     mrp: number | null
+    has_variants: boolean
     stock_quantity: number
     is_in_stock: boolean
+    variant_stock_total: number
+    variant_min_price: number | null
     product_images: Array<{
       thumbnail_url: string
       is_primary: boolean
@@ -127,7 +130,12 @@ export default function WishlistPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {wishlistItems.map((item) => {
             const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-            const price = item.products.sale_price || item.products.base_price
+            const hasVariants = item.products.has_variants
+            const price = hasVariants && item.products.variant_min_price
+              ? item.products.variant_min_price
+              : (item.products.sale_price || item.products.base_price)
+            const effectiveStock = hasVariants ? Number(item.products.variant_stock_total) : item.products.stock_quantity
+            const isInStock = effectiveStock > 0
             const mrp = item.products.mrp ? Number(item.products.mrp) : null
             const mrpDiscount = mrp && mrp > Number(price)
               ? Math.round(((mrp - Number(price)) / mrp) * 100)
@@ -177,7 +185,7 @@ export default function WishlistPage() {
 
                   <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-2xl font-bold text-primary-600">
-                      ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {hasVariants ? 'From ' : ''}₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                     {mrp && mrp > Number(price) && (
                       <span className="text-sm text-gray-400 line-through">
@@ -189,7 +197,7 @@ export default function WishlistPage() {
 
                   {/* Stock Status */}
                   <div className="mb-4">
-                    {item.products.is_in_stock ? (
+                    {isInStock ? (
                       <span className="text-sm text-green-600 font-medium">In Stock</span>
                     ) : (
                       <span className="text-sm text-red-600 font-medium">Out of Stock</span>
@@ -199,7 +207,7 @@ export default function WishlistPage() {
                   {/* Add to Cart Button */}
                   <button
                     onClick={() => handleAddToCart(item.product_id)}
-                    disabled={!item.products.is_in_stock || isAddingToCart}
+                    disabled={!isInStock || isAddingToCart}
                     className="w-full bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {isAddingToCart ? (

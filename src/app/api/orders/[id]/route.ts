@@ -33,7 +33,7 @@ export async function GET(
 
     // Fetch order items with product images
     const orderItems = await queryMany(`
-      SELECT oi.id, oi.product_id, oi.product_name, oi.quantity, oi.unit_price, oi.total_price,
+      SELECT oi.id, oi.product_id, oi.product_name, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price,
         json_build_object('slug', p.slug, 'product_images',
           COALESCE(
             (SELECT json_agg(pi ORDER BY pi.display_order)
@@ -62,6 +62,7 @@ export async function GET(
         id: item.id,
         productId: item.product_id,
         productName: item.product_name,
+        variantName: item.variant_name || null,
         quantity: item.quantity,
         unitPrice: parseFloat(item.unit_price),
         totalPrice: parseFloat(item.total_price),

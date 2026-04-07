@@ -13,6 +13,7 @@ interface OrderItem {
   id: string
   productId: string
   productName: string
+  variantName: string | null
   quantity: number
   unitPrice: number
   totalPrice: number
@@ -430,6 +431,9 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                           </Link>
                         ) : (
                           <p className="font-medium text-gray-900">{item.productName}</p>
+                        )}
+                        {item.variantName && (
+                          <p className="text-sm text-gray-500">{item.variantName}</p>
                         )}
                         <p className="text-sm text-gray-600 mt-1">Quantity: {item.quantity}</p>
                         <p className="text-sm font-semibold text-gray-900 mt-1">

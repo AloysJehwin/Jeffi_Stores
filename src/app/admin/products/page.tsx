@@ -152,16 +152,25 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-primary-500">
-                        Rs. {Number(product.sale_price || product.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        {product.has_variants
+                          ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                          : `Rs. ${Number(product.sale_price || product.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                        }
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {product.stock_quantity}
-                        {product.stock_quantity <= product.low_stock_threshold && (
-                          <span className="ml-2 text-xs text-red-600 font-semibold">Low Stock</span>
-                        )}
-                      </div>
+                      {(() => {
+                        const stock = product.has_variants ? Number(product.variant_stock_total) : product.stock_quantity
+                        const isLow = stock > 0 && stock <= product.low_stock_threshold
+                        return (
+                          <div className="text-sm text-gray-900">
+                            {stock}
+                            {product.has_variants && <span className="ml-1 text-xs text-blue-600">(variants)</span>}
+                            {isLow && <span className="ml-2 text-xs text-red-600 font-semibold">Low Stock</span>}
+                            {stock === 0 && <span className="ml-2 text-xs text-red-600 font-semibold">Out of Stock</span>}
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${

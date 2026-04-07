@@ -255,7 +255,7 @@ function CheckoutPage() {
               <div className="space-y-4">
                 {cartItems.map((item) => {
                   const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                  const price = item.products.sale_price || item.products.base_price
+                  const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
                   const itemTotal = price * item.quantity
 
                   return (
@@ -278,6 +278,9 @@ function CheckoutPage() {
 
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900">{item.products.name}</h3>
+                        {item.variant && (
+                          <p className="text-sm text-gray-500">{item.variant.variant_name}</p>
+                        )}
                         <p className="text-sm text-gray-600 mt-1">
                           ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.quantity}
                         </p>

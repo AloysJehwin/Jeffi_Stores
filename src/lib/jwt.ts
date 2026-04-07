@@ -10,6 +10,7 @@ export interface JWTPayload {
   adminId: string
   username: string
   role: string
+  scopes: string[]
   [key: string]: any
 }
 
@@ -23,6 +24,7 @@ export interface AdminJWTPayload {
   adminId: string
   username: string
   role: string
+  scopes: string[]
   [key: string]: any
 }
 
@@ -89,6 +91,7 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
       adminId: payload.adminId as string,
       username: payload.username as string,
       role: payload.role as string,
+      scopes: (payload.scopes as string[]) || [],
     }
   } catch {
     return null

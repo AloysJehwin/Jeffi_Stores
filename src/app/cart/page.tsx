@@ -94,7 +94,8 @@ export default function CartPage() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               {cartItems.map((item) => {
                 const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                const price = item.products.sale_price || item.products.base_price
+                const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+                const stockQty = item.variant?.stock_quantity ?? item.products.stock_quantity
                 const itemTotal = price * item.quantity
                 const isUpdating = updatingItems.has(item.id)
 
@@ -125,6 +126,9 @@ export default function CartPage() {
                         <Link href={`/products/${item.products.slug}`} className="text-lg font-semibold text-gray-900 hover:text-accent-600 transition-colors">
                           {item.products.name}
                         </Link>
+                        {item.variant && (
+                          <p className="text-sm text-gray-500 mt-0.5">{item.variant.variant_name}</p>
+                        )}
 
                         <div className="mt-2 flex items-center gap-4">
                           <span className="text-lg font-bold text-primary-600">
@@ -138,9 +142,9 @@ export default function CartPage() {
                         </div>
 
                         {/* Stock Status */}
-                        {item.products.stock_quantity < item.quantity && (
+                        {stockQty < item.quantity && (
                           <p className="text-sm text-red-600 mt-2">
-                            Only {item.products.stock_quantity} left in stock
+                            Only {stockQty} left in stock
                           </p>
                         )}
 

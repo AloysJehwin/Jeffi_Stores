@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       adminId: result.admin.id,
       username: result.admin.username,
       role: result.admin.role,
+      scopes: result.admin.scopes || [],
     })
 
     // Set secure HTTP-only cookie

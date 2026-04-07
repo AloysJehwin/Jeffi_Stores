@@ -1,11 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { cache } from 'react'
+import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/db'
 import ProductImageGallery from '@/components/visitor/ProductImageGallery'
 import ProductActions from '@/components/visitor/ProductActions'
 import ProductReviews from '@/components/visitor/ProductReviews'
 
-async function getProductBySlug(slug: string) {
+const getProductBySlug = cache(async (slug: string) => {
   return queryOne(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -14,12 +16,99 @@ async function getProductBySlug(slug: string) {
         (SELECT json_agg(pi ORDER BY pi.display_order)
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
-      ) AS product_images
+      ) AS product_images,
+      COALESCE(
+        (SELECT json_agg(pv ORDER BY pv.variant_name)
+         FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+        '[]'::json
+      ) AS product_variants
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.slug = $1 AND p.is_active = true
   `, [slug])
+})
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string }
+}): Promise<Metadata> {
+  const product = await getProductBySlug(params.slug)
+  if (!product) return { title: 'Product Not Found' }
+
+  const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+  const displayPrice = product.sale_price || product.base_price
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
+
+  return {
+    title: `${product.name} | Jeffi Stores`,
+    description: product.description?.slice(0, 160) || `Buy ${product.name} at Jeffi Stores`,
+    openGraph: {
+      title: product.name,
+      description: product.description?.slice(0, 160) || `Buy ${product.name} at Jeffi Stores`,
+      url: `${baseUrl}/products/${product.slug}`,
+      images: primaryImage ? [{ url: primaryImage.image_url, alt: product.name }] : [],
+      type: 'website',
+    },
+    other: {
+      'product:price:amount': String(Number(displayPrice)),
+      'product:price:currency': 'INR',
+    },
+  }
+}
+
+function buildProductJsonLd(product: any, baseUrl: string) {
+  const images = (product.product_images || []).map((img: any) => img.image_url)
+  const hasVariants = product.has_variants && product.product_variants?.length > 0
+
+  const offers = hasVariants
+    ? product.product_variants.map((v: any) => {
+        const price = v.sale_price ?? v.price
+        return {
+          '@type': 'Offer',
+          name: v.variant_name,
+          sku: v.sku,
+          ...(v.mpn && { mpn: v.mpn }),
+          ...(v.gtin && { gtin: v.gtin }),
+          price: price != null ? Number(price) : undefined,
+          priceCurrency: 'INR',
+          availability: v.stock_quantity > 0
+            ? 'https://schema.org/InStock'
+            : 'https://schema.org/OutOfStock',
+          itemCondition: 'https://schema.org/NewCondition',
+          url: `${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(v.sku)}`,
+        }
+      })
+    : [
+        {
+          '@type': 'Offer',
+          sku: product.sku,
+          price: Number(product.sale_price || product.base_price),
+          priceCurrency: 'INR',
+          availability: product.stock_quantity > 0
+            ? 'https://schema.org/InStock'
+            : 'https://schema.org/OutOfStock',
+          itemCondition: 'https://schema.org/NewCondition',
+          url: `${baseUrl}/products/${product.slug}`,
+        },
+      ]
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description || undefined,
+    sku: product.sku,
+    ...(product.mpn && { mpn: product.mpn }),
+    ...(product.gtin && { gtin: product.gtin }),
+    image: images.length > 0 ? images : undefined,
+    ...(product.brands && { brand: { '@type': 'Brand', name: product.brands.name } }),
+    ...(product.categories && { category: product.categories.name }),
+    offers: hasVariants
+      ? { '@type': 'AggregateOffer', offerCount: offers.length, offers }
+      : offers[0],
+  }
 }
 
 async function getRelatedProducts(productId: string, categoryId: string) {
@@ -31,7 +120,9 @@ async function getRelatedProducts(productId: string, categoryId: string) {
         (SELECT json_agg(pi ORDER BY pi.display_order)
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
-      ) AS product_images
+      ) AS product_images,
+      COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
+      (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -42,8 +133,10 @@ async function getRelatedProducts(productId: string, categoryId: string) {
 
 export default async function ProductDetailPage({
   params,
+  searchParams,
 }: {
   params: { slug: string }
+  searchParams: { [key: string]: string | string[] | undefined }
 }) {
   const product = await getProductBySlug(params.slug)
 
@@ -52,8 +145,12 @@ export default async function ProductDetailPage({
   }
 
   const relatedProducts = await getRelatedProducts(product.id, product.category_id)
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
+  const jsonLd = buildProductJsonLd(product, baseUrl)
+  const skuParam = typeof searchParams.sku === 'string' ? searchParams.sku : undefined
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+  const hasVariants = product.has_variants && product.product_variants?.length > 0
   const displayPrice = product.sale_price || product.base_price
   const mrp = product.mrp ? Number(product.mrp) : null
   const mrpDiscount = mrp && mrp > Number(displayPrice)
@@ -62,6 +159,10 @@ export default async function ProductDetailPage({
 
   return (
     <div className="bg-gray-50 min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Breadcrumb */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-4">
@@ -108,11 +209,8 @@ export default async function ProductDetailPage({
                 {product.name}
               </h1>
 
-              {/* SKU and Brand */}
+              {/* Brand */}
               <div className="flex items-center gap-4 mb-4 text-sm">
-                <span className="text-gray-600">
-                  SKU: <span className="font-medium text-gray-900">{product.sku}</span>
-                </span>
                 {product.brands && (
                   <span className="text-gray-600">
                     Brand: <span className="font-medium text-gray-900">{product.brands.name}</span>
@@ -120,73 +218,84 @@ export default async function ProductDetailPage({
                 )}
               </div>
 
-              {/* Price */}
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <div className="flex items-baseline gap-3 mb-2">
-                  <span className="text-4xl font-bold text-primary-600">
-                    ₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                  {mrp && mrp > Number(displayPrice) && (
-                    <span className="text-xl text-gray-400 line-through">
-                      ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                  )}
-                </div>
-                {mrpDiscount > 0 && (
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="bg-accent-100 text-accent-700 px-3 py-1 rounded-full text-sm font-semibold">
-                      {mrpDiscount}% off
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      You save ₹{(mrp! - Number(displayPrice)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
+              {/* Price & Stock — shown inline for non-variant products */}
+              {!hasVariants && (
+                <>
+                  <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                    <div className="flex items-baseline gap-3 mb-2">
+                      <span className="text-4xl font-bold text-primary-600">
+                        Rs. {Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                      {mrp && mrp > Number(displayPrice) && (
+                        <span className="text-xl text-gray-400 line-through">
+                          Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+                    {mrpDiscount > 0 && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="bg-accent-100 text-accent-700 px-3 py-1 rounded-full text-sm font-semibold">
+                          {mrpDiscount}% off
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          You save Rs. {(mrp! - Number(displayPrice)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-500">
+                      Inclusive of all taxes
+                      {product.gst_percentage ? ` (${parseFloat(product.gst_percentage)}% GST)` : ''}
+                    </p>
+                    {product.wholesale_price && (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <span className="text-sm text-gray-600">
+                          Wholesale Price: <span className="font-semibold text-gray-900">Rs. {Number(product.wholesale_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
-                <p className="text-xs text-gray-500">
-                  Inclusive of all taxes
-                  {product.gst_percentage ? ` (${product.gst_percentage}% GST)` : ''}
-                </p>
-                {product.wholesale_price && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <span className="text-sm text-gray-600">
-                      Wholesale Price: <span className="font-semibold text-gray-900">₹{Number(product.wholesale_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                    </span>
-                  </div>
-                )}
-              </div>
 
-              {/* Stock Status */}
-              <div className="mb-6">
-                {product.stock_quantity > 0 ? (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-green-700 font-semibold">
-                      In Stock ({product.stock_quantity} available)
-                    </span>
+                  <div className="mb-6">
+                    {product.stock_quantity > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-green-700 font-semibold">
+                          In Stock ({product.stock_quantity} available)
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-red-700 font-semibold">Out of Stock</span>
+                      </div>
+                    )}
+                    {product.stock_quantity > 0 && product.stock_quantity <= product.low_stock_threshold && (
+                      <p className="text-sm text-orange-600 mt-1">
+                        Only {product.stock_quantity} left in stock - order soon!
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-red-700 font-semibold">Out of Stock</span>
-                  </div>
-                )}
-                {product.stock_quantity > 0 && product.stock_quantity <= product.low_stock_threshold && (
-                  <p className="text-sm text-orange-600 mt-1">
-                    ⚠️ Only {product.stock_quantity} left in stock - order soon!
-                  </p>
-                )}
-              </div>
+                </>
+              )}
 
-              {/* Product Actions */}
+              {/* Product Actions (includes variant selector + price/stock for variant products) */}
               <ProductActions
                 productId={product.id}
                 productName={product.name}
                 sku={product.sku}
                 stockQuantity={product.stock_quantity}
+                basePrice={Number(product.base_price)}
+                salePrice={product.sale_price ? Number(product.sale_price) : null}
+                mrp={mrp}
+                gstPercentage={product.gst_percentage ? Number(product.gst_percentage) : null}
+                wholesalePrice={product.wholesale_price ? Number(product.wholesale_price) : null}
+                variants={hasVariants ? product.product_variants : []}
+                variantType={product.variant_type || 'Variant'}
+                initialSkuParam={skuParam}
               />
 
               {/* Product Specifications */}
@@ -237,7 +346,10 @@ export default async function ProductDetailPage({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {relatedProducts.map((relatedProduct) => {
                 const relatedPrimaryImage = relatedProduct.product_images?.find((img: any) => img.is_primary) || relatedProduct.product_images?.[0]
-                const relatedDisplayPrice = relatedProduct.sale_price || relatedProduct.base_price
+                const relatedHasVariants = relatedProduct.has_variants
+                const relatedDisplayPrice = relatedHasVariants && relatedProduct.variant_min_price
+                  ? relatedProduct.variant_min_price
+                  : (relatedProduct.sale_price || relatedProduct.base_price)
                 const relatedMrp = relatedProduct.mrp ? Number(relatedProduct.mrp) : null
                 const relatedMrpDiscount = relatedMrp && relatedMrp > Number(relatedDisplayPrice)
                   ? Math.round(((relatedMrp - Number(relatedDisplayPrice)) / relatedMrp) * 100)
@@ -276,7 +388,7 @@ export default async function ProductDetailPage({
                         </h3>
                         <div className="flex items-baseline gap-2">
                           <span className="text-lg font-bold text-primary-600">
-                            ₹{Number(relatedDisplayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            {relatedHasVariants ? 'From ' : ''}₹{Number(relatedDisplayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
                           {relatedMrp && relatedMrp > Number(relatedDisplayPrice) && (
                             <span className="text-xs text-gray-400 line-through">

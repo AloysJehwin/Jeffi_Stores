@@ -14,6 +14,9 @@ export interface Product {
   wholesale_price?: number
   gst_percentage?: number
   currency: string
+  hsn_code?: string
+  mpn?: string
+  gtin?: string
   stock_quantity: number
   low_stock_threshold: number
   is_in_stock: boolean
@@ -22,12 +25,31 @@ export interface Product {
   material?: string
   finish?: string
   size?: string
+  has_variants: boolean
+  variant_type?: string
   is_featured: boolean
   is_active: boolean
   views_count: number
   sales_count: number
   created_at: string
   updated_at: string
+}
+
+export interface ProductVariant {
+  id: string
+  product_id: string
+  sku: string
+  variant_name: string
+  price: number | null
+  mrp?: number | null
+  sale_price?: number | null
+  wholesale_price?: number | null
+  stock_quantity: number
+  mpn?: string
+  gtin?: string
+  attributes: Record<string, string> | null
+  is_active: boolean
+  created_at: string
 }
 
 export interface ProductImage {

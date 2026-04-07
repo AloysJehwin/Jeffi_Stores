@@ -17,6 +17,7 @@ async function updateCategory(categoryId: string, formData: FormData) {
   const description = formData.get('description') as string || null
   const parentCategoryId = formData.get('parent_id') as string || null
   const displayOrder = parseInt(formData.get('display_order') as string)
+  const skuPrefix = (formData.get('sku_prefix') as string || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || null
   const isActive = formData.get('is_active') === 'true'
 
   // Generate slug from name
@@ -26,9 +27,9 @@ async function updateCategory(categoryId: string, formData: FormData) {
     await query(
       `UPDATE categories SET
         name = $1, slug = $2, description = $3, parent_category_id = $4,
-        display_order = $5, is_active = $6, updated_at = $7
-      WHERE id = $8`,
-      [name, slug, description, parentCategoryId, displayOrder, isActive, new Date().toISOString(), categoryId]
+        sku_prefix = $5, display_order = $6, is_active = $7, updated_at = $8
+      WHERE id = $9`,
+      [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, new Date().toISOString(), categoryId]
     )
 
     // Revalidate all pages that use categories

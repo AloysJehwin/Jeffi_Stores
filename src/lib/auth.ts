@@ -46,6 +46,7 @@ export async function verifyAdminCredentials(username: string, password: string)
         user_id: admin.user_id,
         username: admin.username,
         role: admin.role,
+        scopes: admin.scopes || [],
         email: admin.users.email,
         first_name: admin.users.first_name,
         last_name: admin.users.last_name,
@@ -66,6 +67,7 @@ export async function createAdminUser(userData: {
   username: string
   password: string
   role?: string
+  scopes?: string[]
 }) {
   try {
     // Hash password
@@ -81,12 +83,12 @@ export async function createAdminUser(userData: {
 
     if (!user) throw new Error('Failed to create user')
 
-    // Create admin
+    // Create admin with scopes
     const admin = await queryOne(
-      `INSERT INTO admins (user_id, username, password_hash, role)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO admins (user_id, username, password_hash, role, scopes)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [user.id, userData.username, passwordHash, userData.role || 'admin']
+      [user.id, userData.username, passwordHash, userData.role || 'admin', JSON.stringify(userData.scopes || [])]
     )
 
     if (!admin) throw new Error('Failed to create admin')

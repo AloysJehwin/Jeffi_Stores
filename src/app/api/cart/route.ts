@@ -49,9 +49,17 @@ export async function GET(request: NextRequest) {
              FROM product_images pi WHERE pi.product_id = p.id),
             '[]'::json
           )
-        ) AS products
+        ) AS products,
+        CASE WHEN ci.variant_id IS NOT NULL THEN
+          json_build_object(
+            'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
+            'price', pv.price, 'mrp', pv.mrp, 'sale_price', pv.sale_price,
+            'wholesale_price', pv.wholesale_price, 'stock_quantity', pv.stock_quantity
+          )
+        ELSE NULL END AS variant
       FROM cart_items ci
       LEFT JOIN products p ON ci.product_id = p.id
+      LEFT JOIN product_variants pv ON ci.variant_id = pv.id
       WHERE ci.user_id = $1
     `, [userId])
 
@@ -66,7 +74,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { productId, quantity = 1 } = body
+    const { productId, quantity = 1, variantId } = body
 
     const cookieStore = await cookies()
     let sessionId = cookieStore.get('session_id')?.value
@@ -105,23 +113,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    if (product.stock_quantity < quantity) {
+    let priceAtAddition: number
+    let stockToCheck: number
+
+    if (variantId) {
+      const variant = await queryOne(
+        'SELECT id, price, sale_price, stock_quantity FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
+        [variantId, productId]
+      )
+      if (!variant) {
+        return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
+      }
+      priceAtAddition = variant.sale_price ?? variant.price ?? product.sale_price ?? product.base_price
+      stockToCheck = variant.stock_quantity
+    } else {
+      priceAtAddition = product.sale_price || product.base_price
+      stockToCheck = product.stock_quantity
+    }
+
+    if (stockToCheck < quantity) {
       return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
     }
 
-    const priceAtAddition = product.sale_price || product.base_price
-
-    // Check if item already exists in cart
+    // Check if item already exists in cart (same product + variant combo)
     const existingItem = await queryOne(
-      'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NULL',
-      [userId, productId]
+      'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3',
+      [userId, productId, variantId || null]
     )
 
     if (existingItem) {
       // Update quantity
       const newQuantity = existingItem.quantity + quantity
 
-      if (product.stock_quantity < newQuantity) {
+      if (stockToCheck < newQuantity) {
         return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
       }
 
@@ -134,8 +158,8 @@ export async function POST(request: NextRequest) {
     } else {
       // Insert new item
       await query(
-        'INSERT INTO cart_items (user_id, product_id, quantity, price_at_addition) VALUES ($1, $2, $3, $4)',
-        [userId, productId, quantity, priceAtAddition]
+        'INSERT INTO cart_items (user_id, product_id, variant_id, quantity, price_at_addition) VALUES ($1, $2, $3, $4, $5)',
+        [userId, productId, variantId || null, quantity, priceAtAddition]
       )
 
       return NextResponse.json({ message: 'Item added to cart' })
@@ -172,11 +196,13 @@ export async function PATCH(request: NextRequest) {
 
     const userId = await getUserIdForSession(sessionId, authUserId)
 
-    // Get cart item with product stock
+    // Get cart item with product and variant stock
     const cartItem = await queryOne(`
-      SELECT ci.*, p.stock_quantity
+      SELECT ci.*, p.stock_quantity AS product_stock,
+             pv.stock_quantity AS variant_stock
       FROM cart_items ci
       LEFT JOIN products p ON ci.product_id = p.id
+      LEFT JOIN product_variants pv ON ci.variant_id = pv.id
       WHERE ci.id = $1 AND ci.user_id = $2
     `, [cartItemId, userId])
 
@@ -184,7 +210,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Cart item not found' }, { status: 404 })
     }
 
-    if (cartItem.stock_quantity < quantity) {
+    const availableStock = cartItem.variant_id ? cartItem.variant_stock : cartItem.product_stock
+    if (availableStock < quantity) {
       return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
     }
 

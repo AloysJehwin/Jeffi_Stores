@@ -50,7 +50,11 @@ export async function getAllProducts() {
         (SELECT json_agg(pi ORDER BY pi.display_order)
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
-      ) AS product_images
+      ) AS product_images,
+      COALESCE(
+        (SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+        0
+      ) AS variant_stock_total
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -69,7 +73,12 @@ export async function getProduct(id: string) {
         (SELECT json_agg(pi ORDER BY pi.display_order)
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
-      ) AS product_images
+      ) AS product_images,
+      COALESCE(
+        (SELECT json_agg(pv ORDER BY pv.variant_name)
+         FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+        '[]'::json
+      ) AS product_variants
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -165,9 +174,16 @@ export async function getFilteredProducts(filters: {
     params.push(filters.is_active === 'true')
   }
   if (filters.stock === 'low') {
-    conditions.push(`p.stock_quantity <= p.low_stock_threshold AND p.stock_quantity > 0`)
+    conditions.push(`(
+      (p.has_variants = false AND p.stock_quantity <= p.low_stock_threshold AND p.stock_quantity > 0)
+      OR (p.has_variants = true AND COALESCE((SELECT SUM(pv2.stock_quantity) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true), 0) > 0
+        AND COALESCE((SELECT SUM(pv2.stock_quantity) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true), 0) <= p.low_stock_threshold)
+    )`)
   } else if (filters.stock === 'out') {
-    conditions.push(`p.stock_quantity = 0`)
+    conditions.push(`(
+      (p.has_variants = false AND p.stock_quantity = 0)
+      OR (p.has_variants = true AND COALESCE((SELECT SUM(pv2.stock_quantity) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true), 0) = 0)
+    )`)
   }
   if (filters.search) {
     conditions.push(`(p.name ILIKE $${i} OR p.sku ILIKE $${i})`)
@@ -186,7 +202,12 @@ export async function getFilteredProducts(filters: {
         (SELECT json_agg(pi ORDER BY pi.display_order)
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
-      ) AS product_images
+      ) AS product_images,
+      COALESCE(
+        (SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+        0
+      ) AS variant_stock_total,
+      (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id

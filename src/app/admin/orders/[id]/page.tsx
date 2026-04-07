@@ -91,8 +91,11 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                   order.order_items.map((item: any) => (
                     <div key={item.id} className="flex justify-between items-start pb-4 border-b border-gray-100 last:border-0">
                       <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{item.products?.name || 'Product'}</h3>
-                        <p className="text-sm text-gray-500 mt-1">SKU: {item.products?.sku}</p>
+                        <h3 className="font-medium text-gray-900">{item.product_name || item.products?.name || 'Product'}</h3>
+                        <p className="text-sm text-gray-500 mt-1">SKU: {item.product_sku || item.products?.sku}</p>
+                        {item.variant_name && (
+                          <p className="text-sm text-gray-500">{item.variant_name}</p>
+                        )}
                         <p className="text-sm text-gray-600 mt-1">
                           Quantity: {item.quantity} × Rs. {Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>

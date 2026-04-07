@@ -10,6 +10,8 @@ interface Product {
   slug: string
   base_price: number
   sale_price: number | null
+  has_variants: boolean
+  variant_min_price: number | null
   product_images: Array<{
     image_url: string
     thumbnail_url: string
@@ -138,7 +140,9 @@ export default function SearchBar() {
               <div className="py-2">
                 {products.map((product) => {
                   const primaryImage = product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
-                  const displayPrice = product.sale_price || product.base_price
+                  const displayPrice = product.has_variants && product.variant_min_price
+                    ? product.variant_min_price
+                    : (product.sale_price || product.base_price)
 
                   return (
                     <Link
@@ -170,7 +174,7 @@ export default function SearchBar() {
                           {product.name}
                         </h4>
                         <p className="text-sm font-semibold text-primary-600">
-                          ₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          {product.has_variants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
 

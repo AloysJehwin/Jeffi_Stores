@@ -2,24 +2,28 @@ import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
+import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 
 async function updateProduct(productId: string, formData: FormData) {
   'use server'
 
   const name = formData.get('name') as string
-  const sku = formData.get('sku') as string
   const description = formData.get('description') as string
   const categoryId = formData.get('category_id') as string
   const brandId = formData.get('brand_id') as string
-  const basePrice = Math.round(parseFloat(formData.get('base_price') as string) * 100) / 100
+  const hasVariants = formData.get('has_variants') === 'true'
+  const variantType = formData.get('variant_type') as string || null
+  const basePrice = hasVariants ? 0 : Math.round(parseFloat(formData.get('base_price') as string) * 100) / 100
   const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
   const salePrice = formData.get('sale_price') ? Math.round(parseFloat(formData.get('sale_price') as string) * 100) / 100 : null
   const wholesalePrice = formData.get('wholesale_price') ? Math.round(parseFloat(formData.get('wholesale_price') as string) * 100) / 100 : null
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
-  const stockQuantity = parseInt(formData.get('stock_quantity') as string)
-  const lowStockThreshold = parseInt(formData.get('low_stock_threshold') as string)
+  const mpn = formData.get('mpn') as string || null
+  const gtin = formData.get('gtin') as string || null
+  const stockQuantity = hasVariants ? 0 : parseInt(formData.get('stock_quantity') as string)
+  const lowStockThreshold = hasVariants ? 0 : parseInt(formData.get('low_stock_threshold') as string)
   const weight = formData.get('weight') ? parseFloat(formData.get('weight') as string) : null
   const dimensions = formData.get('dimensions') as string || null
   const isActive = formData.get('is_active') === 'true'
@@ -34,16 +38,20 @@ async function updateProduct(productId: string, formData: FormData) {
   try {
     await query(
       `UPDATE products SET
-        name = $1, slug = $2, sku = $3, description = $4, category_id = $5,
-        brand_id = $6, base_price = $7, mrp = $8, sale_price = $9, wholesale_price = $10,
-        gst_percentage = $11, hsn_code = $12, stock_quantity = $13, low_stock_threshold = $14, weight = $15,
-        dimensions = $16, is_active = $17, is_featured = $18, updated_at = $19
-      WHERE id = $20`,
+        name = $1, slug = $2, description = $3, category_id = $4,
+        brand_id = $5, base_price = $6, mrp = $7, sale_price = $8, wholesale_price = $9,
+        gst_percentage = $10, hsn_code = $11, mpn = $12, gtin = $13,
+        stock_quantity = $14, low_stock_threshold = $15, weight = $16,
+        dimensions = $17, is_active = $18, is_featured = $19, has_variants = $20, variant_type = $21,
+        updated_at = $22
+      WHERE id = $23`,
       [
-        name, slug, sku, description, categoryId,
+        name, slug, description, categoryId,
         brandId || null, basePrice, mrp, salePrice, wholesalePrice,
-        gstPercentage, hsnCode, stockQuantity, lowStockThreshold, weight,
-        dimensions, isActive, isFeatured, new Date().toISOString(),
+        gstPercentage, hsnCode, mpn, gtin,
+        stockQuantity, lowStockThreshold, weight,
+        dimensions, isActive, isFeatured, hasVariants, variantType,
+        new Date().toISOString(),
         productId,
       ]
     )
@@ -152,6 +160,62 @@ async function updateProduct(productId: string, formData: FormData) {
           [existingImagesToKeep[0].id]
         )
       }
+    }
+
+    // Handle variant changes
+    if (hasVariants) {
+      const variantsJson = formData.get('variants_json') as string
+      if (variantsJson) {
+        // Get the product SKU for generating variant SKUs
+        const productData = await queryOne<{ sku: string }>('SELECT sku FROM products WHERE id = $1', [productId])
+        const productSku = productData?.sku || 'PRD-000'
+        const variants = JSON.parse(variantsJson)
+
+        for (const variant of variants) {
+          if (variant._isDeleted && variant.id) {
+            // Delete existing variant
+            await query('DELETE FROM product_variants WHERE id = $1 AND product_id = $2', [variant.id, productId])
+          } else if (variant.id && !variant._isDeleted) {
+            // Update existing variant
+            const variantSku = generateVariantSku(productSku, variant.variant_name)
+            await query(
+              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, sale_price = $5, wholesale_price = $6, stock_quantity = $7, mpn = $8, gtin = $9
+               WHERE id = $10 AND product_id = $11`,
+              [
+                variantSku, variant.variant_name,
+                variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
+                variant.mrp ? Math.round(parseFloat(variant.mrp) * 100) / 100 : null,
+                variant.sale_price ? Math.round(parseFloat(variant.sale_price) * 100) / 100 : null,
+                variant.wholesale_price ? Math.round(parseFloat(variant.wholesale_price) * 100) / 100 : null,
+                parseInt(variant.stock_quantity) || 0,
+                variant.mpn || null,
+                variant.gtin || null,
+                variant.id, productId,
+              ]
+            )
+          } else if (!variant.id && !variant._isDeleted && variant.variant_name) {
+            // Insert new variant
+            const variantSku = generateVariantSku(productSku, variant.variant_name)
+            await query(
+              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, sale_price, wholesale_price, stock_quantity, mpn, gtin, is_active)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)`,
+              [
+                productId, variantSku, variant.variant_name,
+                variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
+                variant.mrp ? Math.round(parseFloat(variant.mrp) * 100) / 100 : null,
+                variant.sale_price ? Math.round(parseFloat(variant.sale_price) * 100) / 100 : null,
+                variant.wholesale_price ? Math.round(parseFloat(variant.wholesale_price) * 100) / 100 : null,
+                parseInt(variant.stock_quantity) || 0,
+                variant.mpn || null,
+                variant.gtin || null,
+              ]
+            )
+          }
+        }
+      }
+    } else {
+      // If variants disabled, delete all existing variants
+      await query('DELETE FROM product_variants WHERE product_id = $1', [productId])
     }
 
     revalidatePath('/admin/products')

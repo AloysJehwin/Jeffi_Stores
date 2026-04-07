@@ -12,7 +12,9 @@ async function getFeaturedProducts() {
         (SELECT json_agg(pi ORDER BY pi.display_order)
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
-      ) AS product_images
+      ) AS product_images,
+      COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
+      (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -69,12 +71,11 @@ export default async function HomePage() {
             </div>
             <div className="hidden md:block">
               <div className="relative h-96">
-                {/* Placeholder for hero image */}
-                <div className="w-full h-full bg-white/10 rounded-lg flex items-center justify-center">
-                  <svg className="w-48 h-48 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                  </svg>
-                </div>
+                <img
+                  src="https://jeffi-stores-bucket.s3.us-east-1.amazonaws.com/assets/hero-hardware-tools.png"
+                  alt="Hardware tools and industrial supplies"
+                  className="w-full h-full object-contain drop-shadow-2xl"
+                />
               </div>
             </div>
           </div>
@@ -146,7 +147,11 @@ export default async function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredProducts.map((product) => {
                 const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-                const displayPrice = product.sale_price || product.base_price
+                const hasVariants = product.has_variants
+                const displayPrice = hasVariants && product.variant_min_price
+                  ? product.variant_min_price
+                  : (product.sale_price || product.base_price)
+                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
                 const mrp = product.mrp ? Number(product.mrp) : null
                 const mrpDiscount = mrp && mrp > Number(displayPrice)
                   ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
@@ -193,7 +198,7 @@ export default async function HomePage() {
                         )}
                         <div className="flex items-baseline gap-2 mb-1">
                           <span className="text-2xl font-bold text-primary-600">
-                            ₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            {hasVariants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
                           {mrp && mrp > Number(displayPrice) && (
                             <span className="text-sm text-gray-400 line-through">
@@ -203,8 +208,8 @@ export default async function HomePage() {
                         </div>
                         <p className="text-[10px] text-gray-400 mb-4">Inclusive of all taxes</p>
                         <div className="flex items-center justify-between">
-                          <span className={`text-sm font-medium ${product.stock_quantity > product.low_stock_threshold ? 'text-green-600' : 'text-orange-600'}`}>
-                            {product.stock_quantity > 0 ? 'In Stock' : 'Out of Stock'}
+                          <span className={`text-sm font-medium ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
                           </span>
                           <span className="text-accent-500 group-hover:text-accent-600 font-semibold">
                             View Details →
