@@ -1,0 +1,62 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js
+/.next/
+/out/
+
+# Production
+/build
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env
+.env*.local
+.env*.bak
+*.env.bak
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Database
+/database
+
+# Temporary scripts & guides
+*.sh
+*.csv
+RDS_SECURITY_GROUP_FIX.md
+ADD_IP_TO_SECURITY_GROUP.md
+EMAIL_NOTIFICATION_SYSTEM.md
+QUICKSTART.md
+S3_SETUP_INSTRUCTIONS.md
+SECURITY_GROUP_INSTRUCTIONS.md
+
+# AWS config files
+s3-bucket-policy*.json
+
+# Google Service Account key
+jeffi-stores-*.json
+
+# Production env
+.env.production
+
+# Business documents (keep local, don't commit)
+GST Certificate*.pdf
+INV*.pdf

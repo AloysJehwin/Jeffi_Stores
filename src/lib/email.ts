@@ -1,0 +1,1096 @@
+import nodemailer from 'nodemailer'
+
+// Create transporter using AWS SES SMTP
+const transporter = nodemailer.createTransport({
+  host: 'email-smtp.us-east-1.amazonaws.com',
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.SES_SMTP_USER,
+    pass: process.env.SES_SMTP_PASSWORD,
+  },
+})
+
+export async function sendOTPEmail(email: string, otp: string, name?: string) {
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: email,
+    subject: 'Your Verification Code - Jeffi Stores',
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 30px;
+              border: 1px solid #e0e0e0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
+            .otp-box {
+              background-color: #2563eb;
+              color: white;
+              font-size: 32px;
+              font-weight: bold;
+              text-align: center;
+              padding: 20px;
+              border-radius: 8px;
+              letter-spacing: 8px;
+              margin: 30px 0;
+            }
+            .info {
+              background-color: #fff3cd;
+              border-left: 4px solid #ffc107;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e0e0e0;
+              color: #666;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">Jeffi Stores</div>
+              <p style="color: #666;">Hardware & Tools</p>
+            </div>
+
+            <h2>Email Verification</h2>
+            <p>Hello ${name || 'Customer'},</p>
+            <p>Thank you for registering with Jeffi Stores. Please use the following One-Time Password (OTP) to verify your email address:</p>
+
+            <div class="otp-box">${otp}</div>
+
+            <div class="info">
+              <strong>This OTP will expire in 10 minutes.</strong>
+              <br>
+              <small>Please do not share this code with anyone.</small>
+            </div>
+
+            <p>If you didn't request this verification code, please ignore this email or contact our support team.</p>
+
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong></p>
+              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+                            <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log('OTP email sent:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Email sending error:', error)
+    return { success: false, error }
+  }
+}
+
+export async function sendWelcomeEmail(email: string, name: string) {
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: email,
+    subject: 'Welcome to Jeffi Stores!',
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 30px;
+              border: 1px solid #e0e0e0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
+            .button {
+              display: inline-block;
+              background-color: #f97316;
+              color: white;
+              padding: 12px 30px;
+              text-decoration: none;
+              border-radius: 5px;
+              margin: 20px 0;
+              font-weight: bold;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e0e0e0;
+              color: #666;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">Jeffi Stores</div>
+              <p style="color: #666;">Hardware & Tools</p>
+            </div>
+
+            <h2>Welcome to Jeffi Stores!</h2>
+            <p>Hello ${name},</p>
+            <p>Thank you for creating an account with us. We're excited to have you as part of the Jeffi Stores family!</p>
+
+            <p>At Jeffi Stores, you'll find:</p>
+            <ul>
+              <li>Wide range of industrial machinery parts</li>
+              <li>Quality components for manufacturing & construction</li>
+              <li>Expert service and support</li>
+              <li>Competitive pricing</li>
+            </ul>
+
+            <div style="text-align: center;">
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/products" class="button">
+                Start Shopping
+              </a>
+            </div>
+
+            <p>If you have any questions or need assistance, feel free to reach out to our team.</p>
+
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong></p>
+              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+                                          <p>Phone: +91 89030 31299 | +91 94883 54099<br>Email: jeffistoress@gmail.com</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log('Welcome email sent:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Email sending error:', error)
+    return { success: false, error }
+  }
+}
+
+export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[], invoicePdfBuffer?: Buffer | null) {
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: email,
+    subject: `Order Confirmation - ${order.order_number}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 30px;
+              border: 1px solid #e0e0e0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
+            .order-box {
+              background-color: #e3f2fd;
+              border: 2px solid #2563eb;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 20px 0;
+            }
+            th, td {
+              padding: 12px;
+              text-align: left;
+              border-bottom: 1px solid #ddd;
+            }
+            th {
+              background-color: #f0f0f0;
+              font-weight: bold;
+            }
+            .total {
+              background-color: #fff3cd;
+              padding: 15px;
+              border-radius: 5px;
+              margin: 20px 0;
+              text-align: right;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e0e0e0;
+              color: #666;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">Jeffi Stores</div>
+              <p style="color: #666;">Hardware & Tools</p>
+            </div>
+
+            <h2>Order Confirmed!</h2>
+            <p>Hello ${order.customer_name},</p>
+            <p>Thank you for your order! We've received it and our team will contact you shortly to confirm payment and delivery details.</p>
+
+            <div class="order-box">
+              <h3 style="margin-top: 0;">Order Details</h3>
+              <p><strong>Order Number:</strong> ${order.order_number}</p>
+              ${order.invoice_number ? `<p><strong>Invoice Number:</strong> ${order.invoice_number}</p>` : ''}
+              <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+              })}</p>
+              <p><strong>Status:</strong> <span style="color: #f97316; font-weight: bold;">PENDING CONFIRMATION</span></p>
+              ${order.taxable_amount > 0 ? `
+              <p><strong>GSTIN:</strong> 22AQFPJ2897M1ZG</p>
+              ` : ''}
+            </div>
+
+            <h3>Order Items</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Qty</th>
+                  <th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${orderItems.map(item => `
+                  <tr>
+                    <td>${item.product_name}</td>
+                    <td>${item.quantity}</td>
+                    <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+
+            <div class="total">
+              ${order.taxable_amount > 0 ? `
+              <p style="margin: 3px 0; font-size: 14px;">Taxable Amount: ₹${Number(order.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              ${order.is_igst
+                ? `<p style="margin: 3px 0; font-size: 14px;">IGST: ₹${Number(order.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
+                : `<p style="margin: 3px 0; font-size: 14px;">CGST: ₹${Number(order.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                   <p style="margin: 3px 0; font-size: 14px;">SGST: ₹${Number(order.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
+              }
+              <hr style="border: none; border-top: 1px solid #ccc; margin: 8px 0;">
+              ` : ''}
+              <h3 style="margin: 0;">Total Amount: ₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
+            </div>
+
+            <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+              <h4 style="margin-top: 0;">Next Steps</h4>
+              <p style="margin: 5px 0;">Our team will contact you within 24 hours to:</p>
+              <ul style="margin: 10px 0;">
+                <li>Confirm your order details</li>
+                <li>Provide payment instructions</li>
+                <li>Schedule delivery</li>
+              </ul>
+            </div>
+
+            <p>If you have any questions, feel free to contact us:</p>
+                                        <p>Phone: +91 89030 31299 | +91 94883 54099<br>Email: jeffistoress@gmail.com</p>
+
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong></p>
+              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    attachments: invoicePdfBuffer ? [{
+      filename: `Invoice-${order.invoice_number || order.order_number}.pdf`,
+      content: invoicePdfBuffer,
+      contentType: 'application/pdf',
+    }] : [],
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log('Order confirmation email sent:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Email sending error:', error)
+    return { success: false, error }
+  }
+}
+
+export async function sendNewOrderNotification(order: any, orderItems: any[], user: any) {
+  const adminEmail = process.env.ADMIN_EMAIL || 'jeffistoress@gmail.com'
+  
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: adminEmail,
+    subject: `New Order - ${order.order_number}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 700px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 30px;
+              border: 1px solid #e0e0e0;
+            }
+            .alert {
+              background-color: #d4edda;
+              border: 2px solid #28a745;
+              padding: 20px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin: 20px 0;
+              background-color: white;
+            }
+            th, td {
+              padding: 12px;
+              text-align: left;
+              border: 1px solid #ddd;
+            }
+            th {
+              background-color: #2563eb;
+              color: white;
+              font-weight: bold;
+            }
+            .info-box {
+              background-color: white;
+              padding: 15px;
+              border-radius: 5px;
+              margin: 15px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="alert">
+              <h2 style="margin-top: 0;">New Order Received!</h2>
+              <p style="font-size: 18px; margin: 0;"><strong>Order #${order.order_number}</strong></p>
+            </div>
+
+            <div class="info-box">
+              <h3>Customer Information</h3>
+              <p><strong>Name:</strong> ${order.customer_name}</p>
+              <p><strong>Email:</strong> ${order.customer_email}</p>
+              <p><strong>Phone:</strong> ${order.customer_phone || 'Not provided'}</p>
+            </div>
+
+            <div class="info-box">
+              <h3>Order Information</h3>
+              <p><strong>Order Number:</strong> ${order.order_number}</p>
+              <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleString('en-IN')}</p>
+              <p><strong>Status:</strong> PENDING</p>
+              ${order.notes ? `<p><strong>Customer Notes:</strong> ${order.notes}</p>` : ''}
+            </div>
+
+            <h3>Order Items</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>SKU</th>
+                  <th>Qty</th>
+                  <th>Unit Price</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${orderItems.map(item => `
+                  <tr>
+                    <td>${item.product_name}</td>
+                    <td>${item.product_sku}</td>
+                    <td>${item.quantity}</td>
+                    <td>₹${item.unit_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                `).join('')}
+                <tr style="background-color: #fff3cd; font-weight: bold;">
+                  <td colspan="4" style="text-align: right;">Total:</td>
+                  <td>₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
+              <h4 style="margin-top: 0;">Action Required</h4>
+              <p>Please contact the customer within 24 hours to confirm the order and payment details.</p>
+            </div>
+
+            <p style="text-align: center; margin-top: 30px;">
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/orders/${order.id}" 
+                 style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                View Order in Admin Panel
+              </a>
+            </p>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log('New order notification sent:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Email sending error:', error)
+    return { success: false, error }
+  }
+}
+
+// Send order status update notification
+export async function sendOrderStatusUpdate(
+  customerEmail: string,
+  customerName: string,
+  orderNumber: string,
+  orderId: string,
+  newStatus: string,
+  previousStatus?: string,
+  invoicePdfBuffer?: Buffer | null
+) {
+  const statusMessages: Record<string, { title: string; message: string; color: string }> = {
+    pending: {
+      title: 'Order Received',
+      message: 'We have received your order and are preparing it for processing.',
+      color: '#ffc107',
+    },
+    confirmed: {
+      title: 'Order Confirmed',
+      message: 'Your order has been confirmed and is being prepared for shipment.',
+      color: '#2563eb',
+    },
+    processing: {
+      title: 'Order Processing',
+      message: 'Your order is currently being processed and will be shipped soon.',
+      color: '#2563eb',
+    },
+    shipped: {
+      title: 'Order Shipped',
+      message: 'Great news! Your order has been shipped and is on its way to you.',
+      color: '#8b5cf6',
+    },
+    delivered: {
+      title: 'Order Delivered',
+      message: 'Your order has been successfully delivered. Thank you for shopping with us!',
+      color: '#10b981',
+    },
+    cancelled: {
+      title: 'Order Cancelled',
+      message: 'Your order has been cancelled. If you did not request this cancellation, please contact us immediately.',
+      color: '#ef4444',
+    },
+    cancel_requested: {
+      title: 'Cancellation Request Received',
+      message: 'We have received your cancellation request. Our team will review it and notify you once it is approved or rejected.',
+      color: '#f97316',
+    },
+  }
+
+  const statusInfo = statusMessages[newStatus] || {
+    title: 'Order Update',
+    message: `Your order status has been updated to: ${newStatus}`,
+    color: '#6b7280',
+  }
+
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: customerEmail,
+    subject: `${statusInfo.title} - Order ${orderNumber}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 30px;
+              border: 1px solid #e0e0e0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
+            .status-badge {
+              background-color: ${statusInfo.color};
+              color: white;
+              font-size: 18px;
+              font-weight: bold;
+              text-align: center;
+              padding: 15px 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+              text-transform: uppercase;
+            }
+            .info-box {
+              background-color: #f0f9ff;
+              border-left: 4px solid #2563eb;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+            .order-details {
+              background-color: white;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e0e0e0;
+              color: #666;
+              font-size: 14px;
+            }
+            .button {
+              display: inline-block;
+              background-color: #2563eb;
+              color: white;
+              padding: 12px 30px;
+              text-decoration: none;
+              border-radius: 5px;
+              font-weight: bold;
+              margin: 20px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">Jeffi Stores</div>
+              <p style="color: #666;">Hardware & Tools</p>
+            </div>
+
+            <h2>${statusInfo.title}</h2>
+            <p>Hello ${customerName},</p>
+            <p>${statusInfo.message}</p>
+
+            <div class="status-badge">${newStatus}</div>
+
+            <div class="order-details">
+              <h3 style="margin-top: 0;">Order Details</h3>
+              <p><strong>Order Number:</strong> ${orderNumber}</p>
+              <p><strong>Order ID:</strong> ${orderId}</p>
+              ${previousStatus ? `<p><strong>Previous Status:</strong> ${previousStatus}</p>` : ''}
+              <p><strong>Updated:</strong> ${new Date().toLocaleString('en-IN', { 
+                dateStyle: 'long', 
+                timeStyle: 'short' 
+              })}</p>
+            </div>
+
+            ${newStatus === 'shipped' ? `
+              <div class="info-box">
+                <h4 style="margin-top: 0;">Tracking Information</h4>
+                <p>You can track your order by logging into your account.</p>
+              </div>
+            ` : ''}
+
+            ${newStatus === 'delivered' ? `
+              <div class="info-box">
+                <h4 style="margin-top: 0;">Thank You!</h4>
+                <p>We hope you're satisfied with your purchase. If you have any questions or concerns, please don't hesitate to contact us.</p>
+              </div>
+            ` : ''}
+
+            <p style="text-align: center;">
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
+                 class="button">
+                View Order Details
+              </a>
+            </p>
+
+            <p>If you have any questions about your order, please feel free to contact us.</p>
+
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong></p>
+              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+                            <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    attachments: invoicePdfBuffer ? [{
+      filename: `Invoice-${orderNumber}.pdf`,
+      content: invoicePdfBuffer,
+      contentType: 'application/pdf',
+    }] : [],
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log('Order status update email sent:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Email sending error:', error)
+    return { success: false, error }
+  }
+}
+
+// Send payment status update notification
+export async function sendPaymentStatusUpdate(
+  customerEmail: string,
+  customerName: string,
+  orderNumber: string,
+  orderId: string,
+  newPaymentStatus: string,
+  orderTotal: number
+) {
+  const paymentMessages: Record<string, { title: string; message: string; color: string }> = {
+    paid: {
+      title: 'Payment Received',
+      message: 'We have received your payment successfully. Thank you!',
+      color: '#10b981',
+    },
+    pending: {
+      title: 'Payment Pending',
+      message: 'Your payment is pending. Please complete the payment to proceed with your order.',
+      color: '#ffc107',
+    },
+    failed: {
+      title: 'Payment Failed',
+      message: 'Unfortunately, your payment could not be processed. Please try again or contact us for assistance.',
+      color: '#ef4444',
+    },
+    refunded: {
+      title: 'Payment Refunded',
+      message: 'Your payment has been refunded. It may take 5-7 business days to reflect in your account.',
+      color: '#8b5cf6',
+    },
+  }
+
+  const paymentInfo = paymentMessages[newPaymentStatus] || {
+    title: 'Payment Update',
+    message: `Your payment status has been updated to: ${newPaymentStatus}`,
+    color: '#6b7280',
+  }
+
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: customerEmail,
+    subject: `${paymentInfo.title} - Order ${orderNumber}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 30px;
+              border: 1px solid #e0e0e0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
+            .payment-badge {
+              background-color: ${paymentInfo.color};
+              color: white;
+              font-size: 18px;
+              font-weight: bold;
+              text-align: center;
+              padding: 15px 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+              text-transform: uppercase;
+            }
+            .amount-box {
+              background-color: white;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+              text-align: center;
+            }
+            .amount {
+              font-size: 32px;
+              font-weight: bold;
+              color: #2563eb;
+            }
+            .order-details {
+              background-color: white;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+            }
+            .info-box {
+              background-color: #f0f9ff;
+              border-left: 4px solid #2563eb;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e0e0e0;
+              color: #666;
+              font-size: 14px;
+            }
+            .button {
+              display: inline-block;
+              background-color: #2563eb;
+              color: white;
+              padding: 12px 30px;
+              text-decoration: none;
+              border-radius: 5px;
+              font-weight: bold;
+              margin: 20px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">Jeffi Stores</div>
+              <p style="color: #666;">Hardware & Tools</p>
+            </div>
+
+            <h2>${paymentInfo.title}</h2>
+            <p>Hello ${customerName},</p>
+            <p>${paymentInfo.message}</p>
+
+            <div class="payment-badge">${newPaymentStatus}</div>
+
+            <div class="amount-box">
+              <p style="margin: 0; color: #666;">Order Amount</p>
+              <div class="amount">₹${orderTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+            </div>
+
+            <div class="order-details">
+              <h3 style="margin-top: 0;">Order Details</h3>
+              <p><strong>Order Number:</strong> ${orderNumber}</p>
+              <p><strong>Order ID:</strong> ${orderId}</p>
+              <p><strong>Payment Status:</strong> ${newPaymentStatus}</p>
+              <p><strong>Updated:</strong> ${new Date().toLocaleString('en-IN', { 
+                dateStyle: 'long', 
+                timeStyle: 'short' 
+              })}</p>
+            </div>
+
+            ${newPaymentStatus === 'paid' ? `
+              <div class="info-box">
+                <h4 style="margin-top: 0;">Payment Confirmed</h4>
+                <p>Your order will now be processed and shipped as per the delivery schedule.</p>
+              </div>
+            ` : ''}
+
+            ${newPaymentStatus === 'pending' ? `
+              <div class="info-box">
+                <h4 style="margin-top: 0;">Action Required</h4>
+                <p>Please complete your payment to avoid order cancellation. Contact us if you need assistance.</p>
+              </div>
+            ` : ''}
+
+            ${newPaymentStatus === 'refunded' ? `
+              <div class="info-box">
+                <h4 style="margin-top: 0;">Refund Processed</h4>
+                <p>The refund has been initiated. Please allow 5-7 business days for the amount to reflect in your account.</p>
+              </div>
+            ` : ''}
+
+            <p style="text-align: center;">
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
+                 class="button">
+                View Order Details
+              </a>
+            </p>
+
+            <p>If you have any questions about this payment update, please contact us.</p>
+
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong></p>
+              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+                            <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log('Payment status update email sent:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Email sending error:', error)
+    return { success: false, error }
+  }
+}
+
+export async function sendNewReviewNotification(review: any, user: any, product: any) {
+  const adminEmail = process.env.ADMIN_EMAIL || 'aloysjehwin@gmail.com'
+
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: adminEmail,
+    subject: `New Review Pending Approval - ${product.name}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 30px;
+              border: 1px solid #e0e0e0;
+            }
+            .header {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 20px;
+              border-radius: 10px;
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .content {
+              background-color: white;
+              padding: 20px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+            }
+            .review-box {
+              background-color: #fff3cd;
+              border-left: 4px solid #ffc107;
+              padding: 15px;
+              margin: 20px 0;
+            }
+            .stars {
+              color: #ffc107;
+              font-size: 20px;
+              margin: 10px 0;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 10px 0;
+              border-bottom: 1px solid #eee;
+            }
+            .info-label {
+              font-weight: bold;
+              color: #555;
+            }
+            .button {
+              display: inline-block;
+              padding: 12px 30px;
+              background-color: #28a745;
+              color: white;
+              text-decoration: none;
+              border-radius: 5px;
+              margin: 10px 5px;
+              font-weight: bold;
+            }
+            .button.delete {
+              background-color: #dc3545;
+            }
+            .footer {
+              text-align: center;
+              color: #666;
+              font-size: 12px;
+              margin-top: 30px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0;">New Review Submitted</h1>
+              <p style="margin: 10px 0 0 0; opacity: 0.9;">Action Required: Pending Approval</p>
+            </div>
+
+            <div class="content">
+              <h2 style="color: #667eea; margin-top: 0;">Review Details</h2>
+              
+              <div class="info-row">
+                <span class="info-label">Product:</span>
+                <span>${product.name}</span>
+              </div>
+              
+              <div class="info-row">
+                <span class="info-label">Customer:</span>
+                <span>${user.first_name} ${user.last_name}</span>
+              </div>
+              
+              <div class="info-row">
+                <span class="info-label">Email:</span>
+                <span>${user.email}</span>
+              </div>
+              
+              <div class="info-row">
+                <span class="info-label">Rating:</span>
+                <span class="stars">${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)} (${review.rating}/5)</span>
+              </div>
+              
+              ${review.is_verified_purchase ? `
+              <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span style="color: #28a745; font-weight: bold;">Verified Purchase</span>
+              </div>
+              ` : ''}
+              
+              <div class="info-row">
+                <span class="info-label">Submitted:</span>
+                <span>${new Date(review.created_at).toLocaleString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</span>
+              </div>
+
+              ${review.title ? `
+              <div style="margin-top: 20px;">
+                <strong>Review Title:</strong>
+                <p style="margin: 5px 0; font-size: 16px;">${review.title}</p>
+              </div>
+              ` : ''}
+
+              <div class="review-box">
+                <strong>Review Comment:</strong>
+                <p style="margin: 10px 0 0 0; white-space: pre-wrap;">${review.comment}</p>
+              </div>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/reviews" class="button">
+                Approve / Reject Review
+              </a>
+            </div>
+
+            <div class="footer">
+              <p>This is an automated notification from Jeffi Stores Admin Panel</p>
+              <p>Please review and approve/reject this review from the admin dashboard</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log('New review notification email sent:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Email sending error:', error)
+    return { success: false, error }
+  }
+}

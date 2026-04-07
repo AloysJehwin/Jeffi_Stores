@@ -1,0 +1,38 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env*.local
+.env*.bak
+
+# Certificates (mounted as volumes, not baked in)
+certs/
+
+# Database scripts
+database/
+
+# Old files
+old-files/
+
+# Build artifacts
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+*.md
+!README.md
+
+# Misc
+supabase/
+scripts/
+check-images.js
+s3-bucket-policy*.json

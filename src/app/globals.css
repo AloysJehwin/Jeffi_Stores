@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-0 p-0 m-0 box-border;
+  }
+
+  html {
+    @apply bg-gray-50;
+    height: 100%;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body {
+    @apply antialiased font-sans bg-gray-50;
+    min-height: 100vh;
+    height: 100%;
+    overflow-x: hidden;
+    overscroll-behavior: none;
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgb(249 250 251);
+    z-index: -9999;
+  }
+
+  #__next {
+    @apply bg-gray-50;
+    min-height: 100vh;
+  }
+
+  h1 {
+    @apply font-bebas;
+  }
+}
+
+/* Legacy styles for existing pages - will be migrated to Tailwind */
+.penguin-logo {
+  width: 50px;
+}
+
+.head-section {
+  background-color: rgba(255, 251, 240, 1);
+}
+
+#text-style {
+  color: rgba(250, 190, 76, 1);
+  font-size: 80px;
+}
+
+.text-style2 {
+  font-size: 80px;
+  color: rgba(54, 57, 88, 1);
+}
+
+.penguin-catagory {
+  color: rgba(54, 57, 88, 1);
+}
+
+.penguin-card-img {
+  padding: 5%;
+  background-color: rgba(241, 241, 241, 1);
+  margin: 4% auto;
+  border-radius: 1em;
+}
+
+.penguin-info {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 10%;
+}
+
+.penguin-card-border {
+  border-radius: 1em;
+  background-color: white;
+  border: 0;
+}
+
+.price-text-style {
+  color: rgba(250, 190, 76, 1);
+  font-weight: bold;
+}
+
+.penguin-card-footer {
+  background-color: white;
+  border: 0;
+}
+
+.penguin-btn {
+  background-color: rgba(164, 188, 70, 1);
+  color: white;
+}
+
+.footer-section {
+  background-color: hsla(72, 47%, 51%, 0.486);
+  padding: 3% 1% 1% 1%;
+}
+
+/* Toast notification animation */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Confirmation dialog animation */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
