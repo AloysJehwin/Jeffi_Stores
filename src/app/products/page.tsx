@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { queryMany } from '@/lib/db'
 import SortDropdown from '@/components/visitor/SortDropdown'
+import MobileFilterToggle from '@/components/visitor/MobileFilterToggle'
 
 async function getProducts(searchParams: any) {
   const conditions: string[] = ['p.is_active = true']
@@ -72,132 +73,134 @@ export default async function ProductsPage({
   const brands = await getBrands()
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-surface min-h-screen">
       {/* Page Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-8">
+      <div className="bg-surface-elevated border-b border-border-default">
+        <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
           <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 mb-2">
             All Products
           </h1>
-          <p className="text-gray-600">
+          <p className="text-foreground-secondary">
             Browse our complete range of hardware and industrial tools
           </p>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {/* Sidebar Filters */}
           <aside className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto">
-              <h2 className="font-bold text-lg text-gray-900 mb-4">Filters</h2>
+            <MobileFilterToggle>
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto">
+                <h2 className="font-bold text-lg text-foreground mb-4">Filters</h2>
 
-              {/* Search */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Search
-                </label>
-                <form action="/products" method="get">
-                  <input
-                    type="text"
-                    name="search"
-                    defaultValue={searchParams.search}
-                    placeholder="Search products..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  />
-                  <button
-                    type="submit"
-                    className="mt-2 w-full bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                  >
+                {/* Search */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Search
-                  </button>
-                </form>
-              </div>
+                  </label>
+                  <form action="/products" method="get">
+                    <input
+                      type="text"
+                      name="search"
+                      defaultValue={searchParams.search}
+                      placeholder="Search products..."
+                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    />
+                    <button
+                      type="submit"
+                      className="mt-2 w-full bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                    >
+                      Search
+                    </button>
+                  </form>
+                </div>
 
-              {/* Categories Filter */}
-              <div className="mb-6">
-                <h3 className="font-semibold text-gray-900 mb-3">Categories</h3>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  <Link
-                    href="/products"
-                    className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                      !searchParams.category
-                        ? 'bg-accent-50 text-accent-700 font-medium'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    All Categories
-                  </Link>
-                  {categories.map((category) => (
+                {/* Categories Filter */}
+                <div className="mb-6">
+                  <h3 className="font-semibold text-foreground mb-3">Categories</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
                     <Link
-                      key={category.id}
-                      href={`/products?category=${category.id}`}
+                      href="/products"
                       className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                        searchParams.category === category.id
+                        !searchParams.category
                           ? 'bg-accent-50 text-accent-700 font-medium'
-                          : 'text-gray-700 hover:bg-gray-50'
+                          : 'text-foreground-secondary hover:bg-surface-secondary'
                       }`}
                     >
-                      {category.name}
+                      All Categories
                     </Link>
-                  ))}
-                </div>
-              </div>
-
-              {/* Brands Filter */}
-              <div className="mb-6">
-                <h3 className="font-semibold text-gray-900 mb-3">Brands</h3>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  <Link
-                    href={searchParams.category ? `/products?category=${searchParams.category}` : '/products'}
-                    className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                      !searchParams.brand
-                        ? 'bg-accent-50 text-accent-700 font-medium'
-                        : 'text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    All Brands
-                  </Link>
-                  {brands.map((brand) => {
-                    const params = new URLSearchParams()
-                    if (searchParams.category) params.set('category', searchParams.category)
-                    params.set('brand', brand.id)
-
-                    return (
+                    {categories.map((category) => (
                       <Link
-                        key={brand.id}
-                        href={`/products?${params.toString()}`}
+                        key={category.id}
+                        href={`/products?category=${category.id}`}
                         className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                          searchParams.brand === brand.id
+                          searchParams.category === category.id
                             ? 'bg-accent-50 text-accent-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            : 'text-foreground-secondary hover:bg-surface-secondary'
                         }`}
                       >
-                        {brand.name}
+                        {category.name}
                       </Link>
-                    )
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Clear Filters */}
-              {(searchParams.category || searchParams.brand || searchParams.search) && (
-                <Link
-                  href="/products"
-                  className="block text-center w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
-                >
-                  Clear All Filters
-                </Link>
-              )}
-            </div>
+                {/* Brands Filter */}
+                <div className="mb-6">
+                  <h3 className="font-semibold text-foreground mb-3">Brands</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    <Link
+                      href={searchParams.category ? `/products?category=${searchParams.category}` : '/products'}
+                      className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+                        !searchParams.brand
+                          ? 'bg-accent-50 text-accent-700 font-medium'
+                          : 'text-foreground-secondary hover:bg-surface-secondary'
+                      }`}
+                    >
+                      All Brands
+                    </Link>
+                    {brands.map((brand) => {
+                      const params = new URLSearchParams()
+                      if (searchParams.category) params.set('category', searchParams.category)
+                      params.set('brand', brand.id)
+
+                      return (
+                        <Link
+                          key={brand.id}
+                          href={`/products?${params.toString()}`}
+                          className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
+                            searchParams.brand === brand.id
+                              ? 'bg-accent-50 text-accent-700 font-medium'
+                              : 'text-foreground-secondary hover:bg-surface-secondary'
+                          }`}
+                        >
+                          {brand.name}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Clear Filters */}
+                {(searchParams.category || searchParams.brand || searchParams.search) && (
+                  <Link
+                    href="/products"
+                    className="block text-center w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors"
+                  >
+                    Clear All Filters
+                  </Link>
+                )}
+              </div>
+            </MobileFilterToggle>
           </aside>
 
           {/* Products Grid */}
           <div className="lg:col-span-3">
             {/* Sort Bar */}
             <div className="flex items-center justify-between mb-6">
-              <p className="text-gray-600">
-                <span className="font-semibold text-gray-900">{products.length}</span> products found
+              <p className="text-foreground-secondary">
+                <span className="font-semibold text-foreground">{products.length}</span> products found
               </p>
               <SortDropdown />
             </div>
@@ -223,9 +226,9 @@ export default async function ProductsPage({
                       href={`/products/${product.slug}`}
                       className="group"
                     >
-                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
+                      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
                         {/* Product Image */}
-                        <div className="relative h-56 bg-white overflow-hidden">
+                        <div className="relative h-56 bg-surface-elevated overflow-hidden">
                           {primaryImage ? (
                             <img
                               src={primaryImage.image_url}
@@ -234,7 +237,7 @@ export default async function ProductsPage({
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <svg className="w-20 h-20 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg className="w-20 h-20 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
                             </div>
@@ -248,10 +251,10 @@ export default async function ProductsPage({
 
                         {/* Product Info */}
                         <div className="p-5 flex flex-col flex-grow">
-                          <h3 className="font-semibold text-base text-gray-900 mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[3rem]">
+                          <h3 className="font-semibold text-base text-foreground mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[3rem]">
                             {product.name}
                           </h3>
-                          <div className="text-xs text-gray-500 mb-3 space-y-1">
+                          <div className="text-xs text-foreground-muted mb-3 space-y-1">
                             {product.brands && (
                               <div>Brand: {product.brands.name}</div>
                             )}
@@ -261,16 +264,16 @@ export default async function ProductsPage({
                           </div>
                           <div className="mt-auto">
                             <div className="flex items-baseline gap-2 mb-1">
-                              <span className="text-xl font-bold text-primary-600">
+                              <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
                                 {hasVariants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </span>
                               {mrp && mrp > Number(displayPrice) && (
-                                <span className="text-sm text-gray-400 line-through">
+                                <span className="text-sm text-foreground-muted line-through">
                                   ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] text-gray-400 mb-3">Inclusive of all taxes</p>
+                            <p className="text-[10px] text-foreground-muted mb-3">Inclusive of all taxes</p>
                             <div className="flex items-center justify-between">
                               <span className={`text-xs font-medium ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
@@ -287,12 +290,12 @@ export default async function ProductsPage({
                 })}
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-                <svg className="mx-auto h-24 w-24 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+                <svg className="mx-auto h-24 w-24 text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Products Found</h3>
-                <p className="text-gray-600 mb-6">
+                <h3 className="text-xl font-semibold text-foreground mb-2">No Products Found</h3>
+                <p className="text-foreground-secondary mb-6">
                   We couldn't find any products matching your filters. Try adjusting your search criteria.
                 </p>
                 <Link

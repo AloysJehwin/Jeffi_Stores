@@ -158,43 +158,43 @@ export default async function ProductDetailPage({
     : 0
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-surface min-h-screen">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       {/* Breadcrumb */}
-      <div className="bg-white border-b">
+      <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center gap-2 text-sm">
-            <Link href="/" className="text-gray-500 hover:text-accent-500">
+            <Link href="/" className="text-foreground-muted hover:text-accent-500">
               Home
             </Link>
-            <span className="text-gray-400">/</span>
-            <Link href="/products" className="text-gray-500 hover:text-accent-500">
+            <span className="text-foreground-muted">/</span>
+            <Link href="/products" className="text-foreground-muted hover:text-accent-500">
               Products
             </Link>
             {product.categories && (
               <>
-                <span className="text-gray-400">/</span>
+                <span className="text-foreground-muted">/</span>
                 <Link
                   href={`/categories/${product.categories.slug}`}
-                  className="text-gray-500 hover:text-accent-500"
+                  className="text-foreground-muted hover:text-accent-500"
                 >
                   {product.categories.name}
                 </Link>
               </>
             )}
-            <span className="text-gray-400">/</span>
-            <span className="text-gray-900 font-medium">{product.name}</span>
+            <span className="text-foreground-muted">/</span>
+            <span className="text-foreground font-medium">{product.name}</span>
           </nav>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         {/* Product Details */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8">
+        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
             {/* Product Images */}
             <div>
               <ProductImageGallery
@@ -205,15 +205,15 @@ export default async function ProductDetailPage({
 
             {/* Product Info */}
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              <h1 className="text-3xl font-bold text-foreground mb-4">
                 {product.name}
               </h1>
 
               {/* Brand */}
               <div className="flex items-center gap-4 mb-4 text-sm">
                 {product.brands && (
-                  <span className="text-gray-600">
-                    Brand: <span className="font-medium text-gray-900">{product.brands.name}</span>
+                  <span className="text-foreground-secondary">
+                    Brand: <span className="font-medium text-foreground">{product.brands.name}</span>
                   </span>
                 )}
               </div>
@@ -221,35 +221,35 @@ export default async function ProductDetailPage({
               {/* Price & Stock — shown inline for non-variant products */}
               {!hasVariants && (
                 <>
-                  <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                  <div className="bg-surface rounded-lg p-4 sm:p-6 mb-6">
                     <div className="flex items-baseline gap-3 mb-2">
-                      <span className="text-4xl font-bold text-primary-600">
+                      <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
                         Rs. {Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                       {mrp && mrp > Number(displayPrice) && (
-                        <span className="text-xl text-gray-400 line-through">
+                        <span className="text-xl text-foreground-muted line-through">
                           Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </span>
                       )}
                     </div>
                     {mrpDiscount > 0 && (
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="bg-accent-100 text-accent-700 px-3 py-1 rounded-full text-sm font-semibold">
+                        <span className="bg-accent-100 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
                           {mrpDiscount}% off
                         </span>
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-foreground-secondary">
                           You save Rs. {(mrp! - Number(displayPrice)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                     )}
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-foreground-muted">
                       Inclusive of all taxes
                       {product.gst_percentage ? ` (${parseFloat(product.gst_percentage)}% GST)` : ''}
                     </p>
                     {product.wholesale_price && (
-                      <div className="mt-3 pt-3 border-t border-gray-200">
-                        <span className="text-sm text-gray-600">
-                          Wholesale Price: <span className="font-semibold text-gray-900">Rs. {Number(product.wholesale_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <div className="mt-3 pt-3 border-t border-border-default">
+                        <span className="text-sm text-foreground-secondary">
+                          Wholesale Price: <span className="font-semibold text-foreground">Rs. {Number(product.wholesale_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                         </span>
                       </div>
                     )}
@@ -261,7 +261,7 @@ export default async function ProductDetailPage({
                         <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-green-700 font-semibold">
+                        <span className="text-green-700 dark:text-green-400 font-semibold">
                           In Stock ({product.stock_quantity} available)
                         </span>
                       </div>
@@ -270,11 +270,11 @@ export default async function ProductDetailPage({
                         <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-red-700 font-semibold">Out of Stock</span>
+                        <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
                       </div>
                     )}
                     {product.stock_quantity > 0 && product.stock_quantity <= product.low_stock_threshold && (
-                      <p className="text-sm text-orange-600 mt-1">
+                      <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
                         Only {product.stock_quantity} left in stock - order soon!
                       </p>
                     )}
@@ -299,25 +299,25 @@ export default async function ProductDetailPage({
               />
 
               {/* Product Specifications */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h3 className="font-semibold text-gray-900 mb-3">Product Specifications</h3>
+              <div className="mt-6 pt-6 border-t border-border-default">
+                <h3 className="font-semibold text-foreground mb-3">Product Specifications</h3>
                 <dl className="grid grid-cols-2 gap-3 text-sm">
                   {product.weight && (
                     <>
-                      <dt className="text-gray-600">Weight:</dt>
-                      <dd className="font-medium text-gray-900">{product.weight} kg</dd>
+                      <dt className="text-foreground-secondary">Weight:</dt>
+                      <dd className="font-medium text-foreground">{product.weight} kg</dd>
                     </>
                   )}
                   {product.dimensions && (
                     <>
-                      <dt className="text-gray-600">Dimensions:</dt>
-                      <dd className="font-medium text-gray-900">{product.dimensions} cm</dd>
+                      <dt className="text-foreground-secondary">Dimensions:</dt>
+                      <dd className="font-medium text-foreground">{product.dimensions} cm</dd>
                     </>
                   )}
                   {product.categories && (
                     <>
-                      <dt className="text-gray-600">Category:</dt>
-                      <dd className="font-medium text-gray-900">{product.categories.name}</dd>
+                      <dt className="text-foreground-secondary">Category:</dt>
+                      <dd className="font-medium text-foreground">{product.categories.name}</dd>
                     </>
                   )}
                 </dl>
@@ -327,9 +327,9 @@ export default async function ProductDetailPage({
 
           {/* Description */}
           {product.description && (
-            <div className="border-t border-gray-200 p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Product Description</h2>
-              <p className="text-gray-600 leading-relaxed whitespace-pre-line">
+            <div className="border-t border-border-default p-4 sm:p-6 lg:p-8">
+              <h2 className="text-2xl font-bold text-foreground mb-4">Product Description</h2>
+              <p className="text-foreground-secondary leading-relaxed whitespace-pre-line">
                 {product.description}
               </p>
             </div>
@@ -342,7 +342,7 @@ export default async function ProductDetailPage({
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Related Products</h2>
+            <h2 className="text-2xl font-bold text-foreground mb-6">Related Products</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {relatedProducts.map((relatedProduct) => {
                 const relatedPrimaryImage = relatedProduct.product_images?.find((img: any) => img.is_primary) || relatedProduct.product_images?.[0]
@@ -361,8 +361,8 @@ export default async function ProductDetailPage({
                     href={`/products/${relatedProduct.slug}`}
                     className="group"
                   >
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
-                      <div className="relative h-48 bg-white overflow-hidden">
+                    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow">
+                      <div className="relative h-48 bg-surface-elevated overflow-hidden">
                         {relatedPrimaryImage ? (
                           <img
                             src={relatedPrimaryImage.image_url}
@@ -371,7 +371,7 @@ export default async function ProductDetailPage({
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-16 h-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-16 h-16 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                           </div>
@@ -383,15 +383,15 @@ export default async function ProductDetailPage({
                         )}
                       </div>
                       <div className="p-4">
-                        <h3 className="font-semibold text-sm text-gray-900 mb-2 group-hover:text-accent-600 transition-colors line-clamp-2">
+                        <h3 className="font-semibold text-sm text-foreground mb-2 group-hover:text-accent-600 transition-colors line-clamp-2">
                           {relatedProduct.name}
                         </h3>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-lg font-bold text-primary-600">
+                          <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
                             {relatedHasVariants ? 'From ' : ''}₹{Number(relatedDisplayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
                           {relatedMrp && relatedMrp > Number(relatedDisplayPrice) && (
-                            <span className="text-xs text-gray-400 line-through">
+                            <span className="text-xs text-foreground-muted line-through">
                               ₹{relatedMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </span>
                           )}

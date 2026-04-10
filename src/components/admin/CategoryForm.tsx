@@ -38,18 +38,18 @@ export default function CategoryForm({ categories, action, category }: CategoryF
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200">
-      <div className="p-6">
+    <form onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+      <div className="p-4 sm:p-6">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">
             {error}
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Category Name */}
           <div className="md:col-span-2">
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="name" className="block text-sm font-medium text-foreground-secondary mb-2">
               Category Name *
             </label>
             <input
@@ -58,7 +58,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
               name="name"
               required
               defaultValue={category?.name}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Enter category name"
             />
           </div>
@@ -82,7 +82,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
 
           {/* Display Order */}
           <div>
-            <label htmlFor="display_order" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="display_order" className="block text-sm font-medium text-foreground-secondary mb-2">
               Display Order *
             </label>
             <input
@@ -92,17 +92,17 @@ export default function CategoryForm({ categories, action, category }: CategoryF
               required
               min="0"
               defaultValue={category?.display_order || 0}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="0"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-foreground-muted mt-1">
               Lower numbers appear first
             </p>
           </div>
 
           {/* SKU Prefix */}
           <div>
-            <label htmlFor="sku_prefix" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="sku_prefix" className="block text-sm font-medium text-foreground-secondary mb-2">
               SKU Prefix
             </label>
             <input
@@ -111,17 +111,17 @@ export default function CategoryForm({ categories, action, category }: CategoryF
               name="sku_prefix"
               maxLength={10}
               defaultValue={category?.sku_prefix || ''}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent uppercase"
+              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent uppercase"
               placeholder="e.g. BOLT, NUT, WSH"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-foreground-muted mt-1">
               Used for auto-generating product SKUs (e.g. BOLT-001). If empty, first 3 letters of name are used.
             </p>
           </div>
 
           {/* Description */}
           <div className="md:col-span-2">
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="description" className="block text-sm font-medium text-foreground-secondary mb-2">
               Description
             </label>
             <textarea
@@ -129,7 +129,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
               name="description"
               rows={3}
               defaultValue={category?.description}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Enter category description"
             />
           </div>
@@ -143,9 +143,9 @@ export default function CategoryForm({ categories, action, category }: CategoryF
                 name="is_active"
                 value="true"
                 defaultChecked={category?.is_active ?? true}
-                className="h-4 w-4 text-accent-500 focus:ring-accent-500 border-gray-300 rounded"
+                className="h-4 w-4 text-accent-500 focus:ring-accent-500 border-border-secondary rounded"
               />
-              <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="is_active" className="ml-2 block text-sm text-foreground">
                 Active
               </label>
             </div>
@@ -154,10 +154,10 @@ export default function CategoryForm({ categories, action, category }: CategoryF
       </div>
 
       {/* Form Actions */}
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-4">
+      <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex justify-end gap-4">
         <Link
           href="/admin/categories"
-          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+          className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
         >
           Cancel
         </Link>

@@ -111,7 +111,7 @@ export default function CustomSelect({
   return (
     <div>
       {label && (
-        <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor={id} className="block text-sm font-medium text-foreground-secondary mb-2">
           {label}
         </label>
       )}
@@ -134,16 +134,16 @@ export default function CustomSelect({
             }
           }}
           onKeyDown={handleKeyDown}
-          className={`w-full px-4 py-2.5 bg-white border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center justify-between gap-2
-            ${isOpen ? 'border-accent-500 ring-2 ring-accent-500/20' : 'border-gray-300 hover:border-gray-400'}
-            ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}
+          className={`w-full px-4 py-2.5 bg-surface-elevated border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center justify-between gap-2
+            ${isOpen ? 'border-accent-500 ring-2 ring-accent-500/20' : 'border-border-secondary hover:border-gray-400'}
+            ${disabled ? 'opacity-50 cursor-not-allowed bg-surface-secondary' : ''}
           `}
         >
-          <span className={selectedOption ? 'text-gray-900' : 'text-gray-400'}>
+          <span className={selectedOption ? 'text-foreground' : 'text-foreground-muted'}>
             {displayLabel}
           </span>
           <svg
-            className={`w-4 h-4 text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -155,7 +155,7 @@ export default function CustomSelect({
 
         {isOpen && (
           <div
-            className={`absolute z-50 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden
+            className={`absolute z-50 left-0 right-0 bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden
               ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'}
             `}
             style={{ animation: 'customSelectFadeIn 0.15s ease-out' }}
@@ -170,8 +170,8 @@ export default function CustomSelect({
                     onClick={() => handleSelect(option.value)}
                     onMouseEnter={() => setHighlightedIndex(index)}
                     className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between
-                      ${highlightedIndex === index ? 'bg-accent-50 text-accent-700' : 'text-gray-700'}
-                      ${option.value === value ? 'font-medium text-accent-600' : ''}
+                      ${highlightedIndex === index ? 'bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400' : 'text-foreground-secondary'}
+                      ${option.value === value ? 'font-medium text-accent-600 dark:text-accent-400' : ''}
                     `}
                   >
                     <span>{option.label}</span>

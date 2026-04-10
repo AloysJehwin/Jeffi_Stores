@@ -6,6 +6,7 @@ import Footer from './visitor/Footer'
 import { CartProvider } from '@/contexts/CartContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 
 export default function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -13,25 +14,29 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
 
   if (isAdminPage) {
     return (
-      <ToastProvider>
-        {children}
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          {children}
+        </ToastProvider>
+      </ThemeProvider>
     )
   }
 
   return (
-    <AuthProvider>
-      <CartProvider>
-        <ToastProvider>
-          <div className="flex flex-col min-h-screen bg-gray-50">
-            <Header />
-            <main className="flex-1 bg-gray-50">
-              {children}
-            </main>
-            <Footer />
-          </div>
-        </ToastProvider>
-      </CartProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <CartProvider>
+          <ToastProvider>
+            <div className="flex flex-col min-h-screen bg-surface">
+              <Header />
+              <main className="flex-1 bg-surface">
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </ToastProvider>
+        </CartProvider>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

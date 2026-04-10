@@ -3,12 +3,34 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-surface: #F9FAFB;
+    --color-surface-elevated: #FFFFFF;
+    --color-surface-secondary: #F3F4F6;
+    --color-foreground: #111827;
+    --color-foreground-secondary: #4B5563;
+    --color-foreground-muted: #9CA3AF;
+    --color-border: #E5E7EB;
+    --color-border-secondary: #D1D5DB;
+  }
+
+  .dark {
+    --color-surface: #1a1b23;
+    --color-surface-elevated: #24252f;
+    --color-surface-secondary: #2e303b;
+    --color-foreground: #F3F4F6;
+    --color-foreground-secondary: #D1D5DB;
+    --color-foreground-muted: #9CA3AF;
+    --color-border: #3f4150;
+    --color-border-secondary: #4a4c5e;
+  }
+
   * {
     @apply border-0 p-0 m-0 box-border;
   }
 
   html {
-    @apply bg-gray-50;
+    @apply bg-surface;
     height: 100%;
     overflow-x: hidden;
     overscroll-behavior: none;
@@ -16,7 +38,7 @@
   }
 
   body {
-    @apply antialiased font-sans bg-gray-50;
+    @apply antialiased font-sans bg-surface text-foreground;
     min-height: 100vh;
     height: 100%;
     overflow-x: hidden;
@@ -31,81 +53,25 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgb(249 250 251);
+    background: var(--color-surface);
     z-index: -9999;
   }
 
   #__next {
-    @apply bg-gray-50;
+    @apply bg-surface;
     min-height: 100vh;
   }
 
   h1 {
     @apply font-bebas;
   }
-}
 
-/* Legacy styles for existing pages - will be migrated to Tailwind */
-.penguin-logo {
-  width: 50px;
-}
-
-.head-section {
-  background-color: rgba(255, 251, 240, 1);
-}
-
-#text-style {
-  color: rgba(250, 190, 76, 1);
-  font-size: 80px;
-}
-
-.text-style2 {
-  font-size: 80px;
-  color: rgba(54, 57, 88, 1);
-}
-
-.penguin-catagory {
-  color: rgba(54, 57, 88, 1);
-}
-
-.penguin-card-img {
-  padding: 5%;
-  background-color: rgba(241, 241, 241, 1);
-  margin: 4% auto;
-  border-radius: 1em;
-}
-
-.penguin-info {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: 10%;
-}
-
-.penguin-card-border {
-  border-radius: 1em;
-  background-color: white;
-  border: 0;
-}
-
-.price-text-style {
-  color: rgba(250, 190, 76, 1);
-  font-weight: bold;
-}
-
-.penguin-card-footer {
-  background-color: white;
-  border: 0;
-}
-
-.penguin-btn {
-  background-color: rgba(164, 188, 70, 1);
-  color: white;
-}
-
-.footer-section {
-  background-color: hsla(72, 47%, 51%, 0.486);
-  padding: 3% 1% 1% 1%;
+  /* Dark mode form input defaults */
+  .dark input,
+  .dark select,
+  .dark textarea {
+    color-scheme: dark;
+  }
 }
 
 /* Toast notification animation */

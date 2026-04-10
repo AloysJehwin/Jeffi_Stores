@@ -20,11 +20,11 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
   const subCategoriesCount = totalCategories - mainCategoriesCount
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-secondary-500">Categories</h1>
-          <p className="text-gray-600 mt-1">Manage product categories and subcategories</p>
+          <p className="text-foreground-secondary mt-1">Manage product categories and subcategories</p>
         </div>
         <Link
           href="/admin/categories/add"
@@ -35,17 +35,17 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-gray-600 text-sm">Total Categories</p>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6">
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Total Categories</p>
           <p className="text-3xl font-bold text-secondary-500 mt-2">{totalCategories}</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-gray-600 text-sm">Main Categories</p>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Main Categories</p>
           <p className="text-3xl font-bold text-secondary-500 mt-2">{mainCategoriesCount}</p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <p className="text-gray-600 text-sm">Subcategories</p>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Subcategories</p>
           <p className="text-3xl font-bold text-secondary-500 mt-2">{subCategoriesCount}</p>
         </div>
       </div>
@@ -75,29 +75,29 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
       />
 
       {/* Categories Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-border-default">
+            <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
                   Category
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
                   Slug
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
                   Display Order
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-border-default">
               {mainCategories.length > 0 ? (
                 <>
                   {mainCategories.map((category: any) => {
@@ -105,24 +105,24 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
                     return (
                       <React.Fragment key={category.id}>
                         {/* Main Category */}
-                        <tr className="hover:bg-gray-50">
+                        <tr className="hover:bg-surface-secondary">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-semibold text-gray-900">{category.name}</div>
+                            <div className="text-sm font-semibold text-foreground">{category.name}</div>
                             {category.description && (
-                              <div className="text-xs text-gray-500 mt-1">{category.description}</div>
+                              <div className="text-xs text-foreground-muted mt-1">{category.description}</div>
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-600">{category.slug}</div>
+                            <div className="text-sm text-foreground-secondary">{category.slug}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{category.display_order}</div>
+                            <div className="text-sm text-foreground">{category.display_order}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                               category.is_active
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-800'
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                                : 'bg-surface-secondary text-foreground'
                             }`}>
                               {category.is_active ? 'Active' : 'Inactive'}
                             </span>
@@ -140,27 +140,27 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
 
                         {/* Subcategories */}
                         {subcategories.map((sub: any) => (
-                          <tr key={sub.id} className="hover:bg-gray-50 bg-gray-25">
+                          <tr key={sub.id} className="hover:bg-surface-secondary bg-gray-25">
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 ml-8">
-                                <span className="text-gray-400 mr-2">└</span>
+                              <div className="text-sm text-foreground ml-8">
+                                <span className="text-foreground-muted mr-2">└</span>
                                 {sub.name}
                               </div>
                               {sub.description && (
-                                <div className="text-xs text-gray-500 mt-1 ml-8">{sub.description}</div>
+                                <div className="text-xs text-foreground-muted mt-1 ml-8">{sub.description}</div>
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-600">{sub.slug}</div>
+                              <div className="text-sm text-foreground-secondary">{sub.slug}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{sub.display_order}</div>
+                              <div className="text-sm text-foreground">{sub.display_order}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                 sub.is_active
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-gray-100 text-gray-800'
+                                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                                  : 'bg-surface-secondary text-foreground'
                               }`}>
                                 {sub.is_active ? 'Active' : 'Inactive'}
                               </span>
@@ -182,7 +182,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
                 </>
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-12 text-center text-foreground-muted">
                     No categories found. Add your first category to get started.
                   </td>
                 </tr>

@@ -16,7 +16,7 @@ export default function ProductImage({ thumbnailUrl, altText }: ProductImageProp
 
   if (!thumbnailUrl) {
     return (
-      <div className="h-10 w-10 rounded bg-gray-200 flex items-center justify-center text-gray-500 text-xs">
+      <div className="h-10 w-10 rounded bg-surface-secondary flex items-center justify-center text-foreground-muted text-xs">
         No Image
       </div>
     )
@@ -42,7 +42,7 @@ export default function ProductImage({ thumbnailUrl, altText }: ProductImageProp
           if (fallback) fallback.classList.remove('hidden')
         }}
       />
-      <div className="h-10 w-10 rounded bg-gray-200 flex items-center justify-center text-gray-500 text-xs hidden">
+      <div className="h-10 w-10 rounded bg-surface-secondary flex items-center justify-center text-foreground-muted text-xs hidden">
         !
       </div>
     </>

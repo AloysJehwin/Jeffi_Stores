@@ -101,7 +101,7 @@ export default function SortDropdown() {
 
   return (
     <div className="flex items-center gap-2">
-      <label className="text-sm text-gray-600 whitespace-nowrap">Sort by:</label>
+      <label className="text-sm text-foreground-secondary whitespace-nowrap">Sort by:</label>
       <div ref={containerRef} className="relative">
         <button
           type="button"
@@ -116,13 +116,13 @@ export default function SortDropdown() {
             }
           }}
           onKeyDown={handleKeyDown}
-          className={`px-4 py-2 bg-white border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center gap-2 min-w-[190px]
-            ${isOpen ? 'border-accent-500 ring-2 ring-accent-500/20' : 'border-gray-300 hover:border-gray-400'}
+          className={`px-4 py-2 bg-surface-elevated border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center gap-2 min-w-[190px]
+            ${isOpen ? 'border-accent-500 ring-2 ring-accent-500/20' : 'border-border-secondary hover:border-gray-400'}
           `}
         >
-          <span className="text-gray-900 flex-1">{selectedOption.label}</span>
+          <span className="text-foreground flex-1">{selectedOption.label}</span>
           <svg
-            className={`w-4 h-4 text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -134,7 +134,7 @@ export default function SortDropdown() {
 
         {isOpen && (
           <div
-            className="absolute z-50 right-0 mt-1 w-full min-w-[210px] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+            className="absolute z-50 right-0 mt-1 w-full min-w-[210px] bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden"
             style={{ animation: 'sortFadeIn 0.15s ease-out' }}
           >
             <ul ref={listRef} role="listbox" className="py-1">
@@ -147,8 +147,8 @@ export default function SortDropdown() {
                     onClick={() => handleSelect(option.value)}
                     onMouseEnter={() => setHighlightedIndex(index)}
                     className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between
-                      ${highlightedIndex === index ? 'bg-accent-50 text-accent-700' : 'text-gray-700'}
-                      ${option.value === currentValue ? 'font-medium text-accent-600' : ''}
+                      ${highlightedIndex === index ? 'bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400' : 'text-foreground-secondary'}
+                      ${option.value === currentValue ? 'font-medium text-accent-600 dark:text-accent-400' : ''}
                     `}
                   >
                     <span>{option.label}</span>

@@ -247,7 +247,7 @@ function CheckoutPage() {
 
   if (authLoading || cartLoading || isLoadingAddress) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full"></div>
       </div>
     )
@@ -261,12 +261,12 @@ function CheckoutPage() {
   const tax = getCartTax()
 
   return (
-    <div className="bg-gray-50 min-h-screen py-8">
+    <div className="bg-surface min-h-screen py-4 sm:py-6 lg:py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Place Order</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-4 sm:mb-6 lg:mb-8">Place Order</h1>
 
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
             <p>{error}</p>
             {existingOrder && (
               <div className="flex flex-wrap gap-3 mt-3">
@@ -290,11 +290,11 @@ function CheckoutPage() {
         )}
 
         <form onSubmit={handleSubmitOrder}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {/* Order Items Summary */}
             <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Order Items</h2>
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-8">
+              <h2 className="text-xl font-bold text-foreground mb-6">Order Items</h2>
 
               <div className="space-y-4">
                 {cartItems.map((item) => {
@@ -303,8 +303,8 @@ function CheckoutPage() {
                   const itemTotal = price * item.quantity
 
                   return (
-                    <div key={item.id} className="flex gap-4 pb-4 border-b border-gray-200 last:border-b-0">
-                      <div className="w-20 h-20 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
+                    <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
+                      <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
                         {primaryImage ? (
                           <img
                             src={primaryImage.thumbnail_url}
@@ -313,7 +313,7 @@ function CheckoutPage() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                           </div>
@@ -321,14 +321,14 @@ function CheckoutPage() {
                       </div>
 
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{item.products.name}</h3>
+                        <h3 className="font-semibold text-foreground">{item.products.name}</h3>
                         {item.variant && (
-                          <p className="text-sm text-gray-500">{item.variant.variant_name}</p>
+                          <p className="text-sm text-foreground-muted">{item.variant.variant_name}</p>
                         )}
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-sm text-foreground-secondary mt-1">
                           ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.quantity}
                         </p>
-                        <p className="text-sm font-semibold text-gray-900 mt-1">
+                        <p className="text-sm font-semibold text-foreground mt-1">
                           ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
@@ -339,50 +339,50 @@ function CheckoutPage() {
             </div>
 
             {/* Delivery Address */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-8">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Delivery Address</h2>
+                <h2 className="text-xl font-bold text-foreground">Delivery Address</h2>
                 <Link
                   href="/checkout/review"
-                  className="text-accent-600 hover:text-accent-700 text-sm font-medium"
+                  className="text-accent-600 dark:text-accent-400 hover:text-accent-700 text-sm font-medium"
                 >
                   Change
                 </Link>
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="font-semibold text-gray-900">{address.full_name}</p>
-                <p className="text-gray-700 mt-2">{address.address_line1}</p>
-                {address.address_line2 && <p className="text-gray-700">{address.address_line2}</p>}
-                {address.landmark && <p className="text-gray-600 text-sm">Landmark: {address.landmark}</p>}
-                <p className="text-gray-700">
+              <div className="bg-surface p-4 rounded-lg">
+                <p className="font-semibold text-foreground">{address.full_name}</p>
+                <p className="text-foreground-secondary mt-2">{address.address_line1}</p>
+                {address.address_line2 && <p className="text-foreground-secondary">{address.address_line2}</p>}
+                {address.landmark && <p className="text-foreground-secondary text-sm">Landmark: {address.landmark}</p>}
+                <p className="text-foreground-secondary">
                   {address.city}, {address.state} {address.postal_code}
                 </p>
-                <p className="text-gray-600 mt-2">Phone: {address.phone}</p>
+                <p className="text-foreground-secondary mt-2">Phone: {address.phone}</p>
               </div>
             </div>
 
             {/* Order Notes */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Order Notes (Optional)</h2>
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-8">
+              <h2 className="text-xl font-bold text-foreground mb-4">Order Notes (Optional)</h2>
               <textarea
                 rows={4}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                 placeholder="Any special instructions or requests..."
               />
             </div>
 
             {/* Payment Method */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Payment Method</h2>
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-8">
+              <h2 className="text-xl font-bold text-foreground mb-4">Payment Method</h2>
               <div className="space-y-3">
                 {isRazorpayEnabled && (
                   <label
                     className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${
                       paymentMethod === 'razorpay'
                         ? 'border-accent-500 bg-accent-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-border-default hover:border-border-secondary'
                     }`}
                   >
                     <input
@@ -394,8 +394,8 @@ function CheckoutPage() {
                       className="w-4 h-4 text-accent-600 focus:ring-accent-500"
                     />
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-900">Pay Online</p>
-                      <p className="text-sm text-gray-600">UPI, Cards, Net Banking, Wallets</p>
+                      <p className="font-semibold text-foreground">Pay Online</p>
+                      <p className="text-sm text-foreground-secondary">UPI, Cards, Net Banking, Wallets</p>
                     </div>
                     <svg className="w-8 h-8 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -406,7 +406,7 @@ function CheckoutPage() {
                   className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     paymentMethod === 'manual'
                       ? 'border-accent-500 bg-accent-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : 'border-border-default hover:border-border-secondary'
                   }`}
                 >
                   <input
@@ -418,10 +418,10 @@ function CheckoutPage() {
                     className="w-4 h-4 text-accent-600 focus:ring-accent-500"
                   />
                   <div className="flex-1">
-                    <p className="font-semibold text-gray-900">Request Manual Payment</p>
-                    <p className="text-sm text-gray-600">Our team will contact you for payment details</p>
+                    <p className="font-semibold text-foreground">Request Manual Payment</p>
+                    <p className="text-sm text-foreground-secondary">Our team will contact you for payment details</p>
                   </div>
-                  <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                   </svg>
                 </label>
@@ -430,16 +430,16 @@ function CheckoutPage() {
 
             {/* Payment Information (manual only) */}
             {paymentMethod === 'manual' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 sm:p-6">
                 <div className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-blue-900 mb-2">Order Confirmation</h3>
-                    <p className="text-blue-800">
+                    <h3 className="text-lg font-bold text-blue-900 dark:text-blue-300 mb-2">Order Confirmation</h3>
+                    <p className="text-blue-800 dark:text-blue-300">
                       Our team will contact you shortly to confirm your order and provide payment details.
                     </p>
                   </div>
@@ -450,34 +450,34 @@ function CheckoutPage() {
 
           {/* Order Summary & Contact */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-24">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Order Summary</h2>
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 sticky top-24">
+              <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
 
               <div className="space-y-3 mb-6">
-                <div className="flex justify-between text-gray-600">
+                <div className="flex justify-between text-foreground-secondary">
                   <span>Subtotal ({cartCount} items)</span>
                   <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between text-gray-500 text-sm">
+                <div className="flex justify-between text-foreground-muted text-sm">
                   <span>Incl. GST</span>
                   <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="border-t border-gray-200 pt-3">
-                  <div className="flex justify-between text-lg font-bold text-gray-900">
+                <div className="border-t border-border-default pt-3">
+                  <div className="flex justify-between text-lg font-bold text-foreground">
                     <span>Total</span>
                     <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">Price inclusive of all taxes</p>
+                  <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>
                 </div>
               </div>
 
               {/* Contact Information */}
-              <div className="border-t border-gray-200 pt-6 mb-6">
-                <h3 className="font-semibold text-gray-900 mb-4">Contact Us</h3>
+              <div className="border-t border-border-default pt-6 mb-6">
+                <h3 className="font-semibold text-foreground mb-4">Contact Us</h3>
                 <div className="space-y-3 text-sm">
                   <a
                     href="tel:+918903031299"
-                    className="flex items-center gap-3 text-gray-600 hover:text-accent-600 transition-colors"
+                    className="flex items-center gap-3 text-foreground-secondary hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
                   >
                     <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -486,7 +486,7 @@ function CheckoutPage() {
                   </a>
                   <a
                     href="tel:+919488354099"
-                    className="flex items-center gap-3 text-gray-600 hover:text-accent-600 transition-colors"
+                    className="flex items-center gap-3 text-foreground-secondary hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
                   >
                     <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -495,7 +495,7 @@ function CheckoutPage() {
                   </a>
                   <a
                     href="mailto:jeffistoress@gmail.com"
-                    className="flex items-center gap-3 text-gray-600 hover:text-accent-600 transition-colors"
+                    className="flex items-center gap-3 text-foreground-secondary hover:text-accent-600 dark:hover:text-accent-400 transition-colors"
                   >
                     <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -534,7 +534,7 @@ function CheckoutPage() {
 
               <Link
                 href="/checkout/review"
-                className="block w-full text-center text-accent-600 hover:text-accent-700 font-medium mt-4"
+                className="block w-full text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4"
               >
                 ← Back to Review
               </Link>

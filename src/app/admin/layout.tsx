@@ -2,6 +2,7 @@ import { cookies, headers } from 'next/headers'
 import { logoutAction } from './logout-action'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import AdminMobileNav from '@/components/admin/AdminMobileNav'
 
 export const metadata = {
   title: 'Admin Panel - Jeffi Stores',
@@ -54,13 +55,20 @@ export default async function AdminLayout({
     { href: '/admin/settings', label: 'Settings', scope: 'settings' },
   ]
 
+  const filteredNavLinks = navLinks.filter(link => hasScope(role, scopes, link.scope))
+
   return (
     <div className="min-h-screen">
-      <nav className="bg-secondary-500 text-white shadow-lg">
+      <nav className="bg-secondary-500 dark:bg-secondary-700 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
+            {/* Mobile menu + Logo */}
             <div className="flex items-center">
+              <AdminMobileNav
+                navLinks={filteredNavLinks}
+                username={session?.username || 'Admin'}
+                role={session?.role || 'user'}
+              />
               <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
               </svg>
@@ -70,9 +78,7 @@ export default async function AdminLayout({
             {/* Nav Links */}
             <div className="hidden md:block">
               <div className="flex items-center space-x-6">
-                {navLinks
-                  .filter(link => hasScope(role, scopes, link.scope))
-                  .map(link => (
+                {filteredNavLinks.map(link => (
                     <a
                       key={link.href}
                       href={link.href}
@@ -86,7 +92,7 @@ export default async function AdminLayout({
 
             {/* User Menu */}
             <div className="flex items-center gap-4">
-              <span className="text-sm">
+              <span className="hidden sm:inline text-sm">
                 {session?.username || 'Admin'} <span className="text-gray-300">({session?.role || 'user'})</span>
               </span>
               <form action={logoutAction}>
@@ -101,7 +107,7 @@ export default async function AdminLayout({
           </div>
         </div>
       </nav>
-      <main className="bg-gray-100 min-h-screen">
+      <main className="bg-surface min-h-screen">
         {children}
       </main>
     </div>

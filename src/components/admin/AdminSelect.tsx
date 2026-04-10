@@ -143,7 +143,7 @@ export default function AdminSelect({
       {label && (
         <label
           htmlFor={id}
-          className="block text-sm font-medium text-gray-700 mb-2"
+          className="block text-sm font-medium text-foreground-secondary mb-2"
         >
           {label}
         </label>
@@ -171,17 +171,17 @@ export default function AdminSelect({
             }
           }}
           onKeyDown={handleKeyDown}
-          className={`w-full px-4 py-2.5 bg-gray-50 border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center justify-between gap-2
-            ${isOpen ? 'border-accent-500 ring-2 ring-accent-500' : 'border-gray-300 hover:border-gray-400'}
+          className={`w-full px-4 py-2.5 bg-surface border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center justify-between gap-2
+            ${isOpen ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-secondary hover:border-border-default'}
             ${error ? 'border-red-400 ring-red-500' : ''}
-            ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}
+            ${disabled ? 'opacity-50 cursor-not-allowed bg-surface-secondary' : ''}
           `}
         >
-          <span className={selectedOption ? 'text-gray-900' : 'text-gray-400'}>
+          <span className={selectedOption ? 'text-foreground' : 'text-foreground-muted'}>
             {displayLabel}
           </span>
           <svg
-            className={`w-4 h-4 text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -195,7 +195,7 @@ export default function AdminSelect({
         {isOpen && (
           <div
             ref={dropdownRef}
-            className={`absolute z-50 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden
+            className={`absolute z-50 left-0 right-0 bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden
               ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'}
             `}
             style={{
@@ -214,7 +214,7 @@ export default function AdminSelect({
                 return (
                   <li key={`${option.value}-${index}`}>
                     {showGroupHeader && (
-                      <div className="px-4 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-t border-gray-100 first:border-t-0">
+                      <div className="px-4 py-1.5 text-xs font-semibold text-foreground-muted uppercase tracking-wider bg-surface-secondary border-t border-border-default first:border-t-0">
                         {option.group}
                       </div>
                     )}
@@ -226,8 +226,8 @@ export default function AdminSelect({
                       onMouseEnter={() => setHighlightedIndex(index)}
                       className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between
                         ${option.indent ? 'pl-8' : ''}
-                        ${highlightedIndex === index ? 'bg-accent-50 text-accent-700' : 'text-gray-700'}
-                        ${option.value === currentValue ? 'font-medium text-accent-600' : ''}
+                        ${highlightedIndex === index ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : 'text-foreground-secondary'}
+                        ${option.value === currentValue ? 'font-medium text-accent-600 dark:text-accent-400' : ''}
                       `}
                     >
                       <span>{option.label}</span>
@@ -246,10 +246,10 @@ export default function AdminSelect({
       </div>
 
       {hint && !error && (
-        <p className="text-xs text-gray-500 mt-1.5">{hint}</p>
+        <p className="text-xs text-foreground-muted mt-1.5">{hint}</p>
       )}
       {error && (
-        <p className="text-xs text-red-600 mt-1.5">{error}</p>
+        <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">{error}</p>
       )}
 
       <style jsx>{`

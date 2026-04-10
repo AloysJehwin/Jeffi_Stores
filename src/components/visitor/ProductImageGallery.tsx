@@ -23,9 +23,9 @@ export default function ProductImageGallery({ images, productName }: ProductImag
 
   if (!images || images.length === 0) {
     return (
-      <div className="relative bg-white rounded-xl overflow-hidden border border-gray-200">
+      <div className="relative bg-surface-elevated rounded-xl overflow-hidden border border-border-default">
         <div className="w-full h-96 flex items-center justify-center">
-          <svg className="w-32 h-32 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-32 h-32 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </div>
@@ -58,7 +58,7 @@ export default function ProductImageGallery({ images, productName }: ProductImag
       <div>
         {/* Main Image */}
         <div
-          className="relative bg-white rounded-xl overflow-hidden mb-4 cursor-zoom-in group border border-gray-200"
+          className="relative bg-surface-elevated rounded-xl overflow-hidden mb-4 cursor-zoom-in group border border-border-default"
           onMouseEnter={() => setIsZoomed(true)}
           onMouseLeave={() => setIsZoomed(false)}
           onMouseMove={handleMouseMove}
@@ -100,10 +100,10 @@ export default function ProductImageGallery({ images, productName }: ProductImag
               <div
                 key={image.id}
                 onClick={() => setSelectedImageIndex(index)}
-                className={`relative bg-white rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
+                className={`relative bg-surface-elevated rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
                   index === selectedImageIndex
                     ? 'border-accent-500 ring-2 ring-accent-200'
-                    : 'border-gray-200 hover:border-gray-400'
+                    : 'border-border-default hover:border-gray-400'
                 }`}
               >
                 <img

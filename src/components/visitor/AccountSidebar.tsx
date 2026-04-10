@@ -53,11 +53,13 @@ const navItems = [
   },
 ]
 
+export { navItems }
+
 export default function AccountSidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
       <nav className="space-y-2">
         {navItems.map((item) => {
           const isActive = item.exact
@@ -70,8 +72,8 @@ export default function AccountSidebar() {
               href={item.href}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                 isActive
-                  ? 'bg-accent-50 text-accent-700 font-medium'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-accent-50 text-accent-700 font-medium dark:bg-accent-900/30 dark:text-accent-400'
+                  : 'text-foreground-secondary hover:bg-surface-secondary'
               }`}
             >
               {item.icon}

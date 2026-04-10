@@ -28,21 +28,21 @@ export default async function CategoriesPage() {
     categories.filter(c => c.parent_category_id === parentId)
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-surface min-h-screen">
       {/* Page Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-8">
+      <div className="bg-surface-elevated border-b border-border-default">
+        <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
           <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 mb-2">
             All Categories
           </h1>
-          <p className="text-gray-600">
+          <p className="text-foreground-secondary">
             Browse our complete range of product categories
           </p>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {mainCategories.map((category) => {
             const subcategories = getSubcategories(category.id)
             const totalProducts = (productCounts[category.id] || 0) +
@@ -51,9 +51,9 @@ export default async function CategoriesPage() {
             return (
               <div
                 key={category.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+                className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow"
               >
-                <Link href={`/categories/${category.slug}`} className="block p-6 group">
+                <Link href={`/categories/${category.slug}`} className="block p-4 sm:p-6 group">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 bg-primary-100 rounded-lg flex items-center justify-center group-hover:bg-accent-100 transition-colors">
@@ -63,10 +63,10 @@ export default async function CategoriesPage() {
                         />
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900 group-hover:text-accent-600 transition-colors">
+                        <h2 className="text-xl font-bold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
                           {category.name}
                         </h2>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-foreground-muted mt-1">
                           {totalProducts} {totalProducts === 1 ? 'product' : 'products'}
                         </p>
                       </div>
@@ -74,25 +74,25 @@ export default async function CategoriesPage() {
                   </div>
 
                   {category.description && (
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                    <p className="text-sm text-foreground-secondary mb-4 line-clamp-2">
                       {category.description}
                     </p>
                   )}
 
                   {subcategories.length > 0 && (
-                    <div className="border-t border-gray-100 pt-4">
-                      <p className="text-xs font-medium text-gray-500 mb-2">Subcategories:</p>
+                    <div className="border-t border-border-default pt-4">
+                      <p className="text-xs font-medium text-foreground-muted mb-2">Subcategories:</p>
                       <div className="flex flex-wrap gap-2">
                         {subcategories.slice(0, 5).map((sub) => (
                           <span
                             key={sub.id}
-                            className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                            className="text-xs bg-surface-secondary text-foreground-secondary px-2 py-1 rounded"
                           >
                             {sub.name}
                           </span>
                         ))}
                         {subcategories.length > 5 && (
-                          <span className="text-xs text-accent-600 font-medium">
+                          <span className="text-xs text-accent-600 dark:text-accent-400 font-medium">
                             +{subcategories.length - 5} more
                           </span>
                         )}

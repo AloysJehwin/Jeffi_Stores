@@ -122,7 +122,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
               className={`w-5 h-5 ${
                 star <= (interactive ? (hoverRating || rating) : rating)
                   ? 'text-yellow-400 fill-current'
-                  : 'text-gray-300'
+                  : 'text-foreground-muted'
               }`}
               fill="none"
               viewBox="0 0 24 24"
@@ -146,16 +146,16 @@ export default function ProductReviews({ productId, productName }: ProductReview
     : '0.0'
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6 mt-8">
+    <div className="bg-surface-elevated rounded-lg shadow-sm p-6 mt-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Customer Reviews</h2>
+          <h2 className="text-2xl font-bold text-foreground">Customer Reviews</h2>
           <div className="flex items-center gap-3 mt-2">
             <div className="flex items-center gap-1">
               {renderStars(Number(averageRating))}
             </div>
-            <span className="text-lg font-semibold text-gray-700">{averageRating}</span>
-            <span className="text-gray-500">({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})</span>
+            <span className="text-lg font-semibold text-foreground-secondary">{averageRating}</span>
+            <span className="text-foreground-muted">({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})</span>
           </div>
         </div>
         
@@ -171,13 +171,13 @@ export default function ProductReviews({ productId, productName }: ProductReview
 
       {/* Review Form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-gray-50 rounded-lg p-6 mb-6">
+        <form onSubmit={handleSubmit} className="bg-surface rounded-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Write Your Review</h3>
+            <h3 className="text-lg font-semibold text-foreground">Write Your Review</h3>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-foreground-muted hover:text-foreground-secondary"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -187,14 +187,14 @@ export default function ProductReviews({ productId, productName }: ProductReview
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Rating *
               </label>
               {renderStars(rating, true)}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Review Title (Optional)
               </label>
               <input
@@ -203,12 +203,12 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Sum up your experience"
                 maxLength={255}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Your Review *
               </label>
               <textarea
@@ -217,7 +217,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 placeholder="Share your experience with this product..."
                 rows={5}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
               />
             </div>
 
@@ -225,14 +225,14 @@ export default function ProductReviews({ productId, productName }: ProductReview
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Submitting...' : 'Submit Review'}
               </button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2 rounded-lg font-semibold transition-colors"
+                className="bg-surface-secondary hover:bg-surface-secondary/80 text-foreground-secondary px-6 py-2 rounded-lg font-semibold transition-colors"
               >
                 Cancel
               </button>
@@ -245,35 +245,35 @@ export default function ProductReviews({ productId, productName }: ProductReview
       {isLoading ? (
         <div className="text-center py-8">
           <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
-          <p className="text-gray-500 mt-2">Loading reviews...</p>
+          <p className="text-foreground-muted mt-2">Loading reviews...</p>
         </div>
       ) : reviews.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-12 bg-surface rounded-lg">
+          <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <p className="text-gray-500 text-lg mb-2">No reviews yet</p>
-          <p className="text-gray-400">Be the first to review this product!</p>
+          <p className="text-foreground-muted text-lg mb-2">No reviews yet</p>
+          <p className="text-foreground-muted">Be the first to review this product!</p>
         </div>
       ) : (
         <div className="space-y-6">
           {reviews.map((review) => (
-            <div key={review.id} className="border-b border-gray-200 pb-6 last:border-0">
+            <div key={review.id} className="border-b border-border-default pb-6 last:border-0">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="flex items-center gap-3 mb-1">
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold text-foreground">
                       {review.users.first_name} {review.users.last_name}
                     </span>
                     {review.is_verified_purchase && (
-                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
+                      <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-xs px-2 py-1 rounded-full font-medium">
                         ✓ Verified Purchase
                       </span>
                     )}
                   </div>
                   {renderStars(review.rating)}
                 </div>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-foreground-muted">
                   {new Date(review.created_at).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
@@ -283,10 +283,10 @@ export default function ProductReviews({ productId, productName }: ProductReview
               </div>
               
               {review.title && (
-                <h4 className="font-semibold text-gray-900 mb-2">{review.title}</h4>
+                <h4 className="font-semibold text-foreground mb-2">{review.title}</h4>
               )}
               
-              <p className="text-gray-700 whitespace-pre-wrap">{review.comment}</p>
+              <p className="text-foreground-secondary whitespace-pre-wrap">{review.comment}</p>
             </div>
           ))}
         </div>
