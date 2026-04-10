@@ -271,8 +271,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="lg:col-span-1">
-              <AccountSidebar />
+            <div className="hidden lg:block lg:col-span-1">
             </div>
             <div className="lg:col-span-3">
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
@@ -317,7 +316,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="lg:col-span-1">
+          <div className="hidden lg:block lg:col-span-1">
             <AccountSidebar />
           </div>
 
