@@ -33,8 +33,6 @@
     @apply bg-surface;
     height: 100%;
     overflow-x: hidden;
-    overscroll-behavior: none;
-    -webkit-overflow-scrolling: touch;
   }
 
   body {
@@ -42,7 +40,6 @@
     min-height: 100vh;
     height: 100%;
     overflow-x: hidden;
-    overscroll-behavior: none;
     position: relative;
   }
 

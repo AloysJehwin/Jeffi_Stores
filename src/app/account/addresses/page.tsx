@@ -207,7 +207,7 @@ export default function AddressesPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
           {/* Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="hidden lg:block lg:col-span-1">
             <AccountSidebar />
           </div>
 
