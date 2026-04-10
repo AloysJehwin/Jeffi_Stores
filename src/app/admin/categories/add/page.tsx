@@ -42,10 +42,10 @@ export default async function AddCategoryPage() {
   const categories = await getAllCategories()
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-secondary-500">Add New Category</h1>
-        <p className="text-gray-600 mt-1">Create a new product category</p>
+        <p className="text-foreground-secondary mt-1">Create a new product category</p>
       </div>
 
       <CategoryForm

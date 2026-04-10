@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -45,6 +46,14 @@ const config: Config = {
           800: '#69792b',
           900: '#556222',
         },
+        surface: 'var(--color-surface)',
+        'surface-elevated': 'var(--color-surface-elevated)',
+        'surface-secondary': 'var(--color-surface-secondary)',
+        foreground: 'var(--color-foreground)',
+        'foreground-secondary': 'var(--color-foreground-secondary)',
+        'foreground-muted': 'var(--color-foreground-muted)',
+        'border-default': 'var(--color-border)',
+        'border-secondary': 'var(--color-border-secondary)',
       },
       fontFamily: {
         bebas: ['"Bebas Neue"', 'cursive'],

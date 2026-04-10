@@ -2,14 +2,14 @@ import Link from 'next/link'
 
 export default function AboutPage() {
   return (
-    <div className="bg-gray-50">
+    <div className="bg-surface">
       {/* Page Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-8">
+      <div className="bg-surface-elevated border-b border-border-default">
+        <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
           <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 mb-2">
             About Jeffi Stores
           </h1>
-          <p className="text-gray-600">
+          <p className="text-foreground-secondary">
             Your trusted partner for industrial hardware and tools
           </p>
         </div>
@@ -17,23 +17,23 @@ export default function AboutPage() {
 
       <div className="container mx-auto px-4 py-12">
         {/* Main Content */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8">
+        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-4 sm:p-6 lg:p-8">
             {/* Left Content */}
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Who We Are</h2>
-              <div className="prose prose-gray">
-                <p className="text-gray-600 mb-4 leading-relaxed">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Who We Are</h2>
+              <div className="prose prose-gray dark:prose-invert">
+                <p className="text-foreground-secondary mb-4 leading-relaxed">
                   Jeffi Stores is your trusted hardware partner, offering a wide selection of industrial
                   machinery parts. We guarantee high availability of quality components for manufacturing,
                   construction, and repairs.
                 </p>
-                <p className="text-gray-600 mb-4 leading-relaxed">
+                <p className="text-foreground-secondary mb-4 leading-relaxed">
                   With years of experience in the hardware industry, we've built a reputation for reliability,
                   quality, and exceptional customer service. Our mission is to keep your operations running
                   smoothly with the right tools and parts.
                 </p>
-                <p className="text-gray-600 mb-4 leading-relaxed">
+                <p className="text-foreground-secondary mb-4 leading-relaxed">
                   We ensure high availability of quality components for manufacturing, construction, and repairs.
                   Count on us for reliable products and expert service to keep your operations seamless!
                 </p>
@@ -42,7 +42,7 @@ export default function AboutPage() {
 
             {/* Right Content - Stats */}
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Why Choose Us</h2>
+              <h2 className="text-2xl font-bold text-foreground mb-6">Why Choose Us</h2>
               <div className="space-y-6">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -51,8 +51,8 @@ export default function AboutPage() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Quality Products</h3>
-                    <p className="text-gray-600 text-sm">
+                    <h3 className="font-semibold text-foreground mb-1">Quality Products</h3>
+                    <p className="text-foreground-secondary text-sm">
                       We stock only genuine, high-quality products from trusted brands like TVS, UNBRAKO,
                       Taparia, and more.
                     </p>
@@ -66,9 +66,9 @@ export default function AboutPage() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">24/7 Support</h3>
-                    <p className="text-gray-600 text-sm">
-                      Get round-the-clock assistance with our 24/7 support—always here when you need us!
+                    <h3 className="font-semibold text-foreground mb-1">24/7 Support</h3>
+                    <p className="text-foreground-secondary text-sm">
+                      Get round-the-clock assistance with our 24/7 support--always here when you need us!
                     </p>
                   </div>
                 </div>
@@ -80,8 +80,8 @@ export default function AboutPage() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Wide Range</h3>
-                    <p className="text-gray-600 text-sm">
+                    <h3 className="font-semibold text-foreground mb-1">Wide Range</h3>
+                    <p className="text-foreground-secondary text-sm">
                       From bolts and nuts to power tools and belts, we have everything you need in one place.
                     </p>
                   </div>
@@ -94,8 +94,8 @@ export default function AboutPage() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Expert Team</h3>
-                    <p className="text-gray-600 text-sm">
+                    <h3 className="font-semibold text-foreground mb-1">Expert Team</h3>
+                    <p className="text-foreground-secondary text-sm">
                       Our knowledgeable staff is ready to help you find exactly what you need.
                     </p>
                   </div>
@@ -106,9 +106,9 @@ export default function AboutPage() {
         </div>
 
         {/* Product Categories */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">What We Offer</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 lg:p-8 mb-8">
+          <h2 className="text-2xl font-bold text-foreground mb-6">What We Offer</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {[
               { name: 'Bolts & Nuts', brands: 'TVS, UNBRAKO' },
               { name: 'Screws', brands: 'LandMark' },
@@ -120,9 +120,9 @@ export default function AboutPage() {
               { name: 'Welding Rods', brands: 'Ador, Esab, Mangalam' },
               { name: 'Valves', brands: 'Spirax, Forves Marshall, Exxon' },
             ].map((item, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 hover:border-accent-500 transition-colors">
-                <h3 className="font-semibold text-gray-900 mb-2">{item.name}</h3>
-                <p className="text-sm text-gray-600">Brands: {item.brands}</p>
+              <div key={index} className="border border-border-default rounded-lg p-4 hover:border-accent-500 transition-colors">
+                <h3 className="font-semibold text-foreground mb-2">{item.name}</h3>
+                <p className="text-sm text-foreground-secondary">Brands: {item.brands}</p>
               </div>
             ))}
           </div>
@@ -137,7 +137,7 @@ export default function AboutPage() {
         </div>
 
         {/* CTA Section */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-lg shadow-sm p-8 text-center text-white">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-lg shadow-sm p-4 sm:p-6 lg:p-8 text-center text-white">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-lg mb-6 text-primary-50">
             Contact us today for all your hardware and industrial tool needs.
@@ -151,7 +151,7 @@ export default function AboutPage() {
             </Link>
             <Link
               href="/products"
-              className="bg-white text-primary-700 hover:bg-gray-100 px-8 py-3 rounded-lg font-semibold transition-colors"
+              className="bg-surface-elevated text-primary-700 hover:bg-surface-secondary px-8 py-3 rounded-lg font-semibold transition-colors"
             >
               Browse Products
             </Link>

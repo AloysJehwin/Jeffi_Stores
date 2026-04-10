@@ -12,8 +12,15 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="bg-gray-50">
-      <body className="antialiased bg-gray-50 m-0 p-0">
+    <html lang="en" className="bg-surface" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('jeffi-theme');if(t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}})()`,
+          }}
+        />
+      </head>
+      <body className="antialiased bg-surface text-foreground m-0 p-0">
         <ConditionalLayout>{children}</ConditionalLayout>
       </body>
     </html>

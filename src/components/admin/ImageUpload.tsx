@@ -156,8 +156,8 @@ export default function ImageUpload({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-medium text-gray-700">Product Images</h3>
-          <p className="text-xs text-gray-500 mt-1">
+          <h3 className="text-sm font-medium text-foreground-secondary">Product Images</h3>
+          <p className="text-xs text-foreground-muted mt-1">
             Select up to {maxImages} images. They will be uploaded when you create the product.
           </p>
         </div>
@@ -178,7 +178,7 @@ export default function ImageUpload({
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+        <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
           {error}
         </div>
       )}
@@ -187,7 +187,7 @@ export default function ImageUpload({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {images.map((image, index) => (
             <div key={index} className="relative group">
-              <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200 hover:border-accent-500 transition-colors">
+              <div className="aspect-square rounded-lg overflow-hidden border-2 border-border-default hover:border-accent-500 transition-colors">
                 <img
                   src={image.previewUrl}
                   alt={image.fileName}
@@ -206,7 +206,7 @@ export default function ImageUpload({
                   <button
                     type="button"
                     onClick={() => handleSetPrimary(index)}
-                    className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-white text-gray-700 rounded text-xs font-semibold hover:bg-gray-100 transition-all"
+                    className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-white text-foreground-secondary rounded text-xs font-semibold hover:bg-surface-secondary transition-all"
                   >
                     Set Primary
                   </button>
@@ -220,16 +220,16 @@ export default function ImageUpload({
                 </button>
               </div>
 
-              <p className="text-xs text-gray-600 mt-1 truncate">{image.fileName}</p>
+              <p className="text-xs text-foreground-secondary mt-1 truncate">{image.fileName}</p>
             </div>
           ))}
         </div>
       )}
 
       {images.length === 0 && (
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+        <div className="border-2 border-dashed border-border-secondary rounded-lg p-12 text-center">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-foreground-muted"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -241,7 +241,7 @@ export default function ImageUpload({
               d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
             />
           </svg>
-          <p className="mt-2 text-sm text-gray-600">No images selected yet</p>
+          <p className="mt-2 text-sm text-foreground-secondary">No images selected yet</p>
         </div>
       )}
     </div>

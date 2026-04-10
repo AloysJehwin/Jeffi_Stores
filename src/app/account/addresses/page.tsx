@@ -2,9 +2,10 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import AccountSidebar from '@/components/visitor/AccountSidebar'
+import Link from 'next/link'
+import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 import CustomSelect from '@/components/visitor/CustomSelect'
 
 interface Address {
@@ -26,6 +27,7 @@ export default function AddressesPage() {
   const { user, isLoading } = useAuth()
   const { showToast, showConfirm } = useToast()
   const router = useRouter()
+  const pathname = usePathname()
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -149,7 +151,7 @@ export default function AddressesPage() {
             showToast('Address deleted successfully', 'success')
           } else {
             const data = await response.json()
-            
+
             // Check if it's an ADDRESS_IN_USE error
             if (data.code === 'ADDRESS_IN_USE') {
               showToast(data.error, 'warning')
@@ -169,7 +171,7 @@ export default function AddressesPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-foreground-secondary">Loading...</p>
         </div>
       </div>
     )
@@ -180,11 +182,30 @@ export default function AddressesPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen py-8">
+    <div className="bg-surface min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">My Addresses</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-8">My Addresses</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Mobile Account Nav */}
+        <div className="lg:hidden overflow-x-auto mb-4">
+          <nav className="flex gap-2 min-w-max">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  (item.exact ? pathname === item.href : pathname.startsWith(item.href))
+                    ? 'bg-accent-500 text-white'
+                    : 'bg-surface-secondary text-foreground-secondary hover:bg-border-default'
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <AccountSidebar />
@@ -219,8 +240,8 @@ export default function AddressesPage() {
             </div>
 
             {showForm && (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-6">
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-6">
+                <h2 className="text-xl font-bold text-foreground mb-6">
                   {editingAddress ? 'Edit Address' : 'Add New Address'}
                 </h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -238,7 +259,7 @@ export default function AddressesPage() {
                       ]}
                     />
                     <div>
-                      <label htmlFor="full_name" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="full_name" className="block text-sm font-medium text-foreground-secondary mb-2">
                         Full Name
                       </label>
                       <input
@@ -246,18 +267,18 @@ export default function AddressesPage() {
                         type="text"
                         value={formData.full_name}
                         onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
                         required
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="phone" className="block text-sm font-medium text-foreground-secondary mb-2">
                       Phone Number *
                     </label>
                     <div className="flex">
-                      <span className="inline-flex items-center px-4 py-2 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-gray-600 text-sm font-medium">
+                      <span className="inline-flex items-center px-4 py-2 border border-r-0 border-border-secondary rounded-l-lg bg-surface text-foreground-secondary text-sm font-medium">
                         +91
                       </span>
                       <input
@@ -267,7 +288,7 @@ export default function AddressesPage() {
                         maxLength={10}
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        className="w-full px-4 py-2 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
                         placeholder="98765 43210"
                         required
                       />
@@ -278,7 +299,7 @@ export default function AddressesPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="address_line1" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="address_line1" className="block text-sm font-medium text-foreground-secondary mb-2">
                       Address Line 1
                     </label>
                     <input
@@ -286,14 +307,14 @@ export default function AddressesPage() {
                       type="text"
                       value={formData.address_line1}
                       onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
                       placeholder="Street address, P.O. box"
                       required
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="address_line2" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="address_line2" className="block text-sm font-medium text-foreground-secondary mb-2">
                       Address Line 2 (Optional)
                     </label>
                     <input
@@ -301,13 +322,13 @@ export default function AddressesPage() {
                       type="text"
                       value={formData.address_line2}
                       onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
                       placeholder="Apartment, suite, unit, building, floor, etc."
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="landmark" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="landmark" className="block text-sm font-medium text-foreground-secondary mb-2">
                       Landmark (Optional)
                     </label>
                     <input
@@ -315,14 +336,14 @@ export default function AddressesPage() {
                       type="text"
                       value={formData.landmark}
                       onChange={(e) => setFormData({ ...formData, landmark: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
                       placeholder="Nearby landmark"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="city" className="block text-sm font-medium text-foreground-secondary mb-2">
                         City
                       </label>
                       <input
@@ -330,12 +351,12 @@ export default function AddressesPage() {
                         type="text"
                         value={formData.city}
                         onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="state" className="block text-sm font-medium text-foreground-secondary mb-2">
                         State
                       </label>
                       <input
@@ -343,12 +364,12 @@ export default function AddressesPage() {
                         type="text"
                         value={formData.state}
                         onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="postal_code" className="block text-sm font-medium text-gray-700 mb-2">
+                      <label htmlFor="postal_code" className="block text-sm font-medium text-foreground-secondary mb-2">
                         Postal Code
                       </label>
                       <input
@@ -356,7 +377,7 @@ export default function AddressesPage() {
                         type="text"
                         value={formData.postal_code}
                         onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
                         required
                       />
                     </div>
@@ -368,9 +389,9 @@ export default function AddressesPage() {
                       id="is_default"
                       checked={formData.is_default}
                       onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
-                      className="w-4 h-4 text-accent-600 border-gray-300 rounded focus:ring-accent-500"
+                      className="w-4 h-4 text-accent-600 border-border-secondary rounded focus:ring-accent-500"
                     />
-                    <label htmlFor="is_default" className="text-sm text-gray-700">
+                    <label htmlFor="is_default" className="text-sm text-foreground-secondary">
                       Set as default address
                     </label>
                   </div>
@@ -397,7 +418,7 @@ export default function AddressesPage() {
                         setShowForm(false)
                         setEditingAddress(null)
                       }}
-                      className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-semibold disabled:opacity-50"
+                      className="px-6 py-3 bg-surface-secondary text-foreground-secondary rounded-lg hover:bg-border-default transition-colors font-semibold disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -407,9 +428,9 @@ export default function AddressesPage() {
             )}
 
             {addresses.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg
-                  className="w-16 h-16 text-gray-300 mx-auto mb-4"
+                  className="w-16 h-16 text-foreground-muted mx-auto mb-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -421,51 +442,51 @@ export default function AddressesPage() {
                     d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No addresses saved</h3>
-                <p className="text-gray-600">Add an address to make checkout faster.</p>
+                <h3 className="text-xl font-semibold text-foreground mb-2">No addresses saved</h3>
+                <p className="text-foreground-secondary">Add an address to make checkout faster.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {addresses.map((address) => (
                   <div
                     key={address.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 relative"
+                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 relative"
                   >
                     {address.is_default && (
-                      <span className="absolute top-4 right-4 px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+                      <span className="absolute top-4 right-4 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-semibold rounded-full">
                         Default
                       </span>
                     )}
                     <div className="mb-4">
-                      <span className="inline-block px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded mb-3 capitalize">
+                      <span className="inline-block px-3 py-1 bg-surface-secondary text-foreground-secondary text-xs font-semibold rounded mb-3 capitalize">
                         {address.address_type}
                       </span>
-                      <p className="text-gray-900 font-medium">{address.full_name}</p>
-                      <p className="text-gray-900">{address.address_line1}</p>
+                      <p className="text-foreground font-medium">{address.full_name}</p>
+                      <p className="text-foreground">{address.address_line1}</p>
                       {address.address_line2 && (
-                        <p className="text-gray-600">{address.address_line2}</p>
+                        <p className="text-foreground-secondary">{address.address_line2}</p>
                       )}
                       {address.landmark && (
-                        <p className="text-gray-600 text-sm">Near: {address.landmark}</p>
+                        <p className="text-foreground-secondary text-sm">Near: {address.landmark}</p>
                       )}
-                      <p className="text-gray-600">
+                      <p className="text-foreground-secondary">
                         {address.city}, {address.state} {address.postal_code}
                       </p>
-                      <p className="text-gray-600">{address.country}</p>
-                      <p className="text-gray-600 mt-2">Phone: {address.phone}</p>
+                      <p className="text-foreground-secondary">{address.country}</p>
+                      <p className="text-foreground-secondary mt-2">Phone: {address.phone}</p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => handleEdit(address)}
-                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                        className="px-4 py-2 bg-surface-secondary text-foreground-secondary rounded-lg hover:bg-border-default transition-colors text-sm font-medium"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(address.id)}
-                        className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
+                        className="px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors text-sm font-medium"
                       >
                         Delete
                       </button>

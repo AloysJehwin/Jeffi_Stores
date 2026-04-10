@@ -2,26 +2,26 @@ import Link from 'next/link'
 
 export default function ContactPage() {
   return (
-    <div className="bg-gray-50">
+    <div className="bg-surface">
       {/* Page Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-8">
+      <div className="bg-surface-elevated border-b border-border-default">
+        <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
           <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 mb-2">
             Contact Us
           </h1>
-          <p className="text-gray-600">
+          <p className="text-foreground-secondary">
             Get in touch with us - we're here to help!
           </p>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
           {/* Contact Information */}
           <div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Get In Touch</h2>
-              <p className="text-gray-600 mb-8">
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 lg:p-8 mb-8">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Get In Touch</h2>
+              <p className="text-foreground-secondary mb-8">
                 Have questions about our products or services? We're here to help! Reach out to us
                 through any of the following channels.
               </p>
@@ -36,14 +36,14 @@ export default function ContactPage() {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-2">Phone</h3>
-                    <a href="tel:+918903031299" className="text-accent-600 hover:text-accent-700 block mb-1">
+                    <h3 className="font-semibold text-foreground mb-2">Phone</h3>
+                    <a href="tel:+918903031299" className="text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 block mb-1">
                       +91 89030 31299
                     </a>
-                    <a href="tel:+919488354099" className="text-accent-600 hover:text-accent-700 block">
+                    <a href="tel:+919488354099" className="text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 block">
                       +91 94883 54099
                     </a>
-                    <p className="text-sm text-gray-500 mt-2">Available 24/7</p>
+                    <p className="text-sm text-foreground-muted mt-2">Available 24/7</p>
                   </div>
                 </div>
 
@@ -55,11 +55,11 @@ export default function ContactPage() {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-2">Email</h3>
-                    <a href="mailto:jeffistoress@gmail.com" className="text-accent-600 hover:text-accent-700 block">
+                    <h3 className="font-semibold text-foreground mb-2">Email</h3>
+                    <a href="mailto:jeffistoress@gmail.com" className="text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 block">
                       jeffistoress@gmail.com
                     </a>
-                    <p className="text-sm text-gray-500 mt-2">We'll respond within 24 hours</p>
+                    <p className="text-sm text-foreground-muted mt-2">We'll respond within 24 hours</p>
                   </div>
                 </div>
 
@@ -72,8 +72,8 @@ export default function ContactPage() {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-2">Visit Us</h3>
-                    <p className="text-gray-600">
+                    <h3 className="font-semibold text-foreground mb-2">Visit Us</h3>
+                    <p className="text-foreground-secondary">
                       Sanjay Gandhi Chowk, Station Road<br />
                       Raipur, Chhattisgarh - 490092<br />
                       India
@@ -84,20 +84,20 @@ export default function ContactPage() {
             </div>
 
             {/* Business Hours */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Business Hours</h2>
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 lg:p-8">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Business Hours</h2>
               <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="font-medium text-gray-900">Monday - Friday</span>
-                  <span className="text-gray-600">9:00 AM - 7:00 PM</span>
+                <div className="flex justify-between items-center py-2 border-b border-border-default">
+                  <span className="font-medium text-foreground">Monday - Friday</span>
+                  <span className="text-foreground-secondary">9:00 AM - 7:00 PM</span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                  <span className="font-medium text-gray-900">Saturday</span>
-                  <span className="text-gray-600">9:00 AM - 6:00 PM</span>
+                <div className="flex justify-between items-center py-2 border-b border-border-default">
+                  <span className="font-medium text-foreground">Saturday</span>
+                  <span className="text-foreground-secondary">9:00 AM - 6:00 PM</span>
                 </div>
                 <div className="flex justify-between items-center py-2">
-                  <span className="font-medium text-gray-900">Sunday</span>
-                  <span className="text-gray-600">Closed</span>
+                  <span className="font-medium text-foreground">Sunday</span>
+                  <span className="text-foreground-secondary">Closed</span>
                 </div>
               </div>
               <div className="mt-6 p-4 bg-accent-50 rounded-lg">
@@ -110,15 +110,15 @@ export default function ContactPage() {
 
           {/* Contact Form / Map */}
           <div>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Send Us a Message</h2>
-              <p className="text-gray-600 mb-6">
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 lg:p-8 mb-8">
+              <h2 className="text-2xl font-bold text-foreground mb-6">Send Us a Message</h2>
+              <p className="text-foreground-secondary mb-6">
                 Fill out the form below and we'll get back to you as soon as possible.
               </p>
 
               <form className="space-y-6">
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="name" className="block text-sm font-medium text-foreground-secondary mb-2">
                     Full Name *
                   </label>
                   <input
@@ -126,14 +126,14 @@ export default function ContactPage() {
                     id="name"
                     name="name"
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                     placeholder="Your name"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="email" className="block text-sm font-medium text-foreground-secondary mb-2">
                       Email *
                     </label>
                     <input
@@ -141,17 +141,17 @@ export default function ContactPage() {
                       id="email"
                       name="email"
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                       placeholder="your@email.com"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="phone" className="block text-sm font-medium text-foreground-secondary mb-2">
                       Phone
                     </label>
                     <div className="flex">
-                      <span className="inline-flex items-center px-4 py-3 border border-r-0 border-gray-300 rounded-l-lg bg-gray-50 text-gray-600 text-sm font-medium">
+                      <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface text-foreground-secondary text-sm font-medium">
                         +91
                       </span>
                       <input
@@ -160,7 +160,7 @@ export default function ContactPage() {
                         name="phone"
                         inputMode="numeric"
                         maxLength={10}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                        className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                         placeholder="98765 43210"
                       />
                     </div>
@@ -168,7 +168,7 @@ export default function ContactPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="subject" className="block text-sm font-medium text-foreground-secondary mb-2">
                     Subject *
                   </label>
                   <input
@@ -176,13 +176,13 @@ export default function ContactPage() {
                     id="subject"
                     name="subject"
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                     placeholder="How can we help?"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="message" className="block text-sm font-medium text-foreground-secondary mb-2">
                     Message *
                   </label>
                   <textarea
@@ -190,7 +190,7 @@ export default function ContactPage() {
                     name="message"
                     rows={6}
                     required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                     placeholder="Tell us more about your requirements..."
                   />
                 </div>
@@ -203,13 +203,13 @@ export default function ContactPage() {
                 </button>
               </form>
 
-              <p className="text-sm text-gray-500 mt-4">
+              <p className="text-sm text-foreground-muted mt-4">
                 * By submitting this form, you agree to our privacy policy.
               </p>
             </div>
 
             {/* Quick Links */}
-            <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-lg shadow-sm p-8 text-white">
+            <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-lg shadow-sm p-4 sm:p-6 lg:p-8 text-white">
               <h3 className="text-xl font-bold mb-4">Need Immediate Help?</h3>
               <p className="text-primary-50 mb-6">
                 Browse our products or learn more about what we offer.
@@ -217,7 +217,7 @@ export default function ContactPage() {
               <div className="flex flex-col gap-3">
                 <Link
                   href="/products"
-                  className="bg-white text-primary-700 hover:bg-gray-100 px-6 py-3 rounded-lg font-semibold transition-colors text-center"
+                  className="bg-surface-elevated text-primary-700 hover:bg-surface-secondary px-6 py-3 rounded-lg font-semibold transition-colors text-center"
                 >
                   Browse Products
                 </Link>

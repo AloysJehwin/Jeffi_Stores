@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ADMIN_SCOPES } from '@/lib/scopes'
 
 interface AdminUser {
@@ -28,6 +29,7 @@ export default function AdminUserActions({
   const [loading, setLoading] = useState(false)
   const [scopes, setScopes] = useState<string[]>(admin.scopes || [])
   const [role, setRole] = useState(admin.role)
+  const router = useRouter()
 
   const isSelf = admin.id === currentAdminId
   const isSuperAdmin = admin.role === 'super_admin'
@@ -42,7 +44,7 @@ export default function AdminUserActions({
       })
       if (res.ok) {
         setEditing(false)
-        onUpdate?.()
+        onUpdate ? onUpdate() : router.refresh()
       }
     } finally {
       setLoading(false)
@@ -58,7 +60,20 @@ export default function AdminUserActions({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !admin.is_active }),
       })
-      if (res.ok) onUpdate?.()
+      if (res.ok) onUpdate ? onUpdate() : router.refresh()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Are you sure you want to delete ${admin.username}? This will revoke their certificates and permanently remove their account.`)) return
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/users/${admin.id}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) onUpdate ? onUpdate() : router.refresh()
     } finally {
       setLoading(false)
     }
@@ -66,13 +81,13 @@ export default function AdminUserActions({
 
   if (editing) {
     return (
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mt-2">
+      <div className="bg-surface p-4 rounded-lg border border-border-default mt-2">
         <div className="mb-3">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
+          <label className="block text-xs font-medium text-foreground-secondary mb-1">Role</label>
           <select
             value={role}
             onChange={e => setRole(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-sm"
+            className="border border-border-secondary rounded px-2 py-1 text-sm bg-surface text-foreground"
             disabled={isSuperAdmin}
             aria-label="Role"
           >
@@ -81,15 +96,15 @@ export default function AdminUserActions({
           </select>
         </div>
         <div className="mb-3">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Scopes</label>
+          <label className="block text-xs font-medium text-foreground-secondary mb-1">Scopes</label>
           <div className="flex flex-wrap gap-2">
             {ADMIN_SCOPES.map(scope => (
               <label
                 key={scope.key}
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs cursor-pointer border ${
                   scopes.includes(scope.key)
-                    ? 'border-accent-500 bg-accent-50 text-accent-700'
-                    : 'border-gray-200 text-gray-600'
+                    ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300'
+                    : 'border-border-default text-foreground-secondary'
                 }`}
               >
                 <input
@@ -121,7 +136,7 @@ export default function AdminUserActions({
           <button
             type="button"
             onClick={() => setEditing(false)}
-            className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs font-medium"
+            className="bg-surface-secondary hover:bg-border-default text-foreground-secondary px-3 py-1 rounded text-xs font-medium"
           >
             Cancel
           </button>
@@ -153,10 +168,18 @@ export default function AdminUserActions({
           >
             {admin.is_active ? 'Deactivate' : 'Activate'}
           </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={loading}
+            className="text-red-600 hover:text-red-700 text-xs font-medium"
+          >
+            Delete
+          </button>
         </>
       )}
-      {isSelf && <span className="text-xs text-gray-400">Current session</span>}
-      {isSuperAdmin && !isSelf && <span className="text-xs text-gray-400">Super Admin</span>}
+      {isSelf && <span className="text-xs text-foreground-muted">Current session</span>}
+      {isSuperAdmin && !isSelf && <span className="text-xs text-foreground-muted">Super Admin</span>}
     </div>
   )
 }

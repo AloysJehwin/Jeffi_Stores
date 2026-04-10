@@ -926,6 +926,170 @@ export async function sendPaymentStatusUpdate(
   }
 }
 
+export async function sendAdminCertificateEmail(
+  email: string,
+  username: string,
+  p12Buffer: Buffer,
+  p12Password: string,
+  serialNumber: string,
+  expiresAt: string,
+  role: string
+) {
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: email,
+    subject: 'Your Admin Certificate - Jeffi Stores',
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 30px;
+              border: 1px solid #e0e0e0;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
+            .credential-box {
+              background-color: #1e293b;
+              color: #e2e8f0;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+              font-family: monospace;
+            }
+            .credential-box .label {
+              color: #94a3b8;
+              font-size: 12px;
+              text-transform: uppercase;
+              margin-bottom: 4px;
+            }
+            .credential-box .value {
+              color: #38bdf8;
+              font-size: 16px;
+              font-weight: bold;
+              word-break: break-all;
+            }
+            .credential-box hr {
+              border: none;
+              border-top: 1px solid #334155;
+              margin: 12px 0;
+            }
+            .warning {
+              background-color: #fef3c7;
+              border-left: 4px solid #f59e0b;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+            .info {
+              background-color: #f0f9ff;
+              border-left: 4px solid #2563eb;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #e0e0e0;
+              color: #666;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">Jeffi Stores</div>
+              <p style="color: #666;">Admin Panel Access</p>
+            </div>
+
+            <h2>Welcome, ${username}!</h2>
+            <p>You have been added as an <strong>${role}</strong> on the Jeffi Stores admin panel. Your client certificate is attached to this email.</p>
+
+            <div class="credential-box">
+              <div class="label">Username</div>
+              <div class="value">${username}</div>
+              <hr>
+              <div class="label">Certificate Password</div>
+              <div class="value">${p12Password}</div>
+              <hr>
+              <div class="label">Certificate Serial</div>
+              <div class="value" style="font-size: 11px;">${serialNumber}</div>
+              <hr>
+              <div class="label">Expires On</div>
+              <div class="value">${new Date(expiresAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+            </div>
+
+            <div class="warning">
+              <strong>Important Security Notice</strong>
+              <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                <li>The attached <code>.p12</code> certificate file is required to access the admin panel.</li>
+                <li>Install it in your browser or system keychain using the password above.</li>
+                <li>Do <strong>not</strong> share this certificate or password with anyone.</li>
+                <li>This certificate is valid for 365 days from issuance.</li>
+              </ul>
+            </div>
+
+            <div class="info">
+              <strong>How to install:</strong>
+              <ol style="margin: 8px 0 0 0; padding-left: 20px;">
+                <li>Download the attached <code>${username}-admin-cert.p12</code> file.</li>
+                <li>Double-click the file to open it in your system's certificate manager.</li>
+                <li>Enter the certificate password shown above when prompted.</li>
+                <li>Navigate to <strong>https://admin.jeffistores.in:3443/admin/login</strong> to access the admin panel.</li>
+              </ol>
+            </div>
+
+            <p>If you have any questions, contact the super admin.</p>
+
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong></p>
+              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+              <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    attachments: [
+      {
+        filename: `${username}-admin-cert.p12`,
+        content: p12Buffer,
+        contentType: 'application/x-pkcs12',
+      },
+    ],
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log('Admin certificate email sent:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Admin certificate email error:', error)
+    return { success: false, error }
+  }
+}
+
 export async function sendNewReviewNotification(review: any, user: any, product: any) {
   const adminEmail = process.env.ADMIN_EMAIL || 'aloysjehwin@gmail.com'
 

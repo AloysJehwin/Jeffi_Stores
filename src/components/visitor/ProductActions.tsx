@@ -187,14 +187,14 @@ export default function ProductActions({
   return (
     <div className="space-y-4">
       {/* Dynamic SKU */}
-      <div className="text-sm text-gray-600">
-        SKU: <span className="font-medium text-gray-900">{displaySku}</span>
+      <div className="text-sm text-foreground-secondary">
+        SKU: <span className="font-medium text-foreground">{displaySku}</span>
       </div>
 
       {/* Variant Selector */}
       {hasVariants && (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-foreground-secondary mb-2">
             Select {variantType}
           </label>
           <div className="flex flex-wrap gap-2">
@@ -207,8 +207,8 @@ export default function ProductActions({
                   selectedVariantId === variant.id
                     ? 'bg-accent-500 text-white border-accent-500'
                     : variant.stock_quantity > 0
-                      ? 'bg-white text-gray-700 border-gray-300 hover:border-accent-400'
-                      : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                      ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
+                      : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
                 }`}
                 disabled={variant.stock_quantity === 0}
               >
@@ -223,35 +223,35 @@ export default function ProductActions({
       {/* Price display for variant products */}
       {hasVariants && (
         <>
-          <div className="bg-gray-50 rounded-lg p-6">
+          <div className="bg-surface rounded-lg p-6">
             <div className="flex items-baseline gap-3 mb-2">
-              <span className="text-4xl font-bold text-primary-600">
+              <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
                 Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
               {effectiveMrp && effectiveMrp > effectivePrice && (
-                <span className="text-xl text-gray-400 line-through">
+                <span className="text-xl text-foreground-muted line-through">
                   Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               )}
             </div>
             {mrpDiscount > 0 && (
               <div className="flex items-center gap-2 mb-2">
-                <span className="bg-accent-100 text-accent-700 px-3 py-1 rounded-full text-sm font-semibold">
+                <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
                   {mrpDiscount}% off
                 </span>
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-foreground-secondary">
                   You save Rs. {(effectiveMrp! - effectivePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             )}
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-foreground-muted">
               Inclusive of all taxes
               {gstPercentage ? ` (${gstPercentage}% GST)` : ''}
             </p>
             {effectiveWholesalePrice && (
-              <div className="mt-3 pt-3 border-t border-gray-200">
-                <span className="text-sm text-gray-600">
-                  Wholesale Price: <span className="font-semibold text-gray-900">Rs. {effectiveWholesalePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <div className="mt-3 pt-3 border-t border-border-default">
+                <span className="text-sm text-foreground-secondary">
+                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {effectiveWholesalePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </span>
               </div>
             )}
@@ -261,19 +261,19 @@ export default function ProductActions({
           <div>
             {effectiveStock > 0 ? (
               <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span className="text-green-700 font-semibold">
+                <span className="text-green-700 dark:text-green-400 font-semibold">
                   In Stock ({effectiveStock} available)
                 </span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
-                <span className="text-red-700 font-semibold">Out of Stock</span>
+                <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
               </div>
             )}
           </div>
@@ -282,26 +282,26 @@ export default function ProductActions({
 
       {/* Quantity Selector */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
           Quantity
         </label>
-        <div className="flex items-center border border-gray-300 rounded-lg w-fit">
+        <div className="flex items-center border border-border-secondary rounded-lg w-fit">
           <button
             onClick={() => setQuantity(Math.max(1, quantity - 1))}
             disabled={quantity <= 1}
-            className="px-4 py-2 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
             </svg>
           </button>
-          <span className="px-6 py-2 border-x border-gray-300 min-w-[80px] text-center font-semibold">
+          <span className="px-6 py-2 border-x border-border-secondary min-w-[80px] text-center font-semibold">
             {quantity}
           </span>
           <button
             onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
             disabled={quantity >= effectiveStock}
-            className="px-4 py-2 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -315,7 +315,7 @@ export default function ProductActions({
         <button
           onClick={handleBuyNow}
           disabled={effectiveStock === 0 || isBuyingNow}
-          className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
           {isBuyingNow ? (
             <>
@@ -335,7 +335,7 @@ export default function ProductActions({
         <button
           onClick={handleAddToCart}
           disabled={effectiveStock === 0 || isAddingToCart}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
           {isAddingToCart ? (
             <>
@@ -358,12 +358,12 @@ export default function ProductActions({
           className={`w-full px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
             isInWishlist
               ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300'
+              : 'bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary border border-border-secondary'
           }`}
         >
           {isAddingToWishlist ? (
             <>
-              <div className={`animate-spin w-5 h-5 border-2 ${isInWishlist ? 'border-white' : 'border-gray-700'} border-t-transparent rounded-full`}></div>
+              <div className={`animate-spin w-5 h-5 border-2 ${isInWishlist ? 'border-white' : 'border-foreground-secondary'} border-t-transparent rounded-full`}></div>
               {isInWishlist ? 'Removing...' : 'Adding...'}
             </>
           ) : (
@@ -378,12 +378,12 @@ export default function ProductActions({
       </div>
 
       {/* Contact Buttons */}
-      <div className="pt-4 border-t border-gray-200">
-        <p className="text-sm text-gray-600 mb-3">Need help with your order?</p>
+      <div className="pt-4 border-t border-border-default">
+        <p className="text-sm text-foreground-secondary mb-3">Need help with your order?</p>
         <div className="space-y-2">
           <a
             href={`tel:+918903031299`}
-            className="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
+            className="w-full bg-surface-elevated hover:bg-surface-secondary border border-border-secondary text-foreground-secondary px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -392,7 +392,7 @@ export default function ProductActions({
           </a>
           <a
             href={`mailto:jeffistoress@gmail.com?subject=Inquiry about ${productName}&body=Hi, I'm interested in ${productName} (SKU: ${displaySku}). Please provide more details.`}
-            className="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
+            className="w-full bg-surface-elevated hover:bg-surface-secondary border border-border-secondary text-foreground-secondary px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

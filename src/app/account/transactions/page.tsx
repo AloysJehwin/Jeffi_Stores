@@ -1,10 +1,10 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import AccountSidebar from '@/components/visitor/AccountSidebar'
+import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 
 interface Transaction {
   id: string
@@ -22,15 +22,15 @@ interface Transaction {
 function getStatusColor(status: string) {
   switch (status) {
     case 'completed':
-      return 'bg-green-100 text-green-800'
+      return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
     case 'pending':
-      return 'bg-yellow-100 text-yellow-800'
+      return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
     case 'failed':
-      return 'bg-red-100 text-red-800'
+      return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
     case 'refunded':
-      return 'bg-purple-100 text-purple-800'
+      return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
     default:
-      return 'bg-gray-100 text-gray-800'
+      return 'bg-surface-secondary text-foreground'
   }
 }
 
@@ -60,6 +60,7 @@ function getMethodLabel(method: string, gateway: string) {
 export default function TransactionsPage() {
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -92,7 +93,7 @@ export default function TransactionsPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-foreground-secondary">Loading...</p>
         </div>
       </div>
     )
@@ -101,20 +102,39 @@ export default function TransactionsPage() {
   if (!user) return null
 
   return (
-    <div className="bg-gray-50 min-h-screen py-8">
+    <div className="bg-surface min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Transactions</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-8">Transactions</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Mobile Account Nav */}
+        <div className="lg:hidden overflow-x-auto mb-4">
+          <nav className="flex gap-2 min-w-max">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  (item.exact ? pathname === item.href : pathname.startsWith(item.href))
+                    ? 'bg-accent-500 text-white'
+                    : 'bg-surface-secondary text-foreground-secondary hover:bg-border-default'
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="lg:col-span-1">
             <AccountSidebar />
           </div>
 
           <div className="lg:col-span-3">
             {transactions.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg
-                  className="w-16 h-16 text-gray-300 mx-auto mb-4"
+                  className="w-16 h-16 text-foreground-muted mx-auto mb-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -126,8 +146,8 @@ export default function TransactionsPage() {
                     d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
                   />
                 </svg>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No transactions yet</h3>
-                <p className="text-gray-600 mb-6">
+                <h3 className="text-xl font-semibold text-foreground mb-2">No transactions yet</h3>
+                <p className="text-foreground-secondary mb-6">
                   Your payment transactions will appear here once you place an order.
                 </p>
                 <Link
@@ -142,7 +162,7 @@ export default function TransactionsPage() {
                 {transactions.map((txn) => (
                   <div
                     key={txn.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-5"
+                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       {/* Left side */}
@@ -151,32 +171,32 @@ export default function TransactionsPage() {
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(txn.status)}`}>
                             {getStatusLabel(txn.status)}
                           </span>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary">
                             {getMethodLabel(txn.paymentMethod, txn.paymentGateway)}
                           </span>
                         </div>
 
                         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                          <span className="text-lg font-bold text-gray-900">
+                          <span className="text-lg font-bold text-foreground">
                             {txn.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
                           </span>
                           <Link
                             href={`/account/orders/${txn.orderId}`}
-                            className="text-sm text-accent-600 hover:text-accent-700 font-medium"
+                            className="text-sm text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium"
                           >
                             Order #{txn.orderNumber}
                           </Link>
                         </div>
 
                         {txn.transactionId && (
-                          <p className="text-xs text-gray-500 mt-1 font-mono truncate">
+                          <p className="text-xs text-foreground-muted mt-1 font-mono truncate">
                             TXN: {txn.transactionId}
                           </p>
                         )}
                       </div>
 
                       {/* Right side */}
-                      <div className="text-sm text-gray-500 sm:text-right flex-shrink-0">
+                      <div className="text-sm text-foreground-muted sm:text-right flex-shrink-0">
                         <p>
                           {new Date(txn.createdAt).toLocaleDateString('en-IN', {
                             day: 'numeric',

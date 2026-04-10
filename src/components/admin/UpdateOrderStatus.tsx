@@ -40,7 +40,7 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       }
 
       const data = await response.json()
-      
+
       let successMessage = 'Order updated successfully'
       if (data.notifications) {
         const emailsSent = []
@@ -69,13 +69,13 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
   return (
     <div className="space-y-4">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+        <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+        <div className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg text-green-800 dark:text-green-300 text-sm">
           {success}
         </div>
       )}

@@ -89,7 +89,7 @@ export default function AdminReviewsPage() {
         {[1, 2, 3, 4, 5].map((star) => (
           <svg
             key={star}
-            className={`w-5 h-5 ${star <= rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+            className={`w-5 h-5 ${star <= rating ? 'text-yellow-400 fill-current' : 'text-gray-300 dark:text-gray-600'}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -107,21 +107,21 @@ export default function AdminReviewsPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Product Reviews</h1>
-        <p className="text-gray-600">Manage customer reviews and ratings</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">Product Reviews</h1>
+        <p className="text-foreground-secondary">Manage customer reviews and ratings</p>
       </div>
 
       {/* Filter Tabs */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div className="flex border-b border-gray-200">
+      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default mb-6">
+        <div className="flex border-b border-border-default">
           <button
             onClick={() => setFilter('pending')}
             className={`px-6 py-3 font-medium transition-colors ${
               filter === 'pending'
-                ? 'text-primary-600 border-b-2 border-primary-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
+                : 'text-foreground-secondary hover:text-foreground'
             }`}
           >
             Pending Approval
@@ -130,8 +130,8 @@ export default function AdminReviewsPage() {
             onClick={() => setFilter('approved')}
             className={`px-6 py-3 font-medium transition-colors ${
               filter === 'approved'
-                ? 'text-primary-600 border-b-2 border-primary-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
+                : 'text-foreground-secondary hover:text-foreground'
             }`}
           >
             Approved
@@ -140,8 +140,8 @@ export default function AdminReviewsPage() {
             onClick={() => setFilter('all')}
             className={`px-6 py-3 font-medium transition-colors ${
               filter === 'all'
-                ? 'text-primary-600 border-b-2 border-primary-600'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
+                : 'text-foreground-secondary hover:text-foreground'
             }`}
           >
             All Reviews
@@ -151,50 +151,50 @@ export default function AdminReviewsPage() {
 
       {/* Reviews List */}
       {isLoading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
           <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
-          <p className="text-gray-500 mt-4">Loading reviews...</p>
+          <p className="text-foreground-muted mt-4">Loading reviews...</p>
         </div>
       ) : reviews.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+          <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <p className="text-gray-500 text-lg">No reviews found</p>
+          <p className="text-foreground-muted text-lg">No reviews found</p>
         </div>
       ) : (
         <div className="space-y-4">
           {reviews.map((review) => (
             <div
               key={review.id}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+              className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold text-foreground">
                       {review.users.first_name} {review.users.last_name}
                     </span>
-                    <span className="text-sm text-gray-500">({review.users.email})</span>
+                    <span className="text-sm text-foreground-muted">({review.users.email})</span>
                     {review.is_verified_purchase && (
-                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium">
+                      <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs px-2 py-1 rounded-full font-medium">
                         ✓ Verified Purchase
                       </span>
                     )}
                     {review.is_approved ? (
-                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">
+                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs px-2 py-1 rounded-full font-medium">
                         Approved
                       </span>
                     ) : (
-                      <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium">
+                      <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs px-2 py-1 rounded-full font-medium">
                         Pending
                       </span>
                     )}
                   </div>
-                  
+
                   <div className="flex items-center gap-3 mb-2">
                     {renderStars(review.rating)}
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-foreground-muted">
                       {new Date(review.created_at).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
@@ -210,17 +210,17 @@ export default function AdminReviewsPage() {
                       href={`/products/${review.products.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary-600 hover:text-primary-700 font-medium"
+                      className="text-primary-600 dark:text-primary-400 hover:text-primary-700 font-medium"
                     >
                       {review.products.name} →
                     </a>
                   </div>
 
                   {review.title && (
-                    <h4 className="font-semibold text-gray-900 mb-2">{review.title}</h4>
+                    <h4 className="font-semibold text-foreground mb-2">{review.title}</h4>
                   )}
-                  
-                  <p className="text-gray-700 whitespace-pre-wrap">{review.comment}</p>
+
+                  <p className="text-foreground-secondary whitespace-pre-wrap">{review.comment}</p>
                 </div>
 
                 {!review.is_approved && (

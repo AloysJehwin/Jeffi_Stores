@@ -88,17 +88,18 @@ export async function DELETE(
 
     // Prevent self-deletion
     if (id === admin.adminId) {
-      return NextResponse.json({ error: 'Cannot deactivate your own account' }, { status: 400 })
+      return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
-    // Soft-delete: deactivate
-    await query('UPDATE admins SET is_active = false WHERE id = $1', [id])
+    // Delete certificates first (foreign key)
+    await query('DELETE FROM admin_certificates WHERE admin_id = $1', [id])
 
-    // Revoke all certificates
-    await query(
-      'UPDATE admin_certificates SET is_revoked = true, revoked_at = NOW() WHERE admin_id = $1 AND is_revoked = false',
-      [id]
-    )
+    // Delete admin
+    const deleted = await queryOne('DELETE FROM admins WHERE id = $1 RETURNING id, username', [id])
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

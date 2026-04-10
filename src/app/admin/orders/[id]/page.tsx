@@ -16,7 +16,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Header */}
       <div className="mb-6">
         <Link
@@ -30,7 +30,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             <h1 className="text-3xl font-bold text-secondary-500">
               Order #{order.order_number || order.id.slice(0, 8)}
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-foreground-secondary mt-1">
               Placed on {new Date(order.created_at).toLocaleDateString('en-IN')} at{' '}
               {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
             </p>
@@ -38,23 +38,23 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
           <div className="flex gap-4">
             <span className={`px-4 py-2 text-sm font-semibold rounded-full ${
               order.payment_status === 'paid'
-                ? 'bg-green-100 text-green-800'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                 : order.payment_status === 'pending'
-                ? 'bg-yellow-100 text-yellow-800'
-                : 'bg-red-100 text-red-800'
+                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
             }`}>
               Payment: {order.payment_status}
             </span>
             <span className={`px-4 py-2 text-sm font-semibold rounded-full ${
               order.status === 'delivered'
-                ? 'bg-green-100 text-green-800'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                 : order.status === 'processing' || order.status === 'shipped'
-                ? 'bg-blue-100 text-blue-800'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
                 : order.status === 'cancelled'
-                ? 'bg-red-100 text-red-800'
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                 : order.status === 'cancel_requested'
-                ? 'bg-orange-100 text-orange-800'
-                : 'bg-yellow-100 text-yellow-800'
+                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
             }`}>
               Status: {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status}
             </span>
@@ -77,63 +77,63 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           {/* Order Items */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Order Items</h2>
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Order Items</h2>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="space-y-4">
                 {order.order_items && order.order_items.length > 0 ? (
                   order.order_items.map((item: any) => (
-                    <div key={item.id} className="flex justify-between items-start pb-4 border-b border-gray-100 last:border-0">
+                    <div key={item.id} className="flex justify-between items-start pb-4 border-b border-border-default last:border-0">
                       <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{item.product_name || item.products?.name || 'Product'}</h3>
-                        <p className="text-sm text-gray-500 mt-1">SKU: {item.product_sku || item.products?.sku}</p>
+                        <h3 className="font-medium text-foreground">{item.product_name || item.products?.name || 'Product'}</h3>
+                        <p className="text-sm text-foreground-muted mt-1">SKU: {item.product_sku || item.products?.sku}</p>
                         {item.variant_name && (
-                          <p className="text-sm text-gray-500">{item.variant_name}</p>
+                          <p className="text-sm text-foreground-muted">{item.variant_name}</p>
                         )}
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-sm text-foreground-secondary mt-1">
                           Quantity: {item.quantity} × Rs. {Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-gray-900">
+                        <p className="font-semibold text-foreground">
                           Rs. {Number(item.total_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <p className="text-gray-500">No items in this order</p>
+                  <p className="text-foreground-muted">No items in this order</p>
                 )}
               </div>
 
               {/* Order Summary */}
-              <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
+              <div className="mt-6 pt-6 border-t border-border-default space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="text-gray-900">Rs. {Number(order.subtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground-secondary">Subtotal</span>
+                  <span className="text-foreground">Rs. {Number(order.subtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 {order.discount_amount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Discount</span>
-                    <span className="text-green-600">-Rs. {Number(order.discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-foreground-secondary">Discount</span>
+                    <span className="text-green-600 dark:text-green-400">-Rs. {Number(order.discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">GST (incl.)</span>
-                  <span className="text-gray-900">Rs. {Number(order.tax_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground-secondary">GST (incl.)</span>
+                  <span className="text-foreground">Rs. {Number(order.tax_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="text-gray-900">Rs. {Number(order.shipping_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground-secondary">Shipping</span>
+                  <span className="text-foreground">Rs. {Number(order.shipping_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
-                  <span className="text-gray-900">Total</span>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t border-border-default">
+                  <span className="text-foreground">Total</span>
                   <span className="text-primary-500">Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
@@ -142,11 +142,11 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
 
           {/* Cancellation Review */}
           {order.status === 'cancel_requested' && (
-            <div className="bg-white rounded-lg shadow-sm border-2 border-orange-300">
-              <div className="px-6 py-4 border-b border-orange-200 bg-orange-50">
-                <h2 className="text-lg font-semibold text-orange-900">Cancellation Request</h2>
+            <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-orange-300 dark:border-orange-800">
+              <div className="px-6 py-4 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30">
+                <h2 className="text-lg font-semibold text-orange-900 dark:text-orange-300">Cancellation Request</h2>
               </div>
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <CancelReview orderId={order.id} />
               </div>
             </div>
@@ -154,11 +154,11 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
 
           {/* Update Order Status — hidden for cancelled orders */}
           {order.status !== 'cancelled' && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Update Order Status</h2>
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Update Order Status</h2>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <UpdateOrderStatus orderId={order.id} currentStatus={order.status} currentPaymentStatus={order.payment_status} />
             </div>
           </div>
@@ -166,28 +166,28 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Customer Information */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Customer</h2>
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Customer</h2>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-gray-600">Name</p>
-                  <p className="font-medium text-gray-900">
+                  <p className="text-sm text-foreground-secondary">Name</p>
+                  <p className="font-medium text-foreground">
                     {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || 'Guest' : 'Guest'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Email</p>
-                  <p className="text-gray-900">{order.users?.email || order.billing_email}</p>
+                  <p className="text-sm text-foreground-secondary">Email</p>
+                  <p className="text-foreground">{order.users?.email || order.billing_email}</p>
                 </div>
                 {order.users?.phone && (
                   <div>
-                    <p className="text-sm text-gray-600">Phone</p>
-                    <p className="text-gray-900">{order.users.phone}</p>
+                    <p className="text-sm text-foreground-secondary">Phone</p>
+                    <p className="text-foreground">{order.users.phone}</p>
                   </div>
                 )}
               </div>
@@ -195,60 +195,60 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
           </div>
 
           {/* Billing Address */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Billing Address</h2>
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Billing Address</h2>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {order.billing_address ? (
-                <div className="text-sm text-gray-900">
+                <div className="text-sm text-foreground">
                   <p className="font-medium">{order.billing_address.full_name}</p>
                   <p className="mt-2">{order.billing_address.address_line1}</p>
                   {order.billing_address.address_line2 && <p>{order.billing_address.address_line2}</p>}
-                  {order.billing_address.landmark && <p className="text-gray-600">Landmark: {order.billing_address.landmark}</p>}
+                  {order.billing_address.landmark && <p className="text-foreground-secondary">Landmark: {order.billing_address.landmark}</p>}
                   <p>{order.billing_address.city}, {order.billing_address.state} {order.billing_address.postal_code}</p>
                   <p>{order.billing_address.country || 'India'}</p>
                   {order.billing_address.phone && <p className="mt-2">Phone: {order.billing_address.phone}</p>}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No billing address</p>
+                <p className="text-sm text-foreground-muted">No billing address</p>
               )}
             </div>
           </div>
 
           {/* Shipping Address */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Shipping Address</h2>
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Shipping Address</h2>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {order.shipping_address ? (
-                <div className="text-sm text-gray-900">
+                <div className="text-sm text-foreground">
                   <p className="font-medium">{order.shipping_address.full_name}</p>
                   <p className="mt-2">{order.shipping_address.address_line1}</p>
                   {order.shipping_address.address_line2 && <p>{order.shipping_address.address_line2}</p>}
-                  {order.shipping_address.landmark && <p className="text-gray-600">Landmark: {order.shipping_address.landmark}</p>}
+                  {order.shipping_address.landmark && <p className="text-foreground-secondary">Landmark: {order.shipping_address.landmark}</p>}
                   <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
                   <p>{order.shipping_address.country || 'India'}</p>
                   {order.shipping_address.phone && <p className="mt-2">Phone: {order.shipping_address.phone}</p>}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">No shipping address</p>
+                <p className="text-sm text-foreground-muted">No shipping address</p>
               )}
             </div>
           </div>
 
           {/* Payment Information */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Payment</h2>
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Payment</h2>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Status</span>
+                  <span className="text-foreground-secondary">Status</span>
                   <span className={`font-semibold ${
-                    order.payment_status === 'paid' ? 'text-green-600' : 'text-yellow-600'
+                    order.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
                   }`}>
                     {order.payment_status}
                   </span>
@@ -256,24 +256,24 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 {order.payments && order.payments.length > 0 && (
                   <>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Method</span>
-                      <span className="text-gray-900 capitalize">{order.payments[0].payment_method}</span>
+                      <span className="text-foreground-secondary">Method</span>
+                      <span className="text-foreground capitalize">{order.payments[0].payment_method}</span>
                     </div>
                     {order.payments[0].transaction_id && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Transaction ID</span>
-                        <span className="text-gray-900 font-mono text-xs">{order.payments[0].transaction_id}</span>
+                        <span className="text-foreground-secondary">Transaction ID</span>
+                        <span className="text-foreground font-mono text-xs">{order.payments[0].transaction_id}</span>
                       </div>
                     )}
                     {order.payments[0].payment_gateway && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Gateway</span>
-                        <span className="text-gray-900 capitalize">{order.payments[0].payment_gateway}</span>
+                        <span className="text-foreground-secondary">Gateway</span>
+                        <span className="text-foreground capitalize">{order.payments[0].payment_gateway}</span>
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Amount</span>
-                      <span className="text-gray-900 font-semibold">Rs. {Number(order.payments[0].amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span className="text-foreground-secondary">Amount</span>
+                      <span className="text-foreground font-semibold">Rs. {Number(order.payments[0].amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </>
                 )}

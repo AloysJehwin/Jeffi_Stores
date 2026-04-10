@@ -28,7 +28,6 @@ export default function SearchBar() {
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  // Close search when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -45,14 +44,12 @@ export default function SearchBar() {
     }
   }, [isOpen])
 
-  // Focus input when opening
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus()
     }
   }, [isOpen])
 
-  // Search products
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
       setProducts([])
@@ -96,8 +93,9 @@ export default function SearchBar() {
     <div className="relative" ref={searchRef}>
       {/* Search Button */}
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-gray-600 hover:text-accent-500 transition-colors"
+        className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -106,9 +104,9 @@ export default function SearchBar() {
 
       {/* Search Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+        <div className="absolute right-0 top-full mt-2 w-96 max-w-[calc(100vw-2rem)] bg-surface-elevated rounded-lg shadow-xl border border-border-default z-50">
           {/* Search Input */}
-          <form onSubmit={handleSearchSubmit} className="p-4 border-b border-gray-200">
+          <form onSubmit={handleSearchSubmit} className="p-4 border-b border-border-default">
             <div className="relative">
               <input
                 ref={inputRef}
@@ -116,11 +114,11 @@ export default function SearchBar() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search products..."
-                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500"
+                className="w-full px-4 py-2 pr-10 border border-border-secondary rounded-lg bg-surface-secondary text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
               <button
                 type="submit"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-accent-500"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-accent-500"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -132,7 +130,7 @@ export default function SearchBar() {
           {/* Search Results */}
           <div className="max-h-96 overflow-y-auto">
             {isLoading ? (
-              <div className="p-8 text-center text-gray-500">
+              <div className="p-8 text-center text-foreground-muted">
                 <div className="animate-spin w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
                 <p className="mt-2">Searching...</p>
               </div>
@@ -149,10 +147,9 @@ export default function SearchBar() {
                       key={product.id}
                       href={`/products/${product.slug}`}
                       onClick={handleProductClick}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-surface-secondary transition-colors"
                     >
-                      {/* Product Image */}
-                      <div className="w-16 h-16 bg-gray-100 rounded flex-shrink-0">
+                      <div className="w-16 h-16 bg-surface-secondary rounded flex-shrink-0">
                         {primaryImage ? (
                           <img
                             src={primaryImage.thumbnail_url}
@@ -161,38 +158,35 @@ export default function SearchBar() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                           </div>
                         )}
                       </div>
 
-                      {/* Product Info */}
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-gray-900 truncate">
+                        <h4 className="text-sm font-medium text-foreground truncate">
                           {product.name}
                         </h4>
-                        <p className="text-sm font-semibold text-primary-600">
+                        <p className="text-sm font-semibold text-primary-600 dark:text-primary-400">
                           {product.has_variants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
 
-                      {/* Arrow */}
-                      <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </Link>
                   )
                 })}
 
-                {/* View All Results */}
                 {products.length > 0 && (
-                  <div className="border-t border-gray-200 p-3">
+                  <div className="border-t border-border-default p-3">
                     <Link
                       href={`/products?search=${encodeURIComponent(searchQuery)}`}
                       onClick={handleProductClick}
-                      className="block text-center text-sm text-accent-600 hover:text-accent-700 font-medium"
+                      className="block text-center text-sm text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 font-medium"
                     >
                       View all results →
                     </Link>
@@ -200,15 +194,15 @@ export default function SearchBar() {
                 )}
               </div>
             ) : searchQuery.trim().length >= 2 ? (
-              <div className="p-8 text-center text-gray-500">
-                <svg className="w-16 h-16 mx-auto text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="p-8 text-center text-foreground-muted">
+                <svg className="w-16 h-16 mx-auto text-foreground-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <p>No products found</p>
                 <p className="text-sm mt-1">Try a different search term</p>
               </div>
             ) : (
-              <div className="p-8 text-center text-gray-500">
+              <div className="p-8 text-center text-foreground-muted">
                 <p className="text-sm">Start typing to search products...</p>
               </div>
             )}

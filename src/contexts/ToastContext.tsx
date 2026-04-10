@@ -71,17 +71,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Confirmation Dialog */}
       {confirmDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/30">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-fade-in">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
+          <div className="bg-surface-elevated rounded-lg shadow-xl max-w-md w-full p-6 animate-fade-in">
+            <h3 className="text-lg font-bold text-foreground mb-2">
               {confirmDialog.title}
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-foreground-secondary mb-6">
               {confirmDialog.message}
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={confirmDialog.onCancel}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors"
+                className="px-4 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors"
               >
                 {confirmDialog.cancelText || 'Cancel'}
               </button>
@@ -113,12 +113,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate-slide-in-right
               ${
                 toast.type === 'success'
-                  ? 'bg-green-50 border-green-200 text-green-800'
+                  ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300'
                   : toast.type === 'error'
-                  ? 'bg-red-50 border-red-200 text-red-800'
+                  ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300'
                   : toast.type === 'warning'
-                  ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                  : 'bg-blue-50 border-blue-200 text-blue-800'
+                  ? 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-800 dark:text-yellow-300'
+                  : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300'
               }
             `}
           >
@@ -152,7 +152,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             {/* Close Button */}
             <button
               onClick={() => removeToast(toast.id)}
-              className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+              className="flex-shrink-0 text-foreground-muted hover:text-foreground-secondary transition-colors"
               aria-label="Close notification"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

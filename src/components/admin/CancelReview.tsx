@@ -46,14 +46,14 @@ export default function CancelReview({ orderId }: { orderId: string }) {
       {result && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${
           result.type === 'success'
-            ? 'bg-green-50 text-green-800 border border-green-200'
-            : 'bg-red-50 text-red-800 border border-red-200'
+            ? 'bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800'
+            : 'bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
         }`}>
           {result.message}
         </div>
       )}
 
-      <p className="text-gray-700 mb-4">
+      <p className="text-foreground-secondary mb-4">
         The customer has requested to cancel this order. Please review and approve or reject the cancellation.
       </p>
 
@@ -77,7 +77,7 @@ export default function CancelReview({ orderId }: { orderId: string }) {
           type="button"
           onClick={() => handleReview('reject')}
           disabled={isProcessing}
-          className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium text-sm border border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Reject (Keep Order)
         </button>

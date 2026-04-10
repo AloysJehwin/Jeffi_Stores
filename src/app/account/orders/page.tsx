@@ -1,11 +1,11 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import AccountSidebar from '@/components/visitor/AccountSidebar'
+import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 
 interface OrderItem {
   id: string
@@ -44,6 +44,7 @@ interface Order {
 export default function OrdersPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null)
@@ -97,19 +98,19 @@ export default function OrdersPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800'
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
       case 'confirmed':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
       case 'shipped':
-        return 'bg-purple-100 text-purple-800'
+        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
       case 'delivered':
-        return 'bg-green-100 text-green-800'
+        return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
       case 'cancel_requested':
-        return 'bg-orange-100 text-orange-800'
+        return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
       case 'cancelled':
-        return 'bg-red-100 text-red-800'
+        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-surface-secondary text-foreground'
     }
   }
 
@@ -118,7 +119,7 @@ export default function OrdersPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-foreground-secondary">Loading...</p>
         </div>
       </div>
     )
@@ -129,11 +130,30 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen py-8">
+    <div className="bg-surface min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-8">My Orders</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Mobile Account Nav */}
+        <div className="lg:hidden overflow-x-auto mb-4">
+          <nav className="flex gap-2 min-w-max">
+            {navItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                  (item.exact ? pathname === item.href : pathname.startsWith(item.href))
+                    ? 'bg-accent-500 text-white'
+                    : 'bg-surface-secondary text-foreground-secondary hover:bg-border-default'
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <AccountSidebar />
@@ -142,9 +162,9 @@ export default function OrdersPage() {
           {/* Main Content */}
           <div className="lg:col-span-3">
             {orders.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg
-                  className="w-16 h-16 text-gray-300 mx-auto mb-4"
+                  className="w-16 h-16 text-foreground-muted mx-auto mb-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -156,8 +176,8 @@ export default function OrdersPage() {
                     d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                   />
                 </svg>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No orders yet</h3>
-                <p className="text-gray-600 mb-6">You haven't placed any orders yet.</p>
+                <h3 className="text-xl font-semibold text-foreground mb-2">No orders yet</h3>
+                <p className="text-foreground-secondary mb-6">You haven't placed any orders yet.</p>
                 <Link
                   href="/products"
                   className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
@@ -168,20 +188,20 @@ export default function OrdersPage() {
             ) : (
               <div className="space-y-4">
                 {orders.map((order) => (
-                  <div key={order.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  <div key={order.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
                     {/* Order Header */}
-                    <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
+                    <div className="bg-surface border-b border-border-default px-4 sm:px-6 py-4">
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-6">
                           <div>
-                            <p className="text-xs text-gray-500 mb-1">Order Number</p>
-                            <p className="font-mono text-sm font-medium text-gray-900">
+                            <p className="text-xs text-foreground-muted mb-1">Order Number</p>
+                            <p className="font-mono text-sm font-medium text-foreground">
                               {order.order_number}
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500 mb-1">Order Date</p>
-                            <p className="text-sm text-gray-900">
+                            <p className="text-xs text-foreground-muted mb-1">Order Date</p>
+                            <p className="text-sm text-foreground">
                               {new Date(order.created_at).toLocaleDateString('en-IN', {
                                 day: 'numeric',
                                 month: 'short',
@@ -190,8 +210,8 @@ export default function OrdersPage() {
                             </p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500 mb-1">Total</p>
-                            <p className="text-sm font-semibold text-gray-900">
+                            <p className="text-xs text-foreground-muted mb-1">Total</p>
+                            <p className="text-sm font-semibold text-foreground">
                               ₹{order.total_amount.toLocaleString('en-IN')}
                             </p>
                           </div>
@@ -209,14 +229,14 @@ export default function OrdersPage() {
                     </div>
 
                     {/* Order Items */}
-                    <div className="p-6">
+                    <div className="p-4 sm:p-6">
                       <div className="space-y-4">
                         {order.order_items.map((item) => {
                           const primaryImage = item.products?.product_images?.find(img => img.is_primary) || item.products?.product_images?.[0]
-                          
+
                           return (
                             <div key={item.id} className="flex gap-4">
-                              <div className="relative w-20 h-20 flex-shrink-0 bg-white rounded-lg overflow-hidden border border-gray-200">
+                              <div className="relative w-20 h-20 flex-shrink-0 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
                                 {primaryImage ? (
                                   <img
                                     src={primaryImage.thumbnail_url}
@@ -225,21 +245,21 @@ export default function OrdersPage() {
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
-                                    <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                     </svg>
                                   </div>
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <Link 
+                                <Link
                                   href={`/products/${item.products?.slug}`}
-                                  className="font-medium text-gray-900 hover:text-accent-600 mb-1 block"
+                                  className="font-medium text-foreground hover:text-accent-600 dark:hover:text-accent-400 mb-1 block"
                                 >
                                   {item.product_name}
                                 </Link>
-                                <p className="text-sm text-gray-600">Quantity: {item.quantity}</p>
-                                <p className="text-sm font-semibold text-gray-900 mt-1">
+                                <p className="text-sm text-foreground-secondary">Quantity: {item.quantity}</p>
+                                <p className="text-sm font-semibold text-foreground mt-1">
                                   ₹{item.unit_price.toLocaleString('en-IN')} × {item.quantity} = ₹{item.total_price.toLocaleString('en-IN')}
                                 </p>
                               </div>
@@ -250,9 +270,9 @@ export default function OrdersPage() {
 
                       {/* Shipping Address */}
                       {order.addresses && (
-                        <div className="mt-6 pt-6 border-t border-gray-200">
-                          <h4 className="text-sm font-semibold text-gray-900 mb-2">Shipping Address</h4>
-                          <div className="text-sm text-gray-600">
+                        <div className="mt-6 pt-6 border-t border-border-default">
+                          <h4 className="text-sm font-semibold text-foreground mb-2">Shipping Address</h4>
+                          <div className="text-sm text-foreground-secondary">
                             <p>{order.addresses.address_line1}</p>
                             {order.addresses.address_line2 && <p>{order.addresses.address_line2}</p>}
                             <p>
@@ -263,10 +283,10 @@ export default function OrdersPage() {
                       )}
 
                       {/* View Details */}
-                      <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+                      <div className="mt-4 pt-4 border-t border-border-default flex items-center justify-between">
                         <Link
                           href={`/account/orders/${order.id}`}
-                          className="inline-flex items-center text-accent-600 hover:text-accent-700 font-medium text-sm"
+                          className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm"
                         >
                           View Order Details
                           <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -276,7 +296,7 @@ export default function OrdersPage() {
                         {(order.status === 'pending' || order.status === 'confirmed') && (
                           confirmCancelId === order.id ? (
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-red-700">Request cancellation?</span>
+                              <span className="text-xs text-red-700 dark:text-red-400">Request cancellation?</span>
                               <button
                                 type="button"
                                 onClick={() => handleCancelOrder(order.id)}
@@ -293,7 +313,7 @@ export default function OrdersPage() {
                               <button
                                 type="button"
                                 onClick={() => setConfirmCancelId(null)}
-                                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-medium transition-colors"
+                                className="px-3 py-1 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded text-xs font-medium transition-colors"
                               >
                                 No
                               </button>
@@ -302,7 +322,7 @@ export default function OrdersPage() {
                             <button
                               type="button"
                               onClick={() => setConfirmCancelId(order.id)}
-                              className="text-red-600 hover:text-red-700 text-sm font-medium"
+                              className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium"
                             >
                               Request Cancellation
                             </button>

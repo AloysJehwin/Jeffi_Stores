@@ -65,19 +65,19 @@ export default function ChangePasswordForm({ adminId }: ChangePasswordFormProps)
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+        <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+        <div className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg text-green-800 dark:text-green-300 text-sm">
           {success}
         </div>
       )}
 
       <div>
-        <label htmlFor="current_password" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="current_password" className="block text-sm font-medium text-foreground-secondary mb-2">
           Current Password
         </label>
         <input
@@ -86,13 +86,13 @@ export default function ChangePasswordForm({ adminId }: ChangePasswordFormProps)
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           required
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
           placeholder="Enter current password"
         />
       </div>
 
       <div>
-        <label htmlFor="new_password" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="new_password" className="block text-sm font-medium text-foreground-secondary mb-2">
           New Password
         </label>
         <input
@@ -102,13 +102,13 @@ export default function ChangePasswordForm({ adminId }: ChangePasswordFormProps)
           onChange={(e) => setNewPassword(e.target.value)}
           required
           minLength={8}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
           placeholder="Enter new password (min 8 characters)"
         />
       </div>
 
       <div>
-        <label htmlFor="confirm_password" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="confirm_password" className="block text-sm font-medium text-foreground-secondary mb-2">
           Confirm New Password
         </label>
         <input
@@ -118,7 +118,7 @@ export default function ChangePasswordForm({ adminId }: ChangePasswordFormProps)
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
           minLength={8}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+          className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
           placeholder="Confirm new password"
         />
       </div>

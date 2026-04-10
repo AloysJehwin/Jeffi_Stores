@@ -49,7 +49,7 @@ export default function DeleteProductButton({ productId, productName }: DeletePr
         <button
           onClick={() => setShowConfirm(false)}
           disabled={isDeleting}
-          className="text-gray-600 hover:text-gray-900"
+          className="text-foreground-secondary hover:text-foreground"
         >
           Cancel
         </button>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { createAdminUser } from '@/lib/auth'
 import { generateClientCertificate } from '@/lib/certificates'
+import { sendAdminCertificateEmail } from '@/lib/email'
 import { query } from '@/lib/db'
 import { NextRequest } from 'next/server'
 
@@ -65,6 +66,17 @@ export async function POST(request: NextRequest) {
        VALUES ($1, $2, $3, $4, $5)`,
       [result.admin!.id, cert.serialNumber, username, cert.expiresAt, cert.downloadToken]
     )
+
+    // Send certificate via email (non-blocking — don't fail the request if email fails)
+    sendAdminCertificateEmail(
+      email,
+      username,
+      cert.p12Buffer,
+      cert.p12Password,
+      cert.serialNumber,
+      cert.expiresAt.toISOString(),
+      role || 'admin'
+    ).catch(err => console.error('Failed to send admin certificate email:', err))
 
     return NextResponse.json({
       success: true,
