@@ -4,10 +4,10 @@ set -euo pipefail
 # =============================================================================
 # Jeffi Stores — EC2 Setup Script
 # Target: Amazon Linux 2023 or Ubuntu 22.04 on EC2 t4g.micro (ARM64)
-# Domain: jeffistores.aloysjehwin.com
+# Domain: jeffistores.in
 # =============================================================================
 
-DOMAIN="jeffistores.aloysjehwin.com"
+DOMAIN="jeffistores.in"
 APP_DIR="/opt/jeffi-stores"
 REPO_URL="git@github.com:AloysDev/Jeffi_Storess_Site.git"  # UPDATE THIS
 
@@ -114,8 +114,8 @@ JWT_SECRET=CHANGE_ME_TO_A_STRONG_SECRET
 # Email (AWS SES)
 SES_SMTP_USER=CHANGE_ME
 SES_SMTP_PASSWORD=CHANGE_ME
-SES_FROM_EMAIL=noreply@aloysjehwin.com
-NEXT_PUBLIC_BASE_URL=https://jeffistores.aloysjehwin.com
+SES_FROM_EMAIL=noreply@jeffistores.in
+NEXT_PUBLIC_BASE_URL=https://jeffistores.in
 
 # Redis (internal Docker network)
 REDIS_URL=redis://redis:6379

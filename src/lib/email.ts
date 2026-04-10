@@ -1056,7 +1056,7 @@ export async function sendAdminCertificateEmail(
                 <li>Download the attached <code>${username}-admin-cert.p12</code> file.</li>
                 <li>Double-click the file to open it in your system's certificate manager.</li>
                 <li>Enter the certificate password shown above when prompted.</li>
-                <li>Navigate to <strong>https://jeffistores.aloysjehwin.com:3443/admin/login</strong> to access the admin panel.</li>
+                <li>Navigate to <strong>https://admin.jeffistores.in:3443/admin/login</strong> to access the admin panel.</li>
               </ol>
             </div>
 

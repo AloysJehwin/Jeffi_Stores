@@ -1,0 +1,380 @@
+# =============================================================================
+# Jeffi Stores - AWS Infrastructure Configuration
+# =============================================================================
+# This file documents all AWS resources used by the Jeffi Stores project.
+# Region: us-east-1 | Account: 708835965056
+# Last updated: 2026-04-10
+# =============================================================================
+
+project:
+  name: jeffi-stores
+  domain: jeffistores.in
+  admin_domain: admin.jeffistores.in
+  region: us-east-1
+  account_id: "708835965056"
+
+# -----------------------------------------------------------------------------
+# Domain & DNS (Route 53)
+# -----------------------------------------------------------------------------
+domains:
+  - name: aloysjehwin.com
+    registrar: Amazon Registrar, Inc.
+    expiry: "2027-03-29"
+    auto_renew: true
+    hosted_zone_id: Z09540091YRMNWSQXAABA
+    purpose: Portfolio & other projects (NOT Jeffi Stores)
+
+  - name: jeffistores.in
+    registrar: Amazon Registrar, Inc.
+    expiry: "2029-01-16"
+    auto_renew: true
+    hosted_zone_id: Z08094881XKVZ9XSGBKG1
+    nameservers:
+      - ns-537.awsdns-03.net
+      - ns-279.awsdns-34.com
+      - ns-1623.awsdns-10.co.uk
+      - ns-1362.awsdns-42.org
+    purpose: Jeffi Stores e-commerce platform
+
+dns_records:
+  zone: jeffistores.in (Z08094881XKVZ9XSGBKG1)
+  records:
+    # -- Storefront (CloudFront) --
+    - name: jeffistores.in
+      type: A (Alias)
+      value: d3ktjl9xt287d7.cloudfront.net  # CloudFront distribution
+
+    # -- Admin panel (EC2 direct, mTLS on port 3443) --
+    - name: admin.jeffistores.in
+      type: A
+      value: 52.205.123.118  # EC2 Elastic IP
+      ttl: 300
+
+    # -- ACM validation --
+    - name: _ddfcc6cdf2821683fea8eef29acf227f.jeffistores.in
+      type: CNAME
+      value: _c070fee1d7c24196d9fda2aefab33eee.jkddzztszm.acm-validations.aws.
+
+    # -- SES verification --
+    - name: _amazonses.jeffistores.in
+      type: TXT
+      value: Sq90ePMDuprsTY4/6guWIBILiuiC0s/+8eDMMV/QsOY=
+      ttl: 300
+
+    # -- DKIM records (SES) --
+    - name: gy3iluo3yrhea3zth6ulrocsubo3enxe._domainkey.jeffistores.in
+      type: CNAME
+      value: gy3iluo3yrhea3zth6ulrocsubo3enxe.dkim.amazonses.com
+    - name: yxox4kcv7lgeayhnygmh5egdxlauf4uu._domainkey.jeffistores.in
+      type: CNAME
+      value: yxox4kcv7lgeayhnygmh5egdxlauf4uu.dkim.amazonses.com
+    - name: wuk3ejq6mqggdeksff2aoba6pc6kls3u._domainkey.jeffistores.in
+      type: CNAME
+      value: wuk3ejq6mqggdeksff2aoba6pc6kls3u.dkim.amazonses.com
+
+# Records in aloysjehwin.com zone (NOT Jeffi Stores — listed for reference):
+dns_records_aloysjehwin:
+  zone: aloysjehwin.com (Z09540091YRMNWSQXAABA)
+  note: Jeffi Stores records were removed from this zone on 2026-04-10.
+  records:
+    - name: aloysjehwin.com
+      type: A
+      value: 216.198.79.1
+    - name: www.aloysjehwin.com
+      type: CNAME
+      value: 56f6b1a5389a27bd.vercel-dns-017.com  # Portfolio (Vercel)
+    - name: dashboard.aloysjehwin.com
+      type: A (Alias)
+      value: d-sc3a8mkbyk.execute-api.us-east-1.amazonaws.com
+    - name: assets.aloysjehwin.com
+      type: A (Alias)
+      value: d2t1k30lg4t52u.cloudfront.net
+    - name: gitflow.aloysjehwin.com
+      type: CNAME
+      value: d365zpksjv8s0h.cloudfront.net
+
+# -----------------------------------------------------------------------------
+# Elastic IPs
+# -----------------------------------------------------------------------------
+elastic_ips:
+  - allocation_id: eipalloc-0e13b87b3d8a9ec2d
+    public_ip: 52.205.123.118
+    attached_to: i-0b2466b2a540d6f23  # jeffi-stores-app EC2
+    in_use: true
+  # NOTE: eipalloc-015aa4acfac99fe62 (3.86.73.187) was released on 2026-04-10.
+  #       It was RDS-managed. RDS is now private (no public IP).
+
+# -----------------------------------------------------------------------------
+# ACM Certificates
+# -----------------------------------------------------------------------------
+acm_certificates:
+  - domain: jeffistores.in
+    san: "*.jeffistores.in"
+    arn: arn:aws:acm:us-east-1:708835965056:certificate/4591f2e4-417c-4049-95a0-a30a8e0cfdc5
+    status: ISSUED
+    type: AMAZON_ISSUED
+    used_by: CloudFront (E1M6ZFCWXAMF26)
+  - domain: jeffistores.aloysjehwin.com
+    arn: arn:aws:acm:us-east-1:708835965056:certificate/f24f3b08-b448-4a0d-b570-80c1afc0fcdf
+    status: ISSUED (no longer in use — can be deleted)
+    type: AMAZON_ISSUED
+  - domain: dashboard.aloysjehwin.com
+    status: ISSUED
+    type: AMAZON_ISSUED
+  - domain: assets.aloysjehwin.com
+    status: ISSUED
+    type: AMAZON_ISSUED
+  - domain: gitflow.aloysjehwin.com
+    status: ISSUED
+    type: AMAZON_ISSUED
+
+# -----------------------------------------------------------------------------
+# SSL/TLS (on EC2)
+# -----------------------------------------------------------------------------
+ssl:
+  provider: Let's Encrypt (Certbot)
+  domain: jeffistores.in
+  auto_renew: true  # Certbot auto-renewal via systemd timer
+  mtls:
+    enabled: true
+    port: 3443
+    purpose: Admin access via admin.jeffistores.in (bypasses CloudFront)
+
+# -----------------------------------------------------------------------------
+# CloudFront CDN - Reverse Proxy
+# -----------------------------------------------------------------------------
+# Traffic flow: Users → CloudFront → EC2:80 (HTTP) → Nginx → Next.js
+# Admin mTLS:   Admin → admin.jeffistores.in:3443 → EC2 directly (no CloudFront)
+# -----------------------------------------------------------------------------
+cloudfront:
+  distribution_id: E1M6ZFCWXAMF26
+  domain_name: d3ktjl9xt287d7.cloudfront.net
+  alias: jeffistores.in
+  certificate: arn:aws:acm:us-east-1:708835965056:certificate/4591f2e4-417c-4049-95a0-a30a8e0cfdc5
+  price_class: PriceClass_200  # US, Europe, Asia
+  http_version: http2and3
+  origin:
+    domain: ec2-52-205-123-118.compute-1.amazonaws.com
+    protocol: http-only
+    port: 80
+  cache_behaviors:
+    - path: "/_next/static/*"
+      cache: CachingOptimized (long TTL, immutable)
+    - path: "/images/*"
+      cache: CachingOptimized
+    - path: "* (default)"
+      cache: CachingDisabled (dynamic content)
+
+# -----------------------------------------------------------------------------
+# EC2 - Application Server
+# -----------------------------------------------------------------------------
+ec2:
+  instance_id: i-0b2466b2a540d6f23
+  name: jeffi-stores-app
+  instance_type: t4g.micro
+  architecture: arm64
+  ami: ami-0db69647f2908f537
+  key_pair: jeffi-stores-key
+  availability_zone: us-east-1a
+  vpc_id: vpc-04bd02e91e0bc0882
+  subnet_id: subnet-01ed5f7b63fd320c1
+  public_ip: 52.205.123.118  # Elastic IP (eipalloc-0e13b87b3d8a9ec2d) — stable
+  private_ip: 172.31.20.170
+  security_group:
+    id: sg-0dc5182e111d71d02
+    name: jeffi-stores-ec2
+    inbound_rules:
+      - port: 22
+        protocol: tcp
+        source: 0.0.0.0/0
+        description: SSH
+      - port: 80
+        protocol: tcp
+        source: 0.0.0.0/0
+        description: HTTP
+      - port: 443
+        protocol: tcp
+        source: 0.0.0.0/0
+        description: HTTPS
+      - port: 3443
+        protocol: tcp
+        source: 0.0.0.0/0
+        description: mTLS Admin
+  volume:
+    id: vol-051d3530b64a9515f
+    size_gb: 20
+    type: gp3
+    iops: 3000
+  app_directory: /opt/jeffi-stores
+
+# -----------------------------------------------------------------------------
+# RDS - PostgreSQL Database
+# -----------------------------------------------------------------------------
+rds:
+  instance_id: jeffi-stores-db
+  engine: postgres
+  engine_version: "16.13"
+  instance_class: db.t4g.micro
+  availability_zone: us-east-1f
+  endpoint: jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
+  port: 5432
+  database_name: jeffi_stores
+  storage:
+    type: gp2
+    allocated_gb: 20
+    encrypted: false
+  multi_az: false
+  publicly_accessible: false  # Changed 2026-04-10 (was true, EIP released)
+  security_group: sg-0e361f0f1b093bd83
+  subnet_group: default
+  parameter_group: default.postgres16
+  backup_retention_days: 7
+  auto_minor_upgrade: true
+  deletion_protection: false
+  performance_insights: false
+
+# -----------------------------------------------------------------------------
+# S3 - Object Storage
+# -----------------------------------------------------------------------------
+s3:
+  bucket_name: jeffi-stores-bucket
+  region: us-east-1  # LocationConstraint: null = us-east-1
+  versioning: disabled
+  paths:
+    product_images: /products/{productId}/
+    invoices: /invoices/{year}/
+  public_read: true  # Bucket policy allows public GetObject
+
+# -----------------------------------------------------------------------------
+# SES - Email Service
+# -----------------------------------------------------------------------------
+ses:
+  region: us-east-1
+  domain: jeffistores.in
+  domain_verified: true  # Pending DNS propagation (2026-04-10)
+  dkim_enabled: true
+  from_email: noreply@jeffistores.in
+  admin_email: aloysjehwin@gmail.com
+  production_access: false  # DENIED — case 177558150300722. Resubmit via AWS Console.
+  sandbox_limits:
+    max_24h_send: 200
+    max_send_rate_per_sec: 1
+    recipients: verified_only  # Can only send to verified email addresses
+  # To move to production: AWS Console > SES > Account dashboard > Request production access
+  # NOTE: Also verify sender email noreply@jeffistores.in once domain is verified
+
+# -----------------------------------------------------------------------------
+# Scheduling - Auto Start/Stop (Cost Optimization)
+# -----------------------------------------------------------------------------
+# Managed by: deploy/scheduler-setup.sh
+# EventBridge Scheduler (not Lambda) — directly invokes EC2/RDS APIs
+# -----------------------------------------------------------------------------
+scheduling:
+  status: ACTIVE
+  timezone: Asia/Kolkata
+  schedule_group: jeffi-stores
+  iam_role: jeffi-stores-scheduler-role
+  schedules:
+    - name: jeffi-start-rds
+      action: rds:startDBInstance
+      cron: "cron(45 8 * * ? *)"  # 8:45 AM IST (15 min warm-up before EC2)
+      target: jeffi-stores-db
+    - name: jeffi-start-ec2
+      action: ec2:startInstances
+      cron: "cron(0 9 * * ? *)"   # 9:00 AM IST
+      target: i-0b2466b2a540d6f23
+    - name: jeffi-stop-ec2
+      action: ec2:stopInstances
+      cron: "cron(0 2 * * ? *)"   # 2:00 AM IST
+      target: i-0b2466b2a540d6f23
+    - name: jeffi-stop-rds
+      action: rds:stopDBInstance
+      cron: "cron(0 2 * * ? *)"   # 2:00 AM IST
+      target: jeffi-stores-db
+  operating_hours: "8:45 AM - 2:00 AM IST (17.25 hours/day)"
+  management_script: deploy/scheduler-setup.sh
+
+# -----------------------------------------------------------------------------
+# Docker Services (on EC2)
+# -----------------------------------------------------------------------------
+docker:
+  compose_file: docker-compose.prod.yml
+  services:
+    app:
+      image: jeffi-stores (local build)
+      port: 3000
+      runtime: Next.js standalone
+    nginx:
+      ports:
+        - "80:80"    # HTTP (redirects to HTTPS)
+        - "443:443"  # HTTPS storefront
+        - "3443:3443" # mTLS admin endpoint (admin.jeffistores.in)
+      ssl: Let's Encrypt
+      mtls: Client certificates for admin
+    redis:
+      port: 6379
+      internal_only: true
+
+# -----------------------------------------------------------------------------
+# CI/CD
+# -----------------------------------------------------------------------------
+cicd:
+  provider: GitHub Actions
+  workflow: .github/workflows/deploy.yml
+  triggers:
+    - push to main
+    - push to feature/backend-refactor
+  deployment:
+    method: SSH to EC2
+    steps:
+      - git pull
+      - docker compose build
+      - docker compose up -d
+
+# -----------------------------------------------------------------------------
+# Payment Gateway
+# -----------------------------------------------------------------------------
+razorpay:
+  mode: test  # rzp_test_ prefix
+  webhook_endpoint: /api/webhooks/razorpay
+
+# =============================================================================
+# Monthly Cost Estimate (us-east-1 pricing, as of April 2026)
+# =============================================================================
+# Schedule: 8:45 AM - 2:00 AM IST = ~17.25 hrs on / ~6.75 hrs off per day
+#           ~525 hrs on / ~205 hrs off per month (30.4 days)
+#
+# ┌──────────────────────────────────┬──────────┬──────────────┬─────────────┐
+# │ Resource                         │ Rate     │ 24/7 Cost    │ Scheduled   │
+# ├──────────────────────────────────┼──────────┼──────────────┼─────────────┤
+# │ EC2 t4g.micro                    │ $0.0084/h│ $6.13        │ $4.41       │
+# │ RDS db.t4g.micro (compute)       │ $0.016/h │ $11.68       │ $8.40       │
+# │ RDS storage (20 GB gp2)          │ $0.115/GB│ $2.30        │ $2.30       │
+# │ EBS volume (20 GB gp3)           │ $0.08/GB │ $1.60        │ $1.60       │
+# │ Elastic IP (attached, stopped)   │ $0.005/h │ $0.00        │ $1.03       │
+# │ S3 (~1.2 GB, jeffi-stores)      │ $0.023/GB│ $0.03        │ $0.03       │
+# │ Route 53 (2 hosted zones)        │ $0.50/z  │ $1.00        │ $1.00       │
+# │ SES (sandbox, <200/day)          │ $0.10/1k │ ~$0.06       │ ~$0.06      │
+# │ EventBridge Scheduler            │ free tier│ $0.00        │ $0.00       │
+# ├──────────────────────────────────┼──────────┼──────────────┼─────────────┤
+# │ TOTAL (Jeffi Stores only)        │          │ ~$22.80/mo   │ ~$18.83/mo  │
+# └──────────────────────────────────┴──────────┴──────────────┴─────────────┘
+#
+# Savings vs old setup ($17.17/mo with unused EIP):
+#   - Released unused EIP: -$3.65/mo
+#   - Extended hours (12AM→2AM): +$0.96/mo (EC2+RDS run 2h more)
+#   - Added 2nd hosted zone: +$0.50/mo
+#   - Net: comparable cost but no wasted EIP + better security (RDS private)
+#
+# Other AWS resources in this account (not Jeffi Stores):
+# ┌──────────────────────────────────┬─────────────────────────────────────────┐
+# │ Resource                         │ Estimated Cost                          │
+# ├──────────────────────────────────┼─────────────────────────────────────────┤
+# │ S3 total (~1.18 GB across 10)   │ ~$0.03/mo                              │
+# │ CloudFront (1 distro, assets)    │ Free tier (1 TB/mo) → ~$0.00          │
+# │ Lambda (8 functions)             │ Free tier (1M req/mo) → ~$0.00        │
+# │ API Gateway (11 HTTP APIs)       │ Free tier (1M req/mo) → ~$0.00        │
+# │ ACM certificates (5)             │ Free                                   │
+# │ Route 53 queries                 │ ~$0.40/mo (per 1M queries)            │
+# └──────────────────────────────────┴─────────────────────────────────────────┘
+# =============================================================================

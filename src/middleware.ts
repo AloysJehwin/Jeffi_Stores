@@ -16,28 +16,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Admin subdomain handling
-  if (isAdminSubdomain) {
-    // Check for client certificate (mTLS)
+  // Admin subdomain handling — verify mTLS cert, then fall through to normal admin path handling
+  // URLs on admin subdomain use /admin/... paths (same as main domain)
+  if (isAdminSubdomain && !isAdminPath && !isAdminApiPath) {
+    // Non-admin path on admin subdomain (e.g. "/") — block without cert
     const clientCert = request.headers.get('x-client-cert')
     const certVerified = request.headers.get('x-client-cert-verified')
 
-    // Check certificate in both dev and production
-    // In development, you need to run HTTPS server with client cert verification
-    // In production with proper proxy/CDN, these headers will be set
     if (!clientCert || certVerified !== 'SUCCESS') {
       return new NextResponse('Client certificate required', {
         status: 403,
-        headers: {
-          'Content-Type': 'text/plain',
-        },
+        headers: { 'Content-Type': 'text/plain' },
       })
     }
 
-    // Rewrite to admin app
-    const url = request.nextUrl.clone()
-    url.pathname = `/admin${url.pathname}`
-    return NextResponse.rewrite(url)
+    // Redirect bare admin subdomain root to /admin/dashboard
+    return NextResponse.redirect(new URL('/admin/dashboard', request.url))
   }
 
   // Admin API path authentication and scope check
@@ -137,8 +131,8 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Only run middleware on admin routes and admin API routes
-    '/admin/:path*',
-    '/api/admin/:path*',
+    // Run middleware on all paths (needed for admin subdomain detection)
+    // Exclude static files and images
+    '/((?!_next/static|_next/image|favicon.ico|images|icon.png|apple-icon.png).*)',
   ],
 }
