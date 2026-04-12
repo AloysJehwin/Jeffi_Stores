@@ -34,6 +34,26 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy pdfkit + full dependency tree (serverExternalPackages not bundled by Next.js)
+COPY --from=deps /app/node_modules/pdfkit ./node_modules/pdfkit
+COPY --from=deps /app/node_modules/@noble ./node_modules/@noble
+COPY --from=deps /app/node_modules/fontkit ./node_modules/fontkit
+COPY --from=deps /app/node_modules/@swc ./node_modules/@swc
+COPY --from=deps /app/node_modules/tslib ./node_modules/tslib
+COPY --from=deps /app/node_modules/brotli ./node_modules/brotli
+COPY --from=deps /app/node_modules/base64-js ./node_modules/base64-js
+COPY --from=deps /app/node_modules/clone ./node_modules/clone
+COPY --from=deps /app/node_modules/dfa ./node_modules/dfa
+COPY --from=deps /app/node_modules/fast-deep-equal ./node_modules/fast-deep-equal
+COPY --from=deps /app/node_modules/restructure ./node_modules/restructure
+COPY --from=deps /app/node_modules/tiny-inflate ./node_modules/tiny-inflate
+COPY --from=deps /app/node_modules/unicode-properties ./node_modules/unicode-properties
+COPY --from=deps /app/node_modules/unicode-trie ./node_modules/unicode-trie
+COPY --from=deps /app/node_modules/pako ./node_modules/pako
+COPY --from=deps /app/node_modules/js-md5 ./node_modules/js-md5
+COPY --from=deps /app/node_modules/linebreak ./node_modules/linebreak
+COPY --from=deps /app/node_modules/png-js ./node_modules/png-js
+
 # Copy the Google service account key (will be overridden by Secrets Manager in prod)
 # This is a fallback; prefer fetching from Secrets Manager at runtime
 COPY --from=builder /app/jeffi-stores-76e9ecaecdd6.json ./jeffi-stores-76e9ecaecdd6.json

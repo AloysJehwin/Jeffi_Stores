@@ -80,6 +80,7 @@ CREATE TABLE categories (
     image_url VARCHAR(500),
     parent_category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
     sku_prefix VARCHAR(10),
+    google_product_category VARCHAR(255), -- Google Merchant taxonomy (e.g. "Hardware > Fasteners > Bolts")
     display_order INT DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
