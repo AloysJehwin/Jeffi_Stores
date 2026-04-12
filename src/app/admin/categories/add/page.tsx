@@ -13,15 +13,16 @@ async function createCategory(formData: FormData) {
   const displayOrder = parseInt(formData.get('display_order') as string)
   const skuPrefix = (formData.get('sku_prefix') as string || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || null
   const isActive = formData.get('is_active') === 'true'
+  const googleProductCategory = formData.get('google_product_category') as string || null
 
   // Generate slug from name
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
   try {
     await query(
-      `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive]
+      `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, google_product_category)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory]
     )
 
     // Revalidate all pages that use categories

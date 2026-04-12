@@ -119,6 +119,27 @@ export default function CategoryForm({ categories, action, category }: CategoryF
             </p>
           </div>
 
+          {/* Google Product Category */}
+          <div className="md:col-span-2">
+            <label htmlFor="google_product_category" className="block text-sm font-medium text-foreground-secondary mb-2">
+              Google Product Category
+            </label>
+            <input
+              type="text"
+              id="google_product_category"
+              name="google_product_category"
+              defaultValue={category?.google_product_category || ''}
+              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              placeholder="e.g., Hardware > Fasteners > Bolts"
+            />
+            <p className="text-xs text-foreground-muted mt-1">
+              Google taxonomy path or ID for Merchant Center. Find it at{' '}
+              <a href="https://www.google.com/basepages/producttype/taxonomy-with-ids.en-US.txt" target="_blank" rel="noopener noreferrer" className="text-accent-500 underline">
+                Google Product Taxonomy
+              </a>
+            </p>
+          </div>
+
           {/* Description */}
           <div className="md:col-span-2">
             <label htmlFor="description" className="block text-sm font-medium text-foreground-secondary mb-2">
