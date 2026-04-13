@@ -19,7 +19,12 @@ export async function middleware(request: NextRequest) {
   // Admin subdomain handling — verify mTLS cert, then fall through to normal admin path handling
   // URLs on admin subdomain use /admin/... paths (same as main domain)
   if (isAdminSubdomain && !isAdminPath && !isAdminApiPath) {
-    // Non-admin path on admin subdomain (e.g. "/") — block without cert
+    // Let /api/* routes pass through for admin PATCH/POST calls (e.g. /api/orders/*)
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.next()
+    }
+
+    // Non-admin, non-API path on admin subdomain (e.g. "/") — block without cert
     const clientCert = request.headers.get('x-client-cert')
     const certVerified = request.headers.get('x-client-cert-verified')
 
