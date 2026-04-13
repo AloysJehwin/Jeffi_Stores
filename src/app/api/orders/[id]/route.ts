@@ -110,6 +110,27 @@ export async function PATCH(
       return NextResponse.json({ error: 'Cancelled orders cannot be modified' }, { status: 400 })
     }
 
+    if (currentOrder.status === 'delivered' && status && status !== 'delivered') {
+      return NextResponse.json({ error: 'Delivered orders cannot change status' }, { status: 400 })
+    }
+
+    // Validate status values
+    const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancel_requested', 'cancelled']
+    const validPaymentStatuses = ['pending', 'paid', 'failed', 'refunded']
+
+    if (status && !validStatuses.includes(status)) {
+      return NextResponse.json({ error: `Invalid order status: ${status}` }, { status: 400 })
+    }
+
+    if (payment_status && !validPaymentStatuses.includes(payment_status)) {
+      return NextResponse.json({ error: `Invalid payment status: ${payment_status}` }, { status: 400 })
+    }
+
+    // Prevent setting payment to 'paid' → 'pending' (refunded is the correct reverse path)
+    if (currentOrder.payment_status === 'paid' && payment_status === 'pending') {
+      return NextResponse.json({ error: 'Paid orders cannot revert to pending. Use refunded instead.' }, { status: 400 })
+    }
+
     const statusChanged = status && status !== currentOrder.status
     const paymentStatusChanged = payment_status && payment_status !== currentOrder.payment_status
 
@@ -137,13 +158,26 @@ export async function PATCH(
       values
     )
 
-    // Generate invoice when order moves to confirmed or processing
+    // Generate invoice when order moves to confirmed or processing AND payment is paid
     let invoicePdfBuffer: Buffer | null = null
-    if (statusChanged && (status === 'confirmed' || status === 'processing')) {
+    const effectivePaymentStatus = payment_status || currentOrder.payment_status
+    if (statusChanged && (status === 'confirmed' || status === 'processing') && effectivePaymentStatus === 'paid') {
       try {
         invoicePdfBuffer = await generateOrderInvoice(orderId)
       } catch (err) {
         console.error('Failed to generate invoice:', err)
+      }
+    }
+
+    // Also generate invoice if payment just changed to paid and order is already confirmed/processing
+    const effectiveStatus = status || currentOrder.status
+    if (paymentStatusChanged && payment_status === 'paid' && (effectiveStatus === 'confirmed' || effectiveStatus === 'processing')) {
+      if (!invoicePdfBuffer) {
+        try {
+          invoicePdfBuffer = await generateOrderInvoice(orderId)
+        } catch (err) {
+          console.error('Failed to generate invoice:', err)
+        }
       }
     }
 
