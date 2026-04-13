@@ -16,6 +16,8 @@ export async function POST(
     }
 
     const orderId = params.id
+    const body = await request.json().catch(() => ({}))
+    const restoreToCart = body?.restoreToCart === true
 
     // Fetch order — must belong to the authenticated user
     const order = await queryOne(`
@@ -37,10 +39,10 @@ export async function POST(
       )
     }
 
-    // If order is pending + unpaid, cancel immediately and restore stock
-    if (order.status === 'pending' && order.payment_status === 'unpaid') {
+    // If order is pending + unpaid/failed, cancel immediately and restore stock
+    if (order.status === 'pending' && (order.payment_status === 'unpaid' || order.payment_status === 'failed')) {
       const orderItems = await queryMany(
-        'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
+        'SELECT product_id, variant_id, quantity, unit_price FROM order_items WHERE order_id = $1',
         [orderId]
       )
       for (const item of orderItems) {
@@ -56,11 +58,33 @@ export async function POST(
           )
         }
       }
+
+      // Restore items to cart if requested
+      if (restoreToCart) {
+        for (const item of orderItems) {
+          const existingCartItem = await queryOne(
+            'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3',
+            [authUser.userId, item.product_id, item.variant_id || null]
+          )
+          if (existingCartItem) {
+            await query(
+              'UPDATE cart_items SET quantity = cart_items.quantity + $1, updated_at = NOW() WHERE id = $2',
+              [item.quantity, existingCartItem.id]
+            )
+          } else {
+            await query(
+              'INSERT INTO cart_items (user_id, product_id, variant_id, quantity, price_at_addition) VALUES ($1, $2, $3, $4, $5)',
+              [authUser.userId, item.product_id, item.variant_id || null, item.quantity, item.unit_price]
+            )
+          }
+        }
+      }
+
       await query(
         `UPDATE orders SET status = 'cancelled', payment_status = 'cancelled', updated_at = NOW() WHERE id = $1`,
         [orderId]
       )
-      return NextResponse.json({ success: true, directCancel: true })
+      return NextResponse.json({ success: true, directCancel: true, restoredToCart: restoreToCart })
     }
 
     // Otherwise, set status to cancel_requested (admin will approve/reject)

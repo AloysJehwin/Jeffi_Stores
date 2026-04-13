@@ -2,8 +2,9 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import { useCart } from '@/contexts/CartContext'
 import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
@@ -100,6 +101,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [isPayingNow, setIsPayingNow] = useState(false)
   const [paymentError, setPaymentError] = useState('')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
+  const [timeLeft, setTimeLeft] = useState<number | null>(null)
+  const [isAutoCancelling, setIsAutoCancelling] = useState(false)
+  const autoCancelTriggeredRef = useRef(false)
+  const { refreshCart } = useCart()
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -125,6 +130,51 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       setLoading(false)
     }
   }
+
+  const handleAutoCancel = useCallback(async () => {
+    if (autoCancelTriggeredRef.current) return
+    autoCancelTriggeredRef.current = true
+    setIsAutoCancelling(true)
+    try {
+      const response = await fetch(`/api/orders/${params.id}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restoreToCart: true }),
+      })
+      if (response.ok) {
+        await fetchOrder()
+        await refreshCart()
+      }
+    } catch (err) {
+      console.error('Auto-cancel failed:', err)
+    } finally {
+      setIsAutoCancelling(false)
+    }
+  }, [params.id])
+
+  // 10-minute countdown timer for unpaid/failed Razorpay orders
+  useEffect(() => {
+    if (!order) return
+    if (order.status === 'cancelled' || order.status === 'cancel_requested') return
+    if (order.paymentStatus !== 'failed' && order.paymentStatus !== 'unpaid') return
+    if (!isRazorpayEnabled) return
+
+    const orderCreatedAt = new Date(order.createdAt).getTime()
+    const deadline = orderCreatedAt + 10 * 60 * 1000
+
+    const tick = () => {
+      const remaining = Math.max(0, deadline - Date.now())
+      setTimeLeft(remaining)
+
+      if (remaining <= 0) {
+        handleAutoCancel()
+      }
+    }
+
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [order, handleAutoCancel])
 
   const handleCancelOrder = async () => {
     setIsCancelling(true)
@@ -562,29 +612,43 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             {order.paymentStatus === 'unpaid' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 flex-1">
                     <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p className="text-blue-800 dark:text-blue-300 text-sm">
-                      Payment is pending for this order. Pay online to confirm your order instantly.
-                    </p>
+                    <div>
+                      <p className="text-blue-800 dark:text-blue-300 text-sm">
+                        Payment is pending for this order. Pay online to confirm your order instantly.
+                      </p>
+                      {timeLeft !== null && timeLeft > 0 && (
+                        <p className="text-blue-900 dark:text-blue-200 text-sm font-bold mt-2">
+                          Time remaining to pay: {Math.floor(timeLeft / 60000)}:{String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}
+                        </p>
+                      )}
+                      {isAutoCancelling && (
+                        <p className="text-blue-800 dark:text-blue-300 text-sm mt-2">
+                          Time expired. Cancelling order and restoring items to your cart...
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handlePayNow}
-                    disabled={isPayingNow}
-                    className="flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
-                  >
-                    {isPayingNow ? (
-                      <>
-                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      `Pay ₹${order.totalAmount.toLocaleString('en-IN')}`
-                    )}
-                  </button>
+                  {!isAutoCancelling && (
+                    <button
+                      type="button"
+                      onClick={handlePayNow}
+                      disabled={isPayingNow}
+                      className="flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center"
+                    >
+                      {isPayingNow ? (
+                        <>
+                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        `Pay ₹${order.totalAmount.toLocaleString('en-IN')}`
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -605,29 +669,43 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             {order.paymentStatus === 'failed' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
               <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 flex-1">
                     <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p className="text-red-800 dark:text-red-300 text-sm">
-                      Payment failed for this order. Please retry to complete your purchase.
-                    </p>
+                    <div>
+                      <p className="text-red-800 dark:text-red-300 text-sm">
+                        Payment failed for this order. Please retry to complete your purchase.
+                      </p>
+                      {timeLeft !== null && timeLeft > 0 && (
+                        <p className="text-red-900 dark:text-red-200 text-sm font-bold mt-2">
+                          Time remaining to pay: {Math.floor(timeLeft / 60000)}:{String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}
+                        </p>
+                      )}
+                      {isAutoCancelling && (
+                        <p className="text-red-800 dark:text-red-300 text-sm mt-2">
+                          Time expired. Cancelling order and restoring items to your cart...
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handlePayNow}
-                    disabled={isPayingNow}
-                    className="flex-shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center"
-                  >
-                    {isPayingNow ? (
-                      <>
-                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      'Retry Payment'
-                    )}
-                  </button>
+                  {!isAutoCancelling && (
+                    <button
+                      type="button"
+                      onClick={handlePayNow}
+                      disabled={isPayingNow}
+                      className="flex-shrink-0 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center"
+                    >
+                      {isPayingNow ? (
+                        <>
+                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        'Retry Payment'
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             )}

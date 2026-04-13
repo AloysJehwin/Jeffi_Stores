@@ -150,16 +150,22 @@ function CheckoutPage() {
         theme: { color: '#f97316' },
         modal: {
           ondismiss: function () {
-            setIsSubmitting(false)
-            setError('Payment cancelled. Your order is saved — you can retry from your order details page.')
+            clearCart()
+            window.location.href = `/account/orders/${orderId}`
           },
         },
       }
 
       const rzp = new (window as any).Razorpay(options)
       rzp.on('payment.failed', function (response: any) {
-        setError(`Payment failed: ${response.error.description}. Please try again.`)
-        setIsSubmitting(false)
+        // Notify server about failure (for admin email + payment record update)
+        fetch(`/api/orders/${orderId}/payment-failed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ errorDescription: response.error.description }),
+        }).catch(() => {})
+        clearCart()
+        window.location.href = `/account/orders/${orderId}`
       })
       rzp.open()
     } catch (err: any) {
