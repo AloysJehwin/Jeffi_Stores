@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastContext'
 import Link from 'next/link'
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import AddressFormModal from '@/components/visitor/AddressFormModal'
 
 export default function CheckoutReviewPageWrapper() {
   return (
@@ -25,6 +26,7 @@ function CheckoutReviewPage() {
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [addresses, setAddresses] = useState<any[]>([])
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true)
+  const [showAddressModal, setShowAddressModal] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -104,12 +106,12 @@ function CheckoutReviewPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-foreground">Delivery Address</h2>
-                <Link
-                  href="/account/addresses"
+                <button
+                  onClick={() => setShowAddressModal(true)}
                   className="text-accent-600 dark:text-accent-400 hover:text-accent-700 text-sm font-medium"
                 >
                   + Add New Address
-                </Link>
+                </button>
               </div>
 
               {addresses.length === 0 ? (
@@ -119,12 +121,12 @@ function CheckoutReviewPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                   <p className="text-foreground-secondary mb-4">No saved addresses found</p>
-                  <Link
-                    href="/account/addresses"
+                  <button
+                    onClick={() => setShowAddressModal(true)}
                     className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-6 py-2 rounded-lg font-medium"
                   >
                     Add Delivery Address
-                  </Link>
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -287,6 +289,16 @@ function CheckoutReviewPage() {
             </div>
           </div>
         </div>
+
+        <AddressFormModal
+          isOpen={showAddressModal}
+          onClose={() => setShowAddressModal(false)}
+          onSaved={(newAddress) => {
+            setShowAddressModal(false)
+            fetchAddresses()
+            setSelectedAddress(newAddress)
+          }}
+        />
       </div>
     </div>
   )

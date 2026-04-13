@@ -90,7 +90,7 @@ export default function ProductActions({
     setQuantity(1)
   }, [selectedVariantId])
 
-  // Check if product is in wishlist on mount
+  // Check if product is in wishlist on mount and when user changes
   useEffect(() => {
     const checkWishlistStatus = async () => {
       try {
@@ -106,7 +106,7 @@ export default function ProductActions({
     }
 
     checkWishlistStatus()
-  }, [productId])
+  }, [productId, user])
 
   const handleAddToCart = async () => {
     setIsAddingToCart(true)

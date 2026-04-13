@@ -4,10 +4,12 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCart } from '@/contexts/CartContext'
 
 export default function SignupPage() {
   const router = useRouter()
   const { signup } = useAuth()
+  const { refreshCart } = useCart()
 
   const [step, setStep] = useState<'email' | 'otp' | 'details'>('email')
   const [email, setEmail] = useState('')
@@ -94,6 +96,7 @@ export default function SignupPage() {
         phone,
       })
 
+      await refreshCart()
       router.push('/')
     } catch (err: any) {
       setError(err.message)
