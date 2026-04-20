@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 
 export default function LoginPageWrapper() {
@@ -19,6 +20,7 @@ function LoginPage() {
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/'
   const { login } = useAuth()
+  const { refreshCart } = useCart()
   const { showToast } = useToast()
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
@@ -61,6 +63,7 @@ function LoginPage() {
 
     try {
       await login(email, otp)
+      await refreshCart()
       router.push(redirect)
     } catch (err: any) {
       setError(err.message)

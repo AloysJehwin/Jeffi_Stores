@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
+import { useAuth } from './AuthContext'
 
 interface CartItem {
   id: string
@@ -52,6 +53,8 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { user } = useAuth()
+  const prevUserIdRef = useRef<string | null | undefined>(undefined)
 
   const fetchCart = async () => {
     try {
@@ -74,6 +77,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchCart()
   }, [])
+
+  // Re-fetch cart when user changes (login/logout)
+  useEffect(() => {
+    const currentUserId = user?.id ?? null
+    if (prevUserIdRef.current === undefined) {
+      // Initial mount — skip, the [] effect handles it
+      prevUserIdRef.current = currentUserId
+      return
+    }
+    if (prevUserIdRef.current !== currentUserId) {
+      prevUserIdRef.current = currentUserId
+      fetchCart()
+    }
+  }, [user])
 
   const addToCart = async (productId: string, quantity = 1, variantId?: string) => {
     try {

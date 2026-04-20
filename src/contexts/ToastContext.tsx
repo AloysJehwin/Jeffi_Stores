@@ -88,10 +88,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <button
                 onClick={confirmDialog.onConfirm}
                 className={`px-4 py-2 text-white rounded-lg font-medium transition-colors ${
-                  confirmDialog.type === 'danger'
+                  confirmDialog.type === 'danger' || confirmDialog.type === 'warning'
                     ? 'bg-red-600 hover:bg-red-700'
-                    : confirmDialog.type === 'warning'
-                    ? 'bg-yellow-600 hover:bg-yellow-700'
                     : 'bg-accent-600 hover:bg-accent-700'
                 }`}
               >

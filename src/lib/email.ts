@@ -742,7 +742,7 @@ export async function sendPaymentStatusUpdate(
     },
     failed: {
       title: 'Payment Failed',
-      message: 'Unfortunately, your payment could not be processed. Please try again or contact us for assistance.',
+      message: 'Unfortunately, your payment could not be processed. You have 10 minutes from when the order was placed to retry payment before the order is automatically cancelled.',
       color: '#ef4444',
     },
     refunded: {
@@ -893,6 +893,14 @@ export async function sendPaymentStatusUpdate(
               <div class="info-box">
                 <h4 style="margin-top: 0;">Refund Processed</h4>
                 <p>The refund has been initiated. Please allow 5-7 business days for the amount to reflect in your account.</p>
+              </div>
+            ` : ''}
+
+            ${newPaymentStatus === 'failed' ? `
+              <div class="info-box" style="background-color: #fef2f2; border-left-color: #ef4444;">
+                <h4 style="margin-top: 0; color: #ef4444;">Action Required &mdash; 10 Minute Window</h4>
+                <p>You have <strong>10 minutes</strong> from when the order was placed to complete payment. After that, the order will be automatically cancelled and items returned to your cart.</p>
+                <p>Click the button below to retry payment now.</p>
               </div>
             ` : ''}
 
@@ -1255,6 +1263,106 @@ export async function sendNewReviewNotification(review: any, user: any, product:
     return { success: true, messageId: info.messageId }
   } catch (error) {
     console.error('Email sending error:', error)
+    return { success: false, error }
+  }
+}
+
+export async function sendPaymentFailedAdminNotification(
+  order: { order_number: string; id: string; customer_name: string; customer_email: string; total_amount: string | number; customer_phone?: string },
+  errorDescription?: string
+) {
+  const adminEmail = process.env.ADMIN_EMAIL || 'jeffistoress@gmail.com'
+
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: adminEmail,
+    subject: `Payment Failed - Order ${order.order_number}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 700px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #f9f9f9;
+              border-radius: 10px;
+              padding: 30px;
+              border: 1px solid #e0e0e0;
+            }
+            .alert {
+              background-color: #fef2f2;
+              border: 2px solid #ef4444;
+              padding: 20px;
+              border-radius: 8px;
+              margin-bottom: 20px;
+            }
+            .info-box {
+              background-color: white;
+              padding: 15px;
+              border-radius: 5px;
+              margin: 15px 0;
+            }
+            .warning-box {
+              background-color: #fff3cd;
+              border-left: 4px solid #ffc107;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="alert">
+              <h2 style="margin-top: 0; color: #ef4444;">Payment Failed</h2>
+              <p style="font-size: 18px; margin: 0;"><strong>Order #${order.order_number}</strong></p>
+            </div>
+
+            <div class="info-box">
+              <h3>Customer Information</h3>
+              <p><strong>Name:</strong> ${order.customer_name}</p>
+              <p><strong>Email:</strong> ${order.customer_email}</p>
+              ${order.customer_phone ? `<p><strong>Phone:</strong> ${order.customer_phone}</p>` : ''}
+            </div>
+
+            <div class="info-box">
+              <h3>Payment Details</h3>
+              <p><strong>Order Amount:</strong> ₹${parseFloat(String(order.total_amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              <p><strong>Status:</strong> <span style="color: #ef4444; font-weight: bold;">FAILED</span></p>
+              ${errorDescription ? `<p><strong>Reason:</strong> ${errorDescription}</p>` : ''}
+              <p><strong>Time:</strong> ${new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' })}</p>
+            </div>
+
+            <div class="warning-box">
+              <h4 style="margin-top: 0;">Auto-Cancel in 10 Minutes</h4>
+              <p>The customer has been notified and given a <strong>10-minute window</strong> to retry payment. If payment is not completed, the order will be automatically cancelled and stock restored.</p>
+            </div>
+
+            <p style="text-align: center; margin-top: 30px;">
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/orders/${order.id}"
+                 style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                View Order in Admin Panel
+              </a>
+            </p>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    console.log('Payment failed admin notification sent:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('Payment failed admin notification error:', error)
     return { success: false, error }
   }
 }

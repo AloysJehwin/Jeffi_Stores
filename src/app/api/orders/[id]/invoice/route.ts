@@ -174,6 +174,14 @@ export async function POST(
       return NextResponse.json({ message: 'Invoice already exists', invoiceNumber: order.invoice_number })
     }
 
+    if (order.payment_status !== 'paid') {
+      return NextResponse.json({ error: 'Invoice can only be generated after payment is completed' }, { status: 400 })
+    }
+
+    if (order.status === 'pending' || order.status === 'cancelled') {
+      return NextResponse.json({ error: `Invoice cannot be generated for ${order.status} orders` }, { status: 400 })
+    }
+
     const pdfBuffer = await generateOrderInvoice(orderId)
 
     if (!pdfBuffer) {

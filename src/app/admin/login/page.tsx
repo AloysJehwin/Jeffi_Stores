@@ -12,7 +12,7 @@ export default function AdminLogin() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
-  const [certStatus, setCertStatus] = useState<'checking' | 'verified' | 'development'>('checking')
+  const [certStatus, setCertStatus] = useState<'checking' | 'verified' | 'development' | 'not_found'>('checking')
 
   useEffect(() => {
     // Check if already logged in
@@ -35,18 +35,17 @@ export default function AdminLogin() {
     const checkCertificate = async () => {
       try {
         const response = await fetch('/api/admin/check-session')
-        const certStatus = response.headers.get('x-cert-status')
-        
-        if (certStatus === 'valid') {
+        const certHeader = response.headers.get('x-cert-status')
+
+        if (certHeader === 'valid') {
           setCertStatus('verified')
         } else {
-          // Check if running on localhost
-          const isLocalhost = window.location.hostname === 'localhost' || 
+          const isLocalhost = window.location.hostname === 'localhost' ||
                              window.location.hostname === '127.0.0.1'
-          setCertStatus(isLocalhost ? 'development' : 'checking')
+          setCertStatus(isLocalhost ? 'development' : 'not_found')
         }
       } catch (err) {
-        setCertStatus('checking')
+        setCertStatus('not_found')
       }
     }
     checkCertificate()
@@ -123,6 +122,8 @@ export default function AdminLogin() {
                     ? 'bg-green-500/20 text-green-100 border-green-400/50'
                     : certStatus === 'development'
                     ? 'bg-yellow-500/20 text-yellow-100 border-yellow-400/50'
+                    : certStatus === 'not_found'
+                    ? 'bg-red-500/20 text-red-100 border-red-400/50'
                     : 'bg-gray-500/20 text-gray-100 border-gray-400/50'
                 }
               `}
@@ -143,8 +144,19 @@ export default function AdminLogin() {
                   <span className="font-medium">Development Mode - Certificate Check Bypassed</span>
                 </>
               )}
+              {certStatus === 'not_found' && (
+                <>
+                  <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                  </svg>
+                  <span className="font-medium">Client Certificate Not Detected</span>
+                </>
+              )}
               {certStatus === 'checking' && (
-                <span className="font-medium">Checking certificate...</span>
+                <>
+                  <div className="w-5 h-5 flex-shrink-0 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="font-medium">Checking certificate...</span>
+                </>
               )}
             </div>
           </div>

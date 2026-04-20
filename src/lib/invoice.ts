@@ -35,6 +35,12 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
 
   if (!order) return null
 
+  // Only generate invoice for paid orders
+  if (order.payment_status !== 'paid') return null
+
+  // Don't generate for pending or cancelled orders
+  if (order.status === 'pending' || order.status === 'cancelled') return null
+
   const orderItems = await queryMany(
     'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
     [orderId]
