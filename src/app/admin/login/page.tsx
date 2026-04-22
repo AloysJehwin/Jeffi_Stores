@@ -15,7 +15,6 @@ export default function AdminLogin() {
   const [certStatus, setCertStatus] = useState<'checking' | 'verified' | 'development' | 'not_found'>('checking')
 
   useEffect(() => {
-    // Check if already logged in
     const checkSession = async () => {
       try {
         const response = await fetch('/api/admin/check-session')
@@ -24,31 +23,20 @@ export default function AdminLogin() {
           router.push('/admin/dashboard')
           return
         }
-      } catch (err) {
-        // Not logged in, stay on login page
+      } catch {
       }
       setCheckingSession(false)
     }
     checkSession()
 
-    // Check if client certificate is installed by making a test request
-    const checkCertificate = async () => {
-      try {
-        const response = await fetch('/api/admin/check-session')
-        const certHeader = response.headers.get('x-cert-status')
-
-        if (certHeader === 'valid') {
-          setCertStatus('verified')
-        } else {
-          const isLocalhost = window.location.hostname === 'localhost' ||
-                             window.location.hostname === '127.0.0.1'
-          setCertStatus(isLocalhost ? 'development' : 'not_found')
-        }
-      } catch (err) {
-        setCertStatus('not_found')
-      }
+    const host = window.location.hostname
+    if (host.startsWith('admin.')) {
+      setCertStatus('verified')
+    } else if (host === 'localhost' || host === '127.0.0.1') {
+      setCertStatus('development')
+    } else {
+      setCertStatus('not_found')
     }
-    checkCertificate()
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,31 +45,23 @@ export default function AdminLogin() {
     setLoading(true)
 
     try {
-      console.log('Submitting login...')
       const response = await fetch('/api/admin/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Important: Include cookies in request
+        credentials: 'include',
         body: JSON.stringify(formData),
       })
 
-      console.log('Login response status:', response.status)
       const data = await response.json()
-      console.log('Login response data:', data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Login failed')
       }
 
-      console.log('Login successful, redirecting...')
-
-      // Use window.location for a hard redirect to ensure cookies are available
       window.location.href = '/admin/dashboard'
-      // Don't set loading to false - keep the button disabled during redirect
     } catch (err) {
-      console.error('Login error:', err)
       setError(err instanceof Error ? err.message : 'Login failed')
       setLoading(false)
     }
@@ -105,14 +85,12 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center px-4">
         <div className="w-full max-w-md">
-          {/* Title */}
           <div className="text-center mb-8">
             <h1 className="text-5xl font-bold text-white mb-3">Jeffi Stores</h1>
             <h2 className="text-2xl font-semibold text-white mb-2">Admin Panel</h2>
             <p className="text-gray-300">Sign in to access the dashboard</p>
           </div>
 
-          {/* Certificate Status */}
           <div className="mb-6">
             <div
               className={`
@@ -161,9 +139,7 @@ export default function AdminLogin() {
             </div>
           </div>
 
-          {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Error Message */}
             {error && (
               <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/50 text-red-100 rounded-lg p-4 flex items-start gap-3">
                 <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -173,7 +149,6 @@ export default function AdminLogin() {
               </div>
             )}
 
-            {/* Username Field */}
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-white mb-2">
                 Username
@@ -192,7 +167,6 @@ export default function AdminLogin() {
               />
             </div>
 
-            {/* Password Field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-white mb-2">
                 Password
@@ -210,7 +184,6 @@ export default function AdminLogin() {
               />
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -220,7 +193,6 @@ export default function AdminLogin() {
             </button>
           </form>
 
-          {/* Footer */}
           <div className="mt-8 space-y-3">
             <div className="flex items-center gap-2 text-sm text-gray-300 justify-center">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
