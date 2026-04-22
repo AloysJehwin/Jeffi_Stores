@@ -2,8 +2,6 @@ import Link from 'next/link'
 import { queryMany } from '@/lib/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 
-export const dynamic = 'force-dynamic'
-
 async function getAllCategories() {
   return queryMany('SELECT * FROM categories WHERE is_active = true ORDER BY display_order ASC')
 }
