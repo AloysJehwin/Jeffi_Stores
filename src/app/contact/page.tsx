@@ -10,7 +10,7 @@ export default function ContactPage() {
             Contact Us
           </h1>
           <p className="text-foreground-secondary">
-            Get in touch with us - we're here to help!
+            Get in touch with us - we&apos;re here to help!
           </p>
         </div>
       </div>
@@ -22,7 +22,7 @@ export default function ContactPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 lg:p-8 mb-8">
               <h2 className="text-2xl font-bold text-foreground mb-6">Get In Touch</h2>
               <p className="text-foreground-secondary mb-8">
-                Have questions about our products or services? We're here to help! Reach out to us
+                Have questions about our products or services? We&apos;re here to help! Reach out to us
                 through any of the following channels.
               </p>
 
@@ -59,7 +59,7 @@ export default function ContactPage() {
                     <a href="mailto:jeffistoress@gmail.com" className="text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 block">
                       jeffistoress@gmail.com
                     </a>
-                    <p className="text-sm text-foreground-muted mt-2">We'll respond within 24 hours</p>
+                    <p className="text-sm text-foreground-muted mt-2">We&apos;ll respond within 24 hours</p>
                   </div>
                 </div>
 
@@ -113,7 +113,7 @@ export default function ContactPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 lg:p-8 mb-8">
               <h2 className="text-2xl font-bold text-foreground mb-6">Send Us a Message</h2>
               <p className="text-foreground-secondary mb-6">
-                Fill out the form below and we'll get back to you as soon as possible.
+                Fill out the form below and we&apos;ll get back to you as soon as possible.
               </p>
 
               <form className="space-y-6">

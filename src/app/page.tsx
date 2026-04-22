@@ -3,6 +3,8 @@ import Image from 'next/image'
 import { queryMany } from '@/lib/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 
+export const dynamic = 'force-dynamic'
+
 async function getFeaturedProducts() {
   return queryMany(`
     SELECT p.*,

@@ -296,7 +296,7 @@ export default async function ProductsPage({
                 </svg>
                 <h3 className="text-xl font-semibold text-foreground mb-2">No Products Found</h3>
                 <p className="text-foreground-secondary mb-6">
-                  We couldn't find any products matching your filters. Try adjusting your search criteria.
+                  We couldn&apos;t find any products matching your filters. Try adjusting your search criteria.
                 </p>
                 <Link
                   href="/products"
