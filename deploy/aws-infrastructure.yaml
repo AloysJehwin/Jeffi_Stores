@@ -44,11 +44,10 @@ dns_records:
       type: A (Alias)
       value: d3ktjl9xt287d7.cloudfront.net  # CloudFront distribution
 
-    # -- Admin panel (EC2 direct, mTLS on port 3443) --
     - name: admin.jeffistores.in
-      type: A
-      value: 52.205.123.118  # EC2 Elastic IP
-      ttl: 300
+      type: A (Alias)
+      value: d-6znd6ffwja.execute-api.us-east-1.amazonaws.com  # API Gateway v2 (mTLS)
+      alias_hosted_zone: Z1UJRXOUMOOFQ8
 
     # -- ACM validation --
     - name: _ddfcc6cdf2821683fea8eef29acf227f.jeffistores.in
@@ -137,14 +136,16 @@ ssl:
   auto_renew: true  # Certbot auto-renewal via systemd timer
   mtls:
     enabled: true
-    port: 3443
-    purpose: Admin access via admin.jeffistores.in (bypasses CloudFront)
+    provider: AWS API Gateway v2
+    domain: admin.jeffistores.in
+    truststore: s3://jeffi-stores-mtls-truststore-708835965056/truststore.pem
+    purpose: Admin access via admin.jeffistores.in (mTLS enforced by API Gateway)
 
 # -----------------------------------------------------------------------------
 # CloudFront CDN - Reverse Proxy
 # -----------------------------------------------------------------------------
 # Traffic flow: Users → CloudFront → EC2:80 (HTTP) → Nginx → Next.js
-# Admin mTLS:   Admin → admin.jeffistores.in:3443 → EC2 directly (no CloudFront)
+# Admin mTLS:   Admin → API Gateway v2 (mTLS) → EC2:80 → Nginx → Next.js
 # -----------------------------------------------------------------------------
 cloudfront:
   distribution_id: E1M6ZFCWXAMF26
@@ -164,6 +165,29 @@ cloudfront:
       cache: CachingOptimized
     - path: "* (default)"
       cache: CachingDisabled (dynamic content)
+
+# -----------------------------------------------------------------------------
+# API Gateway v2 - Admin mTLS Proxy
+# -----------------------------------------------------------------------------
+apigateway:
+  api_id: ohcfsa8ukd
+  name: jeffi-stores-admin
+  protocol: HTTP
+  custom_domain: admin.jeffistores.in
+  regional_domain: d-6znd6ffwja.execute-api.us-east-1.amazonaws.com
+  mtls:
+    truststore_uri: s3://jeffi-stores-mtls-truststore-708835965056/truststore.pem
+    truststore_bucket: jeffi-stores-mtls-truststore-708835965056
+  integrations:
+    proxy:
+      id: z09d7wr
+      type: HTTP_PROXY
+      uri: "http://{EC2_IP}:80/{proxy}"
+    root:
+      id: ltjo62p
+      type: HTTP_PROXY
+      uri: "http://{EC2_IP}:80/"
+  execute_api_endpoint: disabled
 
 # -----------------------------------------------------------------------------
 # EC2 - Application Server
@@ -196,10 +220,6 @@ ec2:
         protocol: tcp
         source: 0.0.0.0/0
         description: HTTPS
-      - port: 3443
-        protocol: tcp
-        source: 0.0.0.0/0
-        description: mTLS Admin
   volume:
     id: vol-051d3530b64a9515f
     size_gb: 20
@@ -308,9 +328,8 @@ docker:
       ports:
         - "80:80"    # HTTP (redirects to HTTPS)
         - "443:443"  # HTTPS storefront
-        - "3443:3443" # mTLS admin endpoint (admin.jeffistores.in)
       ssl: Let's Encrypt
-      mtls: Client certificates for admin
+      admin: Proxied via API Gateway v2 (port 80)
     redis:
       port: 6379
       internal_only: true
