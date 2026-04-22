@@ -45,9 +45,8 @@ dns_records:
       value: d3ktjl9xt287d7.cloudfront.net  # CloudFront distribution
 
     - name: admin.jeffistores.in
-      type: A
-      value: 52.205.123.118  # EC2 Elastic IP
-      ttl: 300
+      type: A (Alias)
+      value: "d-4e2ofiu71l.execute-api.us-east-1.amazonaws.com"
 
     # -- ACM validation --
     - name: _ddfcc6cdf2821683fea8eef29acf227f.jeffistores.in
@@ -133,17 +132,13 @@ acm_certificates:
 ssl:
   provider: Let's Encrypt (Certbot)
   domain: jeffistores.in
-  auto_renew: true  # Certbot auto-renewal via systemd timer
-  mtls:
-    enabled: true
-    port: 443
-    purpose: Admin access via admin.jeffistores.in (bypasses CloudFront)
+  auto_renew: true
 
 # -----------------------------------------------------------------------------
 # CloudFront CDN - Reverse Proxy
 # -----------------------------------------------------------------------------
 # Traffic flow: Users → CloudFront → EC2:80 (HTTP) → Nginx → Next.js
-# Admin mTLS:   Admin → admin.jeffistores.in:443 → EC2 directly (no CloudFront)
+# Admin mTLS:   Admin → admin.jeffistores.in → API Gateway v2 (mTLS) → EC2:80 → Nginx → Next.js
 # -----------------------------------------------------------------------------
 cloudfront:
   distribution_id: E1M6ZFCWXAMF26
@@ -163,6 +158,23 @@ cloudfront:
       cache: CachingOptimized
     - path: "* (default)"
       cache: CachingDisabled (dynamic content)
+
+# -----------------------------------------------------------------------------
+# API Gateway v2 — Admin mTLS Proxy
+# -----------------------------------------------------------------------------
+api_gateway:
+  api_id: "59k6oxbk6k"
+  name: jeffi-admin-mtls
+  protocol: HTTP
+  mtls:
+    truststore_uri: s3://jeffi-stores-mtls-truststore/ca-cert.pem
+    truststore_bucket: jeffi-stores-mtls-truststore
+  custom_domain: admin.jeffistores.in
+  certificate: arn:aws:acm:us-east-1:708835965056:certificate/4591f2e4-417c-4049-95a0-a30a8e0cfdc5
+  integration:
+    type: HTTP_PROXY
+    uri: http://52.205.123.118:80/{proxy}
+  stage: $default (auto-deploy)
 
 # -----------------------------------------------------------------------------
 # EC2 - Application Server
@@ -301,10 +313,9 @@ docker:
       runtime: Next.js standalone
     nginx:
       ports:
-        - "80:80"    # HTTP (redirects to HTTPS)
-        - "443:443"  # HTTPS storefront + admin mTLS
-      ssl: Let's Encrypt
-      mtls: Client certificates for admin (admin.jeffistores.in on port 443)
+        - "80:80"
+      ssl: Let's Encrypt (storefront HTTPS)
+      admin: Proxied via API Gateway v2 (mTLS handled by AWS)
     redis:
       port: 6379
       internal_only: true
@@ -350,8 +361,10 @@ razorpay:
 # │ Route 53 (2 hosted zones)        │ $0.50/z  │ $1.00        │ $1.00       │
 # │ SES (sandbox, <200/day)          │ $0.10/1k │ ~$0.06       │ ~$0.06      │
 # │ EventBridge Scheduler            │ free tier│ $0.00        │ $0.00       │
+# │ API Gateway v2 (admin mTLS)      │ $1/1M req│ ~$0.02       │ ~$0.02      │
+# │ S3 truststore (mTLS CA cert)     │ negligibl│ $0.00        │ $0.00       │
 # ├──────────────────────────────────┼──────────┼──────────────┼─────────────┤
-# │ TOTAL (Jeffi Stores only)        │          │ ~$22.80/mo   │ ~$18.83/mo  │
+# │ TOTAL (Jeffi Stores only)        │          │ ~$22.82/mo   │ ~$18.85/mo  │
 # └──────────────────────────────────┴──────────┴──────────────┴─────────────┘
 #
 # Savings vs old setup ($17.17/mo with unused EIP):

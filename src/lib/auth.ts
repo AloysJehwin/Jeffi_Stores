@@ -1,11 +1,6 @@
 import { queryOne, query } from './db'
 import bcrypt from 'bcrypt'
 
-/**
- * Admin Authentication Functions
- */
-
-// Verify admin credentials
 export async function verifyAdminCredentials(username: string, password: string) {
   try {
     const admin = await queryOne(`
@@ -24,18 +19,15 @@ export async function verifyAdminCredentials(username: string, password: string)
       return { success: false, error: 'Invalid credentials' }
     }
 
-    // Check if user is active
     if (!admin.users?.is_active) {
       return { success: false, error: 'Account is disabled' }
     }
 
-    // Verify password
     const passwordMatch = await bcrypt.compare(password, admin.password_hash)
     if (!passwordMatch) {
       return { success: false, error: 'Invalid credentials' }
     }
 
-    // Update last login
     await query('UPDATE admins SET last_login = NOW() WHERE id = $1', [admin.id])
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [admin.user_id])
 
@@ -52,13 +44,11 @@ export async function verifyAdminCredentials(username: string, password: string)
         last_name: admin.users.last_name,
       },
     }
-  } catch (error) {
-    console.error('Admin auth error:', error)
+  } catch {
     return { success: false, error: 'Authentication failed' }
   }
 }
 
-// Create new admin user
 export async function createAdminUser(userData: {
   email: string
   first_name: string
@@ -70,10 +60,8 @@ export async function createAdminUser(userData: {
   scopes?: string[]
 }) {
   try {
-    // Hash password
     const passwordHash = await bcrypt.hash(userData.password, 10)
 
-    // Create user first
     const user = await queryOne(
       `INSERT INTO users (email, first_name, last_name, phone)
        VALUES ($1, $2, $3, $4)
@@ -83,7 +71,6 @@ export async function createAdminUser(userData: {
 
     if (!user) throw new Error('Failed to create user')
 
-    // Create admin with scopes
     const admin = await queryOne(
       `INSERT INTO admins (user_id, username, password_hash, role, scopes)
        VALUES ($1, $2, $3, $4, $5)
@@ -95,25 +82,10 @@ export async function createAdminUser(userData: {
 
     return { success: true, admin }
   } catch (error) {
-    console.error('Create admin error:', error)
     return { success: false, error: (error as Error).message }
   }
 }
 
-// Verify client certificate (called from middleware)
-export function verifyClientCertificate(certHeader: string | undefined, certVerified: string | undefined) {
-  if (!certHeader || certVerified !== 'SUCCESS') {
-    return {
-      valid: false,
-      error: 'Invalid or missing client certificate',
-      details: 'Please install the client certificate (client-cert.p12) in your browser'
-    }
-  }
-
-  return { valid: true }
-}
-
-// Check if user has admin role
 export function hasAdminRole(session: any, requiredRole: string = 'admin') {
   if (!session?.admin) return false
 
@@ -129,7 +101,6 @@ export function hasAdminRole(session: any, requiredRole: string = 'admin') {
   return userRoleLevel >= requiredRoleLevel
 }
 
-// Session management helpers
 export function createSessionToken(admin: any) {
   return {
     id: admin.id,
@@ -137,7 +108,7 @@ export function createSessionToken(admin: any) {
     username: admin.username,
     role: admin.role,
     email: admin.email,
-    exp: Date.now() + 30 * 60 * 1000, // 30 minutes
+    exp: Date.now() + 30 * 60 * 1000,
   }
 }
 

@@ -8,11 +8,10 @@ export async function GET(request: NextRequest) {
     const cookieStore = cookies()
     const token = cookieStore.get('admin_token')
 
-    const clientCert = request.headers.get('x-client-cert')
-    const certVerified = request.headers.get('x-client-cert-verified')
-    const hasValidCert = clientCert && certVerified === 'SUCCESS'
-
-    const certStatus = hasValidCert ? 'valid' : 'missing'
+    const hostname = request.headers.get('host') || ''
+    const isAdminSubdomain = hostname.startsWith('admin.')
+    const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:')
+    const certStatus = isAdminSubdomain ? 'valid' : (isLocalhost ? 'development' : 'missing')
 
     if (!token) {
       const res = NextResponse.json({ authenticated: false })
