@@ -308,21 +308,21 @@ scheduling:
   schedules:
     - name: jeffi-start-rds
       action: rds:startDBInstance
-      cron: "cron(45 8 * * ? *)"  # 8:45 AM IST (15 min warm-up before EC2)
+      cron: "cron(45 10 * * ? *)"  # 10:45 AM IST (15 min warm-up before EC2)
       target: jeffi-stores-db
     - name: jeffi-start-ec2
       action: ec2:startInstances
-      cron: "cron(0 9 * * ? *)"   # 9:00 AM IST
+      cron: "cron(0 11 * * ? *)"   # 11:00 AM IST
       target: i-0b2466b2a540d6f23
     - name: jeffi-stop-ec2
       action: ec2:stopInstances
-      cron: "cron(0 2 * * ? *)"   # 2:00 AM IST
+      cron: "cron(0 22 * * ? *)"   # 10:00 PM IST
       target: i-0b2466b2a540d6f23
     - name: jeffi-stop-rds
       action: rds:stopDBInstance
-      cron: "cron(0 2 * * ? *)"   # 2:00 AM IST
+      cron: "cron(0 22 * * ? *)"   # 10:00 PM IST
       target: jeffi-stores-db
-  operating_hours: "8:45 AM - 2:00 AM IST (17.25 hours/day)"
+  operating_hours: "10:45 AM - 10:00 PM IST (11.25 hours/day)"
   management_script: deploy/scheduler-setup.sh
 
 # -----------------------------------------------------------------------------
@@ -370,17 +370,17 @@ razorpay:
 # =============================================================================
 # Monthly Cost Estimate (us-east-1 pricing, as of April 2026)
 # =============================================================================
-# Schedule: 8:45 AM - 2:00 AM IST = ~17.25 hrs on / ~6.75 hrs off per day
-#           ~525 hrs on / ~205 hrs off per month (30.4 days)
+# Schedule: 10:45 AM - 10:00 PM IST = ~11.25 hrs on / ~12.75 hrs off per day
+#           ~342 hrs on / ~389 hrs off per month (30.4 days)
 #
 # ┌──────────────────────────────────┬──────────┬──────────────┬─────────────┐
 # │ Resource                         │ Rate     │ 24/7 Cost    │ Scheduled   │
 # ├──────────────────────────────────┼──────────┼──────────────┼─────────────┤
-# │ EC2 t4g.micro                    │ $0.0084/h│ $6.13        │ $4.41       │
-# │ RDS db.t4g.micro (compute)       │ $0.016/h │ $11.68       │ $8.40       │
+# │ EC2 t4g.micro                    │ $0.0084/h│ $6.13        │ $2.87       │
+# │ RDS db.t4g.micro (compute)       │ $0.016/h │ $11.68       │ $5.47       │
 # │ RDS storage (20 GB gp2)          │ $0.115/GB│ $2.30        │ $2.30       │
 # │ EBS volume (20 GB gp3)           │ $0.08/GB │ $1.60        │ $1.60       │
-# │ Elastic IP (attached, stopped)   │ $0.005/h │ $0.00        │ $1.03       │
+# │ Elastic IP (attached, stopped)   │ $0.005/h │ $0.00        │ $1.94       │
 # │ S3 (~1.2 GB, jeffi-stores)      │ $0.023/GB│ $0.03        │ $0.03       │
 # │ Route 53 (2 hosted zones)        │ $0.50/z  │ $1.00        │ $1.00       │
 # │ SES (sandbox, <200/day)          │ $0.10/1k │ ~$0.06       │ ~$0.06      │
@@ -389,7 +389,7 @@ razorpay:
 # │ Lambda (admin proxy)             │ free tier│ $0.00        │ $0.00       │
 # │ S3 truststore (mTLS CA cert)     │ negligibl│ $0.00        │ $0.00       │
 # ├──────────────────────────────────┼──────────┼──────────────┼─────────────┤
-# │ TOTAL (Jeffi Stores only)        │          │ ~$22.82/mo   │ ~$18.85/mo  │
+# │ TOTAL (Jeffi Stores only)        │          │ ~$22.82/mo   │ ~$15.32/mo  │
 # └──────────────────────────────────┴──────────┴──────────────┴─────────────┘
 #
 # Savings vs old setup ($17.17/mo with unused EIP):
