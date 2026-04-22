@@ -95,12 +95,13 @@ dns_records_aloysjehwin:
 # Elastic IPs
 # -----------------------------------------------------------------------------
 elastic_ips:
-  - allocation_id: eipalloc-0e13b87b3d8a9ec2d
-    public_ip: 52.205.123.118
+  - allocation_id: eipalloc-025dccb8bfce1b857
+    public_ip: 32.196.38.130
     attached_to: i-0b2466b2a540d6f23  # jeffi-stores-app EC2
+    association_id: eipassoc-0f3898734484698ea
     in_use: true
+  # NOTE: eipalloc-0e13b87b3d8a9ec2d (52.205.123.118) was released/lost around 2026-04-22.
   # NOTE: eipalloc-015aa4acfac99fe62 (3.86.73.187) was released on 2026-04-10.
-  #       It was RDS-managed. RDS is now private (no public IP).
 
 # -----------------------------------------------------------------------------
 # ACM Certificates
@@ -138,7 +139,7 @@ ssl:
 # CloudFront CDN - Reverse Proxy
 # -----------------------------------------------------------------------------
 # Traffic flow: Users → CloudFront → EC2:80 (HTTP) → Nginx → Next.js
-# Admin mTLS:   Admin → admin.jeffistores.in → API Gateway v2 (mTLS) → EC2:80 → Nginx → Next.js
+# Admin mTLS:   Admin → admin.jeffistores.in → API Gateway v2 (mTLS) → Lambda → EC2:80 → Nginx → Next.js
 # -----------------------------------------------------------------------------
 cloudfront:
   distribution_id: E1M6ZFCWXAMF26
@@ -148,7 +149,7 @@ cloudfront:
   price_class: PriceClass_200  # US, Europe, Asia
   http_version: http2and3
   origin:
-    domain: ec2-52-205-123-118.compute-1.amazonaws.com
+    domain: ec2-32-196-38-130.compute-1.amazonaws.com
     protocol: http-only
     port: 80
   cache_behaviors:
@@ -172,9 +173,32 @@ api_gateway:
   custom_domain: admin.jeffistores.in
   certificate: arn:aws:acm:us-east-1:708835965056:certificate/4591f2e4-417c-4049-95a0-a30a8e0cfdc5
   integration:
-    type: HTTP_PROXY
-    uri: http://52.205.123.118:80/{proxy}
+    type: AWS_PROXY
+    lambda: jeffi-admin-proxy
+    lambda_arn: arn:aws:lambda:us-east-1:708835965056:function:jeffi-admin-proxy
+    integration_id: wyzsv9d
+    payload_format: "2.0"
+  routes:
+    - route_id: qk2ox3c
+      key: "ANY /{proxy+}"
+    - route_id: ug7wydv
+      key: "ANY /"
   stage: $default (auto-deploy)
+
+# -----------------------------------------------------------------------------
+# Lambda — Admin Proxy (API Gateway → EC2)
+# -----------------------------------------------------------------------------
+lambda:
+  function_name: jeffi-admin-proxy
+  arn: arn:aws:lambda:us-east-1:708835965056:function:jeffi-admin-proxy
+  runtime: nodejs20.x
+  memory_mb: 256
+  timeout_sec: 30
+  role: jeffi-admin-proxy-lambda-role
+  environment:
+    EC2_HOST: "32.196.38.130"
+    EC2_PORT: "80"
+  purpose: HTTP proxy — forwards admin requests from API Gateway to EC2:80
 
 # -----------------------------------------------------------------------------
 # EC2 - Application Server
@@ -189,7 +213,7 @@ ec2:
   availability_zone: us-east-1a
   vpc_id: vpc-04bd02e91e0bc0882
   subnet_id: subnet-01ed5f7b63fd320c1
-  public_ip: 52.205.123.118  # Elastic IP (eipalloc-0e13b87b3d8a9ec2d) — stable
+  public_ip: 32.196.38.130  # Elastic IP (eipalloc-025dccb8bfce1b857) — stable
   private_ip: 172.31.20.170
   security_group:
     id: sg-0dc5182e111d71d02
@@ -362,6 +386,7 @@ razorpay:
 # │ SES (sandbox, <200/day)          │ $0.10/1k │ ~$0.06       │ ~$0.06      │
 # │ EventBridge Scheduler            │ free tier│ $0.00        │ $0.00       │
 # │ API Gateway v2 (admin mTLS)      │ $1/1M req│ ~$0.02       │ ~$0.02      │
+# │ Lambda (admin proxy)             │ free tier│ $0.00        │ $0.00       │
 # │ S3 truststore (mTLS CA cert)     │ negligibl│ $0.00        │ $0.00       │
 # ├──────────────────────────────────┼──────────┼──────────────┼─────────────┤
 # │ TOTAL (Jeffi Stores only)        │          │ ~$22.82/mo   │ ~$18.85/mo  │
