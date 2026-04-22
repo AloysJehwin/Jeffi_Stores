@@ -177,7 +177,7 @@ export default function OrdersPage() {
                   />
                 </svg>
                 <h3 className="text-xl font-semibold text-foreground mb-2">No orders yet</h3>
-                <p className="text-foreground-secondary mb-6">You haven't placed any orders yet.</p>
+                <p className="text-foreground-secondary mb-6">You haven&apos;t placed any orders yet.</p>
                 <Link
                   href="/products"
                   className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
