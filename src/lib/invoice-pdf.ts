@@ -1,4 +1,7 @@
-// eslint-disable-next-line no-eval
+// Dynamically require pdfkit to bypass webpack bundling.
+// PDFKit relies on __dirname to find .afm font data files, which breaks
+// when webpack bundles it (resolves to the output chunk dir instead of node_modules).
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const PDFDocument = eval('require')('pdfkit')
 
 export interface InvoiceBusinessSettings {

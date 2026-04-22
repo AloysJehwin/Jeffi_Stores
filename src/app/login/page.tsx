@@ -155,7 +155,7 @@ function LoginPage() {
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
                 <p className="text-sm text-blue-800 dark:text-blue-300">
-                  We&apos;ve sent a 6-digit verification code to <strong>{email}</strong>
+                  We've sent a 6-digit verification code to <strong>{email}</strong>
                 </p>
               </div>
 
@@ -212,7 +212,7 @@ function LoginPage() {
 
           {/* Footer */}
           <div className="mt-6 text-center text-sm text-foreground-secondary">
-            Don&apos;t have an account?{' '}
+            Don't have an account?{' '}
             <Link href="/signup" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
               Create one
             </Link>

@@ -29,7 +29,7 @@ export default function AboutPage() {
                   construction, and repairs.
                 </p>
                 <p className="text-foreground-secondary mb-4 leading-relaxed">
-                  With years of experience in the hardware industry, we&apos;ve built a reputation for reliability,
+                  With years of experience in the hardware industry, we've built a reputation for reliability,
                   quality, and exceptional customer service. Our mission is to keep your operations running
                   smoothly with the right tools and parts.
                 </p>

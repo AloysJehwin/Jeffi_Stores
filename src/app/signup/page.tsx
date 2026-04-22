@@ -188,7 +188,7 @@ export default function SignupPage() {
             <form onSubmit={handleVerifyOTP} className="space-y-6">
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
                 <p className="text-sm text-blue-800 dark:text-blue-300">
-                  We&apos;ve sent a 6-digit verification code to <strong>{email}</strong>
+                  We've sent a 6-digit verification code to <strong>{email}</strong>
                 </p>
               </div>
 

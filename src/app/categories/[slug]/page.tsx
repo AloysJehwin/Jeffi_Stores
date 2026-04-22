@@ -204,7 +204,7 @@ export default async function CategoryDetailPage({
               </svg>
               <h3 className="text-xl font-semibold text-foreground mb-2">No Products Yet</h3>
               <p className="text-foreground-secondary mb-6">
-                We&apos;re working on adding products to this category. Check back soon!
+                We're working on adding products to this category. Check back soon!
               </p>
               <Link
                 href="/products"
