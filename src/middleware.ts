@@ -62,32 +62,27 @@ export async function middleware(request: NextRequest) {
 
   // Admin path authentication check
   if (isAdminPath) {
-    // For admin routes, check for client certificate
     const clientCert = request.headers.get('x-client-cert')
     const certVerified = request.headers.get('x-client-cert-verified')
     const hasValidCert = clientCert && certVerified === 'SUCCESS'
 
-    // In development (localhost) or Docker internal, skip certificate requirement
     const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:') ||
                        hostname === '127.0.0.1' || hostname.startsWith('127.0.0.1:') ||
-                       hostname.startsWith('app:') // Docker internal service name
+                       hostname.startsWith('app:')
 
-    // Require certificate for all admin routes including login (except in development)
+    if (pathname === '/admin/login') {
+      const response = NextResponse.next()
+      response.headers.set('x-pathname', pathname)
+      return response
+    }
+
     if (!hasValidCert && !isLocalhost) {
-      console.log('🔒 No valid client certificate, blocking admin access')
       return new NextResponse('Client certificate required for admin access', {
         status: 403,
         headers: {
           'Content-Type': 'text/plain',
         },
       })
-    }
-
-    // Allow login page without JWT check (cert is already verified above)
-    if (pathname === '/admin/login') {
-      const response = NextResponse.next()
-      response.headers.set('x-pathname', pathname)
-      return response
     }
 
     // Check for valid JWT token in cookie
