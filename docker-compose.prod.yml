@@ -21,7 +21,6 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "3443:3443"
     volumes:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./certs:/app/certs:ro
