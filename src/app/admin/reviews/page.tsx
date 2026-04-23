@@ -38,8 +38,7 @@ export default function AdminReviewsPage() {
         const data = await response.json()
         setReviews(data.reviews || [])
       }
-    } catch (error) {
-      console.error('Failed to fetch reviews:', error)
+    } catch {
     } finally {
       setIsLoading(false)
     }
@@ -107,18 +106,17 @@ export default function AdminReviewsPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Product Reviews</h1>
+    <div className="p-4 sm:p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Product Reviews</h1>
         <p className="text-foreground-secondary">Manage customer reviews and ratings</p>
       </div>
 
-      {/* Filter Tabs */}
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default mb-6">
         <div className="flex border-b border-border-default">
           <button
             onClick={() => setFilter('pending')}
-            className={`px-6 py-3 font-medium transition-colors ${
+            className={`px-3 sm:px-6 py-3 text-sm sm:text-base font-medium transition-colors ${
               filter === 'pending'
                 ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
                 : 'text-foreground-secondary hover:text-foreground'
@@ -128,7 +126,7 @@ export default function AdminReviewsPage() {
           </button>
           <button
             onClick={() => setFilter('approved')}
-            className={`px-6 py-3 font-medium transition-colors ${
+            className={`px-3 sm:px-6 py-3 text-sm sm:text-base font-medium transition-colors ${
               filter === 'approved'
                 ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
                 : 'text-foreground-secondary hover:text-foreground'
@@ -138,7 +136,7 @@ export default function AdminReviewsPage() {
           </button>
           <button
             onClick={() => setFilter('all')}
-            className={`px-6 py-3 font-medium transition-colors ${
+            className={`px-3 sm:px-6 py-3 text-sm sm:text-base font-medium transition-colors ${
               filter === 'all'
                 ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
                 : 'text-foreground-secondary hover:text-foreground'
@@ -149,7 +147,6 @@ export default function AdminReviewsPage() {
         </div>
       </div>
 
-      {/* Reviews List */}
       {isLoading ? (
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
           <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
@@ -169,77 +166,76 @@ export default function AdminReviewsPage() {
               key={review.id}
               className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6"
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="font-semibold text-foreground">
-                      {review.users.first_name} {review.users.last_name}
+              <div className="mb-4">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="font-semibold text-foreground">
+                    {review.users.first_name} {review.users.last_name}
+                  </span>
+                  <span className="text-sm text-foreground-muted hidden sm:inline">({review.users.email})</span>
+                  {review.is_verified_purchase && (
+                    <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs px-2 py-0.5 rounded-full font-medium">
+                      Verified
                     </span>
-                    <span className="text-sm text-foreground-muted">({review.users.email})</span>
-                    {review.is_verified_purchase && (
-                      <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs px-2 py-1 rounded-full font-medium">
-                        ✓ Verified Purchase
-                      </span>
-                    )}
-                    {review.is_approved ? (
-                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs px-2 py-1 rounded-full font-medium">
-                        Approved
-                      </span>
-                    ) : (
-                      <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs px-2 py-1 rounded-full font-medium">
-                        Pending
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-3 mb-2">
-                    {renderStars(review.rating)}
-                    <span className="text-sm text-foreground-muted">
-                      {new Date(review.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-
-                  <div className="mb-3">
-                    <a
-                      href={`/products/${review.products.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary-600 dark:text-primary-400 hover:text-primary-700 font-medium"
-                    >
-                      {review.products.name} →
-                    </a>
-                  </div>
-
-                  {review.title && (
-                    <h4 className="font-semibold text-foreground mb-2">{review.title}</h4>
                   )}
+                  {review.is_approved ? (
+                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs px-2 py-0.5 rounded-full font-medium">
+                      Approved
+                    </span>
+                  ) : (
+                    <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs px-2 py-0.5 rounded-full font-medium">
+                      Pending
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm text-foreground-muted sm:hidden mb-1">{review.users.email}</div>
 
-                  <p className="text-foreground-secondary whitespace-pre-wrap">{review.comment}</p>
+                <div className="flex items-center gap-3 mb-2">
+                  {renderStars(review.rating)}
+                  <span className="text-xs sm:text-sm text-foreground-muted">
+                    {new Date(review.created_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </span>
                 </div>
 
-                {!review.is_approved && (
-                  <div className="flex gap-2 ml-4">
-                    <button
-                      onClick={() => handleApprove(review.id)}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => handleReject(review.id)}
-                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
+                <div className="mb-3">
+                  <a
+                    href={`/products/${review.products.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-600 dark:text-primary-400 hover:text-primary-700 font-medium text-sm"
+                  >
+                    {review.products.name} →
+                  </a>
+                </div>
+
+                {review.title && (
+                  <h4 className="font-semibold text-foreground mb-2">{review.title}</h4>
                 )}
+
+                <p className="text-foreground-secondary whitespace-pre-wrap text-sm">{review.comment}</p>
               </div>
+
+              {!review.is_approved && (
+                <div className="flex gap-2 pt-3 border-t border-border-default">
+                  <button
+                    type="button"
+                    onClick={() => handleApprove(review.id)}
+                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleReject(review.id)}
+                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

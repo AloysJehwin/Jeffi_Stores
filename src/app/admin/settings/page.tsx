@@ -39,14 +39,12 @@ export default async function SettingsPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-secondary-500">Settings</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Settings</h1>
         <p className="text-foreground-secondary mt-1">Manage your account and system settings</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Main Content */}
         <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-          {/* Account Information */}
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Account Information</h2>
@@ -96,7 +94,6 @@ export default async function SettingsPage() {
             </div>
           </div>
 
-          {/* Change Password */}
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Change Password</h2>
@@ -106,10 +103,8 @@ export default async function SettingsPage() {
             </div>
           </div>
 
-          {/* Admin Users Management (Super Admin Only) */}
           {adminInfo?.role === 'super_admin' && (
             <>
-              {/* Create New Admin */}
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
                 <div className="px-6 py-4 border-b border-border-default">
                   <h2 className="text-lg font-semibold text-foreground">Create New Admin</h2>
@@ -120,13 +115,80 @@ export default async function SettingsPage() {
                 </div>
               </div>
 
-              {/* All Admins */}
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
                 <div className="px-6 py-4 border-b border-border-default">
                   <h2 className="text-lg font-semibold text-foreground">Admin Users</h2>
                 </div>
                 <div className="p-4 sm:p-6">
-                  <div className="overflow-x-auto">
+                  <div className="md:hidden space-y-3">
+                    {allAdmins.map((admin: any) => {
+                      const latestCert = admin.certificates?.[admin.certificates.length - 1]
+                      const certStatus = latestCert
+                        ? latestCert.is_revoked
+                          ? 'Revoked'
+                          : new Date(latestCert.expires_at) < new Date()
+                          ? 'Expired'
+                          : latestCert.downloaded_at
+                          ? 'Active'
+                          : 'Pending Download'
+                        : 'No Certificate'
+
+                      const certStatusColor =
+                        certStatus === 'Active' ? 'text-green-600 dark:text-green-400' :
+                        certStatus === 'Pending Download' ? 'text-amber-600 dark:text-amber-400' :
+                        certStatus === 'Revoked' ? 'text-red-600 dark:text-red-400' :
+                        certStatus === 'Expired' ? 'text-red-600 dark:text-red-400' :
+                        'text-foreground-muted'
+
+                      return (
+                        <div key={admin.id} className="border border-border-default rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-sm font-medium text-foreground">
+                              {admin.username}
+                              {admin.id === adminInfo.id && (
+                                <span className="ml-2 text-xs text-accent-500">(You)</span>
+                              )}
+                            </div>
+                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                              admin.is_active !== false
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                                : 'bg-surface-secondary text-foreground'
+                            }`}>
+                              {admin.is_active !== false ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-foreground-secondary capitalize mb-2">
+                            {admin.role.replace('_', ' ')}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {admin.role === 'super_admin' ? (
+                              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">All Access</span>
+                            ) : (
+                              (admin.scopes || []).map((scope: string) => (
+                                <span key={scope} className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs">
+                                  {scopeLabels[scope] || scope}
+                                </span>
+                              ))
+                            )}
+                            {(!admin.scopes || admin.scopes.length === 0) && admin.role !== 'super_admin' && (
+                              <span className="text-xs text-foreground-muted">No scopes</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-xs mb-3">
+                            <span className={`font-medium ${certStatusColor}`}>{certStatus}</span>
+                            <span className="text-foreground-muted">
+                              Login: {admin.last_login ? new Date(admin.last_login).toLocaleDateString('en-IN') : 'Never'}
+                            </span>
+                          </div>
+                          <div className="pt-2 border-t border-border-default">
+                            <AdminUserActions admin={admin} currentAdminId={adminInfo.id} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="min-w-full divide-y divide-border-default">
                       <thead>
                         <tr>
@@ -228,9 +290,7 @@ export default async function SettingsPage() {
           )}
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-4 sm:space-y-6">
-          {/* System Information */}
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">System Info</h2>
@@ -253,7 +313,6 @@ export default async function SettingsPage() {
             </div>
           </div>
 
-          {/* Quick Stats */}
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Quick Stats</h2>
@@ -272,7 +331,6 @@ export default async function SettingsPage() {
             </div>
           </div>
 
-          {/* Scope Reference */}
           {adminInfo?.role === 'super_admin' && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               <div className="px-6 py-4 border-b border-border-default">

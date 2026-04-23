@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import React from 'react'
 import { getFilteredCategories } from '@/lib/queries'
 import DeleteCategoryButton from '@/components/admin/DeleteCategoryButton'
 import AdminFilters from '@/components/admin/AdminFilters'
@@ -10,7 +11,6 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
     search: searchParams.search,
   })
 
-  // Organize categories by parent
   const mainCategories = categories?.filter(c => !c.parent_category_id) || []
   const getSubcategories = (parentId: string) =>
     categories?.filter(c => c.parent_category_id === parentId) || []
@@ -21,36 +21,34 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-secondary-500">Categories</h1>
-          <p className="text-foreground-secondary mt-1">Manage product categories and subcategories</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Categories</h1>
+          <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
         </div>
         <Link
           href="/admin/categories/add"
-          className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+          className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
         >
           Add New Category
         </Link>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Categories</p>
-          <p className="text-3xl font-bold text-secondary-500 mt-2">{totalCategories}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{totalCategories}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Main Categories</p>
-          <p className="text-3xl font-bold text-secondary-500 mt-2">{mainCategoriesCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{mainCategoriesCount}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Subcategories</p>
-          <p className="text-3xl font-bold text-secondary-500 mt-2">{subCategoriesCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{subCategoriesCount}</p>
         </div>
       </div>
 
-      {/* Filters */}
       <AdminFilters
         filters={[
           {
@@ -74,8 +72,85 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
         searchParam="search"
       />
 
-      {/* Categories Table */}
-      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
+      <div className="md:hidden space-y-3">
+        {mainCategories.length > 0 ? (
+          <>
+            {mainCategories.map((category: any) => {
+              const subcategories = getSubcategories(category.id)
+              return (
+                <React.Fragment key={category.id}>
+                  <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-foreground">{category.name}</div>
+                        {category.description && (
+                          <div className="text-xs text-foreground-muted mt-1">{category.description}</div>
+                        )}
+                      </div>
+                      <span className={`flex-shrink-0 ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        category.is_active
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                          : 'bg-surface-secondary text-foreground'
+                      }`}>
+                        {category.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
+                      <span>{category.slug}</span>
+                      <span>Order: {category.display_order}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-3 text-sm">
+                      <Link href={`/admin/categories/edit/${category.id}`} className="text-accent-500 font-medium">
+                        Edit
+                      </Link>
+                      <DeleteCategoryButton categoryId={category.id} categoryName={category.name} />
+                    </div>
+                  </div>
+
+                  {subcategories.map((sub: any) => (
+                    <div key={sub.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 ml-6">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-foreground">
+                            <span className="text-foreground-muted mr-1">└</span>
+                            {sub.name}
+                          </div>
+                          {sub.description && (
+                            <div className="text-xs text-foreground-muted mt-1">{sub.description}</div>
+                          )}
+                        </div>
+                        <span className={`flex-shrink-0 ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                          sub.is_active
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                            : 'bg-surface-secondary text-foreground'
+                        }`}>
+                          {sub.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
+                        <span>{sub.slug}</span>
+                        <span>Order: {sub.display_order}</span>
+                      </div>
+                      <div className="flex items-center justify-end gap-3 text-sm">
+                        <Link href={`/admin/categories/edit/${sub.id}`} className="text-accent-500 font-medium">
+                          Edit
+                        </Link>
+                        <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} />
+                      </div>
+                    </div>
+                  ))}
+                </React.Fragment>
+              )
+            })}
+          </>
+        ) : (
+          <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
+            No categories found. Add your first category to get started.
+          </div>
+        )}
+      </div>
+
+      <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border-default">
             <thead className="bg-surface-secondary">
@@ -104,7 +179,6 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
                     const subcategories = getSubcategories(category.id)
                     return (
                       <React.Fragment key={category.id}>
-                        {/* Main Category */}
                         <tr className="hover:bg-surface-secondary">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-semibold text-foreground">{category.name}</div>
@@ -138,7 +212,6 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
                           </td>
                         </tr>
 
-                        {/* Subcategories */}
                         {subcategories.map((sub: any) => (
                           <tr key={sub.id} className="hover:bg-surface-secondary bg-gray-25">
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -194,6 +267,3 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
     </div>
   )
 }
-
-// Import React for Fragment
-import React from 'react'

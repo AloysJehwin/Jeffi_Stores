@@ -26,37 +26,35 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-secondary-500">Orders</h1>
-          <p className="text-foreground-secondary mt-1">Manage customer orders</p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Orders</h1>
+        <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Orders</p>
-          <p className="text-3xl font-bold text-secondary-500 mt-2">{totalOrders}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{totalOrders}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Pending</p>
-          <p className="text-3xl font-bold text-orange-500 mt-2">{pendingOrders}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-orange-500 mt-2">{pendingOrders}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Processing</p>
-          <p className="text-3xl font-bold text-blue-500 mt-2">{processingOrders}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-blue-500 mt-2">{processingOrders}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Completed</p>
-          <p className="text-3xl font-bold text-green-500 mt-2">{completedOrders}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-green-500 mt-2">{completedOrders}</p>
         </div>
       </div>
 
       {/* Revenue Card */}
       <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm mb-6">
         <p className="text-white text-sm">Total Revenue</p>
-        <p className="text-4xl font-bold text-white mt-2">
+        <p className="text-3xl sm:text-4xl font-bold text-white mt-2">
           Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
         </p>
       </div>
@@ -93,8 +91,66 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
         searchParam="search"
       />
 
-      {/* Orders Table */}
-      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
+      {/* Orders - Mobile Cards */}
+      <div className="md:hidden space-y-3">
+        {orders && orders.length > 0 ? (
+          orders.map((order: any) => (
+            <Link
+              key={order.id}
+              href={`/admin/orders/${order.id}`}
+              className="block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 active:bg-surface-secondary transition-colors"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-foreground">
+                  #{order.order_number || order.id.slice(0, 8)}
+                </span>
+                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                  order.status === 'delivered'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                    : order.status === 'processing' || order.status === 'shipped'
+                    ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                    : order.status === 'cancelled'
+                    ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                    : order.status === 'cancel_requested'
+                    ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                    : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                }`}>
+                  {order.status === 'cancel_requested' ? 'Cancel Req.' : order.status}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm text-foreground">
+                  {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || 'Guest' : 'Guest'}
+                </span>
+                <span className="text-sm font-semibold text-foreground">
+                  Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-foreground-muted">
+                  {new Date(order.created_at).toLocaleDateString('en-IN')}
+                </span>
+                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                  order.payment_status === 'paid'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                    : order.payment_status === 'pending'
+                    ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                    : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                }`}>
+                  {order.payment_status}
+                </span>
+              </div>
+            </Link>
+          ))
+        ) : (
+          <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
+            No orders found.
+          </div>
+        )}
+      </div>
+
+      {/* Orders Table - Desktop */}
+      <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border-default">
             <thead className="bg-surface-secondary">
