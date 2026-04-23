@@ -11,7 +11,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Authenticate: accept both user and admin tokens
     const userAuth = await authenticateUser(request)
     const adminAuth = await authenticateAdmin(request)
 
@@ -21,7 +20,6 @@ export async function GET(
 
     const orderId = params.id
 
-    // Fetch order
     const order = await queryOne(
       `SELECT o.*, a.full_name, a.address_line1, a.address_line2, a.city, a.state, a.postal_code, a.phone AS address_phone
        FROM orders o
@@ -34,34 +32,28 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    // If user auth, verify they own this order
     if (userAuth && !adminAuth && order.user_id !== userAuth.userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Check if invoice exists
     if (!order.invoice_number) {
       return NextResponse.json({ error: 'Invoice not available for this order' }, { status: 404 })
     }
 
-    // Check if PDF is already cached on S3
     const invoiceRecord = await queryOne(
       'SELECT pdf_url FROM invoices WHERE order_id = $1',
       [orderId]
     )
 
     if (invoiceRecord?.pdf_url) {
-      // Redirect to cached S3 URL
       return NextResponse.redirect(invoiceRecord.pdf_url)
     }
 
-    // Generate PDF
     const orderItems = await queryMany(
       'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
       [orderId]
     )
 
-    // Fetch business settings
     const settingsRows = await queryMany(
       "SELECT key, value FROM site_settings WHERE key LIKE 'business_%' OR key LIKE 'bank_%' OR key = 'invoice_prefix'",
       []
@@ -125,19 +117,35 @@ export async function GET(
       phone: order.address_phone || order.customer_phone || '',
     }
 
-    const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress)
+    let billingAddress: InvoiceBuyerAddress | undefined
+    if (order.billing_address_id && order.billing_address_id !== order.shipping_address_id) {
+      const billAddr = await queryOne(
+        'SELECT full_name, address_line1, address_line2, city, state, postal_code, phone FROM addresses WHERE id = $1',
+        [order.billing_address_id]
+      )
+      if (billAddr) {
+        billingAddress = {
+          full_name: billAddr.full_name || '',
+          address_line1: billAddr.address_line1 || '',
+          address_line2: billAddr.address_line2 || null,
+          city: billAddr.city || '',
+          state: billAddr.state || '',
+          postal_code: billAddr.postal_code || '',
+          phone: billAddr.phone || '',
+        }
+      }
+    }
 
-    // Upload to S3 and cache
+    const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress)
+
     const fy = getFinancialYear(new Date(order.invoice_date || order.created_at))
     const s3Url = await uploadInvoicePDF(pdfBuffer, order.invoice_number, fy)
 
-    // Update invoice record with S3 URL
     await query(
       'UPDATE invoices SET pdf_url = $1 WHERE order_id = $2',
       [s3Url, orderId]
     )
 
-    // Return the PDF
     const safeFileName = order.invoice_number.replace(/\//g, '-')
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
@@ -146,13 +154,11 @@ export async function GET(
         'Content-Length': String(pdfBuffer.length),
       },
     })
-  } catch (error) {
-    console.error('Invoice generation error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to generate invoice' }, { status: 500 })
   }
 }
 
-// POST: Admin-triggered invoice generation for orders missing an invoice
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -188,12 +194,10 @@ export async function POST(
       return NextResponse.json({ error: 'Invoice generation failed. Ensure GST is enabled.' }, { status: 400 })
     }
 
-    // Re-fetch to get the invoice number
     const updated = await queryOne('SELECT invoice_number FROM orders WHERE id = $1', [orderId])
 
     return NextResponse.json({ success: true, invoiceNumber: updated?.invoice_number || null })
-  } catch (error) {
-    console.error('Invoice generation error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to generate invoice' }, { status: 500 })
   }
 }
