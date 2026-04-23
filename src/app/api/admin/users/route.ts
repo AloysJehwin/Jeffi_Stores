@@ -23,13 +23,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate role
     const validRoles = ['admin', 'moderator']
     if (role && !validRoles.includes(role)) {
       return NextResponse.json({ error: 'Invalid role. Must be admin or moderator.' }, { status: 400 })
     }
 
-    // Validate scopes
     const validScopes = ['dashboard', 'products', 'categories', 'orders', 'reviews', 'settings']
     if (scopes && !Array.isArray(scopes)) {
       return NextResponse.json({ error: 'Scopes must be an array' }, { status: 400 })
@@ -42,7 +40,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create admin user
     const result = await createAdminUser({
       username,
       password,
@@ -57,17 +54,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 })
     }
 
-    // Generate client certificate
     const cert = await generateClientCertificate(username, result.admin!.id)
 
-    // Store certificate metadata
     await query(
       `INSERT INTO admin_certificates (admin_id, serial_number, common_name, expires_at, download_token)
        VALUES ($1, $2, $3, $4, $5)`,
       [result.admin!.id, cert.serialNumber, username, cert.expiresAt, cert.downloadToken]
     )
 
-    // Send certificate via email (non-blocking — don't fail the request if email fails)
     sendAdminCertificateEmail(
       email,
       username,
@@ -76,7 +70,7 @@ export async function POST(request: NextRequest) {
       cert.serialNumber,
       cert.expiresAt.toISOString(),
       role || 'admin'
-    ).catch(err => console.error('Failed to send admin certificate email:', err))
+    ).catch(() => {})
 
     return NextResponse.json({
       success: true,
@@ -94,8 +88,7 @@ export async function POST(request: NextRequest) {
         downloadToken: cert.downloadToken,
       },
     })
-  } catch (error) {
-    console.error('Create admin user error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

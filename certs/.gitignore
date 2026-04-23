@@ -4,6 +4,7 @@
 *.csr
 *.srl
 *.key
+*.bak
 
 # Keep only the README
 !README.md
