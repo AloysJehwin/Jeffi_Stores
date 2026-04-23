@@ -17,7 +17,6 @@ export async function PATCH(
     const body = await request.json()
     const { scopes, role, is_active } = body
 
-    // Build update query dynamically
     const updates: string[] = []
     const values: any[] = []
     let i = 1
@@ -59,7 +58,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
     }
 
-    // If deactivating, revoke their certificates
     if (is_active === false) {
       await query(
         `UPDATE admin_certificates SET is_revoked = true, revoked_at = NOW() WHERE admin_id = $1 AND is_revoked = false`,
@@ -68,8 +66,7 @@ export async function PATCH(
     }
 
     return NextResponse.json({ success: true, admin: updated })
-  } catch (error) {
-    console.error('Update admin error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -86,24 +83,24 @@ export async function DELETE(
 
     const { id } = params
 
-    // Prevent self-deletion
     if (id === admin.adminId) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
-    // Delete certificates first (foreign key)
     await query('DELETE FROM admin_certificates WHERE admin_id = $1', [id])
 
-    // Delete admin
-    const deleted = await queryOne('DELETE FROM admins WHERE id = $1 RETURNING id, username', [id])
+    const deleted = await queryOne('DELETE FROM admins WHERE id = $1 RETURNING id, username, user_id', [id])
 
     if (!deleted) {
       return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
     }
 
+    if (deleted.user_id) {
+      await query('DELETE FROM users WHERE id = $1', [deleted.user_id])
+    }
+
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Delete admin error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

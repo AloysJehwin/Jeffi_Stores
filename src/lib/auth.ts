@@ -62,12 +62,26 @@ export async function createAdminUser(userData: {
   try {
     const passwordHash = await bcrypt.hash(userData.password, 10)
 
-    const user = await queryOne(
-      `INSERT INTO users (email, first_name, last_name, phone)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [userData.email, userData.first_name, userData.last_name, userData.phone || null]
+    let user = await queryOne(
+      `SELECT u.* FROM users u
+       LEFT JOIN admins a ON a.user_id = u.id
+       WHERE u.email = $1 AND a.id IS NULL`,
+      [userData.email]
     )
+
+    if (user) {
+      user = await queryOne(
+        `UPDATE users SET first_name = $1, last_name = $2, phone = $3 WHERE id = $4 RETURNING *`,
+        [userData.first_name, userData.last_name, userData.phone || null, user.id]
+      )
+    } else {
+      user = await queryOne(
+        `INSERT INTO users (email, first_name, last_name, phone)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *`,
+        [userData.email, userData.first_name, userData.last_name, userData.phone || null]
+      )
+    }
 
     if (!user) throw new Error('Failed to create user')
 
