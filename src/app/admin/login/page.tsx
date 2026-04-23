@@ -10,6 +10,7 @@ export default function AdminLogin() {
     password: '',
   })
   const [error, setError] = useState('')
+  const [isCertError, setIsCertError] = useState(false)
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const [certStatus, setCertStatus] = useState<'checking' | 'verified' | 'development' | 'not_found'>('checking')
@@ -42,6 +43,7 @@ export default function AdminLogin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setIsCertError(false)
     setLoading(true)
 
     try {
@@ -57,6 +59,9 @@ export default function AdminLogin() {
       const data = await response.json()
 
       if (!response.ok) {
+        if (response.status === 403) {
+          setIsCertError(true)
+        }
         throw new Error(data.error || 'Login failed')
       }
 
@@ -141,11 +146,26 @@ export default function AdminLogin() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-500/20 backdrop-blur-sm border border-red-400/50 text-red-100 rounded-lg p-4 flex items-start gap-3">
+              <div className={`backdrop-blur-sm border rounded-lg p-4 flex items-start gap-3 ${
+                isCertError
+                  ? 'bg-orange-500/20 border-orange-400/50 text-orange-100'
+                  : 'bg-red-500/20 border-red-400/50 text-red-100'
+              }`}>
                 <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                  {isCertError ? (
+                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+                  ) : (
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                  )}
                 </svg>
-                <span className="text-sm font-medium">{error}</span>
+                <div>
+                  <span className="text-sm font-medium block">{error}</span>
+                  {isCertError && (
+                    <span className="text-xs mt-1 block opacity-80">
+                      Your device certificate does not match this account. Use the certificate issued for your admin account.
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 

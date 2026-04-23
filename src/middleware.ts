@@ -33,6 +33,14 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
+    const certCN = request.headers.get('x-client-cert-cn') || ''
+    if (certCN && payload.username !== certCN) {
+      return NextResponse.json(
+        { error: 'Certificate does not match authenticated user' },
+        { status: 403 }
+      )
+    }
+
     const requiredScope = getScopeForPath(pathname)
     if (requiredScope && !hasScope(payload.role, payload.scopes || [], requiredScope)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -68,6 +76,13 @@ export async function middleware(request: NextRequest) {
     const payload = await verifyToken(token)
 
     if (!payload) {
+      const response = NextResponse.redirect(new URL('/admin/login', request.url))
+      response.cookies.delete('admin_token')
+      return response
+    }
+
+    const certCN = request.headers.get('x-client-cert-cn') || ''
+    if (certCN && payload.username !== certCN) {
       const response = NextResponse.redirect(new URL('/admin/login', request.url))
       response.cookies.delete('admin_token')
       return response
