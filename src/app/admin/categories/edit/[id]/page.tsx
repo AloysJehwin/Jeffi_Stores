@@ -21,7 +21,6 @@ async function updateCategory(categoryId: string, formData: FormData) {
   const isActive = formData.get('is_active') === 'true'
   const googleProductCategory = formData.get('google_product_category') as string || null
 
-  // Generate slug from name
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
   try {
@@ -33,7 +32,6 @@ async function updateCategory(categoryId: string, formData: FormData) {
       [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, new Date().toISOString(), categoryId]
     )
 
-    // Revalidate all pages that use categories
     revalidatePath('/admin/categories')
     revalidatePath('/admin/categories/add')
     revalidatePath('/admin/categories/edit/[id]', 'page')
@@ -41,9 +39,8 @@ async function updateCategory(categoryId: string, formData: FormData) {
     revalidatePath('/admin/products/edit/[id]', 'page')
 
     redirect('/admin/categories')
-  } catch (error) {
-    console.error('Error updating category:', error)
-    throw error
+  } catch {
+    throw new Error('Failed to update category')
   }
 }
 
@@ -59,7 +56,7 @@ export default async function EditCategoryPage({ params }: { params: { id: strin
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-secondary-500">Edit Category</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Edit Category</h1>
         <p className="text-foreground-secondary mt-1">Update category information</p>
       </div>
 

@@ -34,14 +34,12 @@ export default async function AdminLayout({
   const headersList = headers()
   const pathname = headersList.get('x-pathname') || ''
 
-  // If it's the login page, render without navigation
   const isLoginPage = pathname === '/admin/login'
 
   if (isLoginPage) {
     return children
   }
 
-  // For all other admin pages, get session and show navigation
   const session = await getAdminSession()
   const role = session?.role || ''
   const scopes: string[] = session?.scopes || []
@@ -107,7 +105,7 @@ export default async function AdminLayout({
           </div>
         </div>
       </nav>
-      <main className="bg-surface min-h-screen">
+      <main className="bg-surface min-h-screen pb-20 md:pb-0">
         {children}
       </main>
     </div>

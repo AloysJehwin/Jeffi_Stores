@@ -65,7 +65,6 @@ export default function ProductForm({ categories, brands, action, product, produ
     ]
   })
 
-  // Organize categories by parent
   const mainCategories = categories.filter(c => !c.parent_category_id)
   const getSubcategories = (parentId: string) => categories.filter(c => c.parent_category_id === parentId)
 
@@ -76,7 +75,6 @@ export default function ProductForm({ categories, brands, action, product, produ
   const removeVariant = (index: number) => {
     const v = variants[index]
     if (v.id) {
-      // Mark existing variant for deletion
       const updated = [...variants]
       updated[index] = { ...v, _isDeleted: true }
       setVariants(updated)
@@ -101,16 +99,13 @@ export default function ProductForm({ categories, brands, action, product, produ
     try {
       const formData = new FormData(e.currentTarget)
 
-      // Add new image files to formData
       imageFiles.forEach((file, index) => {
         formData.append(`image_${index}`, file)
       })
       formData.append('image_count', imageFiles.length.toString())
 
-      // Add existing images to keep as JSON
       formData.append('existing_images_to_keep', JSON.stringify(existingImagesToKeep))
 
-      // Add variant data
       formData.set('has_variants', hasVariants ? 'true' : 'false')
       if (hasVariants) {
         formData.set('variant_type', variantType)
@@ -441,7 +436,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
 
           {/* Checkboxes */}
-          <div className="md:col-span-2 flex gap-6">
+          <div className="md:col-span-2 flex flex-wrap gap-4 sm:gap-6">
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -507,7 +502,75 @@ export default function ProductForm({ categories, brands, action, product, produ
               </div>
 
               {/* Variant Table */}
-              <div className="overflow-x-auto">
+              <div className="md:hidden space-y-4">
+                {variants.map((variant, index) => {
+                  if (variant._isDeleted) return null
+                  return (
+                    <div key={variant.id || index} className="border border-border-default rounded-lg p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-foreground-muted uppercase">Variant {index + 1}</span>
+                        {activeVariants.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeVariant(index)}
+                            className="text-red-500 hover:text-red-700 text-xs font-medium"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground-secondary mb-1">{variantType || 'Variant'} Name *</label>
+                        <input
+                          type="text"
+                          value={variant.variant_name}
+                          onChange={(e) => updateVariant(index, 'variant_name', e.target.value)}
+                          className="w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                          placeholder={`e.g. ${variantType === 'Length' ? '10mm' : variantType === 'Size' ? 'M8' : '...'}`}
+                          required
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price *</label>
+                          <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => updateVariant(index, 'price', e.target.value)} className="w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" required />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP</label>
+                          <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className="w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">Sale Price</label>
+                          <input type="number" step="0.01" min="0" value={variant.sale_price} onChange={(e) => updateVariant(index, 'sale_price', e.target.value)} className="w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale</label>
+                          <input type="number" step="0.01" min="0" value={variant.wholesale_price} onChange={(e) => updateVariant(index, 'wholesale_price', e.target.value)} className="w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock *</label>
+                          <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className="w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0" required />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
+                          <input type="text" value={variant.mpn} onChange={(e) => updateVariant(index, 'mpn', e.target.value)} className="w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="Part No." />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
+                        <input type="text" value={variant.gtin} onChange={(e) => updateVariant(index, 'gtin', e.target.value)} className="w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="Barcode" />
+                      </div>
+                      {product?.sku && variant.variant_name && (
+                        <div className="text-xs font-mono text-foreground-muted">
+                          SKU: {product.sku}-{variant.variant_name.toUpperCase().replace(/[^A-Z0-9]/g, '')}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border-secondary">
@@ -660,10 +723,10 @@ export default function ProductForm({ categories, brands, action, product, produ
       </div>
 
       {/* Form Actions */}
-      <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex justify-end gap-4">
+      <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
         <Link
           href="/admin/products"
-          className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
+          className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors text-center"
         >
           Cancel
         </Link>

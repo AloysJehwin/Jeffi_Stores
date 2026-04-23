@@ -32,7 +32,6 @@ async function updateProduct(productId: string, formData: FormData) {
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
   const existingImagesToKeep = existingImagesToKeepJson ? JSON.parse(existingImagesToKeepJson) : []
 
-  // Generate slug from name
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
   try {
@@ -56,19 +55,15 @@ async function updateProduct(productId: string, formData: FormData) {
       ]
     )
 
-    // Handle image changes - only if there are changes
     if (imageCount > 0 || existingImagesToKeep.length > 0) {
-      // Get all existing images
       const allExistingImages = await queryMany(
         'SELECT * FROM product_images WHERE product_id = $1',
         [productId]
       )
 
-      // Determine which images to delete (images not in existingImagesToKeep)
       const existingIdsToKeep = new Set(existingImagesToKeep.map((img: any) => img.id))
       const imagesToDelete = (allExistingImages || []).filter(img => !existingIdsToKeep.has(img.id))
 
-      // Delete removed images from S3
       if (imagesToDelete.length > 0) {
         const { DeleteObjectCommand, S3Client } = await import('@aws-sdk/client-s3')
         const s3Client = new S3Client({
@@ -93,12 +88,10 @@ async function updateProduct(productId: string, formData: FormData) {
             }))
           }
 
-          // Delete from database
           await query('DELETE FROM product_images WHERE id = $1', [img.id])
         }
       }
 
-      // Upload new images to S3 and save to database
       if (imageCount > 0) {
         const { uploadProductImage } = await import('@/lib/s3')
 
@@ -127,7 +120,6 @@ async function updateProduct(productId: string, formData: FormData) {
         }
       }
 
-      // Update display order and primary status for existing images that were kept
       for (let i = 0; i < existingImagesToKeep.length; i++) {
         const img = existingImagesToKeep[i]
         await query(
@@ -136,12 +128,9 @@ async function updateProduct(productId: string, formData: FormData) {
         )
       }
 
-      // Determine which image should be primary
-      // Priority: 1) User-selected existing image, 2) First new image, 3) First existing image
       const hasPrimaryExisting = existingImagesToKeep.some((img: any) => img.is_primary)
 
       if (!hasPrimaryExisting && imageCount > 0) {
-        // If no existing image is primary and we have new images, make first new image primary
         const newImages = await queryMany(
           'SELECT * FROM product_images WHERE product_id = $1 ORDER BY created_at DESC LIMIT $2',
           [productId, imageCount]
@@ -154,7 +143,6 @@ async function updateProduct(productId: string, formData: FormData) {
           )
         }
       } else if (!hasPrimaryExisting && existingImagesToKeep.length > 0) {
-        // If no primary was selected, make the first existing image primary
         await query(
           'UPDATE product_images SET is_primary = true WHERE id = $1',
           [existingImagesToKeep[0].id]
@@ -162,21 +150,17 @@ async function updateProduct(productId: string, formData: FormData) {
       }
     }
 
-    // Handle variant changes
     if (hasVariants) {
       const variantsJson = formData.get('variants_json') as string
       if (variantsJson) {
-        // Get the product SKU for generating variant SKUs
         const productData = await queryOne<{ sku: string }>('SELECT sku FROM products WHERE id = $1', [productId])
         const productSku = productData?.sku || 'PRD-000'
         const variants = JSON.parse(variantsJson)
 
         for (const variant of variants) {
           if (variant._isDeleted && variant.id) {
-            // Delete existing variant
             await query('DELETE FROM product_variants WHERE id = $1 AND product_id = $2', [variant.id, productId])
           } else if (variant.id && !variant._isDeleted) {
-            // Update existing variant
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
               `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, sale_price = $5, wholesale_price = $6, stock_quantity = $7, mpn = $8, gtin = $9
@@ -194,7 +178,6 @@ async function updateProduct(productId: string, formData: FormData) {
               ]
             )
           } else if (!variant.id && !variant._isDeleted && variant.variant_name) {
-            // Insert new variant
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
               `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, sale_price, wholesale_price, stock_quantity, mpn, gtin, is_active)
@@ -214,20 +197,17 @@ async function updateProduct(productId: string, formData: FormData) {
         }
       }
     } else {
-      // If variants disabled, delete all existing variants
       await query('DELETE FROM product_variants WHERE product_id = $1', [productId])
     }
 
-    // Sync to Google Merchant Sheet (fire-and-forget)
     const { syncProductToSheet } = await import('@/lib/google-sheets')
-    syncProductToSheet(productId).catch(err => console.error('Sheet sync error:', err))
+    syncProductToSheet(productId).catch(() => {})
 
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
     redirect('/admin/products')
-  } catch (error) {
-    console.error('Error updating product:', error)
-    throw error
+  } catch {
+    throw new Error('Failed to update product')
   }
 }
 
@@ -244,7 +224,7 @@ export default async function EditProductPage({ params }: { params: { id: string
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-secondary-500">Edit Product</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Edit Product</h1>
         <p className="text-foreground-secondary mt-1">Update product information</p>
       </div>
 
