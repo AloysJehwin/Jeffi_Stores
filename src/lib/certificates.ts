@@ -1,7 +1,8 @@
-import forge from 'node-forge'
 import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
+import { execSync } from 'child_process'
+import os from 'os'
 
 const CERTS_DIR = path.join(process.cwd(), 'certs')
 
@@ -13,90 +14,62 @@ interface CertificateResult {
   downloadToken: string
 }
 
-/**
- * Generate a client certificate for an admin user, signed by the existing CA.
- */
 export async function generateClientCertificate(
   adminUsername: string,
-  adminId: string
+  _adminId: string
 ): Promise<CertificateResult> {
-  // Read CA key and cert
-  const caCertPem = fs.readFileSync(path.join(CERTS_DIR, 'ca-cert.pem'), 'utf8')
-  const caKeyPem = fs.readFileSync(path.join(CERTS_DIR, 'ca-key.pem'), 'utf8')
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cert-'))
+  const keyPath = path.join(tmpDir, 'client-key.pem')
+  const csrPath = path.join(tmpDir, 'client.csr')
+  const certPath = path.join(tmpDir, 'client-cert.pem')
+  const extPath = path.join(tmpDir, 'ext.cnf')
+  const p12Path = path.join(tmpDir, 'client.p12')
+  const caKeyPath = path.join(CERTS_DIR, 'ca-key.pem')
+  const caCertPath = path.join(CERTS_DIR, 'ca-cert.pem')
 
-  const caCert = forge.pki.certificateFromPem(caCertPem)
-  const caKey = forge.pki.privateKeyFromPem(caKeyPem)
-
-  // Generate a new key pair for the client
-  const keys = forge.pki.rsa.generateKeyPair(4096)
-
-  // Create the client certificate
-  const cert = forge.pki.createCertificate()
-  cert.publicKey = keys.publicKey
-
-  // Serial number from random bytes
   const serialHex = crypto.randomBytes(16).toString('hex')
-  cert.serialNumber = serialHex
-
-  // Validity: 365 days
-  const now = new Date()
-  const expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
-  cert.validity.notBefore = now
-  cert.validity.notAfter = expiresAt
-
-  // Subject
-  cert.setSubject([
-    { name: 'commonName', value: adminUsername },
-    { name: 'organizationName', value: 'Jeffi Stores' },
-    { shortName: 'OU', value: 'Admin' },
-    { name: 'countryName', value: 'IN' },
-    { name: 'stateOrProvinceName', value: 'Chhattisgarh' },
-    { name: 'localityName', value: 'Raipur' },
-  ])
-
-  // Issuer from CA
-  cert.setIssuer(caCert.subject.attributes)
-
-  // Extensions
-  cert.setExtensions([
-    {
-      name: 'basicConstraints',
-      cA: false,
-    },
-    {
-      name: 'keyUsage',
-      digitalSignature: true,
-      keyEncipherment: true,
-    },
-    {
-      name: 'extKeyUsage',
-      clientAuth: true,
-    },
-    {
-      name: 'subjectKeyIdentifier',
-    },
-  ])
-
-  // Sign with CA private key
-  cert.sign(caKey, forge.md.sha256.create())
-
-  // Create PKCS12 with random password
-  const p12Password = crypto.randomBytes(8).toString('hex') // 16 char hex password
-  const p12Asn1 = forge.pkcs12.toPkcs12Asn1(keys.privateKey, [cert, caCert], p12Password, {
-    algorithm: '3des',
-    friendlyName: `${adminUsername}-admin-cert`,
-  })
-  const p12Der = forge.asn1.toDer(p12Asn1).getBytes()
-  const p12Buffer = Buffer.from(p12Der, 'binary')
-
-  // One-time download token
+  const p12Password = crypto.randomBytes(8).toString('hex')
   const downloadToken = crypto.randomUUID()
 
-  return {
-    p12Buffer,
-    p12Password,
-    serialNumber: serialHex,
-    expiresAt,
-    downloadToken,
+  try {
+    execSync(`openssl genrsa -out ${keyPath} 4096 2>/dev/null`)
+
+    const subject = `/C=IN/ST=Chhattisgarh/L=Raipur/O=Jeffi Stores/OU=Admin/CN=${adminUsername}`
+    execSync(`openssl req -new -key ${keyPath} -out ${csrPath} -subj '${subject}' 2>/dev/null`)
+
+    fs.writeFileSync(extPath, [
+      'basicConstraints = CA:FALSE',
+      'keyUsage = digitalSignature, keyEncipherment',
+      'extendedKeyUsage = clientAuth',
+      'subjectKeyIdentifier = hash',
+      'authorityKeyIdentifier = keyid,issuer',
+    ].join('\n'))
+
+    execSync(
+      `openssl x509 -req -days 365 -in ${csrPath} ` +
+      `-CA ${caCertPath} -CAkey ${caKeyPath} -CAcreateserial ` +
+      `-out ${certPath} -extfile ${extPath} -set_serial 0x${serialHex} 2>/dev/null`
+    )
+
+    execSync(
+      `openssl pkcs12 -export -out ${p12Path} ` +
+      `-inkey ${keyPath} -in ${certPath} -certfile ${caCertPath} ` +
+      `-name '${adminUsername}-admin-cert' -passout pass:${p12Password} 2>/dev/null`
+    )
+
+    const p12Buffer = fs.readFileSync(p12Path)
+
+    const now = new Date()
+    const expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+
+    return {
+      p12Buffer,
+      p12Password,
+      serialNumber: serialHex,
+      expiresAt,
+      downloadToken,
+    }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 }
