@@ -65,6 +65,11 @@ export default function AdminLogin() {
         throw new Error(data.error || 'Login failed')
       }
 
+      if (data.token) {
+        const maxAge = 8 * 60 * 60
+        document.cookie = `admin_token=${data.token}; path=/; max-age=${maxAge}; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`
+      }
+
       window.location.href = '/admin/dashboard'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
