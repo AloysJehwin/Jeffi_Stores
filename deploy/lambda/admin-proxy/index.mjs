@@ -45,8 +45,20 @@ export const handler = async (event) => {
         const isText = /text|json|html|xml|javascript|css/.test(contentType)
 
         const responseHeaders = {}
+        const cookies = []
+
         for (const [key, value] of Object.entries(res.headers)) {
           if (key === 'transfer-encoding') continue
+
+          if (key === 'set-cookie') {
+            if (Array.isArray(value)) {
+              cookies.push(...value)
+            } else {
+              cookies.push(value)
+            }
+            continue
+          }
+
           if (key === 'location' && value) {
             const loc = Array.isArray(value) ? value[0] : value
             responseHeaders[key] = loc
@@ -54,6 +66,7 @@ export const handler = async (event) => {
               .replace(`http://${EC2_HOST}`, `https://${originalHost}`)
             continue
           }
+
           if (Array.isArray(value)) {
             responseHeaders[key] = value.join(', ')
           } else {
@@ -61,12 +74,18 @@ export const handler = async (event) => {
           }
         }
 
-        resolve({
+        const result = {
           statusCode: res.statusCode,
           headers: responseHeaders,
           body: isText ? responseBody.toString('utf-8') : responseBody.toString('base64'),
           isBase64Encoded: !isText,
-        })
+        }
+
+        if (cookies.length > 0) {
+          result.cookies = cookies
+        }
+
+        resolve(result)
       })
     })
 
