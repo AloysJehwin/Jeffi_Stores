@@ -15,7 +15,7 @@ export const handler = async (event) => {
   const path = rawPath + (rawQueryString ? `?${rawQueryString}` : '')
   const method = requestContext?.http?.method || 'GET'
 
-  const originalHost = reqHeaders['host'] || reqHeaders['Host'] || 'admin.jeffistores.in'
+  const originalHost = requestContext?.domainName || reqHeaders['x-forwarded-host'] || reqHeaders['host'] || 'admin.jeffistores.in'
 
   const proxyHeaders = { ...reqHeaders }
   delete proxyHeaders['host']
