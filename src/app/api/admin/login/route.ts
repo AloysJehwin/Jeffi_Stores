@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { verifyAdminCredentials } from '@/lib/auth'
 import { generateToken } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
@@ -81,22 +80,23 @@ export async function POST(request: Request) {
       scopes: result.admin.scopes || [],
     })
 
-    const cookieStore = cookies()
-    cookieStore.set('admin_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 8 * 60 * 60,
-      path: '/',
-    })
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       admin: {
         username: result.admin.username,
         role: result.admin.role,
       },
     })
+
+    response.cookies.set('admin_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 8 * 60 * 60,
+      path: '/',
+    })
+
+    return response
   } catch {
     return NextResponse.json(
       { error: 'Internal server error' },
