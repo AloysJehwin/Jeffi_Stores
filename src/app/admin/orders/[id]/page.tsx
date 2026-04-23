@@ -17,7 +17,6 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
 
   return (
     <div className="p-4 sm:p-6">
-      {/* Header */}
       <div className="mb-6">
         <Link
           href="/admin/orders"
@@ -25,9 +24,9 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
         >
           ← Back to Orders
         </Link>
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-secondary-500">
+            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">
               Order #{order.order_number || order.id.slice(0, 8)}
             </h1>
             <p className="text-foreground-secondary mt-1">
@@ -35,7 +34,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-2 sm:gap-4">
             <span className={`px-4 py-2 text-sm font-semibold rounded-full ${
               order.payment_status === 'paid'
                 ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
@@ -78,9 +77,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Main Content */}
         <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-          {/* Order Items */}
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Order Items</h2>
@@ -112,7 +109,6 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 )}
               </div>
 
-              {/* Order Summary */}
               <div className="mt-6 pt-6 border-t border-border-default space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-foreground-secondary">Subtotal</span>
@@ -140,7 +136,6 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           </div>
 
-          {/* Cancellation Review */}
           {order.status === 'cancel_requested' && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-orange-300 dark:border-orange-800">
               <div className="px-6 py-4 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30">
@@ -152,7 +147,6 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           )}
 
-          {/* Update Order Status — hidden for cancelled orders */}
           {order.status !== 'cancelled' && (
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
@@ -165,9 +159,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
           )}
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-4 sm:space-y-6">
-          {/* Customer Information */}
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Customer</h2>
@@ -194,7 +186,6 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           </div>
 
-          {/* Billing Address */}
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Billing Address</h2>
@@ -216,7 +207,6 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           </div>
 
-          {/* Shipping Address */}
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Shipping Address</h2>
@@ -238,7 +228,6 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           </div>
 
-          {/* Payment Information */}
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Payment</h2>

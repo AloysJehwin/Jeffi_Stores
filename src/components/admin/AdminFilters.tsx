@@ -60,10 +60,10 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
 
   return (
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 mb-6">
-      <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 sm:gap-4">
         {/* Dropdown Filters */}
         {filters.map((filter) => (
-          <div key={filter.name} className="flex-1 min-w-[160px] max-w-[220px]">
+          <div key={filter.name} className="w-full sm:flex-1 sm:min-w-[160px] sm:max-w-[220px]">
             <label
               htmlFor={`filter-${filter.name}`}
               className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider"
@@ -85,7 +85,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
 
         {/* Search Input */}
         {searchPlaceholder && (
-          <form onSubmit={handleSearchSubmit} className="flex-1 min-w-[200px] max-w-[300px]">
+          <form onSubmit={handleSearchSubmit} className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[300px]">
             <label
               htmlFor={`filter-${searchParam}`}
               className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider"
