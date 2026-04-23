@@ -4,7 +4,7 @@ const EC2_HOST = process.env.EC2_HOST
 const EC2_PORT = process.env.EC2_PORT || '80'
 
 export const handler = async (event) => {
-  const { requestContext, headers: reqHeaders, body, isBase64Encoded, rawPath, rawQueryString } = event
+  const { requestContext, headers: reqHeaders, cookies: eventCookies, body, isBase64Encoded, rawPath, rawQueryString } = event
 
   const clientCert = requestContext?.authentication?.clientCert
   const certCN = clientCert?.subjectDN
@@ -25,6 +25,10 @@ export const handler = async (event) => {
   proxyHeaders['x-client-cert-cn'] = certCN
   proxyHeaders['x-client-cert-serial'] = certSerial
 
+  if (eventCookies && eventCookies.length > 0 && !proxyHeaders['cookie']) {
+    proxyHeaders['cookie'] = eventCookies.join('; ')
+  }
+
   const requestBody = body
     ? (isBase64Encoded ? Buffer.from(body, 'base64') : Buffer.from(body))
     : undefined
@@ -41,8 +45,10 @@ export const handler = async (event) => {
       res.on('data', (chunk) => chunks.push(chunk))
       res.on('end', () => {
         const responseBody = Buffer.concat(chunks)
+        const contentEncoding = res.headers['content-encoding'] || ''
         const contentType = res.headers['content-type'] || ''
-        const isText = /text|json|html|xml|javascript|css/.test(contentType)
+        const isCompressed = /gzip|br|deflate/.test(contentEncoding)
+        const isText = !isCompressed && /text|json|html|xml|javascript|css/.test(contentType)
 
         const responseHeaders = {}
         const cookies = []
