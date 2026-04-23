@@ -12,6 +12,8 @@ export const handler = async (event) => {
     : ''
   const certSerial = clientCert?.serialNumber || ''
 
+  console.log('CERT_DEBUG:', JSON.stringify({ subjectDN: clientCert?.subjectDN, serialNumber: clientCert?.serialNumber, certCN, certSerial, hasCert: !!clientCert }))
+
   const path = rawPath + (rawQueryString ? `?${rawQueryString}` : '')
   const method = requestContext?.http?.method || 'GET'
 
