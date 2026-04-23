@@ -29,10 +29,8 @@ async function createProduct(formData: FormData) {
   const isFeatured = formData.get('is_featured') === 'true'
   const imageCount = parseInt(formData.get('image_count') as string || '0')
 
-  // Generate slug from name
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-  // Auto-generate race-safe SKU
   let sku: string
   try {
     sku = await generateProductSku(categoryId || null)
@@ -59,7 +57,6 @@ async function createProduct(formData: FormData) {
 
     if (!data) throw new Error('Failed to create product')
 
-    // Upload images to S3 and save to database
     if (imageCount > 0) {
       const { uploadProductImage } = await import('@/lib/s3')
 
@@ -86,7 +83,6 @@ async function createProduct(formData: FormData) {
       }
     }
 
-    // Create variants if product has variants
     if (hasVariants) {
       const variantsJson = formData.get('variants_json') as string
       if (variantsJson) {
@@ -114,14 +110,12 @@ async function createProduct(formData: FormData) {
       }
     }
 
-    // Sync to Google Merchant Sheet (fire-and-forget, must be before redirect)
     const { syncProductToSheet } = await import('@/lib/google-sheets')
-    syncProductToSheet(data.id).catch(err => console.error('Sheet sync error:', err))
+    syncProductToSheet(data.id).catch(() => {})
 
     redirect('/admin/products')
-  } catch (error) {
-    console.error('Error creating product:', error)
-    throw error
+  } catch {
+    throw new Error('Failed to create product')
   }
 }
 export default async function AddProductPage() {
@@ -131,7 +125,7 @@ export default async function AddProductPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-secondary-500">Add New Product</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Add New Product</h1>
         <p className="text-foreground-secondary mt-1">Create a new product in your inventory</p>
       </div>
 

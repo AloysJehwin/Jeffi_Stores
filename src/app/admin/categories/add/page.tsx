@@ -15,7 +15,6 @@ async function createCategory(formData: FormData) {
   const isActive = formData.get('is_active') === 'true'
   const googleProductCategory = formData.get('google_product_category') as string || null
 
-  // Generate slug from name
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
   try {
@@ -25,7 +24,6 @@ async function createCategory(formData: FormData) {
       [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory]
     )
 
-    // Revalidate all pages that use categories
     revalidatePath('/admin/categories')
     revalidatePath('/admin/categories/add')
     revalidatePath('/admin/categories/edit/[id]', 'page')
@@ -33,9 +31,8 @@ async function createCategory(formData: FormData) {
     revalidatePath('/admin/products/edit/[id]', 'page')
 
     redirect('/admin/categories')
-  } catch (error) {
-    console.error('Error creating category:', error)
-    throw error
+  } catch {
+    throw new Error('Failed to create category')
   }
 }
 
@@ -45,7 +42,7 @@ export default async function AddCategoryPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-secondary-500">Add New Category</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Add New Category</h1>
         <p className="text-foreground-secondary mt-1">Create a new product category</p>
       </div>
 
