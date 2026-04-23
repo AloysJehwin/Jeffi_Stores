@@ -15,9 +15,13 @@ export const handler = async (event) => {
   const path = rawPath + (rawQueryString ? `?${rawQueryString}` : '')
   const method = requestContext?.http?.method || 'GET'
 
+  const originalHost = reqHeaders['host'] || reqHeaders['Host'] || 'admin.jeffistores.in'
+
   const proxyHeaders = { ...reqHeaders }
   delete proxyHeaders['host']
-  proxyHeaders['host'] = EC2_HOST
+  proxyHeaders['host'] = originalHost
+  proxyHeaders['x-forwarded-host'] = originalHost
+  proxyHeaders['x-forwarded-proto'] = 'https'
   proxyHeaders['x-client-cert-cn'] = certCN
   proxyHeaders['x-client-cert-serial'] = certSerial
 
@@ -43,6 +47,13 @@ export const handler = async (event) => {
         const responseHeaders = {}
         for (const [key, value] of Object.entries(res.headers)) {
           if (key === 'transfer-encoding') continue
+          if (key === 'location' && value) {
+            const loc = Array.isArray(value) ? value[0] : value
+            responseHeaders[key] = loc
+              .replace(`http://${EC2_HOST}:${EC2_PORT}`, `https://${originalHost}`)
+              .replace(`http://${EC2_HOST}`, `https://${originalHost}`)
+            continue
+          }
           if (Array.isArray(value)) {
             responseHeaders[key] = value.join(', ')
           } else {
