@@ -55,8 +55,6 @@ export interface InvoiceBuyerAddress {
   phone: string
 }
 
-// ── Helpers ──
-
 function numberToWords(num: number): string {
   if (num === 0) return 'Zero'
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
@@ -115,8 +113,6 @@ function getStateCode(stateName: string): string {
   return map[stateName.toLowerCase().trim()] || ''
 }
 
-// ── PDF Drawing Helpers ──
-
 function drawRect(doc: any, x: number, y: number, w: number, h: number) {
   doc.rect(x, y, w, h).stroke()
 }
@@ -129,13 +125,51 @@ function drawVLine(doc: any, x: number, y1: number, y2: number) {
   doc.moveTo(x, y1).lineTo(x, y2).stroke()
 }
 
-// ── Main Generator ──
+function renderAddressBlock(
+  doc: any, label: string, addr: InvoiceBuyerAddress, buyerGstin: string | null,
+  LM: number, pw: number, startY: number
+): number {
+  let y = startY
+  doc.font('Helvetica').fontSize(6).text(label, LM + 3, y + 2, { width: pw - 6 })
+  y += 10
+  doc.font('Helvetica-Bold').fontSize(7)
+  const fullAddr = [
+    addr.full_name,
+    addr.address_line1,
+    addr.address_line2,
+    addr.city,
+    `${addr.state} - ${addr.postal_code}, India`,
+  ].filter(Boolean).join('\n')
+  doc.text(fullAddr, LM + 3, y, { width: pw * 0.55 - 6 })
+  y += doc.heightOfString(fullAddr, { width: pw * 0.55 - 6 }) + 2
+
+  const stateCode = getStateCode(addr.state)
+  if (buyerGstin) {
+    doc.font('Helvetica').fontSize(7).text(`GSTIN/UIN      : ${buyerGstin}`, LM + 3, y, { width: pw * 0.55 - 6 })
+    y += 9
+    const pan = buyerGstin.substring(2, 12)
+    doc.text(`PAN/IT No       : ${pan}`, LM + 3, y, { width: pw * 0.55 - 6 })
+    y += 9
+  }
+  doc.font('Helvetica').fontSize(7)
+  doc.text(`State Name      : ${addr.state}${stateCode ? ', Code : ' + stateCode : ''}`, LM + 3, y, { width: pw * 0.55 - 6 })
+  y += 9
+  if (addr.phone) {
+    doc.text(`Phone            : ${addr.phone}`, LM + 3, y, { width: pw * 0.55 - 6 })
+    y += 9
+  }
+  doc.text(`Place of Supply  : ${addr.state}`, LM + 3, y, { width: pw * 0.55 - 6 })
+  y += 11
+  drawRect(doc, LM, startY, pw, y - startY)
+  return y
+}
 
 export function generateInvoicePDF(
   order: InvoiceOrder,
   items: InvoiceOrderItem[],
   business: InvoiceBusinessSettings,
-  buyerAddress: InvoiceBuyerAddress
+  buyerAddress: InvoiceBuyerAddress,
+  billingAddress?: InvoiceBuyerAddress
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 28 })
@@ -145,9 +179,9 @@ export function generateInvoicePDF(
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)
 
-    const LM = 28          // left margin
-    const pw = 595.28 - 56 // page width minus margins (A4 = 595.28pt)
-    const R = LM + pw      // right edge
+    const LM = 28
+    const pw = 595.28 - 56
+    const R = LM + pw
     const F = 'Helvetica'
     const FB = 'Helvetica-Bold'
     const FI = 'Helvetica-Oblique'
@@ -155,29 +189,21 @@ export function generateInvoicePDF(
 
     let y = 28
 
-    // ════════════════════════════════════════════════
-    // TITLE: "Tax Invoice" centered
-    // ════════════════════════════════════════════════
     doc.font(FB).fontSize(12).text('Tax Invoice', LM, y, { width: pw, align: 'center' })
     y += 16
 
-    // ════════════════════════════════════════════════
-    // TOP SECTION: Seller info (left) + Invoice meta grid (right)
-    // ════════════════════════════════════════════════
     const topY = y
-    const sellerW = pw * 0.55   // left column width
-    const metaW = pw - sellerW  // right columns
+    const sellerW = pw * 0.55
+    const metaW = pw - sellerW
     const metaX = LM + sellerW
     const metaHalfW = metaW / 2
 
-    // ── Seller block ──
     const sellerX = LM + 3
     let sy = topY + 3
     doc.font(FB).fontSize(9).text(business.tradeName.toUpperCase(), sellerX, sy, { width: sellerW - 6 })
     sy += 11
     doc.font(F).fontSize(7)
     const addressLines = business.address.split(',').map(s => s.trim())
-    // Show multi-line address
     const addrText = addressLines.join(',\n')
     doc.text(addrText, sellerX, sy, { width: sellerW - 6 })
     sy += doc.heightOfString(addrText, { width: sellerW - 6 }) + 2
@@ -197,8 +223,6 @@ export function generateInvoicePDF(
       sy += 9
     }
 
-    // ── Invoice meta grid (right side) ──
-    // Row heights for the meta grid
     const metaRowH = 18
     const metaRows = [
       { left: 'Invoice No.', leftVal: order.invoice_number, right: 'Dated', rightVal: formatDate(order.invoice_date) },
@@ -211,77 +235,34 @@ export function generateInvoicePDF(
 
     let my = topY
     for (const row of metaRows) {
-      // Draw cells
       drawRect(doc, metaX, my, metaHalfW, metaRowH)
       drawRect(doc, metaX + metaHalfW, my, metaHalfW, metaRowH)
-      // Labels
       doc.font(F).fontSize(6)
       doc.text(row.left, metaX + 2, my + 2, { width: metaHalfW - 4 })
       doc.text(row.right, metaX + metaHalfW + 2, my + 2, { width: metaHalfW - 4 })
-      // Values
       doc.font(FB).fontSize(7)
       if (row.leftVal) doc.text(row.leftVal, metaX + 2, my + 9, { width: metaHalfW - 4 })
       if (row.rightVal) doc.text(row.rightVal, metaX + metaHalfW + 2, my + 9, { width: metaHalfW - 4 })
       my += metaRowH
     }
 
-    // "Terms of Delivery" row spanning full meta width
     drawRect(doc, metaX, my, metaW, metaRowH)
     doc.font(F).fontSize(6).text('Terms of Delivery', metaX + 2, my + 2, { width: metaW - 4 })
     my += metaRowH
 
-    // Seller area height = max of seller text or meta grid
     const sellerEndY = Math.max(sy + 4, my)
-
-    // Draw seller outer border
     drawRect(doc, LM, topY, sellerW, sellerEndY - topY)
-
     y = sellerEndY
 
-    // ════════════════════════════════════════════════
-    // CONSIGNEE (Ship to)
-    // ════════════════════════════════════════════════
-    const consigneeY = y
-    doc.font(F).fontSize(6).text('Consignee (Ship to)', LM + 3, y + 2, { width: pw - 6 })
-    y += 10
-    doc.font(FB).fontSize(7)
-    const buyerFullAddr = [
-      buyerAddress.full_name,
-      buyerAddress.address_line1,
-      buyerAddress.address_line2,
-      `${buyerAddress.city}`,
-      `${buyerAddress.state} - ${buyerAddress.postal_code}, India`,
-    ].filter(Boolean).join('\n')
-    doc.text(buyerFullAddr, LM + 3, y, { width: pw * 0.55 - 6 })
-    y += doc.heightOfString(buyerFullAddr, { width: pw * 0.55 - 6 }) + 2
+    y = renderAddressBlock(doc, 'Consignee (Ship to)', buyerAddress, order.buyer_gstin, LM, pw, y)
 
-    const buyerStateCode = getStateCode(buyerAddress.state)
-    if (order.buyer_gstin) {
-      doc.font(F).fontSize(7).text(`GSTIN/UIN      : ${order.buyer_gstin}`, LM + 3, y, { width: pw * 0.55 - 6 })
-      y += 9
-      const pan = order.buyer_gstin.substring(2, 12)
-      doc.text(`PAN/IT No       : ${pan}`, LM + 3, y, { width: pw * 0.55 - 6 })
-      y += 9
-    }
-    doc.font(F).fontSize(7)
-    doc.text(`State Name      : ${buyerAddress.state}${buyerStateCode ? ', Code : ' + buyerStateCode : ''}`, LM + 3, y, { width: pw * 0.55 - 6 })
-    y += 9
-    if (buyerAddress.phone) {
-      doc.text(`Phone            : ${buyerAddress.phone}`, LM + 3, y, { width: pw * 0.55 - 6 })
-      y += 9
-    }
-    doc.font(F).fontSize(7).text(`Place of Supply  : ${buyerAddress.state}`, LM + 3, y, { width: pw * 0.55 - 6 })
-    y += 11
-    drawRect(doc, LM, consigneeY, pw, y - consigneeY)
+    const billAddr = billingAddress || buyerAddress
+    y = renderAddressBlock(doc, 'Buyer (Bill to)', billAddr, order.buyer_gstin, LM, pw, y)
 
-    // ════════════════════════════════════════════════
-    // ITEMS TABLE (with page break support)
-    // ════════════════════════════════════════════════
-    const pageH = 841.89  // A4 height in points
+    const pageH = 841.89
     const bottomMargin = 28
     const pageBottom = pageH - bottomMargin
 
-    // Column definitions — match the sample invoice
     const itemCols = [
       { label: 'Sl\nNo.', w: 22, align: 'center' as const },
       { label: 'Description of Goods', w: 140, align: 'left' as const },
@@ -295,10 +276,9 @@ export function generateInvoicePDF(
       { label: 'Amount', w: 62, align: 'right' as const },
     ]
 
-    // Scale columns to fit page width
     const rawTotal = itemCols.reduce((s, c) => s + c.w, 0)
-    const sc = pw / rawTotal
-    itemCols.forEach(c => { c.w = Math.round(c.w * sc) })
+    const colScale = pw / rawTotal
+    itemCols.forEach(c => { c.w = Math.round(c.w * colScale) })
     const drift = pw - itemCols.reduce((s, c) => s + c.w, 0)
     itemCols[itemCols.length - 1].w += drift
 
@@ -308,14 +288,10 @@ export function generateInvoicePDF(
     const amountColX = R - amountColW
     const descLabelX = LM + itemCols[0].w + 8
 
-    // Calculate how much space the summary rows need after items
-    // subtotal(14) + tax rows(14 or 28) + possible round-off(14) + total(22) = ~64-78pt
     const summaryRowsHeight = rowH + (order.is_igst ? rowH : rowH * 2) + 22
 
-    // Track table segments per page for drawing grid lines
     let tableTop = y
 
-    // Helper: draw the table header row
     function drawTableHeader() {
       let cx = LM
       doc.font(FB).fontSize(6.5)
@@ -327,11 +303,8 @@ export function generateInvoicePDF(
       y += headerH
     }
 
-    // Helper: close the current table segment (draw grid lines for this page)
     function closeTableSegment() {
-      // Outer border for this segment
       drawRect(doc, LM, tableTop, pw, y - tableTop)
-      // All column vertical lines full height of this segment
       let cx = LM
       for (let i = 0; i < itemCols.length - 1; i++) {
         cx += itemCols[i].w
@@ -339,28 +312,20 @@ export function generateInvoicePDF(
       }
     }
 
-    // Helper: check if we need a page break, and if so, close current segment, add new page, redraw header
     function checkPageBreak(neededHeight: number) {
       if (y + neededHeight > pageBottom) {
-        // Close current table segment with grid lines
         closeTableSegment()
-        // Add "Continued on next page..." note
         doc.font(FI).fontSize(6).text('Continued on next page...', LM, y + 2, { width: pw, align: 'center' })
-        // New page
         doc.addPage()
         y = LM
         tableTop = y
-        // Redraw header
         drawTableHeader()
       }
     }
 
-    // ── Draw first table header ──
     drawTableHeader()
 
-    // ── Item rows ──
     for (let i = 0; i < items.length; i++) {
-      // For the last item, ensure there's room for both this item AND the summary rows
       const isLastItem = i === items.length - 1
       const spaceNeeded = isLastItem ? rowH + summaryRowsHeight : rowH
       checkPageBreak(spaceNeeded)
@@ -393,15 +358,12 @@ export function generateInvoicePDF(
       y += rowH
     }
 
-    // ── Summary rows (subtotal, tax, round off) ──
-    // Subtotal row
     checkPageBreak(rowH)
     drawHLine(doc, LM, R, y)
     doc.font(F).fontSize(7)
     doc.text(fmt(order.taxable_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
     y += rowH
 
-    // Tax rows (IGST / CGST+SGST)
     if (order.is_igst) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
@@ -422,7 +384,6 @@ export function generateInvoicePDF(
       y += rowH
     }
 
-    // Round off row
     const roundOff = order.total_amount - (order.taxable_amount + order.cgst_amount + order.sgst_amount + order.igst_amount)
     if (Math.abs(roundOff) >= 0.01) {
       checkPageBreak(rowH)
@@ -432,28 +393,22 @@ export function generateInvoicePDF(
       y += rowH
     }
 
-    // ── Total row ──
     checkPageBreak(22)
-    const totalRowY = y  // Record where Total row starts (for grid lines)
+    const totalRowY = y
     drawHLine(doc, LM, R, y)
     y += 3
     doc.font(FB).fontSize(7).text('Total', LM + itemCols[0].w + 2, y + 3, { width: 40, align: 'right' })
-    doc.font(FB).fontSize(9).text(`Rs. ${fmt(order.total_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+    doc.font(FB).fontSize(9).text(`₹ ${fmt(order.total_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
     y += 18
 
-    // ── Close final table segment grid lines ──
-    // Outer border for full table including Total row
     drawRect(doc, LM, tableTop, pw, y - tableTop)
-    // Column vertical lines stop at the Total row — only Amount column goes full height
     let gridCx = LM
     for (let i = 0; i < itemCols.length - 1; i++) {
       gridCx += itemCols[i].w
-      drawVLine(doc, gridCx, tableTop, totalRowY) // stop at Total row
+      drawVLine(doc, gridCx, tableTop, totalRowY)
     }
-    // Amount column vertical line extends through Total row
     drawVLine(doc, amountColX, tableTop, y)
 
-    // Helper: simple page break for non-table sections
     function ensureSpace(needed: number) {
       if (y + needed > pageBottom) {
         doc.addPage()
@@ -461,9 +416,6 @@ export function generateInvoicePDF(
       }
     }
 
-    // ════════════════════════════════════════════════
-    // AMOUNT IN WORDS
-    // ════════════════════════════════════════════════
     ensureSpace(26)
     const wordsY = y
     doc.font(F).fontSize(7).text('Amount Chargeable (in words)', LM + 3, y + 2)
@@ -473,14 +425,10 @@ export function generateInvoicePDF(
     y += 13
     drawRect(doc, LM, wordsY, pw, y - wordsY)
 
-    // ════════════════════════════════════════════════
-    // HSN/SAC SUMMARY TABLE
-    // ════════════════════════════════════════════════
     ensureSpace(60)
     let cx = LM
     const hsnY = y
 
-    // Group items by HSN code
     const hsnMap = new Map<string, { taxable: number; rate: number; cgst: number; sgst: number; igst: number; totalTax: number }>()
     for (const item of items) {
       const key = item.hsn_code || 'N/A'
@@ -493,7 +441,6 @@ export function generateInvoicePDF(
       hsnMap.set(key, ex)
     }
 
-    // HSN columns — adapt based on IGST vs CGST/SGST
     const hsnCols = order.is_igst
       ? [
           { label: 'HSN/SAC', w: 160, align: 'left' as const },
@@ -518,7 +465,6 @@ export function generateInvoicePDF(
           { label: 'Total\nTax Amount', w: 70, align: 'right' as const },
         ]
 
-    // Flatten and scale
     type FlatCol = { label: string; w: number; align: 'left' | 'right' | 'center' }
     const flatCols: FlatCol[] = []
     for (const col of hsnCols) {
@@ -533,18 +479,14 @@ export function generateInvoicePDF(
     flatCols.forEach(c => { c.w = Math.round(c.w * hsnSc) })
     flatCols[flatCols.length - 1].w += pw - flatCols.reduce((s, c) => s + c.w, 0)
 
-    // Header row 1 — group labels
     const hsnHeaderH1 = 12
     const hsnHeaderH2 = 12
     cx = LM
     doc.font(FB).fontSize(6.5)
 
-    // For IGST: HSN/SAC | Taxable Value | [IGST: Rate | Amount] | Total Tax Amount
-    // We need to draw group headers spanning sub-columns
     let flatIdx = 0
     for (const col of hsnCols) {
       if ((col as any).sub && (col as any).subCols) {
-        // Calculate actual sub-width from flatCols
         let actualSubW = 0
         for (const _sc of (col as any).subCols) {
           actualSubW += flatCols[flatIdx].w
@@ -562,7 +504,6 @@ export function generateInvoicePDF(
     }
     y += hsnHeaderH1
 
-    // Header row 2 — sub-column labels
     cx = LM
     flatIdx = 0
     for (const col of hsnCols) {
@@ -574,14 +515,12 @@ export function generateInvoicePDF(
           flatIdx++
         }
       } else {
-        // Already drawn as spanning row, just advance
         cx += flatCols[flatIdx].w
         flatIdx++
       }
     }
     y += hsnHeaderH2
 
-    // HSN data rows
     let hsnTotalTaxable = 0
     let hsnTotalTax = 0
     doc.font(F).fontSize(7)
@@ -604,41 +543,33 @@ export function generateInvoicePDF(
       y += 12
     }
 
-    // HSN total row
     drawHLine(doc, LM, R, y)
     y += 1
     cx = LM
     doc.font(FB).fontSize(7)
 
-    // "Total" label right-aligned in HSN column
     doc.text('Total', cx + 2, y + 2, { width: flatCols[0].w - 4, align: 'right' })
     cx += flatCols[0].w
-    // Taxable total
     doc.text(fmt(hsnTotalTaxable), cx + 2, y + 2, { width: flatCols[1].w - 4, align: 'right' })
     cx += flatCols[1].w
 
     if (order.is_igst) {
-      cx += flatCols[2].w // skip rate
+      cx += flatCols[2].w
       doc.text(fmt(order.igst_amount), cx + 2 - flatCols[3].w, y + 2, { width: flatCols[3].w - 4, align: 'right' })
       cx = LM + flatCols.reduce((s, c) => s + c.w, 0) - flatCols[flatCols.length - 1].w
     } else {
-      cx += flatCols[2].w // skip cgst rate
+      cx += flatCols[2].w
       doc.text(fmt(order.cgst_amount), cx + 2, y + 2, { width: flatCols[3].w - 4, align: 'right' })
-      cx += flatCols[3].w + flatCols[4].w // skip sgst rate
+      cx += flatCols[3].w + flatCols[4].w
       doc.text(fmt(order.sgst_amount), cx + 2, y + 2, { width: flatCols[5].w - 4, align: 'right' })
       cx += flatCols[5].w
     }
-    // Total tax
     const lastColX = R - flatCols[flatCols.length - 1].w
     doc.text(fmt(hsnTotalTax), lastColX + 2, y + 2, { width: flatCols[flatCols.length - 1].w - 4, align: 'right' })
     y += 14
 
-    // Draw outer border for HSN table
     drawRect(doc, LM, hsnY, pw, y - hsnY)
 
-    // ════════════════════════════════════════════════
-    // TAX AMOUNT IN WORDS
-    // ════════════════════════════════════════════════
     const taxWordsY = y
     const totalTaxAmount = order.is_igst ? order.igst_amount : (order.cgst_amount + order.sgst_amount)
     doc.font(F).fontSize(7)
@@ -648,22 +579,17 @@ export function generateInvoicePDF(
     y += 14
     drawRect(doc, LM, taxWordsY, pw, y - taxWordsY)
 
-    // ════════════════════════════════════════════════
-    // DECLARATION + BANK DETAILS + SIGNATORY
-    // ════════════════════════════════════════════════
-    ensureSpace(110) // declaration + bank + seal + footer
+    ensureSpace(110)
     const bottomY = y
     const bottomH = 70
     const declW = pw * 0.48
     const bankW = pw - declW
 
-    // Declaration (left)
     doc.font(FB).fontSize(7).text('Declaration', LM + 3, y + 3, { width: declW - 6 })
     y += 10
     doc.font(F).fontSize(6.5)
     doc.text('We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.', LM + 3, y, { width: declW - 6 })
 
-    // Bank details (right)
     const bankX = LM + declW
     let by = bottomY + 3
     doc.font(F).fontSize(7)
@@ -684,13 +610,9 @@ export function generateInvoicePDF(
 
     y = bottomY + bottomH
 
-    // Draw borders
     drawRect(doc, LM, bottomY, declW, bottomH)
     drawRect(doc, bankX, bottomY, bankW, bottomH)
 
-    // ════════════════════════════════════════════════
-    // SEAL + SIGNATORY ROW
-    // ════════════════════════════════════════════════
     const sigY = y
     const sigH = 30
     drawRect(doc, LM, sigY, declW, sigH)
@@ -702,9 +624,6 @@ export function generateInvoicePDF(
 
     y = sigY + sigH + 8
 
-    // ════════════════════════════════════════════════
-    // FOOTER
-    // ════════════════════════════════════════════════
     doc.font(F).fontSize(7).text('SUBJECT TO RAIPUR JURISDICTION', LM, y, { width: pw, align: 'center' })
     y += 10
     doc.font(F).fontSize(6.5).text('This is a Computer Generated Invoice', LM, y, { width: pw, align: 'center' })

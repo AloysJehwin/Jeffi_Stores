@@ -5,27 +5,15 @@ import { uploadInvoicePDF } from '@/lib/s3'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
-/**
- * Generate invoice for an order: create invoice number, calculate GST if needed,
- * generate PDF, upload to S3, and return the PDF buffer for email attachment.
- *
- * Call this when:
- * - Razorpay payment is verified (payment_status → paid)
- * - Admin changes order status to confirmed/processing
- *
- * Returns null if GST is disabled or invoice already exists.
- */
 export async function generateOrderInvoice(orderId: string): Promise<Buffer | null> {
   if (!isGSTEnabled) return null
 
-  // Check if invoice already exists
   const existingInvoice = await queryOne(
     'SELECT id FROM invoices WHERE order_id = $1',
     [orderId]
   )
   if (existingInvoice) return null
 
-  // Fetch order with address
   const order = await queryOne(`
     SELECT o.*, a.full_name, a.address_line1, a.address_line2, a.city, a.state, a.postal_code, a.phone AS address_phone
     FROM orders o
@@ -35,10 +23,8 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
 
   if (!order) return null
 
-  // Only generate invoice for paid orders
   if (order.payment_status !== 'paid') return null
 
-  // Don't generate for pending or cancelled orders
   if (order.status === 'pending' || order.status === 'cancelled') return null
 
   const orderItems = await queryMany(
@@ -46,7 +32,6 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     [orderId]
   )
 
-  // Generate invoice number and update order in a transaction
   const invoiceData = await withTransaction(async (client) => {
     const now = new Date()
     const fy = getFinancialYear(now)
@@ -58,7 +43,6 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     const invoiceNumber = generateInvoiceNumber(prefix, fy, seq)
     const invoiceDate = now.toISOString()
 
-    // If order doesn't have GST breakdown yet, calculate it now
     let taxableAmount = parseFloat(order.taxable_amount || '0')
     let cgstAmount = parseFloat(order.cgst_amount || '0')
     let sgstAmount = parseFloat(order.sgst_amount || '0')
@@ -66,7 +50,6 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     let orderIsIgst = order.is_igst || false
 
     if (taxableAmount === 0 && parseFloat(order.tax_amount || '0') > 0) {
-      // GST breakdown wasn't calculated at order creation — calculate now
       const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'
       const buyerState = order.state || ''
       orderIsIgst = isInterState(buyerState, sellerStateCode)
@@ -83,7 +66,6 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
         totalSgst += gst.sgst
         totalIgst += gst.igst
 
-        // Update order item with GST breakdown
         await client.query(
           `UPDATE order_items SET hsn_code = COALESCE(hsn_code, $1), gst_rate = COALESCE(gst_rate, $2),
            taxable_amount = $3, cgst_amount = $4, sgst_amount = $5, igst_amount = $6
@@ -98,7 +80,6 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
       igstAmount = Math.round(totalIgst * 100) / 100
     }
 
-    // Update order with invoice info and GST breakdown
     await client.query(
       `UPDATE orders SET invoice_number = $1, invoice_date = $2,
        taxable_amount = $3, cgst_amount = $4, sgst_amount = $5, igst_amount = $6, is_igst = $7
@@ -106,7 +87,6 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
       [invoiceNumber, invoiceDate, taxableAmount, cgstAmount, sgstAmount, igstAmount, orderIsIgst, orderId]
     )
 
-    // Insert invoice record
     await client.query(
       'INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)',
       [orderId, invoiceNumber, fy, seq]
@@ -117,7 +97,6 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     }
   })
 
-  // Fetch business settings for PDF
   const settingsRows = await queryMany(
     "SELECT key, value FROM site_settings WHERE key LIKE 'business_%' OR key LIKE 'bank_%'",
     []
@@ -142,7 +121,6 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     bankBranch: settings.bank_branch || '',
   }
 
-  // Re-fetch order items with updated GST data
   const updatedItems = await queryMany(
     'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
     [orderId]
@@ -187,14 +165,30 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     phone: order.address_phone || order.customer_phone || '',
   }
 
-  // Generate PDF
-  const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress)
+  let billingAddress: InvoiceBuyerAddress | undefined
+  if (order.billing_address_id && order.billing_address_id !== order.shipping_address_id) {
+    const billAddr = await queryOne(
+      'SELECT full_name, address_line1, address_line2, city, state, postal_code, phone FROM addresses WHERE id = $1',
+      [order.billing_address_id]
+    )
+    if (billAddr) {
+      billingAddress = {
+        full_name: billAddr.full_name || '',
+        address_line1: billAddr.address_line1 || '',
+        address_line2: billAddr.address_line2 || null,
+        city: billAddr.city || '',
+        state: billAddr.state || '',
+        postal_code: billAddr.postal_code || '',
+        phone: billAddr.phone || '',
+      }
+    }
+  }
 
-  // Upload to S3
+  const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress)
+
   const fy = getFinancialYear(new Date(invoiceData.invoiceDate))
   const s3Url = await uploadInvoicePDF(pdfBuffer, invoiceData.invoiceNumber, fy)
 
-  // Update invoice with S3 URL
   await queryOne(
     'UPDATE invoices SET pdf_url = $1 WHERE order_id = $2 RETURNING id',
     [s3Url, orderId]
