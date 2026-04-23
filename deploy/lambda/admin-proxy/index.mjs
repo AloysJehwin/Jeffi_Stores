@@ -41,8 +41,10 @@ export const handler = async (event) => {
       res.on('data', (chunk) => chunks.push(chunk))
       res.on('end', () => {
         const responseBody = Buffer.concat(chunks)
+        const contentEncoding = res.headers['content-encoding'] || ''
         const contentType = res.headers['content-type'] || ''
-        const isText = /text|json|html|xml|javascript|css/.test(contentType)
+        const isCompressed = /gzip|br|deflate/.test(contentEncoding)
+        const isText = !isCompressed && /text|json|html|xml|javascript|css/.test(contentType)
 
         const responseHeaders = {}
         const cookies = []
