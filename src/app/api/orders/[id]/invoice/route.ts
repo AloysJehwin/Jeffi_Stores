@@ -92,6 +92,12 @@ export async function GET(
       igst_amount: parseFloat(order.igst_amount || '0'),
       is_igst: order.is_igst || false,
       buyer_gstin: order.buyer_gstin || null,
+      order_date: order.created_at,
+      payment_mode: order.payment_status === 'paid' ? 'Online Payment' : '',
+      tracking_number: order.tracking_number || '',
+      shipped_at: order.shipped_at || '',
+      shipping_method: order.shipping_method || '',
+      destination: [order.city, order.state].filter(Boolean).join(', '),
     }
 
     const invoiceItems: InvoiceOrderItem[] = (orderItems || []).map((item: any) => ({
