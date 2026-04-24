@@ -212,11 +212,10 @@ export function generateInvoicePDF(
     doc.text(`State Name : ${business.state}, Code : ${business.stateCode}`, sellerX, sy, { width: sellerW - 6 })
     sy += 9
     if (business.phone || business.email) {
-      const contactParts: string[] = []
-      if (business.phone) contactParts.push(business.phone)
-      if (business.email) contactParts.push(business.email)
-      doc.text(`Contact : ${contactParts.join(',')}`, sellerX, sy, { width: sellerW - 6 })
-      sy += 9
+      if (business.phone) {
+        doc.text(`Contact : ${business.phone}`, sellerX, sy, { width: sellerW - 6 })
+        sy += 9
+      }
     }
     if (business.email) {
       doc.text(`E-Mail : ${business.email}`, sellerX, sy, { width: sellerW - 6 })
@@ -398,7 +397,7 @@ export function generateInvoicePDF(
     drawHLine(doc, LM, R, y)
     y += 3
     doc.font(FB).fontSize(7).text('Total', LM + itemCols[0].w + 2, y + 3, { width: 40, align: 'right' })
-    doc.font(FB).fontSize(9).text(`₹ ${fmt(order.total_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+    doc.font(FB).fontSize(9).text(`Rs. ${fmt(order.total_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
     y += 18
 
     drawRect(doc, LM, tableTop, pw, y - tableTop)
@@ -595,6 +594,9 @@ export function generateInvoicePDF(
     doc.font(F).fontSize(7)
     doc.text("Company's Bank Details", bankX + 2, by, { width: bankW - 4 })
     by += 10
+    const bankLabelW = 90
+    const bankValX = bankX + bankLabelW + 10
+    const bankValW = bankW - bankLabelW - 14
     const bankDetails = [
       { label: "A/c Holder's Name", value: business.tradeName.toUpperCase() },
       { label: 'Bank Name', value: business.bankName.toUpperCase() },
@@ -602,9 +604,8 @@ export function generateInvoicePDF(
       { label: 'Branch & IFS Code', value: `${business.bankBranch} & ${business.bankIfsc}` },
     ]
     for (const bd of bankDetails) {
-      doc.font(F).fontSize(6.5).text(`${bd.label}`, bankX + 2, by, { width: 80, continued: true })
-      doc.text('  :  ', { continued: true })
-      doc.font(FB).fontSize(6.5).text(bd.value, { width: bankW - 90 })
+      doc.font(F).fontSize(6.5).text(`${bd.label}  :`, bankX + 2, by, { width: bankLabelW })
+      doc.font(FB).fontSize(6.5).text(bd.value, bankValX, by, { width: bankValW })
       by += 9
     }
 
