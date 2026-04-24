@@ -140,6 +140,12 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     igst_amount: invoiceData.igstAmount,
     is_igst: invoiceData.isIgst,
     buyer_gstin: order.buyer_gstin || null,
+    order_date: order.created_at,
+    payment_mode: order.payment_status === 'paid' ? 'Online Payment' : '',
+    tracking_number: order.tracking_number || '',
+    shipped_at: order.shipped_at || '',
+    shipping_method: order.shipping_method || '',
+    destination: [order.city, order.state].filter(Boolean).join(', '),
   }
 
   const invoiceItems: InvoiceOrderItem[] = (updatedItems || []).map((item: any) => ({

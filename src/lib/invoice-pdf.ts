@@ -43,6 +43,12 @@ export interface InvoiceOrder {
   igst_amount: number
   is_igst: boolean
   buyer_gstin: string | null
+  order_date?: string
+  payment_mode?: string
+  tracking_number?: string
+  shipped_at?: string
+  shipping_method?: string
+  destination?: string
 }
 
 export interface InvoiceBuyerAddress {
@@ -225,11 +231,11 @@ export function generateInvoicePDF(
     const metaRowH = 18
     const metaRows = [
       { left: 'Invoice No.', leftVal: order.invoice_number, right: 'Dated', rightVal: formatDate(order.invoice_date) },
-      { left: 'Delivery Note', leftVal: '', right: 'Mode/Terms of Payment', rightVal: '' },
+      { left: 'Delivery Note', leftVal: order.tracking_number || '', right: 'Mode/Terms of Payment', rightVal: order.payment_mode || 'Online Payment' },
       { left: 'Reference No. & Date.', leftVal: '', right: 'Other References', rightVal: '' },
-      { left: "Buyer's Order No.", leftVal: order.order_number, right: 'Dated', rightVal: '' },
-      { left: 'Dispatch Doc No.', leftVal: '', right: 'Delivery Note Date', rightVal: '' },
-      { left: 'Dispatched through', leftVal: '', right: 'Destination', rightVal: '' },
+      { left: "Buyer's Order No.", leftVal: order.order_number, right: 'Dated', rightVal: order.order_date ? formatDate(order.order_date) : '' },
+      { left: 'Dispatch Doc No.', leftVal: order.tracking_number || '', right: 'Delivery Note Date', rightVal: order.shipped_at ? formatDate(order.shipped_at) : '' },
+      { left: 'Dispatched through', leftVal: order.shipping_method || '', right: 'Destination', rightVal: order.destination || '' },
     ]
 
     let my = topY
