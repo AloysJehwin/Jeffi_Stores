@@ -31,6 +31,8 @@ async function updateProduct(productId: string, formData: FormData) {
   const imageCount = parseInt(formData.get('image_count') as string || '0')
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
   const existingImagesToKeep = existingImagesToKeepJson ? JSON.parse(existingImagesToKeepJson) : []
+  const galleryImageIdsJson = formData.get('gallery_image_ids') as string
+  const galleryImageIds: string[] = galleryImageIdsJson ? JSON.parse(galleryImageIdsJson) : []
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
@@ -55,7 +57,7 @@ async function updateProduct(productId: string, formData: FormData) {
       ]
     )
 
-    if (imageCount > 0 || existingImagesToKeep.length > 0) {
+    if (imageCount > 0 || existingImagesToKeep.length > 0 || galleryImageIds.length > 0) {
       const allExistingImages = await queryMany(
         'SELECT * FROM product_images WHERE product_id = $1',
         [productId]
@@ -147,6 +149,32 @@ async function updateProduct(productId: string, formData: FormData) {
           'UPDATE product_images SET is_primary = true WHERE id = $1',
           [existingImagesToKeep[0].id]
         )
+      }
+
+      if (galleryImageIds.length > 0) {
+        const galleryImages = await queryMany(
+          `SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`,
+          [galleryImageIds]
+        )
+        for (let i = 0; i < (galleryImages || []).length; i++) {
+          const gimg = galleryImages![i]
+          const displayOrder = existingImagesToKeep.length + imageCount + i
+          const isPrimary = existingImagesToKeep.length === 0 && imageCount === 0 && i === 0
+          await query(
+            `INSERT INTO product_images (
+              product_id, image_url, thumbnail_url, s3_bucket, s3_key,
+              s3_thumbnail_key, file_name, file_size, mime_type, width,
+              height, display_order, is_primary
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            [
+              productId, gimg.image_url, gimg.thumbnail_url,
+              process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+              gimg.s3_key, gimg.s3_thumbnail_key,
+              gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
+              gimg.width, gimg.height, displayOrder, isPrimary,
+            ]
+          )
+        }
       }
     }
 

@@ -28,6 +28,8 @@ async function createProduct(formData: FormData) {
   const isActive = formData.get('is_active') === 'true'
   const isFeatured = formData.get('is_featured') === 'true'
   const imageCount = parseInt(formData.get('image_count') as string || '0')
+  const galleryImageIdsJson = formData.get('gallery_image_ids') as string
+  const galleryImageIds: string[] = galleryImageIdsJson ? JSON.parse(galleryImageIdsJson) : []
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
@@ -80,6 +82,32 @@ async function createProduct(formData: FormData) {
             ]
           )
         }
+      }
+    }
+
+    if (galleryImageIds.length > 0) {
+      const galleryImages = await queryMany(
+        `SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`,
+        [galleryImageIds]
+      )
+      for (let i = 0; i < (galleryImages || []).length; i++) {
+        const gimg = galleryImages![i]
+        const displayOrder = imageCount + i
+        const isPrimary = imageCount === 0 && i === 0
+        await query(
+          `INSERT INTO product_images (
+            product_id, image_url, thumbnail_url, s3_bucket, s3_key,
+            s3_thumbnail_key, file_name, file_size, mime_type, width,
+            height, display_order, is_primary
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+          [
+            data.id, gimg.image_url, gimg.thumbnail_url,
+            process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+            gimg.s3_key, gimg.s3_thumbnail_key,
+            gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
+            gimg.width, gimg.height, displayOrder, isPrimary,
+          ]
+        )
       }
     }
 
