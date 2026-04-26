@@ -370,7 +370,8 @@ export async function syncProductToSheet(productId: string): Promise<void> {
         }
       )
     }
-  } catch {
+  } catch (err: any) {
+    process.stderr.write('SHEETS_SYNC_ERROR: ' + (err?.message || String(err)) + '\n')
   }
 }
 
