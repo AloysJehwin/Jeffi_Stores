@@ -56,10 +56,6 @@ COPY --from=deps /app/node_modules/js-md5 ./node_modules/js-md5
 COPY --from=deps /app/node_modules/linebreak ./node_modules/linebreak
 COPY --from=deps /app/node_modules/png-js ./node_modules/png-js
 
-# Copy the Google service account key (will be overridden by Secrets Manager in prod)
-# This is a fallback; prefer fetching from Secrets Manager at runtime
-COPY --from=builder /app/jeffi-stores-76e9ecaecdd6.json ./jeffi-stores-76e9ecaecdd6.json
-
 USER nextjs
 
 EXPOSE 3000
