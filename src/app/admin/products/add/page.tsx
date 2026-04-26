@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getAllCategories, getAllBrands } from '@/lib/queries'
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, queryMany } from '@/lib/db'
 import { generateProductSku, generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 
