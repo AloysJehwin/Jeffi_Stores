@@ -370,7 +370,8 @@ export async function syncProductToSheet(productId: string): Promise<void> {
         }
       )
     }
-  } catch {
+  } catch (err: any) {
+    throw err
   }
 }
 
