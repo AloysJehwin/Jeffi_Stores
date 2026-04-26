@@ -1,5 +1,7 @@
 import { SignJWT } from 'jose'
 import { queryMany } from './db'
+import fs from 'fs'
+import path from 'path'
 import {
   getGoogleProductCategory,
   buildProductType,
@@ -26,12 +28,9 @@ interface ServiceAccountCreds {
 let cachedToken: { token: string; expiresAt: number } | null = null
 
 function loadCredentials(): ServiceAccountCreds {
-  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')
-  if (!clientEmail || !privateKey) {
-    throw new Error('GOOGLE_CLIENT_EMAIL or GOOGLE_PRIVATE_KEY env vars not set')
-  }
-  return { client_email: clientEmail, private_key: privateKey }
+  const credPath = path.join(process.cwd(), 'jeffi-stores-76e9ecaecdd6.json')
+  const creds = JSON.parse(fs.readFileSync(credPath, 'utf8'))
+  return { client_email: creds.client_email, private_key: creds.private_key }
 }
 
 async function getAccessToken(): Promise<string> {
