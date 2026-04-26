@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 interface LocalImage {
   file?: File
@@ -282,27 +283,28 @@ export default function ImageUpload({
               </button>
             </div>
 
-            <div className="px-6 py-3 border-b border-border-default flex gap-2">
+            <div className="px-6 py-3 border-b border-border-default flex gap-2 items-center">
               <input
                 type="text"
                 placeholder="Search by name..."
                 value={gallerySearch}
                 onChange={e => setGallerySearch(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm border border-border-default rounded-lg bg-surface-secondary text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-accent-500"
+                className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               />
-              <select
-                value={galleryCategory}
-                onChange={e => setGalleryCategory(e.target.value)}
-                className="px-3 py-2 text-sm border border-border-default rounded-lg bg-surface-secondary text-foreground focus:outline-none focus:border-accent-500"
-              >
-                <option value="">All categories</option>
-                {categories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <div className="w-48 shrink-0">
+                <AdminSelect
+                  value={galleryCategory}
+                  onChange={setGalleryCategory}
+                  placeholder="All categories"
+                  options={[
+                    { value: '', label: 'All categories' },
+                    ...categories.map(c => ({ value: c.id, label: c.name })),
+                  ]}
+                />
+              </div>
             </div>
 
-            <div className="overflow-y-auto flex-1 p-4">
+            <div className="overflow-y-auto flex-1 min-h-0 p-4">
               {galleryLoading && (
                 <div className="flex items-center justify-center py-16">
                   <div className="w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full animate-spin" />
