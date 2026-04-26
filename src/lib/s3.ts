@@ -118,23 +118,23 @@ export interface GalleryUploadResult {
 export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string): Promise<GalleryUploadResult> {
   const timestamp = Date.now()
   const baseName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '')
-  const s3Key = `gallery/${timestamp}-${baseName}.jpg`
-  const s3ThumbnailKey = `gallery/thumbnails/${timestamp}-${baseName}.jpg`
+  const s3Key = `gallery/${timestamp}-${baseName}.png`
+  const s3ThumbnailKey = `gallery/thumbnails/${timestamp}-${baseName}.png`
 
   const metadata = await sharp(imageBuffer).rotate().metadata()
-  const jpegBuffer = await sharp(imageBuffer).rotate().jpeg({ quality: 85 }).toBuffer()
-  const thumbnailBuffer = await sharp(imageBuffer).rotate().resize(300, 300, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer()
+  const pngBuffer = await sharp(imageBuffer).rotate().png({ compressionLevel: 8 }).toBuffer()
+  const thumbnailBuffer = await sharp(imageBuffer).rotate().resize(300, 300, { fit: 'cover' }).png({ compressionLevel: 8 }).toBuffer()
 
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key, Body: jpegBuffer, ContentType: 'image/jpeg' }))
-  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3ThumbnailKey, Body: thumbnailBuffer, ContentType: 'image/jpeg' }))
+  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key, Body: pngBuffer, ContentType: 'image/png' }))
+  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3ThumbnailKey, Body: thumbnailBuffer, ContentType: 'image/png' }))
 
   return {
     url: getS3Url(s3Key),
     thumbnailUrl: getS3Url(s3ThumbnailKey),
     s3Key,
     s3ThumbnailKey,
-    fileName: `${baseName}.jpg`,
-    fileSize: jpegBuffer.length,
+    fileName: `${baseName}.png`,
+    fileSize: pngBuffer.length,
     width: metadata.width || 0,
     height: metadata.height || 0,
   }

@@ -30,6 +30,7 @@ interface GalleryImage {
   file_size: number
   width: number
   height: number
+  custom_name: string | null
 }
 
 interface ImageUploadProps {
@@ -50,6 +51,7 @@ export default function ImageUpload({
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([])
   const [galleryLoading, setGalleryLoading] = useState(false)
   const [selectedGalleryId, setSelectedGalleryId] = useState<string | null>(null)
+  const [gallerySearch, setGallerySearch] = useState('')
 
   useEffect(() => {
     if (existingImages && existingImages.length > 0) {
@@ -126,6 +128,7 @@ export default function ImageUpload({
   const openGallery = useCallback(async () => {
     setShowGallery(true)
     setSelectedGalleryId(null)
+    setGallerySearch('')
     setGalleryLoading(true)
     try {
       const res = await fetch('/api/gallery?limit=60')
@@ -263,6 +266,16 @@ export default function ImageUpload({
               </button>
             </div>
 
+            <div className="px-6 py-3 border-b border-border-default">
+              <input
+                type="text"
+                placeholder="Search by name..."
+                value={gallerySearch}
+                onChange={e => setGallerySearch(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface-secondary text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-accent-500"
+              />
+            </div>
+
             <div className="overflow-y-auto flex-1 p-4">
               {galleryLoading && (
                 <div className="flex items-center justify-center py-16">
@@ -272,20 +285,33 @@ export default function ImageUpload({
               {!galleryLoading && galleryImages.length === 0 && (
                 <p className="text-center text-foreground-secondary py-16">No images in gallery yet. Use the Chrome extension to add images.</p>
               )}
-              {!galleryLoading && galleryImages.length > 0 && (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {galleryImages.map(gimg => (
-                    <button
-                      key={gimg.id}
-                      type="button"
-                      onClick={() => setSelectedGalleryId(gimg.id)}
-                      className={`aspect-square rounded-lg overflow-hidden border-2 transition-colors ${selectedGalleryId === gimg.id ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-default hover:border-accent-400'}`}
-                    >
-                      <img src={gimg.thumbnail_url || gimg.image_url} alt={gimg.file_name} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
+              {!galleryLoading && galleryImages.length > 0 && (() => {
+                const q = gallerySearch.toLowerCase()
+                const filtered = galleryImages.filter(g =>
+                  (g.custom_name || g.file_name || '').toLowerCase().includes(q)
+                )
+                return filtered.length === 0 ? (
+                  <p className="text-center text-foreground-secondary py-16">No images match &ldquo;{gallerySearch}&rdquo;</p>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                    {filtered.map(gimg => (
+                      <button
+                        key={gimg.id}
+                        type="button"
+                        onClick={() => setSelectedGalleryId(gimg.id)}
+                        className={`rounded-lg overflow-hidden border-2 transition-colors text-left ${selectedGalleryId === gimg.id ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-default hover:border-accent-400'}`}
+                      >
+                        <div className="aspect-square">
+                          <img src={gimg.thumbnail_url || gimg.image_url} alt={gimg.custom_name || gimg.file_name} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="px-1.5 py-1 bg-surface-secondary">
+                          <p className="text-xs text-foreground-secondary truncate">{gimg.custom_name || gimg.file_name}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
 
             <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
