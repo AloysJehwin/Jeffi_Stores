@@ -31,6 +31,14 @@ interface GalleryImage {
   width: number
   height: number
   custom_name: string | null
+  category_id: string | null
+  category_name: string | null
+}
+
+interface Category {
+  id: string
+  name: string
+  slug: string
 }
 
 interface ImageUploadProps {
@@ -52,6 +60,8 @@ export default function ImageUpload({
   const [galleryLoading, setGalleryLoading] = useState(false)
   const [selectedGalleryId, setSelectedGalleryId] = useState<string | null>(null)
   const [gallerySearch, setGallerySearch] = useState('')
+  const [galleryCategory, setGalleryCategory] = useState('')
+  const [categories, setCategories] = useState<Category[]>([])
 
   useEffect(() => {
     if (existingImages && existingImages.length > 0) {
@@ -129,11 +139,17 @@ export default function ImageUpload({
     setShowGallery(true)
     setSelectedGalleryId(null)
     setGallerySearch('')
+    setGalleryCategory('')
     setGalleryLoading(true)
     try {
-      const res = await fetch('/api/gallery?limit=60')
-      const data = await res.json()
-      setGalleryImages(data.images || [])
+      const [galleryRes, catRes] = await Promise.all([
+        fetch('/api/gallery?limit=100'),
+        fetch('/api/categories'),
+      ])
+      const galleryData = await galleryRes.json()
+      const catData = await catRes.json()
+      setGalleryImages(galleryData.images || [])
+      setCategories(catData.categories || [])
     } catch {
       setGalleryImages([])
     } finally {
@@ -266,14 +282,24 @@ export default function ImageUpload({
               </button>
             </div>
 
-            <div className="px-6 py-3 border-b border-border-default">
+            <div className="px-6 py-3 border-b border-border-default flex gap-2">
               <input
                 type="text"
                 placeholder="Search by name..."
                 value={gallerySearch}
                 onChange={e => setGallerySearch(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface-secondary text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-accent-500"
+                className="flex-1 px-3 py-2 text-sm border border-border-default rounded-lg bg-surface-secondary text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-accent-500"
               />
+              <select
+                value={galleryCategory}
+                onChange={e => setGalleryCategory(e.target.value)}
+                className="px-3 py-2 text-sm border border-border-default rounded-lg bg-surface-secondary text-foreground focus:outline-none focus:border-accent-500"
+              >
+                <option value="">All categories</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
 
             <div className="overflow-y-auto flex-1 p-4">
@@ -287,9 +313,11 @@ export default function ImageUpload({
               )}
               {!galleryLoading && galleryImages.length > 0 && (() => {
                 const q = gallerySearch.toLowerCase()
-                const filtered = q
-                  ? galleryImages.filter(g => (g.custom_name || '').toLowerCase().includes(q))
-                  : galleryImages
+                const filtered = galleryImages.filter(g => {
+                  const nameMatch = q ? (g.custom_name || '').toLowerCase().includes(q) : true
+                  const catMatch = galleryCategory ? g.category_id === galleryCategory : true
+                  return nameMatch && catMatch
+                })
                 return filtered.length === 0 ? (
                   <p className="text-center text-foreground-secondary py-16">No images match &ldquo;{gallerySearch}&rdquo;</p>
                 ) : (
@@ -306,6 +334,9 @@ export default function ImageUpload({
                         </div>
                         <div className="px-1.5 py-1 bg-surface-secondary">
                           <p className="text-xs text-foreground-secondary truncate">{gimg.custom_name || gimg.file_name}</p>
+                          {gimg.category_name && (
+                            <p className="text-xs text-accent-500 truncate">{gimg.category_name}</p>
+                          )}
                         </div>
                       </button>
                     ))}
