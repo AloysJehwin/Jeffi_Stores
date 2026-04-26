@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { getAllCategories, getAllBrands } from '@/lib/queries'
 import { query, queryOne } from '@/lib/db'
 import { generateProductSku, generateVariantSku } from '@/lib/sku'
@@ -114,7 +115,8 @@ async function createProduct(formData: FormData) {
     syncProductToSheet(data.id).catch(() => {})
 
     redirect('/admin/products')
-  } catch {
+  } catch (err) {
+    if (isRedirectError(err)) throw err
     throw new Error('Failed to create product')
   }
 }
