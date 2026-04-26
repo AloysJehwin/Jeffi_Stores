@@ -30,6 +30,8 @@ async function createProduct(formData: FormData) {
   const imageCount = parseInt(formData.get('image_count') as string || '0')
   const galleryImageIdsJson = formData.get('gallery_image_ids') as string
   const galleryImageRefs: { id: string; isPrimary: boolean }[] = galleryImageIdsJson ? JSON.parse(galleryImageIdsJson) : []
+  const imageOrderJson = formData.get('image_order') as string
+  const imageOrder: string[] = imageOrderJson ? JSON.parse(imageOrderJson) : []
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
@@ -59,56 +61,76 @@ async function createProduct(formData: FormData) {
 
     if (!data) throw new Error('Failed to create product')
 
-    if (imageCount > 0) {
+    if (imageCount > 0 || galleryImageRefs.length > 0) {
       const { uploadProductImage } = await import('@/lib/s3')
+      const newFileIds: Record<number, string> = {}
 
       for (let i = 0; i < imageCount; i++) {
         const file = formData.get(`image_${i}`) as File
         if (file) {
           const uploadResult = await uploadProductImage(file, data.id)
-
-          await query(
+          const inserted = await queryOne<{ id: string }>(
             `INSERT INTO product_images (
               product_id, image_url, thumbnail_url, s3_bucket, s3_key,
               s3_thumbnail_key, file_name, file_size, mime_type, width,
               height, display_order, is_primary
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
               data.id, uploadResult.url, uploadResult.thumbnailUrl,
               process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
               uploadResult.s3Key, uploadResult.s3ThumbnailKey,
               uploadResult.fileName, uploadResult.fileSize, uploadResult.mimeType,
-              uploadResult.width, uploadResult.height, i, i === 0,
+              uploadResult.width, uploadResult.height, 999, false,
             ]
           )
+          if (inserted) newFileIds[i] = inserted.id
         }
       }
-    }
 
-    if (galleryImageRefs.length > 0) {
-      const galleryImages = await queryMany(
-        `SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`,
-        [galleryImageRefs.map(r => r.id)]
-      )
-      for (let i = 0; i < (galleryImages || []).length; i++) {
-        const gimg = galleryImages![i]
-        const ref = galleryImageRefs.find(r => r.id === gimg.id)
-        const displayOrder = imageCount + i
-        const isPrimary = ref?.isPrimary ?? (imageCount === 0 && i === 0)
-        await query(
-          `INSERT INTO product_images (
-            product_id, image_url, thumbnail_url, s3_bucket, s3_key,
-            s3_thumbnail_key, file_name, file_size, mime_type, width,
-            height, display_order, is_primary
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [
-            data.id, gimg.image_url, gimg.thumbnail_url,
-            process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
-            gimg.s3_key, gimg.s3_thumbnail_key,
-            gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
-            gimg.width, gimg.height, displayOrder, isPrimary,
-          ]
+      const newGalleryIds: Record<string, string> = {}
+      if (galleryImageRefs.length > 0) {
+        const galleryImages = await queryMany(
+          `SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`,
+          [galleryImageRefs.map(r => r.id)]
         )
+        for (const gimg of (galleryImages || [])) {
+          const inserted = await queryOne<{ id: string }>(
+            `INSERT INTO product_images (
+              product_id, image_url, thumbnail_url, s3_bucket, s3_key,
+              s3_thumbnail_key, file_name, file_size, mime_type, width,
+              height, display_order, is_primary
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+            [
+              data.id, gimg.image_url, gimg.thumbnail_url,
+              process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+              gimg.s3_key, gimg.s3_thumbnail_key,
+              gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
+              gimg.width, gimg.height, 999, false,
+            ]
+          )
+          if (inserted) newGalleryIds[gimg.id] = inserted.id
+        }
+      }
+
+      const keys = imageOrder.length > 0 ? imageOrder : [
+        ...Object.keys(newFileIds).map(i => `file:${i}`),
+        ...galleryImageRefs.map(r => `gallery:${r.id}`),
+      ]
+      const primaryKey = keys.find(k => {
+        if (k.startsWith('gallery:')) return galleryImageRefs.find(r => r.id === k.slice(8))?.isPrimary
+        return false
+      }) || keys[0]
+
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i]
+        const isPrimary = key === primaryKey
+        if (key.startsWith('file:')) {
+          const pid = newFileIds[parseInt(key.slice(5))]
+          if (pid) await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, pid])
+        } else if (key.startsWith('gallery:')) {
+          const pid = newGalleryIds[key.slice(8)]
+          if (pid) await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, pid])
+        }
       }
     }
 

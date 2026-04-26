@@ -33,6 +33,8 @@ async function updateProduct(productId: string, formData: FormData) {
   const existingImagesToKeep = existingImagesToKeepJson ? JSON.parse(existingImagesToKeepJson) : []
   const galleryImageIdsJson = formData.get('gallery_image_ids') as string
   const galleryImageRefs: { id: string; isPrimary: boolean }[] = galleryImageIdsJson ? JSON.parse(galleryImageIdsJson) : []
+  const imageOrderJson = formData.get('image_order') as string
+  const imageOrder: string[] = imageOrderJson ? JSON.parse(imageOrderJson) : []
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
@@ -75,106 +77,110 @@ async function updateProduct(productId: string, formData: FormData) {
             secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
           },
         })
-
         for (const img of imagesToDelete) {
-          if (img.s3_key) {
-            await s3Client.send(new DeleteObjectCommand({
-              Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
-              Key: img.s3_key,
-            }))
-          }
-          if (img.s3_thumbnail_key) {
-            await s3Client.send(new DeleteObjectCommand({
-              Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
-              Key: img.s3_thumbnail_key,
-            }))
-          }
-
+          if (img.s3_key) await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket', Key: img.s3_key }))
+          if (img.s3_thumbnail_key) await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket', Key: img.s3_thumbnail_key }))
           await query('DELETE FROM product_images WHERE id = $1', [img.id])
         }
       }
 
+      const newFileIds: Record<number, string> = {}
       if (imageCount > 0) {
         const { uploadProductImage } = await import('@/lib/s3')
-
         for (let i = 0; i < imageCount; i++) {
           const file = formData.get(`image_${i}`) as File
           if (file) {
             const uploadResult = await uploadProductImage(file, productId)
-
-            await query(
+            const inserted = await queryOne<{ id: string }>(
               `INSERT INTO product_images (
                 product_id, image_url, thumbnail_url, s3_bucket, s3_key,
                 s3_thumbnail_key, file_name, file_size, mime_type, width,
                 height, display_order, is_primary
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
               [
                 productId, uploadResult.url, uploadResult.thumbnailUrl,
                 process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
                 uploadResult.s3Key, uploadResult.s3ThumbnailKey,
                 uploadResult.fileName, uploadResult.fileSize, uploadResult.mimeType,
-                uploadResult.width, uploadResult.height,
-                existingImagesToKeep.length + i,
-                existingImagesToKeep.length === 0 && i === 0,
+                uploadResult.width, uploadResult.height, 999, false,
               ]
             )
+            if (inserted) newFileIds[i] = inserted.id
           }
         }
       }
 
-      for (let i = 0; i < existingImagesToKeep.length; i++) {
-        const img = existingImagesToKeep[i]
-        await query(
-          'UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3',
-          [i, img.is_primary || false, img.id]
-        )
-      }
-
-      const hasPrimaryExisting = existingImagesToKeep.some((img: any) => img.is_primary)
-
-      if (!hasPrimaryExisting && imageCount > 0) {
-        const newImages = await queryMany(
-          'SELECT * FROM product_images WHERE product_id = $1 ORDER BY created_at DESC LIMIT $2',
-          [productId, imageCount]
-        )
-
-        if (newImages && newImages.length > 0) {
-          await query(
-            'UPDATE product_images SET is_primary = true WHERE id = $1',
-            [newImages[newImages.length - 1].id]
-          )
-        }
-      } else if (!hasPrimaryExisting && existingImagesToKeep.length > 0) {
-        await query(
-          'UPDATE product_images SET is_primary = true WHERE id = $1',
-          [existingImagesToKeep[0].id]
-        )
-      }
-
+      const newGalleryIds: Record<string, string> = {}
       if (galleryImageRefs.length > 0) {
         const galleryImages = await queryMany(
           `SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`,
           [galleryImageRefs.map(r => r.id)]
         )
-        for (let i = 0; i < (galleryImages || []).length; i++) {
-          const gimg = galleryImages![i]
-          const ref = galleryImageRefs.find(r => r.id === gimg.id)
-          const displayOrder = existingImagesToKeep.length + imageCount + i
-          const isPrimary = ref?.isPrimary ?? (existingImagesToKeep.length === 0 && imageCount === 0 && i === 0)
-          await query(
+        for (const gimg of (galleryImages || [])) {
+          const inserted = await queryOne<{ id: string }>(
             `INSERT INTO product_images (
               product_id, image_url, thumbnail_url, s3_bucket, s3_key,
               s3_thumbnail_key, file_name, file_size, mime_type, width,
               height, display_order, is_primary
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
               productId, gimg.image_url, gimg.thumbnail_url,
               process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
               gimg.s3_key, gimg.s3_thumbnail_key,
               gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
-              gimg.width, gimg.height, displayOrder, isPrimary,
+              gimg.width, gimg.height, 999, false,
             ]
           )
+          if (inserted) newGalleryIds[gimg.id] = inserted.id
+        }
+      }
+
+      const applyOrder = async (keys: string[]) => {
+        const primaryKey = keys.find(k => {
+          if (k.startsWith('existing:')) {
+            const id = k.slice(9)
+            return existingImagesToKeep.find((img: any) => img.id === id)?.is_primary
+          }
+          if (k.startsWith('gallery:')) {
+            const gid = k.slice(8)
+            return galleryImageRefs.find(r => r.id === gid)?.isPrimary
+          }
+          return false
+        }) || keys[0]
+
+        for (let i = 0; i < keys.length; i++) {
+          const key = keys[i]
+          const isPrimary = key === primaryKey
+          if (key.startsWith('existing:')) {
+            const id = key.slice(9)
+            await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, id])
+          } else if (key.startsWith('gallery:')) {
+            const gid = key.slice(8)
+            const pid = newGalleryIds[gid]
+            if (pid) await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, pid])
+          } else if (key.startsWith('file:')) {
+            const fi = parseInt(key.slice(5))
+            const pid = newFileIds[fi]
+            if (pid) await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, isPrimary, pid])
+          }
+        }
+      }
+
+      if (imageOrder.length > 0) {
+        await applyOrder(imageOrder)
+      } else {
+        for (let i = 0; i < existingImagesToKeep.length; i++) {
+          const img = existingImagesToKeep[i]
+          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, img.is_primary || false, img.id])
+        }
+        let offset = existingImagesToKeep.length
+        for (const [fi, pid] of Object.entries(newFileIds)) {
+          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [offset, offset === 0, pid])
+          offset++
+        }
+        for (const [, pid] of Object.entries(newGalleryIds)) {
+          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [offset, offset === 0, pid])
+          offset++
         }
       }
     }

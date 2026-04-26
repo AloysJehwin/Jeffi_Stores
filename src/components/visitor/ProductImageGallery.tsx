@@ -16,7 +16,8 @@ interface ProductImageGalleryProps {
 }
 
 export default function ProductImageGallery({ images, productName }: ProductImageGalleryProps) {
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
+  const primaryIndex = images.findIndex(img => img.is_primary)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(primaryIndex >= 0 ? primaryIndex : 0)
   const [isZoomed, setIsZoomed] = useState(false)
   const [showLightbox, setShowLightbox] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
