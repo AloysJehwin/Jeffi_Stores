@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import AdminSelect from '@/components/admin/AdminSelect'
 
 interface LocalImage {
@@ -46,7 +46,7 @@ interface ImageUploadProps {
   productId: string
   maxImages?: number
   existingImages?: ExistingImage[]
-  onImagesChange?: (files: File[], existingImagesToKeep: ExistingImage[], galleryImages: { id: string; isPrimary: boolean }[]) => void
+  onImagesChange?: (files: File[], existingImagesToKeep: ExistingImage[], galleryImages: { id: string; isPrimary: boolean }[], orderedKeys: string[]) => void
 }
 
 export default function ImageUpload({
@@ -63,6 +63,8 @@ export default function ImageUpload({
   const [gallerySearch, setGallerySearch] = useState('')
   const [galleryCategory, setGalleryCategory] = useState('')
   const [categories, setCategories] = useState<Category[]>([])
+  const dragIndex = useRef<number | null>(null)
+  const dragOverIndex = useRef<number | null>(null)
 
   useEffect(() => {
     if (existingImages && existingImages.length > 0) {
@@ -99,7 +101,15 @@ export default function ImageUpload({
         return { ...original, is_primary: img.isPrimary || false }
       })
       .filter(Boolean)
-    onImagesChange?.(newFiles, existingToKeep, galleryImgs)
+
+    let fileIndex = 0
+    const orderedKeys = updatedImages.map(img => {
+      if (img.isExisting && img.id) return `existing:${img.id}`
+      if (img.isGallery && img.id) return `gallery:${img.id}`
+      return `file:${fileIndex++}`
+    })
+
+    onImagesChange?.(newFiles, existingToKeep, galleryImgs, orderedKeys)
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -135,6 +145,31 @@ export default function ImageUpload({
 
   function handleSetPrimary(index: number) {
     const updated = images.map((img, i) => ({ ...img, isPrimary: i === index }))
+    setImages(updated)
+    notifyChange(updated)
+  }
+
+  function handleDragStart(index: number) {
+    dragIndex.current = index
+  }
+
+  function handleDragEnter(index: number) {
+    dragOverIndex.current = index
+  }
+
+  function handleDragEnd() {
+    const from = dragIndex.current
+    const to = dragOverIndex.current
+    if (from === null || to === null || from === to) {
+      dragIndex.current = null
+      dragOverIndex.current = null
+      return
+    }
+    const updated = [...images]
+    const [moved] = updated.splice(from, 1)
+    updated.splice(to, 0, moved)
+    dragIndex.current = null
+    dragOverIndex.current = null
     setImages(updated)
     notifyChange(updated)
   }
@@ -227,36 +262,50 @@ export default function ImageUpload({
       )}
 
       {images.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {images.map((image, index) => (
-            <div key={index} className="relative group">
-              <div className="aspect-square rounded-lg overflow-hidden border-2 border-border-default hover:border-accent-500 transition-colors">
-                <img src={image.previewUrl} alt={image.fileName} className="w-full h-full object-cover" />
-              </div>
-              {image.isPrimary && (
-                <div className="absolute top-2 left-2 bg-accent-500 text-white text-xs px-2 py-1 rounded">Primary</div>
-              )}
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg flex items-center justify-center gap-2">
-                {!image.isPrimary && (
+        <div>
+          <p className="text-xs text-foreground-muted mb-2">Drag to reorder · First image is shown first on the product page</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {images.map((image, index) => (
+              <div
+                key={index}
+                className="relative group cursor-grab active:cursor-grabbing"
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragEnter={() => handleDragEnter(index)}
+                onDragEnd={handleDragEnd}
+                onDragOver={e => e.preventDefault()}
+              >
+                <div className="aspect-square rounded-lg overflow-hidden border-2 border-border-default hover:border-accent-500 transition-colors select-none">
+                  <img src={image.previewUrl} alt={image.fileName} className="w-full h-full object-cover pointer-events-none" />
+                </div>
+                {image.isPrimary && (
+                  <div className="absolute top-2 left-2 bg-accent-500 text-white text-xs px-2 py-1 rounded">Primary</div>
+                )}
+                <div className="absolute top-2 right-2 bg-black/50 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                  {index + 1}
+                </div>
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                  {!image.isPrimary && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetPrimary(index)}
+                      className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-white text-foreground-secondary rounded text-xs font-semibold hover:bg-surface-secondary transition-all"
+                    >
+                      Set Primary
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => handleSetPrimary(index)}
-                    className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-white text-foreground-secondary rounded text-xs font-semibold hover:bg-surface-secondary transition-all"
+                    onClick={() => handleRemoveImage(index)}
+                    className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-all"
                   >
-                    Set Primary
+                    Remove
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleRemoveImage(index)}
-                  className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-all"
-                >
-                  Remove
-                </button>
+                </div>
+                <p className="text-xs text-foreground-secondary mt-1 truncate">{image.fileName}</p>
               </div>
-              <p className="text-xs text-foreground-secondary mt-1 truncate">{image.fileName}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 

@@ -43,6 +43,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [existingImagesToKeep, setExistingImagesToKeep] = useState<any[]>([])
   const [galleryImageIds, setGalleryImageIds] = useState<{ id: string; isPrimary: boolean }[]>([])
+  const [imageOrder, setImageOrder] = useState<string[]>([])
   const [tempProductId] = useState<string>(productId || `temp-${Date.now()}`)
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantType, setVariantType] = useState(product?.variant_type ?? '')
@@ -105,6 +106,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       })
       formData.append('image_count', imageFiles.length.toString())
       formData.append('gallery_image_ids', JSON.stringify(galleryImageIds))
+      formData.append('image_order', JSON.stringify(imageOrder))
 
       formData.append('existing_images_to_keep', JSON.stringify(existingImagesToKeep))
 
@@ -430,10 +432,11 @@ export default function ProductForm({ categories, brands, action, product, produ
               productId={tempProductId}
               maxImages={5}
               existingImages={product?.product_images || []}
-              onImagesChange={(files, existingToKeep, galleryImgs) => {
+              onImagesChange={(files, existingToKeep, galleryImgs, orderedKeys) => {
                 setImageFiles(files)
                 setExistingImagesToKeep(existingToKeep)
                 setGalleryImageIds(galleryImgs)
+                setImageOrder(orderedKeys)
               }}
             />
           </div>
