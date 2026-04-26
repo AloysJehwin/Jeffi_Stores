@@ -304,7 +304,7 @@ export default function ImageUpload({
               </div>
             </div>
 
-            <div className="overflow-y-auto flex-1 min-h-0 p-4">
+            <div className="overflow-y-auto flex-1 min-h-0 p-4 pr-3">
               {galleryLoading && (
                 <div className="flex items-center justify-center py-16">
                   <div className="w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full animate-spin" />
@@ -323,7 +323,7 @@ export default function ImageUpload({
                 return filtered.length === 0 ? (
                   <p className="text-center text-foreground-secondary py-16">No images match &ldquo;{gallerySearch}&rdquo;</p>
                 ) : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-4 gap-3 w-full">
                     {filtered.map(gimg => (
                       <button
                         key={gimg.id}
