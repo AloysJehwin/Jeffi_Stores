@@ -19,6 +19,14 @@ const nextConfig = {
           { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization' },
         ],
       },
+      {
+        source: '/api/categories',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: 'chrome-extension://*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization' },
+        ],
+      },
     ]
   },
 }
