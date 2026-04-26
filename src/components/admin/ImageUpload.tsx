@@ -46,7 +46,7 @@ interface ImageUploadProps {
   productId: string
   maxImages?: number
   existingImages?: ExistingImage[]
-  onImagesChange?: (files: File[], existingImagesToKeep: ExistingImage[]) => void
+  onImagesChange?: (files: File[], existingImagesToKeep: ExistingImage[], galleryImageIds: string[]) => void
 }
 
 export default function ImageUpload({
@@ -88,7 +88,8 @@ export default function ImageUpload({
   }, [images])
 
   function notifyChange(updatedImages: LocalImage[]) {
-    const newFiles = updatedImages.filter(img => img.file).map(img => img.file!)
+    const newFiles = updatedImages.filter(img => img.file && !img.isGallery).map(img => img.file!)
+    const galleryIds = updatedImages.filter(img => img.isGallery && img.id).map(img => img.id!)
     const existingToKeep = updatedImages
       .filter(img => img.isExisting && img.id)
       .map(img => {
@@ -96,7 +97,7 @@ export default function ImageUpload({
         return { ...original, is_primary: img.isPrimary || false }
       })
       .filter(Boolean)
-    onImagesChange?.(newFiles, existingToKeep)
+    onImagesChange?.(newFiles, existingToKeep, galleryIds)
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -166,34 +167,17 @@ export default function ImageUpload({
       setShowGallery(false)
       return
     }
-    try {
-      const res = await fetch(gimg.image_url)
-      const blob = await res.blob()
-      const file = new File([blob], gimg.custom_name || gimg.file_name || 'gallery-image.png', { type: 'image/png' })
-      const newImg: LocalImage = {
-        file,
-        previewUrl: URL.createObjectURL(blob),
-        fileName: file.name,
-        fileSize: file.size,
-        isPrimary: images.length === 0,
-        isGallery: true,
-      }
-      const updated = [...images, newImg]
-      setImages(updated)
-      notifyChange(updated)
-    } catch {
-      const newImg: LocalImage = {
-        previewUrl: gimg.thumbnail_url || gimg.image_url,
-        fileName: gimg.custom_name || gimg.file_name || 'gallery-image.png',
-        fileSize: gimg.file_size,
-        isPrimary: images.length === 0,
-        isGallery: true,
-        id: gimg.id,
-      }
-      const updated = [...images, newImg]
-      setImages(updated)
-      notifyChange(updated)
+    const newImg: LocalImage = {
+      previewUrl: gimg.thumbnail_url || gimg.image_url,
+      fileName: gimg.custom_name || gimg.file_name || 'gallery-image.png',
+      fileSize: gimg.file_size,
+      isPrimary: images.length === 0,
+      isGallery: true,
+      id: gimg.id,
     }
+    const updated = [...images, newImg]
+    setImages(updated)
+    notifyChange(updated)
     setShowGallery(false)
     setError(null)
   }
