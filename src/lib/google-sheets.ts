@@ -1,4 +1,4 @@
-import { SignJWT } from 'jose'
+import { createSign } from 'crypto'
 import { queryMany } from './db'
 import fs from 'fs'
 import path from 'path'
@@ -39,18 +39,21 @@ async function getAccessToken(): Promise<string> {
   }
 
   const creds = loadCredentials()
-  const privateKey = await (await import('jose')).importPKCS8(creds.private_key, 'RS256')
   const now = Math.floor(Date.now() / 1000)
 
-  const jwt = await new SignJWT({
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({
     iss: creds.client_email,
     scope: SCOPES,
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600,
-  })
-    .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
-    .sign(privateKey)
+  })).toString('base64url')
+
+  const signer = createSign('RSA-SHA256')
+  signer.update(header + '.' + payload)
+  const sig = signer.sign(creds.private_key).toString('base64url')
+  const jwt = header + '.' + payload + '.' + sig
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
