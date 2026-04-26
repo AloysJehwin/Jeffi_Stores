@@ -9,6 +9,7 @@ services:
       - REDIS_URL=redis://redis:6379
     volumes:
       - ./certs:/app/certs:ro
+      - ./jeffi-stores-76e9ecaecdd6.json:/app/jeffi-stores-76e9ecaecdd6.json:ro
     depends_on:
       - redis
     restart: always
