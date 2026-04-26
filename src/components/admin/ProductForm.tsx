@@ -42,7 +42,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [error, setError] = useState<string | null>(null)
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [existingImagesToKeep, setExistingImagesToKeep] = useState<any[]>([])
-  const [galleryImageIds, setGalleryImageIds] = useState<string[]>([])
+  const [galleryImageIds, setGalleryImageIds] = useState<{ id: string; isPrimary: boolean }[]>([])
   const [tempProductId] = useState<string>(productId || `temp-${Date.now()}`)
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantType, setVariantType] = useState(product?.variant_type ?? '')
@@ -430,10 +430,10 @@ export default function ProductForm({ categories, brands, action, product, produ
               productId={tempProductId}
               maxImages={5}
               existingImages={product?.product_images || []}
-              onImagesChange={(files, existingToKeep, galleryIds) => {
+              onImagesChange={(files, existingToKeep, galleryImgs) => {
                 setImageFiles(files)
                 setExistingImagesToKeep(existingToKeep)
-                setGalleryImageIds(galleryIds)
+                setGalleryImageIds(galleryImgs)
               }}
             />
           </div>

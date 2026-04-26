@@ -29,7 +29,7 @@ async function createProduct(formData: FormData) {
   const isFeatured = formData.get('is_featured') === 'true'
   const imageCount = parseInt(formData.get('image_count') as string || '0')
   const galleryImageIdsJson = formData.get('gallery_image_ids') as string
-  const galleryImageIds: string[] = galleryImageIdsJson ? JSON.parse(galleryImageIdsJson) : []
+  const galleryImageRefs: { id: string; isPrimary: boolean }[] = galleryImageIdsJson ? JSON.parse(galleryImageIdsJson) : []
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
@@ -85,15 +85,16 @@ async function createProduct(formData: FormData) {
       }
     }
 
-    if (galleryImageIds.length > 0) {
+    if (galleryImageRefs.length > 0) {
       const galleryImages = await queryMany(
         `SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`,
-        [galleryImageIds]
+        [galleryImageRefs.map(r => r.id)]
       )
       for (let i = 0; i < (galleryImages || []).length; i++) {
         const gimg = galleryImages![i]
+        const ref = galleryImageRefs.find(r => r.id === gimg.id)
         const displayOrder = imageCount + i
-        const isPrimary = imageCount === 0 && i === 0
+        const isPrimary = ref?.isPrimary ?? (imageCount === 0 && i === 0)
         await query(
           `INSERT INTO product_images (
             product_id, image_url, thumbnail_url, s3_bucket, s3_key,

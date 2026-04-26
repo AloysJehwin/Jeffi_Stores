@@ -46,7 +46,7 @@ interface ImageUploadProps {
   productId: string
   maxImages?: number
   existingImages?: ExistingImage[]
-  onImagesChange?: (files: File[], existingImagesToKeep: ExistingImage[], galleryImageIds: string[]) => void
+  onImagesChange?: (files: File[], existingImagesToKeep: ExistingImage[], galleryImages: { id: string; isPrimary: boolean }[]) => void
 }
 
 export default function ImageUpload({
@@ -89,7 +89,9 @@ export default function ImageUpload({
 
   function notifyChange(updatedImages: LocalImage[]) {
     const newFiles = updatedImages.filter(img => img.file && !img.isGallery).map(img => img.file!)
-    const galleryIds = updatedImages.filter(img => img.isGallery && img.id).map(img => img.id!)
+    const galleryImgs = updatedImages
+      .filter(img => img.isGallery && img.id)
+      .map(img => ({ id: img.id!, isPrimary: img.isPrimary || false }))
     const existingToKeep = updatedImages
       .filter(img => img.isExisting && img.id)
       .map(img => {
@@ -97,7 +99,7 @@ export default function ImageUpload({
         return { ...original, is_primary: img.isPrimary || false }
       })
       .filter(Boolean)
-    onImagesChange?.(newFiles, existingToKeep, galleryIds)
+    onImagesChange?.(newFiles, existingToKeep, galleryImgs)
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
