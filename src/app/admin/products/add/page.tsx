@@ -145,7 +145,7 @@ async function createProduct(formData: FormData) {
     redirect('/admin/products')
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
-    throw new Error('Failed to create product')
+    throw new Error(err?.message || 'Failed to create product')
   }
 }
 export default async function AddProductPage() {
