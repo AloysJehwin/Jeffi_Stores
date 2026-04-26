@@ -2,6 +2,7 @@ import { queryOne, queryMany } from '@/lib/db'
 import ChangePasswordForm from '@/components/admin/ChangePasswordForm'
 import CreateAdminForm from '@/components/admin/CreateAdminForm'
 import AdminUserActions from '@/components/admin/AdminUserActions'
+import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES } from '@/lib/scopes'
 
@@ -330,6 +331,8 @@ export default async function SettingsPage() {
               </div>
             </div>
           </div>
+
+          <ExtensionTokenCard />
 
           {adminInfo?.role === 'super_admin' && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
