@@ -287,9 +287,9 @@ export default function ImageUpload({
               )}
               {!galleryLoading && galleryImages.length > 0 && (() => {
                 const q = gallerySearch.toLowerCase()
-                const filtered = galleryImages.filter(g =>
-                  (g.custom_name || g.file_name || '').toLowerCase().includes(q)
-                )
+                const filtered = q
+                  ? galleryImages.filter(g => (g.custom_name || '').toLowerCase().includes(q))
+                  : galleryImages
                 return filtered.length === 0 ? (
                   <p className="text-center text-foreground-secondary py-16">No images match &ldquo;{gallerySearch}&rdquo;</p>
                 ) : (
