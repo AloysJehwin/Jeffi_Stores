@@ -237,7 +237,7 @@ async function updateProduct(productId: string, formData: FormData) {
     redirect('/admin/products')
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
-    throw new Error('Failed to update product')
+    throw new Error(err?.message || 'Failed to update product')
   }
 }
 
