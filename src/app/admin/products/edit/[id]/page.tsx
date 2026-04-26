@@ -1,6 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { isRedirectError } from 'next/dist/client/components/redirect-error'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { generateVariantSku } from '@/lib/sku'
@@ -207,8 +206,8 @@ async function updateProduct(productId: string, formData: FormData) {
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
     redirect('/admin/products')
-  } catch (err) {
-    if (isRedirectError(err)) throw err
+  } catch (err: any) {
+    if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error('Failed to update product')
   }
 }
