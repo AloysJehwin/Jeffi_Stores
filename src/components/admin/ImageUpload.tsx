@@ -166,20 +166,34 @@ export default function ImageUpload({
       setShowGallery(false)
       return
     }
-    const res = await fetch(gimg.image_url)
-    const blob = await res.blob()
-    const file = new File([blob], gimg.file_name || 'gallery-image.jpg', { type: 'image/jpeg' })
-    const newImg: LocalImage = {
-      file,
-      previewUrl: URL.createObjectURL(blob),
-      fileName: file.name,
-      fileSize: file.size,
-      isPrimary: images.length === 0,
-      isGallery: true,
+    try {
+      const res = await fetch(gimg.image_url)
+      const blob = await res.blob()
+      const file = new File([blob], gimg.custom_name || gimg.file_name || 'gallery-image.png', { type: 'image/png' })
+      const newImg: LocalImage = {
+        file,
+        previewUrl: URL.createObjectURL(blob),
+        fileName: file.name,
+        fileSize: file.size,
+        isPrimary: images.length === 0,
+        isGallery: true,
+      }
+      const updated = [...images, newImg]
+      setImages(updated)
+      notifyChange(updated)
+    } catch {
+      const newImg: LocalImage = {
+        previewUrl: gimg.thumbnail_url || gimg.image_url,
+        fileName: gimg.custom_name || gimg.file_name || 'gallery-image.png',
+        fileSize: gimg.file_size,
+        isPrimary: images.length === 0,
+        isGallery: true,
+        id: gimg.id,
+      }
+      const updated = [...images, newImg]
+      setImages(updated)
+      notifyChange(updated)
     }
-    const updated = [...images, newImg]
-    setImages(updated)
-    notifyChange(updated)
     setShowGallery(false)
     setError(null)
   }
@@ -270,8 +284,8 @@ export default function ImageUpload({
       )}
 
       {showGallery && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-surface-elevated rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/50 p-4">
+          <div className="bg-surface-elevated rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Choose from Gallery</h2>
               <button
