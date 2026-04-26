@@ -81,8 +81,7 @@ export default function TransactionsPage() {
         const data = await response.json()
         setTransactions(data.transactions || [])
       }
-    } catch (error) {
-      console.error('Failed to fetch transactions:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -104,11 +103,10 @@ export default function TransactionsPage() {
   return (
     <div className="bg-surface min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-foreground mb-8">Transactions</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6">Transactions</h1>
 
-        {/* Mobile Account Nav */}
-        <div className="lg:hidden overflow-x-auto mb-4">
-          <nav className="flex gap-2 min-w-max">
+        <div className="lg:hidden overflow-x-auto mb-4 -mx-4 px-4">
+          <nav className="flex gap-2 min-w-max pb-1 pr-4">
             {navItems.map((item) => (
               <Link
                 key={item.href}

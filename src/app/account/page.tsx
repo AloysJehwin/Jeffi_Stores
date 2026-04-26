@@ -80,11 +80,10 @@ export default function AccountPage() {
   return (
     <div className="bg-surface min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-foreground mb-8">My Account</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6">My Account</h1>
 
-        {/* Mobile Account Nav */}
-        <div className="lg:hidden overflow-x-auto mb-4">
-          <nav className="flex gap-2 min-w-max">
+        <div className="lg:hidden overflow-x-auto mb-4 -mx-4 px-4">
+          <nav className="flex gap-2 min-w-max pb-1 pr-4">
             {navItems.map((item) => (
               <Link
                 key={item.href}

@@ -63,8 +63,7 @@ export default function AddressesPage() {
         const data = await response.json()
         setAddresses(data.addresses || [])
       }
-    } catch (error) {
-      console.error('Failed to fetch addresses:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -152,7 +151,6 @@ export default function AddressesPage() {
           } else {
             const data = await response.json()
 
-            // Check if it's an ADDRESS_IN_USE error
             if (data.code === 'ADDRESS_IN_USE') {
               showToast(data.error, 'warning')
             } else {
@@ -184,11 +182,10 @@ export default function AddressesPage() {
   return (
     <div className="bg-surface min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-foreground mb-8">My Addresses</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6">My Addresses</h1>
 
-        {/* Mobile Account Nav */}
-        <div className="lg:hidden overflow-x-auto mb-4">
-          <nav className="flex gap-2 min-w-max">
+        <div className="lg:hidden overflow-x-auto mb-4 -mx-4 px-4">
+          <nav className="flex gap-2 min-w-max pb-1 pr-4">
             {navItems.map((item) => (
               <Link
                 key={item.href}

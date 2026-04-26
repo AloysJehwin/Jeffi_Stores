@@ -3,6 +3,7 @@ import sharp from 'sharp'
 
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1'
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'
+const KEY_PREFIX = process.env.S3_KEY_PREFIX ? `${process.env.S3_KEY_PREFIX}/` : ''
 
 const s3Client = new S3Client({
   region: AWS_REGION,
@@ -23,8 +24,8 @@ export function generateProductImageKeys(productId: string, fileName: string) {
   const timestamp = Date.now()
   const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_')
   return {
-    imageKey: `products/${productId}/${timestamp}-${sanitizedName}`,
-    thumbnailKey: `products/${productId}/thumbnails/${timestamp}-${sanitizedName}`,
+    imageKey: `${KEY_PREFIX}products/${productId}/${timestamp}-${sanitizedName}`,
+    thumbnailKey: `${KEY_PREFIX}products/${productId}/thumbnails/${timestamp}-${sanitizedName}`,
   }
 }
 
@@ -73,7 +74,7 @@ export async function uploadProductImage(file: File, productId: string): Promise
 
 export async function uploadInvoicePDF(pdfBuffer: Buffer, invoiceNumber: string, financialYear: string): Promise<string> {
   const safeFileName = invoiceNumber.replace(/\//g, '-')
-  const s3Key = `invoices/${financialYear}/${safeFileName}.pdf`
+  const s3Key = `${KEY_PREFIX}invoices/${financialYear}/${safeFileName}.pdf`
   await s3Client.send(new PutObjectCommand({
     Bucket: BUCKET_NAME,
     Key: s3Key,
@@ -118,8 +119,8 @@ export interface GalleryUploadResult {
 export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string): Promise<GalleryUploadResult> {
   const timestamp = Date.now()
   const baseName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '')
-  const s3Key = `gallery/${timestamp}-${baseName}.png`
-  const s3ThumbnailKey = `gallery/thumbnails/${timestamp}-${baseName}.png`
+  const s3Key = `${KEY_PREFIX}gallery/${timestamp}-${baseName}.png`
+  const s3ThumbnailKey = `${KEY_PREFIX}gallery/thumbnails/${timestamp}-${baseName}.png`
 
   const metadata = await sharp(imageBuffer).rotate().metadata()
   const pngBuffer = await sharp(imageBuffer).rotate().png({ compressionLevel: 8 }).toBuffer()

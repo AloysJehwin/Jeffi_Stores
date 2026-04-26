@@ -61,18 +61,12 @@ export default function OrdersPage() {
 
   const fetchOrders = async () => {
     try {
-      console.log('Fetching orders...')
       const response = await fetch('/api/orders')
-      console.log('Orders response status:', response.status)
       if (response.ok) {
         const data = await response.json()
-        console.log('Orders data:', data)
         setOrders(data.orders || [])
-      } else {
-        console.error('Failed to fetch orders:', response.status, response.statusText)
       }
-    } catch (error) {
-      console.error('Failed to fetch orders:', error)
+    } catch {
     } finally {
       setLoading(false)
     }
@@ -81,14 +75,9 @@ export default function OrdersPage() {
   const handleCancelOrder = async (orderId: string) => {
     setCancellingOrderId(orderId)
     try {
-      const response = await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
-      if (!response.ok) {
-        const data = await response.json()
-        console.error('Cancel failed:', data.error)
-      }
+      await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
       await fetchOrders()
-    } catch (error) {
-      console.error('Failed to cancel order:', error)
+    } catch {
     } finally {
       setCancellingOrderId(null)
       setConfirmCancelId(null)
@@ -132,11 +121,10 @@ export default function OrdersPage() {
   return (
     <div className="bg-surface min-h-screen py-8">
       <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-foreground mb-8">My Orders</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6">My Orders</h1>
 
-        {/* Mobile Account Nav */}
-        <div className="lg:hidden overflow-x-auto mb-4">
-          <nav className="flex gap-2 min-w-max">
+        <div className="lg:hidden overflow-x-auto mb-4 -mx-4 px-4">
+          <nav className="flex gap-2 min-w-max pb-1 pr-4">
             {navItems.map((item) => (
               <Link
                 key={item.href}
