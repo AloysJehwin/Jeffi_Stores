@@ -2,15 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  .pb-safe-4 {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
-}
-
 @layer base {
   :root {
     --color-surface: #F9FAFB;
