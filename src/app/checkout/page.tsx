@@ -53,11 +53,9 @@ function CheckoutPage() {
       return
     }
 
-    // Load selected address
     fetchAddress(addressId)
   }, [cartCount, user, authLoading, cartLoading, router, searchParams])
 
-  // Load Razorpay script
   useEffect(() => {
     if (paymentMethod !== 'razorpay') return
     if (razorpayLoaded) return
@@ -85,8 +83,7 @@ function CheckoutPage() {
           router.push('/checkout/review')
         }
       }
-    } catch (error) {
-      console.error('Failed to fetch address:', error)
+    } catch {
       router.push('/checkout/review')
     } finally {
       setIsLoadingAddress(false)
@@ -158,7 +155,6 @@ function CheckoutPage() {
 
       const rzp = new (window as any).Razorpay(options)
       rzp.on('payment.failed', function (response: any) {
-        // Notify server about failure (for admin email + payment record update)
         fetch(`/api/orders/${orderId}/payment-failed`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -203,7 +199,6 @@ function CheckoutPage() {
     }
 
     try {
-      // Step 1: Create order in DB
       const response = await fetch('/api/orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -237,11 +232,9 @@ function CheckoutPage() {
         throw new Error(data.error || 'Failed to create order')
       }
 
-      // Step 2: Branch based on payment method
       if (paymentMethod === 'razorpay' && data.requiresPayment) {
         await initiateRazorpayPayment(data.order.id, parseFloat(data.order.total))
       } else {
-        // Manual payment — cart already cleared, emails already sent
         clearCart()
         router.push(`/account/orders/${data.order.id}`)
       }
@@ -455,8 +448,8 @@ function CheckoutPage() {
           </div>
 
           {/* Order Summary & Contact */}
-          <div className="lg:col-span-1">
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 sticky top-24">
+          <div className="lg:col-span-1 lg:self-start lg:sticky lg:top-24">
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
 
               <div className="space-y-3 mb-6">

@@ -26,7 +26,6 @@ async function getProducts(searchParams: any) {
   const sortBy = searchParams.sort || 'created_at'
   const sortOrder = searchParams.order === 'asc' ? 'ASC' : 'DESC'
 
-  // Whitelist sort columns to prevent SQL injection
   const allowedSortColumns: Record<string, string> = {
     created_at: 'p.created_at',
     name: 'p.name',
@@ -89,9 +88,9 @@ export default async function ProductsPage({
       <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {/* Sidebar Filters */}
-          <aside className="lg:col-span-1">
+          <aside className="lg:col-span-1 lg:self-start lg:sticky lg:top-24">
             <MobileFilterToggle>
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto">
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 max-h-[calc(100vh-7rem)] overflow-y-auto">
                 <h2 className="font-bold text-lg text-foreground mb-4">Filters</h2>
 
                 {/* Search */}

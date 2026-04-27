@@ -10,17 +10,21 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 1. USER MANAGEMENT
 -- ============================================
 
--- Users table (leveraging Supabase Auth)
+-- Users table
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     phone VARCHAR(20),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
+    password_hash VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_login TIMESTAMP WITH TIME ZONE,
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    is_guest BOOLEAN DEFAULT FALSE,
+    session_id TEXT UNIQUE,
+    merged_to_user_id UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Admin users table
@@ -519,11 +523,33 @@ CREATE TABLE shipping_zones (
 );
 
 -- ============================================
+-- 11. GALLERY
+-- ============================================
+
+CREATE TABLE gallery_images (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    image_url VARCHAR(500) NOT NULL,
+    thumbnail_url VARCHAR(500),
+    s3_key VARCHAR(500) NOT NULL,
+    s3_thumbnail_key VARCHAR(500),
+    s3_bucket VARCHAR(100),
+    file_name VARCHAR(255),
+    file_size INT,
+    mime_type VARCHAR(100) DEFAULT 'image/jpeg',
+    width INT,
+    height INT,
+    source_url VARCHAR(1000),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
 -- INDEXES FOR PERFORMANCE
 -- ============================================
 
 -- Users
 CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_session_id ON users(session_id);
+CREATE INDEX idx_users_is_guest ON users(is_guest);
 CREATE INDEX idx_customer_profiles_user_id ON customer_profiles(user_id);
 
 -- Products
@@ -574,6 +600,8 @@ CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
 CREATE INDEX idx_product_views_product_id ON product_views(product_id);
 CREATE INDEX idx_product_views_created_at ON product_views(created_at);
 CREATE INDEX idx_search_queries_created_at ON search_queries(created_at);
+
+CREATE INDEX idx_gallery_images_created ON gallery_images(created_at DESC);
 
 -- ============================================
 -- FUNCTIONS & TRIGGERS
@@ -660,6 +688,45 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER check_product_image_limit
 BEFORE INSERT ON product_images
 FOR EACH ROW EXECUTE FUNCTION validate_product_image_limit();
+
+-- Merge guest cart to user account on login
+CREATE OR REPLACE FUNCTION merge_guest_cart_to_user(
+    p_guest_user_id UUID,
+    p_actual_user_id UUID
+)
+RETURNS void AS $$
+BEGIN
+    INSERT INTO cart_items (user_id, product_id, variant_id, quantity, price_at_addition, created_at, updated_at)
+    SELECT p_actual_user_id, product_id, variant_id, quantity, price_at_addition, created_at, updated_at
+    FROM cart_items WHERE user_id = p_guest_user_id
+    ON CONFLICT (user_id, product_id, variant_id)
+    DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity, updated_at = NOW();
+
+    DELETE FROM cart_items WHERE user_id = p_guest_user_id;
+
+    INSERT INTO wishlist_items (user_id, product_id, created_at)
+    SELECT p_actual_user_id, product_id, created_at
+    FROM wishlist_items WHERE user_id = p_guest_user_id
+    ON CONFLICT (user_id, product_id) DO NOTHING;
+
+    DELETE FROM wishlist_items WHERE user_id = p_guest_user_id;
+
+    UPDATE users SET merged_to_user_id = p_actual_user_id, updated_at = NOW()
+    WHERE id = p_guest_user_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Delete old guest users with no cart/wishlist items
+CREATE OR REPLACE FUNCTION cleanup_old_guest_users(days_old INT DEFAULT 30)
+RETURNS void AS $$
+BEGIN
+    DELETE FROM users
+    WHERE is_guest = TRUE
+        AND created_at < NOW() - (days_old || ' days')::INTERVAL
+        AND id NOT IN (SELECT DISTINCT user_id FROM cart_items)
+        AND id NOT IN (SELECT DISTINCT user_id FROM wishlist_items);
+END;
+$$ LANGUAGE plpgsql;
 
 -- ============================================
 -- ROW LEVEL SECURITY (RLS) - For Supabase

@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useAuth } from '@/contexts/AuthContext'
+import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 
 interface WishlistItem {
   id: string
@@ -32,6 +35,8 @@ export default function WishlistPage() {
   const [isLoading, setIsLoading] = useState(true)
   const { addToCart } = useCart()
   const { showToast, showConfirm } = useToast()
+  const { user } = useAuth()
+  const pathname = usePathname()
   const [addingToCart, setAddingToCart] = useState<Set<string>>(new Set())
 
   const fetchWishlist = async () => {
@@ -41,8 +46,7 @@ export default function WishlistPage() {
         const data = await response.json()
         setWishlistItems(data.items || [])
       }
-    } catch (error) {
-      console.error('Failed to fetch wishlist:', error)
+    } catch {
     } finally {
       setIsLoading(false)
     }
@@ -96,39 +100,101 @@ export default function WishlistPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="text-center">
           <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-foreground-secondary">Loading wishlist...</p>
+          <p className="mt-4 text-foreground-secondary">Loading...</p>
         </div>
       </div>
     )
   }
 
+  const MobileHeader = () => (
+    <>
+      <div className="lg:hidden bg-accent-500 pt-8 pb-16 px-4">
+        <h1 className="text-lg font-semibold text-white/80 mb-4">My Account</h1>
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
+            {user?.firstName?.[0]?.toUpperCase() || 'U'}
+          </div>
+          <div>
+            <p className="text-xl font-bold text-white">{user?.firstName} {user?.lastName}</p>
+            <p className="text-sm text-white/70 mt-0.5">{user?.email}</p>
+          </div>
+        </div>
+      </div>
+      <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
+        <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
+          <div className="flex">
+            {navItems.map((item) => {
+              const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors border-b-2 ${
+                    isActive
+                      ? 'text-accent-600 border-accent-500 dark:text-accent-400'
+                      : 'text-foreground-muted border-transparent'
+                  }`}
+                >
+                  <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
+                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
   if (wishlistItems.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-md mx-auto text-center">
-          <svg className="w-24 h-24 mx-auto text-foreground-muted mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-          <h2 className="text-2xl font-bold text-foreground mb-2">Your wishlist is empty</h2>
-          <p className="text-foreground-secondary mb-6">Save your favorite items to buy them later</p>
-          <Link
-            href="/products"
-            className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
-          >
-            Browse Products
-          </Link>
+      <div className="bg-surface min-h-screen">
+        <MobileHeader />
+        <div className="container mx-auto px-4 py-4 lg:py-8">
+          <div className="hidden lg:block mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Wishlist</h1>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="hidden lg:block lg:col-span-1">
+              <AccountSidebar />
+            </div>
+            <div className="lg:col-span-3">
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+                <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Your wishlist is empty</h3>
+                <p className="text-foreground-secondary mb-6">Save your favorite items to buy them later</p>
+                <Link
+                  href="/products"
+                  className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Browse Products
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-surface min-h-screen py-8">
-      <div className="container mx-auto px-4">
-        <h1 className="text-3xl font-bold text-foreground mb-8">My Wishlist</h1>
+    <div className="bg-surface min-h-screen">
+      <MobileHeader />
+      <div className="container mx-auto px-4 py-4 lg:py-8">
+        <div className="hidden lg:block mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Wishlist</h1>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {wishlistItems.map((item) => {
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="hidden lg:block lg:col-span-1">
+            <AccountSidebar />
+          </div>
+
+          <div className="lg:col-span-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {wishlistItems.map((item) => {
             const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
             const hasVariants = item.products.has_variants
             const price = hasVariants && item.products.variant_min_price
@@ -228,6 +294,8 @@ export default function WishlistPage() {
               </div>
             )
           })}
+            </div>
+          </div>
         </div>
       </div>
     </div>
