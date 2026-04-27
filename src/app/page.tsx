@@ -40,39 +40,36 @@ export default async function HomePage() {
 
   return (
     <div className="bg-surface">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-r from-primary-600 to-primary-800 text-white">
-        <div className="container mx-auto px-4 py-16 md:py-24">
+
+      {/* Hero */}
+      <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white">
+        <div className="container mx-auto px-4 py-10 md:py-20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
             <div>
-              <h1 className="text-4xl md:text-6xl font-bold mb-4">
+              <p className="text-sm font-semibold uppercase tracking-widest text-primary-200 mb-2">Hardware &amp; Tools</p>
+              <h1 className="text-3xl md:text-5xl font-bold mb-3 leading-tight">
                 Jeffi Stores
               </h1>
-              <h2 className="text-2xl md:text-3xl font-semibold mb-6 text-primary-100">
-                Hardware and Tools
-              </h2>
-              <p className="text-lg mb-8 text-primary-50">
-                Your trusted hardware store with a wide range of industrial machinery parts.
-                We ensure high availability of quality components for manufacturing, construction,
-                and repairs. Get reliable products and expert service to keep your operations running smoothly!
+              <p className="text-base text-primary-100 mb-6 leading-relaxed max-w-md">
+                Your trusted source for industrial machinery parts, tools, and hardware — for manufacturing, construction, and repairs.
               </p>
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 <Link
                   href="/products"
-                  className="bg-accent-500 hover:bg-accent-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+                  className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors text-sm"
                 >
                   Shop Now
                 </Link>
                 <Link
                   href="/categories"
-                  className="bg-surface-elevated text-primary-700 hover:bg-surface-secondary px-8 py-3 rounded-lg font-semibold transition-colors"
+                  className="bg-white/15 hover:bg-white/25 text-white px-6 py-2.5 rounded-lg font-semibold transition-colors text-sm border border-white/30"
                 >
                   Browse Categories
                 </Link>
               </div>
             </div>
-            <div className="hidden md:block">
-              <div className="relative h-96">
+            <div className="hidden md:flex justify-center">
+              <div className="relative h-80 w-full max-w-sm">
                 <img
                   src="/images/Welcome.png"
                   alt="Hardware tools and industrial supplies"
@@ -84,69 +81,59 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* Categories */}
       {mainCategories.length > 0 && (
-        <section className="py-16 bg-surface">
+        <section className="py-8 md:py-14 bg-surface">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-secondary-500 mb-4">
-                Shop by Category
-              </h2>
-              <p className="text-foreground-secondary">
-                Browse our wide range of hardware and industrial tools
-              </p>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl md:text-3xl font-bold text-foreground">Shop by Category</h2>
+              <Link href="/categories" className="text-sm text-accent-500 hover:text-accent-600 font-semibold flex items-center gap-1">
+                All
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+
+            <div className="flex gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-3 lg:grid-cols-6 md:overflow-visible scrollbar-hide">
               {mainCategories.map((category) => (
                 <Link
                   key={category.id}
                   href={`/categories/${category.slug}`}
-                  className="group"
+                  className="group flex-shrink-0 w-24 md:w-auto"
                 >
-                  <div className="bg-surface-elevated rounded-lg p-4 sm:p-6 shadow-sm border border-border-default hover:border-accent-500 hover:shadow-md transition-all">
-                    <div className="flex flex-col items-center text-center">
-                      <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-accent-100 transition-colors">
-                        <CategoryIcon
-                          categoryName={category.name}
-                          className="w-8 h-8 text-primary-600 dark:text-primary-400 group-hover:text-accent-600"
-                        />
-                      </div>
-                      <h3 className="font-semibold text-foreground group-hover:text-accent-600 transition-colors">
-                        {category.name}
-                      </h3>
+                  <div className="flex flex-col items-center text-center gap-2 p-3 rounded-xl bg-surface-elevated border border-border-default hover:border-accent-400 hover:shadow-md transition-all">
+                    <div className="w-12 h-12 bg-primary-50 dark:bg-primary-900/20 rounded-full flex items-center justify-center group-hover:bg-accent-50 dark:group-hover:bg-accent-900/20 transition-colors">
+                      <CategoryIcon
+                        categoryName={category.name}
+                        className="w-6 h-6 text-primary-600 dark:text-primary-400 group-hover:text-accent-600"
+                      />
                     </div>
+                    <span className="text-xs font-medium text-foreground group-hover:text-accent-600 transition-colors leading-tight">
+                      {category.name}
+                    </span>
                   </div>
                 </Link>
               ))}
-            </div>
-            <div className="text-center mt-8">
-              <Link
-                href="/categories"
-                className="text-accent-500 hover:text-accent-600 font-semibold inline-flex items-center"
-              >
-                View All Categories
-                <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
             </div>
           </div>
         </section>
       )}
 
-      {/* Featured Products Section */}
+      {/* Featured Products */}
       {featuredProducts.length > 0 && (
-        <section className="py-16">
+        <section className="py-8 md:py-14 bg-surface-secondary">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-secondary-500 mb-4">
-                Featured Products
-              </h2>
-              <p className="text-foreground-secondary">
-                Check out our most popular and trusted products
-              </p>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl md:text-3xl font-bold text-foreground">Featured Products</h2>
+              <Link href="/products" className="text-sm text-accent-500 hover:text-accent-600 font-semibold flex items-center gap-1">
+                All
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
               {featuredProducts.map((product) => {
                 const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                 const hasVariants = product.has_variants
@@ -160,70 +147,52 @@ export default async function HomePage() {
                   : 0
 
                 return (
-                  <Link
-                    key={product.id}
-                    href={`/products/${product.slug}`}
-                    className="group"
-                  >
-                    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow">
-                      {/* Product Image */}
-                      <div className="relative h-64 bg-surface-elevated overflow-hidden">
+                  <Link key={product.id} href={`/products/${product.slug}`} className="group">
+                    <div className="bg-surface-elevated rounded-xl shadow-sm border border-border-default overflow-hidden hover:shadow-md transition-shadow h-full flex flex-col">
+                      <div className="relative aspect-square bg-surface-elevated overflow-hidden">
                         {primaryImage ? (
                           <img
                             src={primaryImage.image_url}
                             alt={product.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-24 h-24 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-16 h-16 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                           </div>
                         )}
                         {mrpDiscount > 0 && (
-                          <div className="absolute top-4 right-4 bg-accent-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                          <div className="absolute top-2 right-2 bg-accent-500 text-white px-2 py-0.5 rounded-full text-xs font-bold">
                             {mrpDiscount}% off
                           </div>
                         )}
                       </div>
-
-                      {/* Product Info */}
-                      <div className="p-4 sm:p-6">
-                        <h3 className="font-semibold text-lg text-foreground mb-2 group-hover:text-accent-600 transition-colors line-clamp-2">
+                      <div className="p-3 flex flex-col flex-1">
+                        <h3 className="font-semibold text-sm text-foreground mb-1 group-hover:text-accent-600 transition-colors line-clamp-2 leading-snug flex-1">
                           {product.name}
                         </h3>
-                        {product.brands && (
-                          <p className="text-sm text-foreground-muted mb-3">
-                            Brand: {product.brands.name}
-                          </p>
-                        )}
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                            {hasVariants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        <div className="mt-2">
+                          <span className="text-base font-bold text-primary-600 dark:text-primary-400">
+                            {hasVariants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN')}
                           </span>
                           {mrp && mrp > Number(displayPrice) && (
-                            <span className="text-sm text-foreground-muted line-through">
-                              ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            <span className="text-xs text-foreground-muted line-through ml-1.5">
+                              ₹{mrp.toLocaleString('en-IN')}
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-foreground-muted mb-4">Inclusive of all taxes</p>
-                        <div className="flex items-center justify-between">
-                          <span className={`text-sm font-medium ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
-                          </span>
-                          <span className="text-accent-500 group-hover:text-accent-600 font-semibold">
-                            View Details →
-                          </span>
-                        </div>
+                        <span className={`text-xs font-medium mt-1 ${effectiveStock > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                          {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
+                        </span>
                       </div>
                     </div>
                   </Link>
                 )
               })}
             </div>
-            <div className="text-center mt-12">
+            <div className="text-center mt-8">
               <Link
                 href="/products"
                 className="bg-accent-500 hover:bg-accent-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors inline-block"
@@ -235,77 +204,70 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Features Section */}
-      <section className="py-16 bg-surface">
+      {/* Features */}
+      <section className="py-8 md:py-14 bg-surface">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-            <div className="bg-surface-elevated rounded-lg p-4 sm:p-6 lg:p-8 shadow-sm border border-border-default">
-              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-6">
-                <svg className="w-8 h-8 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="grid grid-cols-3 md:grid-cols-3 gap-3 md:gap-6">
+            <div className="flex flex-col items-center text-center p-3 md:p-6 bg-surface-elevated rounded-xl border border-border-default shadow-sm">
+              <div className="w-10 h-10 md:w-14 md:h-14 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center mb-3">
+                <svg className="w-5 h-5 md:w-7 md:h-7 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-foreground mb-3">24/7 Service</h3>
-              <p className="text-foreground-secondary">
-                Get round-the-clock assistance with our 24/7 support—always here when you need us!
-              </p>
+              <h3 className="text-xs md:text-base font-bold text-foreground mb-1">24/7 Service</h3>
+              <p className="text-xs text-foreground-secondary hidden md:block">Round-the-clock support, always here when you need us.</p>
             </div>
 
-            <div className="bg-surface-elevated rounded-lg p-4 sm:p-6 lg:p-8 shadow-sm border border-border-default">
-              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-6">
-                <svg className="w-8 h-8 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex flex-col items-center text-center p-3 md:p-6 bg-surface-elevated rounded-xl border border-border-default shadow-sm">
+              <div className="w-10 h-10 md:w-14 md:h-14 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center mb-3">
+                <svg className="w-5 h-5 md:w-7 md:h-7 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-foreground mb-3">Instant Assistance</h3>
-              <p className="text-foreground-secondary">
-                Instant assistance anytime with our 24/7 immediate support!
-              </p>
+              <h3 className="text-xs md:text-base font-bold text-foreground mb-1">Fast Delivery</h3>
+              <p className="text-xs text-foreground-secondary hidden md:block">Prompt dispatch and reliable delivery to your doorstep.</p>
             </div>
 
-            <div className="bg-surface-elevated rounded-lg p-4 sm:p-6 lg:p-8 shadow-sm border border-border-default">
-              <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-6">
-                <svg className="w-8 h-8 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex flex-col items-center text-center p-3 md:p-6 bg-surface-elevated rounded-xl border border-border-default shadow-sm">
+              <div className="w-10 h-10 md:w-14 md:h-14 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center mb-3">
+                <svg className="w-5 h-5 md:w-7 md:h-7 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-foreground mb-3">Contact Our Team</h3>
-              <p className="text-foreground-secondary">
-                They are here to help you. Reach out anytime for expert guidance and support.
-              </p>
+              <h3 className="text-xs md:text-base font-bold text-foreground mb-1">Expert Support</h3>
+              <p className="text-xs text-foreground-secondary hidden md:block">Reach out anytime for expert guidance and support.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* About Section */}
-      <section className="py-16">
+      {/* About */}
+      <section className="py-8 md:py-14 bg-surface-secondary">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-secondary-500 mb-6">
+              <h2 className="text-2xl md:text-4xl font-bold text-foreground mb-4">
                 About Jeffi Stores
               </h2>
-              <p className="text-foreground-secondary mb-6 leading-relaxed">
+              <p className="text-foreground-secondary mb-4 leading-relaxed text-sm md:text-base">
                 Jeffi Stores is your trusted hardware partner, offering a wide selection of industrial
-                machinery parts. We guarantee high availability of quality components for manufacturing,
-                construction, and repairs.
+                machinery parts — for manufacturing, construction, and repairs.
               </p>
-              <p className="text-foreground-secondary mb-8 leading-relaxed">
-                Count on us for reliable products and expert service to keep your operations seamless!
+              <p className="text-foreground-secondary mb-6 leading-relaxed text-sm md:text-base">
+                Count on us for reliable products and expert service to keep your operations seamless.
               </p>
               <Link
                 href="/about"
-                className="text-accent-500 hover:text-accent-600 font-semibold inline-flex items-center"
+                className="text-accent-500 hover:text-accent-600 font-semibold inline-flex items-center text-sm"
               >
                 Learn More About Us
-                <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-4 h-4 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
             </div>
-            <div className="relative h-96 bg-surface-secondary rounded-lg flex items-center justify-center">
-              <svg className="w-48 h-48 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="hidden md:flex items-center justify-center h-72 bg-surface rounded-xl border border-border-default">
+              <svg className="w-40 h-40 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             </div>
