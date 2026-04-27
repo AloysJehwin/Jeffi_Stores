@@ -336,7 +336,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     return (
       <div className="bg-surface min-h-screen">
         <MobileAccountHeader />
-        <div className="container mx-auto px-4 py-4 lg:py-8">
+        <div className="container mx-auto px-4 py-4 pb-16 lg:py-8 lg:pb-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
             <div className="hidden lg:block lg:col-span-1">
               <AccountSidebar />
@@ -362,7 +362,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   return (
     <div className="bg-surface min-h-screen">
       <MobileAccountHeader />
-      <div className="container mx-auto px-4 py-4 lg:py-8">
+      <div className="container mx-auto px-4 py-4 pb-16 lg:py-8 lg:pb-8">
         <div className="hidden lg:block mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Order Details</h1>
         </div>
