@@ -8,10 +8,8 @@ interface CategoryIconProps {
 export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: CategoryIconProps) {
   const normalizedName = categoryName.toLowerCase()
 
-  // Check each word in the category name for better matching
   const words = normalizedName.split(/[\s-_]+/)
 
-  // Bolts - Lightning bolt icon
   if (words.some(w => w === 'bolt' || w === 'bolts')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -20,7 +18,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Screws - Screwdriver icon
   if (words.some(w => w === 'screw' || w === 'screws')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -29,7 +26,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Nuts - Hexagon icon
   if (words.some(w => w === 'nut' || w === 'nuts')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -38,7 +34,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Washers - Circle with dot icon
   if (words.some(w => w === 'washer' || w === 'washers')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -47,7 +42,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Bearings - Refresh/rotation icon
   if (words.some(w => w === 'bearing' || w === 'bearings')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -56,17 +50,14 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Wheels/Pulleys - Cog/gear icon
   if (words.some(w => w === 'wheel' || w === 'wheels' || w === 'pulley' || w === 'pulleys')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     )
   }
 
-  // Fasteners - Paperclip icon
   if (words.some(w => w === 'fastener' || w === 'fasteners')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -75,17 +66,14 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Tools - Wrench icon
   if (words.some(w => w === 'tool' || w === 'tools')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
       </svg>
     )
   }
 
-  // Pipes - Arrows icon
   if (words.some(w => w === 'pipe' || w === 'pipes' || w === 'plumbing')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -94,7 +82,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Electrical - Lightning icon
   if (words.some(w => w === 'electrical' || w === 'electric' || w === 'wire' || w === 'cable')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -103,7 +90,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Valves - Square with inner square icon
   if (words.some(w => w === 'valve' || w === 'valves' || w === 'fitting' || w === 'fittings')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -112,7 +98,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Motors/Engines - Light bulb icon
   if (words.some(w => w === 'motor' || w === 'motors' || w === 'engine' || w === 'engines')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -121,7 +106,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Paint - Paint brush icon
   if (words.some(w => w === 'paint' || w === 'coating' || w === 'brush')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -130,7 +114,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Safety - Shield icon
   if (words.some(w => w === 'safety' || w === 'protective' || w === 'protection')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -139,7 +122,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Cutting tools - Scissors icon
   if (words.some(w => w === 'cutting' || w === 'blade' || w === 'saw' || w === 'cutter')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -148,7 +130,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Measuring - Calculator icon
   if (words.some(w => w === 'measure' || w === 'measuring' || w === 'gauge' || w === 'meter')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -157,7 +138,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Springs - Up/down arrows
   if (words.some(w => w === 'spring' || w === 'springs' || w === 'coil')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -166,7 +146,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Hydraulic/Pneumatic - Sliders icon
   if (words.some(w => w === 'pneumatic' || w === 'hydraulic' || w === 'cylinder')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -175,7 +154,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Chains - Link icon
   if (words.some(w => w === 'chain' || w === 'chains' || w === 'link')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -184,7 +162,6 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Clamps - Clip icon
   if (words.some(w => w === 'clamp' || w === 'clamps' || w === 'clip')) {
     return (
       <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -193,7 +170,14 @@ export default function CategoryIcon({ categoryName, className = "w-8 h-8" }: Ca
     )
   }
 
-  // Default hardware icon - Toolbox
+  if (words.some(w => w === 'transmission' || w === 'drive' || w === 'belt' || w === 'belts')) {
+    return (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m0 0V5a2 2 0 00-2-2H10a2 2 0 00-2 2v2m8 0v10a2 2 0 01-2 2H10a2 2 0 01-2-2V7m4 4v6" />
+      </svg>
+    )
+  }
+
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
