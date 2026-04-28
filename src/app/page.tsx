@@ -42,60 +42,71 @@ export default async function HomePage() {
 
       {/* ── Hero ── */}
       <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden md:min-h-[calc(100vh-5rem)] md:flex md:items-center">
-        <div className="container mx-auto px-5 py-10 sm:py-12 md:py-16 relative z-10 w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-16 items-center">
+        <div className="container mx-auto px-4 sm:px-6 py-10 sm:py-14 md:py-16 relative z-10 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-20 items-center">
 
-            <div>
-              <span className="inline-block bg-white/20 backdrop-blur-sm text-white text-xs sm:text-sm font-bold uppercase tracking-widest px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-4 sm:mb-6 border border-white/30">
+            {/* Text column */}
+            <div className="order-2 md:order-1">
+              <span className="inline-block bg-white/20 backdrop-blur-sm text-white font-bold uppercase tracking-widest rounded-full border border-white/30
+                               text-[10px] sm:text-xs px-3 py-1.5 mb-4
+                               md:text-sm md:px-4 md:py-2 md:mb-6">
                 Hardware &amp; Industrial Tools
               </span>
 
-              <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-extrabold text-white leading-[1.05] mb-4 sm:mb-6 tracking-tight">
+              <h1 className="font-extrabold text-white leading-[1.05] tracking-tight mb-3 sm:mb-5 md:mb-6
+                             text-[clamp(2.25rem,8vw,5rem)] md:text-[clamp(3rem,6vw,6rem)]">
                 Jeffi <span className="text-secondary-500">Stores</span>
               </h1>
 
-              <p className="text-base sm:text-lg md:text-2xl lg:text-3xl text-white/80 mb-6 sm:mb-8 leading-relaxed max-w-sm md:max-w-none">
+              <p className="text-white/80 leading-relaxed mb-6 sm:mb-8 max-w-md md:max-w-none
+                            text-[clamp(0.875rem,2.5vw,1.25rem)] md:text-[clamp(1rem,2vw,1.5rem)]">
                 Industrial machinery parts, tools, and hardware — for manufacturing, construction, and repairs.
               </p>
 
-              <div className="flex gap-3 sm:gap-4 mb-6 sm:mb-10">
+              <div className="flex gap-3 mb-6 sm:mb-10">
                 <Link
                   href="/products"
-                  className="bg-secondary-500 hover:bg-secondary-600 text-white px-6 sm:px-8 py-3 md:py-4 rounded-xl font-bold transition-all text-sm sm:text-base md:text-lg shadow-lg"
+                  className="bg-secondary-500 hover:bg-secondary-600 text-white font-bold rounded-xl shadow-lg transition-all
+                             px-5 py-2.5 text-sm
+                             sm:px-7 sm:py-3 sm:text-base
+                             md:px-8 md:py-4 md:text-lg"
                 >
                   Shop Now
                 </Link>
                 <Link
                   href="/categories"
-                  className="bg-white/15 hover:bg-white/25 text-white px-6 sm:px-8 py-3 md:py-4 rounded-xl font-semibold transition-all text-sm sm:text-base md:text-lg border border-white/40"
+                  className="bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-all
+                             px-5 py-2.5 text-sm
+                             sm:px-7 sm:py-3 sm:text-base
+                             md:px-8 md:py-4 md:text-lg"
                 >
                   Browse
                 </Link>
               </div>
 
-              <div className="flex items-center gap-6 sm:gap-8 pt-4 sm:pt-6 border-t border-white/20">
-                <div>
-                  <p className="text-2xl sm:text-3xl md:text-4xl font-black text-white">500+</p>
-                  <p className="text-white/60 text-xs sm:text-sm md:text-base mt-0.5 font-medium">Products</p>
-                </div>
-                <div className="w-px h-8 sm:h-10 bg-white/20" />
-                <div>
-                  <p className="text-2xl sm:text-3xl md:text-4xl font-black text-white">50+</p>
-                  <p className="text-white/60 text-xs sm:text-sm md:text-base mt-0.5 font-medium">Brands</p>
-                </div>
-                <div className="w-px h-8 sm:h-10 bg-white/20" />
-                <div>
-                  <p className="text-2xl sm:text-3xl md:text-4xl font-black text-white">24/7</p>
-                  <p className="text-white/60 text-xs sm:text-sm md:text-base mt-0.5 font-medium">Support</p>
-                </div>
+              <div className="flex items-center gap-5 sm:gap-8 pt-4 sm:pt-6 border-t border-white/20">
+                {[
+                  { val: '500+', label: 'Products' },
+                  { val: '50+', label: 'Brands' },
+                  { val: '24/7', label: 'Support' },
+                ].map((stat, i, arr) => (
+                  <div key={stat.label} className="flex items-center gap-5 sm:gap-8">
+                    <div>
+                      <p className="font-black text-white text-[clamp(1.5rem,4vw,2.5rem)] md:text-[clamp(2rem,3.5vw,2.75rem)] leading-none">{stat.val}</p>
+                      <p className="text-white/60 font-medium mt-0.5 text-[clamp(0.65rem,1.5vw,0.875rem)]">{stat.label}</p>
+                    </div>
+                    {i < arr.length - 1 && <div className="w-px h-8 bg-white/20 shrink-0" />}
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="flex justify-center md:justify-end mt-2 md:mt-0">
+            {/* Image column */}
+            <div className="order-1 md:order-2 flex justify-center md:justify-end">
               <img
                 src="/images/Welcome.png"
                 alt="Industrial hardware and tools"
-                className="w-56 sm:w-80 md:w-full md:max-w-2xl object-contain drop-shadow-2xl"
+                className="w-[min(14rem,55vw)] sm:w-72 md:w-full md:max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
                 style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
               />
             </div>
