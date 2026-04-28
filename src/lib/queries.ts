@@ -14,7 +14,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       queryCount('SELECT COUNT(*) FROM products'),
       queryCount('SELECT COUNT(*) FROM orders'),
       queryOne<{ total: string }>('SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE payment_status = $1', ['paid']),
-      queryCount('SELECT COUNT(*) FROM users WHERE is_active = $1', [true]),
+      queryCount('SELECT COUNT(*) FROM users WHERE is_active = $1 AND is_guest = $2', [true, false]),
       queryCount('SELECT COUNT(*) FROM products WHERE stock_quantity <= low_stock_threshold'),
       queryCount('SELECT COUNT(*) FROM orders WHERE status = $1', ['pending']),
     ])

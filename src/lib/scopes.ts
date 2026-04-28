@@ -37,6 +37,12 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/reviews'],
   },
   {
+    key: 'brands',
+    label: 'Brands',
+    description: 'Manage product brands',
+    routes: ['/admin/brands'],
+  },
+  {
     key: 'customers',
     label: 'Customers',
     description: 'View and manage customer accounts',
@@ -67,6 +73,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/users')) return 'settings'
   if (pathname.startsWith('/api/admin/certificates')) return 'settings'
   if (pathname.startsWith('/api/admin/reviews')) return 'reviews'
+  if (pathname.startsWith('/api/brands')) return 'brands'
   if (pathname.startsWith('/api/customers')) return 'customers'
 
   return null

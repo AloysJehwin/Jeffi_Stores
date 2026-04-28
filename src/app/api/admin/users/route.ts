@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid role. Must be admin or moderator.' }, { status: 400 })
     }
 
-    const validScopes = ['dashboard', 'products', 'categories', 'orders', 'reviews', 'customers', 'settings']
+    const validScopes = ['dashboard', 'products', 'categories', 'brands', 'orders', 'reviews', 'customers', 'settings']
     if (scopes && !Array.isArray(scopes)) {
       return NextResponse.json({ error: 'Scopes must be an array' }, { status: 400 })
     }

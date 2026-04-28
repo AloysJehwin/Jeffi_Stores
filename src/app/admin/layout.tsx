@@ -48,6 +48,7 @@ export default async function AdminLayout({
     { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard' },
     { href: '/admin/products', label: 'Products', scope: 'products' },
     { href: '/admin/categories', label: 'Categories', scope: 'categories' },
+    { href: '/admin/brands', label: 'Brands', scope: 'brands' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders' },
     { href: '/admin/customers', label: 'Customers', scope: 'customers' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews' },
