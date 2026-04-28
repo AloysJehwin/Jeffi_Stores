@@ -57,34 +57,20 @@
   .group:hover .group-hover\:text-accent-600 { color: var(--accent-600) !important; }
 
   * {
-    @apply border-0 p-0 m-0 box-border;
+    @apply box-border;
   }
 
   html {
     @apply bg-surface;
-    height: 100%;
     overflow-x: hidden;
-    overscroll-behavior: none;
   }
 
   body {
     @apply antialiased font-sans bg-surface text-foreground;
     min-height: 100vh;
-    height: 100%;
     overflow-x: hidden;
-    overscroll-behavior: none;
-    position: relative;
-  }
-
-  body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: var(--color-surface);
-    z-index: -9999;
+    margin: 0;
+    padding: 0;
   }
 
   #__next {
