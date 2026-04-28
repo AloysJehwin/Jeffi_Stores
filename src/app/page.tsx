@@ -101,12 +101,12 @@ export default async function HomePage() {
               </div>
             </div>
 
-            {/* Image column — hidden on mobile to keep hero compact */}
-            <div className="hidden md:flex md:order-2 justify-end">
+            {/* Image column */}
+            <div className="flex md:order-2 justify-center md:justify-end mt-4 md:mt-0">
               <img
                 src="/images/Welcome.png"
                 alt="Industrial hardware and tools"
-                className="w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
+                className="w-48 sm:w-64 md:w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
                 style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
               />
             </div>
