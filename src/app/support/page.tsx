@@ -105,7 +105,7 @@ export default async function SupportPage() {
                   <div className="w-6 h-6 rounded-full bg-primary-500 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">2</div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">Request a live agent</p>
-                    <p className="text-xs text-foreground-muted mt-0.5">If the bot can't resolve it, tap "Connect to Support Agent" — our team gets an email alert instantly.</p>
+                    <p className="text-xs text-foreground-muted mt-0.5">If the bot can&apos;t resolve it, tap &ldquo;Connect to Support Agent&rdquo; &mdash; our team gets an email alert instantly.</p>
                   </div>
                 </li>
                 <li className="flex gap-3">

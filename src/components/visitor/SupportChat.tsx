@@ -269,7 +269,7 @@ export default function SupportChat() {
         {mode === 'bot' && showConnectPrompt && !isSending && (
           <div className="flex justify-start pt-1">
             <div className="bg-surface border border-border-default rounded-2xl rounded-bl-sm px-3.5 py-3 max-w-[85%]">
-              <p className="text-sm text-foreground mb-3">Still need help? Connect to a live support agent and we'll assist you directly.</p>
+              <p className="text-sm text-foreground mb-3">Still need help? Connect to a live support agent and we&apos;ll assist you directly.</p>
               <button
                 onClick={connectToAgent}
                 disabled={isConnecting}

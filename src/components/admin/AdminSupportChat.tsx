@@ -216,7 +216,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
     }
   }
 
-  function useQuickReply(text: string) {
+  function handleQuickReply(text: string) {
     setInput(text)
     setIsClosingReply(activeCategory === 'Closing')
     setShowQuickReplies(false)
@@ -330,7 +330,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                 {activeCategoryReplies.map((reply, i) => (
                   <button
                     key={i}
-                    onClick={() => useQuickReply(reply)}
+                    onClick={() => handleQuickReply(reply)}
                     className="w-full text-left text-sm px-3 py-2 rounded-lg border border-border-default bg-surface hover:border-accent-400 hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors text-foreground leading-snug"
                   >
                     {reply}
