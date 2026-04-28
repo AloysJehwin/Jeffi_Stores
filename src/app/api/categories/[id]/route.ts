@@ -14,7 +14,6 @@ export async function DELETE(
 
     const categoryId = params.id
 
-    // Check if category has products
     const productCount = await queryCount(
       'SELECT COUNT(*) FROM products WHERE category_id = $1',
       [categoryId]
@@ -27,7 +26,6 @@ export async function DELETE(
       )
     }
 
-    // Check if category has subcategories
     const subCategoryCount = await queryCount(
       'SELECT COUNT(*) FROM categories WHERE parent_category_id = $1',
       [categoryId]
@@ -40,12 +38,10 @@ export async function DELETE(
       )
     }
 
-    // Delete category
     await query('DELETE FROM categories WHERE id = $1', [categoryId])
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error('Delete error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to delete category' },
       { status: 500 }

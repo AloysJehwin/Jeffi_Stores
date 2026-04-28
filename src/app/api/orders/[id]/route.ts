@@ -16,7 +16,6 @@ export async function GET(
 
     const orderId = params.id
 
-    // Fetch order with address
     const order = await queryOne(`
       SELECT o.*,
         (SELECT row_to_json(a) FROM (
@@ -31,7 +30,6 @@ export async function GET(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    // Fetch order items with product images
     const orderItems = await queryMany(`
       SELECT oi.id, oi.product_id, oi.product_name, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price,
         json_build_object('slug', p.slug, 'product_images',
@@ -72,7 +70,6 @@ export async function GET(
 
     return NextResponse.json({ order: orderDetails })
   } catch (error) {
-    console.error('Order fetch error:', error)
     return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 })
   }
 }
@@ -91,7 +88,6 @@ export async function PATCH(
     const body = await request.json()
     const { status, payment_status } = body
 
-    // First, get current order details and user info
     const currentOrder = await queryOne(`
       SELECT
         o.order_number, o.status, o.payment_status, o.total_amount,
@@ -114,7 +110,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Delivered orders cannot change status' }, { status: 400 })
     }
 
-    // Validate status values
     const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancel_requested', 'cancelled']
     const validPaymentStatuses = ['pending', 'paid', 'failed', 'refunded']
 
@@ -126,7 +121,6 @@ export async function PATCH(
       return NextResponse.json({ error: `Invalid payment status: ${payment_status}` }, { status: 400 })
     }
 
-    // Prevent setting payment to 'paid' → 'pending' (refunded is the correct reverse path)
     if (currentOrder.payment_status === 'paid' && payment_status === 'pending') {
       return NextResponse.json({ error: 'Paid orders cannot revert to pending. Use refunded instead.' }, { status: 400 })
     }
@@ -152,36 +146,32 @@ export async function PATCH(
 
     values.push(orderId)
 
-    // Update the order
     await query(
       `UPDATE orders SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
       values
     )
 
-    // Generate invoice when order moves to confirmed or processing AND payment is paid
     let invoicePdfBuffer: Buffer | null = null
     const effectivePaymentStatus = payment_status || currentOrder.payment_status
     if (statusChanged && (status === 'confirmed' || status === 'processing') && effectivePaymentStatus === 'paid') {
       try {
         invoicePdfBuffer = await generateOrderInvoice(orderId)
-      } catch (err) {
-        console.error('Failed to generate invoice:', err)
+      } catch (_err) {
+        invoicePdfBuffer = null
       }
     }
 
-    // Also generate invoice if payment just changed to paid and order is already confirmed/processing
     const effectiveStatus = status || currentOrder.status
     if (paymentStatusChanged && payment_status === 'paid' && (effectiveStatus === 'confirmed' || effectiveStatus === 'processing')) {
       if (!invoicePdfBuffer) {
         try {
           invoicePdfBuffer = await generateOrderInvoice(orderId)
-        } catch (err) {
-          console.error('Failed to generate invoice:', err)
+        } catch (_err) {
+          invoicePdfBuffer = null
         }
       }
     }
 
-    // Send email notifications if user exists
     const user = currentOrder.users
     const userEmail = user?.email || currentOrder.customer_email
     const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : currentOrder.customer_name
@@ -190,7 +180,6 @@ export async function PATCH(
     let paymentEmailSent = false
 
     if (userEmail && userName) {
-      // Send order status update notification
       if (statusChanged) {
         const statusResult = await sendOrderStatusUpdate(
           userEmail,
@@ -204,7 +193,6 @@ export async function PATCH(
         statusEmailSent = statusResult.success
       }
 
-      // Send payment status update notification
       if (paymentStatusChanged) {
         const paymentResult = await sendPaymentStatusUpdate(
           userEmail,
@@ -226,10 +214,13 @@ export async function PATCH(
       },
     })
   } catch (error: any) {
-    console.error('Update error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to update order' },
       { status: 500 }
     )
   }
+}
+
+export async function DELETE() {
+  return NextResponse.json({ error: 'Orders cannot be deleted.' }, { status: 405 })
 }
