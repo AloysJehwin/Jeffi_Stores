@@ -41,7 +41,7 @@ export default async function HomePage() {
     <div className="bg-surface">
 
       {/* ── Hero ── */}
-      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden md:min-h-[calc(100vh-5rem)] md:flex md:items-center">
+      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden min-h-[calc(100svh-4rem)] flex items-center md:min-h-[calc(100vh-5rem)]">
         <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 md:py-16 relative z-10 w-full">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-20 items-center">
 

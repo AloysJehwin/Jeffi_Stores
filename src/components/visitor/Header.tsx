@@ -14,9 +14,9 @@ export default function Header() {
 
   return (
     <>
-      <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default sticky top-0 z-40">
+      <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default sticky top-0 z-40 w-full">
         <div className="container mx-auto px-3 sm:px-4">
-          <div className="flex items-center justify-between h-14 sm:h-16 lg:h-20">
+          <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20">
             {/* Logo */}
             <Link href="/" className="flex items-center">
               <div className="flex items-center gap-2 sm:gap-3">
@@ -55,6 +55,13 @@ export default function Header() {
             <div className="flex items-center gap-2 sm:gap-4">
               {/* Search Bar */}
               <SearchBar />
+
+              {/* Tools/Spanner Icon (mobile) */}
+              <Link href="/support" className="sm:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+                </svg>
+              </Link>
 
               {/* Wishlist Icon */}
               <Link href="/wishlist" className="hidden sm:flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors relative">
