@@ -38,7 +38,7 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
       />
 
       <div
-        className={`fixed top-0 left-0 bottom-0 z-50 w-[72vw] max-w-[280px] bg-surface-elevated shadow-xl transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`fixed top-0 left-0 bottom-0 z-50 w-4/5 max-w-xs bg-surface-elevated shadow-xl transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex flex-col h-full overflow-y-auto">
           <div className="flex items-center justify-between p-4 border-b border-border-default">

@@ -42,11 +42,11 @@ export default async function HomePage() {
 
       {/* ── Hero ── */}
       <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden md:min-h-[calc(100vh-5rem)] md:flex md:items-center">
-        <div className="container mx-auto px-4 sm:px-6 py-10 sm:py-14 md:py-16 relative z-10 w-full">
+        <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 md:py-16 relative z-10 w-full">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-20 items-center">
 
             {/* Text column */}
-            <div className="order-2 md:order-1">
+            <div className="md:order-1">
               <span className="inline-block bg-white/20 backdrop-blur-sm text-white font-bold uppercase tracking-widest rounded-full border border-white/30
                                text-[10px] sm:text-xs px-3 py-1.5 mb-4
                                md:text-sm md:px-4 md:py-2 md:mb-6">
@@ -101,12 +101,12 @@ export default async function HomePage() {
               </div>
             </div>
 
-            {/* Image column */}
-            <div className="order-1 md:order-2 flex justify-center md:justify-end">
+            {/* Image column — hidden on mobile to keep hero compact */}
+            <div className="hidden md:flex md:order-2 justify-end">
               <img
                 src="/images/Welcome.png"
                 alt="Industrial hardware and tools"
-                className="w-[min(14rem,55vw)] sm:w-72 md:w-full md:max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
+                className="w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
                 style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
               />
             </div>
