@@ -85,8 +85,12 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
 
             <div class="otp-box">${otp}</div>
 
-            <p style="text-align: center; font-size: 12px; color: #94a3b8; margin: -16px 0 20px;">
-              Tap the code above to select, then copy
+            <p style="text-align: center; margin: -10px 0 24px;">
+              <a href="#"
+                 onclick="var t=this;navigator.clipboard.writeText('${otp}').then(function(){t.innerHTML='&#10003; Copied!';t.style.backgroundColor='#22c55e';t.style.borderColor='#16a34a';t.style.color='white';setTimeout(function(){t.innerHTML='&#128203; Copy OTP';t.style.backgroundColor='#f1f5f9';t.style.borderColor='#cbd5e1';t.style.color='#334155';},2000)}).catch(function(){});return false;"
+                 style="display:inline-block;background-color:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:9px 24px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;font-family:Arial,sans-serif;cursor:pointer;">
+                &#128203; Copy OTP
+              </a>
             </p>
 
             <div class="info">
