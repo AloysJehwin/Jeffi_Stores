@@ -17,23 +17,19 @@ async function createCategory(formData: FormData) {
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-  try {
-    await query(
-      `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, google_product_category)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory]
-    )
+  await query(
+    `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, google_product_category)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory]
+  )
 
-    revalidatePath('/admin/categories')
-    revalidatePath('/admin/categories/add')
-    revalidatePath('/admin/categories/edit/[id]', 'page')
-    revalidatePath('/admin/products/add')
-    revalidatePath('/admin/products/edit/[id]', 'page')
+  revalidatePath('/admin/categories')
+  revalidatePath('/admin/categories/add')
+  revalidatePath('/admin/categories/edit/[id]', 'page')
+  revalidatePath('/admin/products/add')
+  revalidatePath('/admin/products/edit/[id]', 'page')
 
-    redirect('/admin/categories')
-  } catch {
-    throw new Error('Failed to create category')
-  }
+  redirect('/admin/categories')
 }
 
 export default async function AddCategoryPage() {

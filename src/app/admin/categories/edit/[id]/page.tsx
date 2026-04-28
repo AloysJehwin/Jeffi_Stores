@@ -23,25 +23,21 @@ async function updateCategory(categoryId: string, formData: FormData) {
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-  try {
-    await query(
-      `UPDATE categories SET
-        name = $1, slug = $2, description = $3, parent_category_id = $4,
-        sku_prefix = $5, display_order = $6, is_active = $7, google_product_category = $8, updated_at = $9
-      WHERE id = $10`,
-      [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, new Date().toISOString(), categoryId]
-    )
+  await query(
+    `UPDATE categories SET
+      name = $1, slug = $2, description = $3, parent_category_id = $4,
+      sku_prefix = $5, display_order = $6, is_active = $7, google_product_category = $8, updated_at = $9
+    WHERE id = $10`,
+    [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, new Date().toISOString(), categoryId]
+  )
 
-    revalidatePath('/admin/categories')
-    revalidatePath('/admin/categories/add')
-    revalidatePath('/admin/categories/edit/[id]', 'page')
-    revalidatePath('/admin/products/add')
-    revalidatePath('/admin/products/edit/[id]', 'page')
+  revalidatePath('/admin/categories')
+  revalidatePath('/admin/categories/add')
+  revalidatePath('/admin/categories/edit/[id]', 'page')
+  revalidatePath('/admin/products/add')
+  revalidatePath('/admin/products/edit/[id]', 'page')
 
-    redirect('/admin/categories')
-  } catch {
-    throw new Error('Failed to update category')
-  }
+  redirect('/admin/categories')
 }
 
 export default async function EditCategoryPage({ params }: { params: { id: string } }) {
