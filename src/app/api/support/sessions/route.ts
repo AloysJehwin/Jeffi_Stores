@@ -55,7 +55,9 @@ export async function POST(request: NextRequest) {
         []
       )
       const adminEmails = admins.map((a: any) => a.email)
-      await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id, adminEmails)
+      try {
+        await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id, adminEmails)
+      } catch {}
     }
 
     return NextResponse.json({ session })

@@ -65,14 +65,14 @@ export default function SupportChat() {
 
   async function resumeSession() {
     try {
-      const res = await fetch('/api/support/sessions')
+      const res = await fetch('/api/support/sessions', { credentials: 'include' })
       if (!res.ok) return
       const data = await res.json()
       if (data.session) {
         setSession(data.session)
         if (data.session.admin_name) setAdminName(data.session.admin_name)
         setMode('live')
-        const msgsRes = await fetch(`/api/support/sessions/${data.session.id}/messages`)
+        const msgsRes = await fetch(`/api/support/sessions/${data.session.id}/messages`, { credentials: 'include' })
         if (msgsRes.ok) {
           const msgsData = await msgsRes.json()
           if (msgsData.messages?.length) {
@@ -87,7 +87,7 @@ export default function SupportChat() {
 
   async function pollMessages(sessionId: string) {
     try {
-      const res = await fetch(`/api/support/sessions/${sessionId}/messages`)
+      const res = await fetch(`/api/support/sessions/${sessionId}/messages`, { credentials: 'include' })
       if (!res.ok) return
       const data = await res.json()
       if (!data.messages?.length) return
@@ -125,7 +125,7 @@ export default function SupportChat() {
   async function connectToAgent() {
     setIsConnecting(true)
     try {
-      const res = await fetch('/api/support/sessions', { method: 'POST' })
+      const res = await fetch('/api/support/sessions', { method: 'POST', credentials: 'include' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setSession(data.session)
@@ -151,6 +151,7 @@ export default function SupportChat() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
+        credentials: 'include',
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -170,6 +171,7 @@ export default function SupportChat() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'closed' }),
+        credentials: 'include',
       })
     } catch {}
     if (pollRef.current) clearInterval(pollRef.current)
