@@ -41,61 +41,61 @@ export default async function HomePage() {
     <div className="bg-surface">
 
       {/* ── Hero ── */}
-      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden min-h-[calc(100vh-5rem)] flex items-center">
-        <div className="container mx-auto px-5 py-12 md:py-16 relative z-10 w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
+      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden">
+        <div className="container mx-auto px-5 py-8 sm:py-12 md:py-16 relative z-10 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-16 items-center">
 
             <div>
-              <span className="inline-block bg-white/20 backdrop-blur-sm text-white text-sm font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-6 border border-white/30">
+              <span className="inline-block bg-white/20 backdrop-blur-sm text-white text-xs sm:text-sm font-bold uppercase tracking-widest px-3 sm:px-4 py-1.5 sm:py-2 rounded-full mb-4 sm:mb-6 border border-white/30">
                 Hardware &amp; Industrial Tools
               </span>
 
-              <h1 className="text-5xl sm:text-6xl md:text-8xl font-extrabold text-white leading-[1.05] mb-6 tracking-tight whitespace-nowrap">
+              <h1 className="text-4xl sm:text-6xl md:text-8xl font-extrabold text-white leading-[1.05] mb-4 sm:mb-6 tracking-tight">
                 Jeffi <span className="text-secondary-500">Stores</span>
               </h1>
 
-              <p className="text-xl sm:text-2xl md:text-3xl text-white/80 mb-8 leading-relaxed max-w-sm md:max-w-none">
+              <p className="text-base sm:text-xl md:text-2xl text-white/80 mb-6 sm:mb-8 leading-relaxed max-w-sm md:max-w-none">
                 Industrial machinery parts, tools, and hardware — for manufacturing, construction, and repairs.
               </p>
 
-              <div className="flex gap-4 mb-10">
+              <div className="flex gap-3 sm:gap-4 mb-6 sm:mb-10">
                 <Link
                   href="/products"
-                  className="bg-secondary-500 hover:bg-secondary-600 text-white px-8 py-4 rounded-xl font-bold transition-all text-base md:text-lg shadow-lg"
+                  className="bg-secondary-500 hover:bg-secondary-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold transition-all text-sm sm:text-base md:text-lg shadow-lg"
                 >
                   Shop Now
                 </Link>
                 <Link
                   href="/categories"
-                  className="bg-white/15 hover:bg-white/25 text-white px-8 py-4 rounded-xl font-semibold transition-all text-base md:text-lg border border-white/40"
+                  className="bg-white/15 hover:bg-white/25 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-semibold transition-all text-sm sm:text-base md:text-lg border border-white/40"
                 >
                   Browse
                 </Link>
               </div>
 
-              <div className="flex items-center gap-8 pt-6 border-t border-white/20">
+              <div className="flex items-center gap-6 sm:gap-8 pt-4 sm:pt-6 border-t border-white/20">
                 <div>
-                  <p className="text-3xl sm:text-4xl font-black text-white">500+</p>
-                  <p className="text-white/60 text-sm sm:text-base mt-1 font-medium">Products</p>
+                  <p className="text-2xl sm:text-3xl md:text-4xl font-black text-white">500+</p>
+                  <p className="text-white/60 text-xs sm:text-sm md:text-base mt-0.5 font-medium">Products</p>
                 </div>
-                <div className="w-px h-10 bg-white/20" />
+                <div className="w-px h-8 sm:h-10 bg-white/20" />
                 <div>
-                  <p className="text-3xl sm:text-4xl font-black text-white">50+</p>
-                  <p className="text-white/60 text-sm sm:text-base mt-1 font-medium">Brands</p>
+                  <p className="text-2xl sm:text-3xl md:text-4xl font-black text-white">50+</p>
+                  <p className="text-white/60 text-xs sm:text-sm md:text-base mt-0.5 font-medium">Brands</p>
                 </div>
-                <div className="w-px h-10 bg-white/20" />
+                <div className="w-px h-8 sm:h-10 bg-white/20" />
                 <div>
-                  <p className="text-3xl sm:text-4xl font-black text-white">24/7</p>
-                  <p className="text-white/60 text-sm sm:text-base mt-1 font-medium">Support</p>
+                  <p className="text-2xl sm:text-3xl md:text-4xl font-black text-white">24/7</p>
+                  <p className="text-white/60 text-xs sm:text-sm md:text-base mt-0.5 font-medium">Support</p>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-center md:justify-end">
+            <div className="flex justify-center md:justify-end mt-2 md:mt-0">
               <img
                 src="/images/Welcome.png"
                 alt="Industrial hardware and tools"
-                className="w-80 sm:w-[28rem] md:w-full md:max-w-2xl object-contain drop-shadow-2xl"
+                className="w-56 sm:w-80 md:w-full md:max-w-2xl object-contain drop-shadow-2xl"
                 style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
               />
             </div>

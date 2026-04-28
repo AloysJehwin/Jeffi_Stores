@@ -9,9 +9,6 @@ node_modules
 # Certificates (mounted as volumes, not baked in)
 certs/
 
-# Database scripts
-database/
-
 # Old files
 old-files/
 
