@@ -20,7 +20,6 @@ export default function CategoryForm({ categories, action, category }: CategoryF
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Get only main categories (for parent selection)
   const mainCategories = categories.filter(c => !c.parent_category_id)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -31,7 +30,8 @@ export default function CategoryForm({ categories, action, category }: CategoryF
     try {
       const formData = new FormData(e.currentTarget)
       await action(formData)
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
       setError('Failed to save category. Please try again.')
       setIsSubmitting(false)
     }
