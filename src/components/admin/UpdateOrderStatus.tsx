@@ -92,6 +92,7 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
             { value: 'shipped', label: 'Shipped' },
             { value: 'delivered', label: 'Delivered' },
             { value: 'cancel_requested', label: 'Cancel Requested' },
+            { value: 'cancel_rejected', label: 'Cancel Rejected' },
             { value: 'cancelled', label: 'Cancelled' },
           ]}
         />

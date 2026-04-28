@@ -22,7 +22,7 @@ export async function PATCH(
     let i = 1
 
     if (scopes !== undefined) {
-      const validScopes = ['dashboard', 'products', 'categories', 'orders', 'reviews', 'settings']
+      const validScopes = ['dashboard', 'products', 'categories', 'orders', 'reviews', 'brands', 'customers', 'settings']
       if (!Array.isArray(scopes) || scopes.some((s: string) => !validScopes.includes(s))) {
         return NextResponse.json({ error: 'Invalid scopes' }, { status: 400 })
       }

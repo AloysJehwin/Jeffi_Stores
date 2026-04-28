@@ -515,7 +515,8 @@ export async function sendOrderStatusUpdate(
   orderId: string,
   newStatus: string,
   previousStatus?: string,
-  invoicePdfBuffer?: Buffer | null
+  invoicePdfBuffer?: Buffer | null,
+  cancellationNote?: string
 ) {
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
     pending: {
@@ -552,6 +553,11 @@ export async function sendOrderStatusUpdate(
       title: 'Cancellation Request Received',
       message: 'We have received your cancellation request. Our team will review it and notify you once it is approved or rejected.',
       color: '#f97316',
+    },
+    cancel_rejected: {
+      title: 'Cancellation Request Rejected',
+      message: 'We were unable to process your cancellation request. Your order will continue as normal.',
+      color: '#6b7280',
     },
   }
 
@@ -647,6 +653,13 @@ export async function sendOrderStatusUpdate(
             <h2>${statusInfo.title}</h2>
             <p>Hello ${customerName},</p>
             <p>${statusInfo.message}</p>
+
+            ${cancellationNote ? `
+            <div class="info-box" style="background-color: #fef2f2; border-left-color: #ef4444;">
+              <h4 style="margin-top: 0; color: #b91c1c;">Reason</h4>
+              <p style="margin: 0;">${cancellationNote}</p>
+            </div>
+            ` : ''}
 
             <div class="status-badge">${newStatus}</div>
 

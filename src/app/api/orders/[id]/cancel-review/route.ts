@@ -16,13 +16,16 @@ export async function POST(
 
     const orderId = params.id
     const body = await request.json()
-    const { action } = body
+    const { action, note } = body
 
     if (!action || !['approve', 'reject'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action. Must be "approve" or "reject".' }, { status: 400 })
     }
 
-    // Fetch order
+    if (action === 'reject' && (!note || !note.trim())) {
+      return NextResponse.json({ error: 'A reason is required when rejecting a cancellation.' }, { status: 400 })
+    }
+
     const order = await queryOne(`
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
         o.customer_name, o.customer_email, o.user_id,
@@ -47,7 +50,6 @@ export async function POST(
     let refundFailed = false
 
     if (action === 'approve') {
-      // Attempt Razorpay refund if order was paid via Razorpay
       let refundSuccess = false
       if (order.payment_status === 'paid' && isRazorpayEnabled()) {
         const paymentRecord = await queryOne(
@@ -65,18 +67,15 @@ export async function POST(
               amount: amountInPaise,
             })
 
-            // Update payment and order in transaction with stock restore
             await withTransaction(async (client) => {
               await client.query(
                 `UPDATE orders SET status = 'cancelled', payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
                 [orderId]
               )
               await client.query(
-                `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW()
-                 WHERE id = $2`,
+                `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
                 [JSON.stringify({ ...(typeof paymentRecord.gateway_response === 'string' ? JSON.parse(paymentRecord.gateway_response) : paymentRecord.gateway_response || {}), refund }), paymentRecord.id]
               )
-              // Restore stock
               const itemsResult = await client.query(
                 'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
                 [orderId]
@@ -89,10 +88,8 @@ export async function POST(
               }
             })
             refundSuccess = true
-          } catch (refundError) {
-            console.error('Razorpay refund failed:', refundError)
+          } catch {
             refundFailed = true
-            // Still cancel the order, but leave payment_status as 'paid' for manual handling
             await withTransaction(async (client) => {
               await client.query(
                 `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
@@ -111,7 +108,6 @@ export async function POST(
             })
           }
         } else {
-          // No Razorpay payment record found — cancel without refund
           await withTransaction(async (client) => {
             await client.query(
               `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
@@ -130,7 +126,6 @@ export async function POST(
           })
         }
       } else {
-        // Not a Razorpay paid order — just cancel and restore stock
         await withTransaction(async (client) => {
           await client.query(
             `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
@@ -150,7 +145,6 @@ export async function POST(
       }
       newStatus = 'cancelled'
 
-      // Send refund email if refund was processed
       if (refundSuccess) {
         const refundUser = order.users
         const refundEmail = refundUser?.email || order.customer_email
@@ -159,19 +153,17 @@ export async function POST(
           sendPaymentStatusUpdate(
             refundEmail, refundName, order.order_number, orderId,
             'refunded', parseFloat(order.total_amount)
-          ).catch(err => console.error('Failed to send refund email:', err))
+          ).catch(() => {})
         }
       }
     } else {
-      // Reject — set back to pending
       await query(
-        `UPDATE orders SET status = 'pending', updated_at = NOW() WHERE id = $1`,
-        [orderId]
+        `UPDATE orders SET status = 'cancel_rejected', cancellation_note = $2, updated_at = NOW() WHERE id = $1`,
+        [orderId, note.trim()]
       )
-      newStatus = 'pending'
+      newStatus = 'cancel_rejected'
     }
 
-    // Send email notification (fire-and-forget)
     const user = order.users
     const userEmail = user?.email || order.customer_email
     const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : order.customer_name
@@ -183,13 +175,14 @@ export async function POST(
         order.order_number,
         orderId,
         newStatus,
-        'cancel_requested'
-      ).catch(err => console.error('Failed to send cancel review email:', err))
+        'cancel_requested',
+        null,
+        newStatus === 'cancel_rejected' ? note.trim() : undefined
+      ).catch(() => {})
     }
 
     return NextResponse.json({ success: true, newStatus, refundFailed })
-  } catch (error) {
-    console.error('Cancel review error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to process cancellation review' }, { status: 500 })
   }
 }
