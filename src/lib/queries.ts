@@ -27,8 +27,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       lowStockProducts,
       pendingOrders,
     }
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error)
+  } catch {
     return {
       totalProducts: 0,
       totalOrders: 0,
@@ -243,6 +242,82 @@ export async function getFilteredCategories(filters: {
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
   return queryMany(`SELECT * FROM categories ${where} ORDER BY display_order ASC`, params)
+}
+
+export async function getCustomers(filters: {
+  search?: string
+  status?: string
+  page?: number
+  limit?: number
+}) {
+  const conditions: string[] = ['u.is_guest = false']
+  const params: any[] = []
+  let i = 1
+
+  if (filters.status === 'active') {
+    conditions.push(`u.is_active = true AND u.is_flagged = false`)
+  } else if (filters.status === 'inactive') {
+    conditions.push(`u.is_active = false AND u.is_flagged = false`)
+  } else if (filters.status === 'flagged') {
+    conditions.push(`u.is_flagged = true`)
+  }
+
+  if (filters.search) {
+    conditions.push(`(u.email ILIKE $${i} OR u.first_name ILIKE $${i} OR u.last_name ILIKE $${i} OR u.phone ILIKE $${i})`)
+    params.push(`%${filters.search}%`)
+    i++
+  }
+
+  const where = `WHERE ${conditions.join(' AND ')}`
+  const limit = filters.limit || 50
+  const offset = ((filters.page || 1) - 1) * limit
+
+  const [customers, total] = await Promise.all([
+    queryMany(`
+      SELECT
+        u.id, u.email, u.phone, u.first_name, u.last_name,
+        u.is_active, u.is_flagged, u.flag_reason, u.created_at,
+        cp.customer_type,
+        COALESCE(o.order_count, 0) AS order_count,
+        o.last_order_at
+      FROM users u
+      LEFT JOIN customer_profiles cp ON u.id = cp.user_id
+      LEFT JOIN (
+        SELECT user_id, COUNT(*) AS order_count, MAX(created_at) AS last_order_at
+        FROM orders GROUP BY user_id
+      ) o ON u.id = o.user_id
+      ${where}
+      ORDER BY u.created_at DESC
+      LIMIT $${i} OFFSET $${i + 1}
+    `, [...params, limit, offset]),
+    queryCount(`SELECT COUNT(*) FROM users u ${where}`, params),
+  ])
+
+  return { customers, total }
+}
+
+export async function getCustomerById(id: string) {
+  const customer = await queryOne(`
+    SELECT
+      u.id, u.email, u.phone, u.first_name, u.last_name,
+      u.is_active, u.is_flagged, u.flag_reason, u.created_at,
+      cp.customer_type, cp.company_name, cp.gst_number, cp.credit_limit
+    FROM users u
+    LEFT JOIN customer_profiles cp ON u.id = cp.user_id
+    WHERE u.id = $1 AND u.is_guest = false
+  `, [id])
+
+  if (!customer) throw new Error('Customer not found')
+
+  const recentOrders = await queryMany(`
+    SELECT id, order_number, total_amount, status, payment_status, created_at
+    FROM orders
+    WHERE user_id = $1
+    ORDER BY created_at DESC
+    LIMIT 5
+  `, [id])
+
+  return { ...customer, recent_orders: recentOrders }
 }
 
 export async function getRecentOrders(limit: number = 10) {

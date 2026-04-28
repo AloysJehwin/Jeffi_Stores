@@ -37,6 +37,12 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/reviews'],
   },
   {
+    key: 'customers',
+    label: 'Customers',
+    description: 'View and manage customer accounts',
+    routes: ['/admin/customers'],
+  },
+  {
     key: 'settings',
     label: 'Settings',
     description: 'System settings and admin management',
@@ -46,14 +52,8 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
 
-/**
- * Determine which scope is required for a given admin path.
- * Returns null if no scope is required (e.g. login page, root admin).
- */
 export function getScopeForPath(pathname: string): string | null {
-  // No scope required for login
   if (pathname === '/admin/login') return null
-  // Root admin redirects to dashboard
   if (pathname === '/admin') return 'dashboard'
 
   for (const scope of ADMIN_SCOPES) {
@@ -64,18 +64,14 @@ export function getScopeForPath(pathname: string): string | null {
     }
   }
 
-  // API routes for admin
   if (pathname.startsWith('/api/admin/users')) return 'settings'
   if (pathname.startsWith('/api/admin/certificates')) return 'settings'
   if (pathname.startsWith('/api/admin/reviews')) return 'reviews'
+  if (pathname.startsWith('/api/customers')) return 'customers'
 
   return null
 }
 
-/**
- * Check if an admin with the given role and scopes has access to the required scope.
- * super_admin always has access to everything.
- */
 export function hasScope(role: string, scopes: string[], requiredScope: string): boolean {
   if (role === 'super_admin') return true
   return scopes.includes(requiredScope)
