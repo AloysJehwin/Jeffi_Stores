@@ -41,54 +41,52 @@ export default async function HomePage() {
     <div className="bg-surface">
 
       {/* ── Hero ── */}
-      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden">
-        <div className="container mx-auto px-5 pt-10 pb-8 md:py-24 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 items-center">
+      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden min-h-[calc(100vh-5rem)] flex items-center">
+        <div className="container mx-auto px-5 py-12 md:py-16 relative z-10 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-center">
 
             <div>
-              <span className="inline-block bg-white/20 backdrop-blur-sm text-white text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4 border border-white/30">
+              <span className="inline-block bg-white/20 backdrop-blur-sm text-white text-sm font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-6 border border-white/30">
                 Hardware &amp; Industrial Tools
               </span>
 
-              <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white leading-[1.05] mb-4 tracking-tight">
-                Jeffi
-                <br />
-                <span className="text-secondary-500">Stores</span>
+              <h1 className="text-5xl sm:text-6xl md:text-8xl font-extrabold text-white leading-[1.05] mb-6 tracking-tight whitespace-nowrap">
+                Jeffi <span className="text-secondary-500">Stores</span>
               </h1>
 
-              <p className="text-base sm:text-lg md:text-2xl text-white/80 mb-6 leading-relaxed max-w-sm md:max-w-none">
+              <p className="text-xl sm:text-2xl md:text-3xl text-white/80 mb-8 leading-relaxed max-w-sm md:max-w-none">
                 Industrial machinery parts, tools, and hardware — for manufacturing, construction, and repairs.
               </p>
 
-              <div className="flex gap-3 mb-8">
+              <div className="flex gap-4 mb-10">
                 <Link
                   href="/products"
-                  className="bg-secondary-500 hover:bg-secondary-600 text-white px-6 py-3 rounded-xl font-bold transition-all text-sm sm:text-base shadow-lg"
+                  className="bg-secondary-500 hover:bg-secondary-600 text-white px-8 py-4 rounded-xl font-bold transition-all text-base md:text-lg shadow-lg"
                 >
                   Shop Now
                 </Link>
                 <Link
                   href="/categories"
-                  className="bg-white/15 hover:bg-white/25 text-white px-6 py-3 rounded-xl font-semibold transition-all text-sm sm:text-base border border-white/40"
+                  className="bg-white/15 hover:bg-white/25 text-white px-8 py-4 rounded-xl font-semibold transition-all text-base md:text-lg border border-white/40"
                 >
                   Browse
                 </Link>
               </div>
 
-              <div className="flex items-center gap-6 pt-6 border-t border-white/20">
+              <div className="flex items-center gap-8 pt-6 border-t border-white/20">
                 <div>
-                  <p className="text-2xl sm:text-3xl font-black text-white">500+</p>
-                  <p className="text-white/60 text-xs sm:text-sm mt-0.5 font-medium">Products</p>
+                  <p className="text-3xl sm:text-4xl font-black text-white">500+</p>
+                  <p className="text-white/60 text-sm sm:text-base mt-1 font-medium">Products</p>
                 </div>
-                <div className="w-px h-8 bg-white/20" />
+                <div className="w-px h-10 bg-white/20" />
                 <div>
-                  <p className="text-2xl sm:text-3xl font-black text-white">50+</p>
-                  <p className="text-white/60 text-xs sm:text-sm mt-0.5 font-medium">Brands</p>
+                  <p className="text-3xl sm:text-4xl font-black text-white">50+</p>
+                  <p className="text-white/60 text-sm sm:text-base mt-1 font-medium">Brands</p>
                 </div>
-                <div className="w-px h-8 bg-white/20" />
+                <div className="w-px h-10 bg-white/20" />
                 <div>
-                  <p className="text-2xl sm:text-3xl font-black text-white">24/7</p>
-                  <p className="text-white/60 text-xs sm:text-sm mt-0.5 font-medium">Support</p>
+                  <p className="text-3xl sm:text-4xl font-black text-white">24/7</p>
+                  <p className="text-white/60 text-sm sm:text-base mt-1 font-medium">Support</p>
                 </div>
               </div>
             </div>
@@ -97,7 +95,7 @@ export default async function HomePage() {
               <img
                 src="/images/Welcome.png"
                 alt="Industrial hardware and tools"
-                className="w-56 sm:w-72 md:w-full md:max-w-lg object-contain drop-shadow-2xl"
+                className="w-80 sm:w-[28rem] md:w-full md:max-w-2xl object-contain drop-shadow-2xl"
                 style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
               />
             </div>
@@ -180,13 +178,21 @@ export default async function HomePage() {
                 return (
                   <Link key={product.id} href={`/products/${product.slug}`} className="group">
                     <div className="bg-surface-elevated rounded-xl shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-all duration-200 h-full flex flex-col">
-                      <div className="relative aspect-square bg-surface overflow-hidden">
+                      <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-2 mt-2 md:mx-3 md:mt-3">
                         {primaryImage ? (
-                          <img
-                            src={primaryImage.image_url}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
+                          <>
+                            <img
+                              src={primaryImage.image_url}
+                              alt=""
+                              aria-hidden="true"
+                              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
+                            />
+                            <img
+                              src={primaryImage.image_url}
+                              alt={product.name}
+                              className="relative w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                            />
+                          </>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-surface-secondary">
                             <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -299,20 +305,6 @@ export default async function HomePage() {
                 className="w-full h-52 sm:h-72 md:h-[420px] object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/50 via-transparent to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4">
-                <div className="bg-white dark:bg-secondary-800 rounded-xl px-4 py-3 shadow-lg flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center shrink-0">
-                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="font-bold text-foreground text-sm">Serving across India</p>
-                    <p className="text-foreground-secondary text-xs">Manufacturing · Construction · Repairs</p>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <div>
@@ -348,32 +340,6 @@ export default async function HomePage() {
                 </svg>
               </Link>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section className="relative py-10 md:py-24 overflow-hidden bg-gradient-to-br from-primary-600 to-primary-700">
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-white mb-3 leading-tight">
-            Ready to stock up?
-          </h2>
-          <p className="text-white/75 mb-7 max-w-lg mx-auto text-sm md:text-lg leading-relaxed">
-            Browse our full catalogue of industrial hardware, tools, and components — fast delivery across India.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/products"
-              className="bg-secondary-500 hover:bg-secondary-600 text-white px-8 py-3.5 rounded-xl font-bold transition-all shadow-xl text-sm md:text-base"
-            >
-              Browse Products
-            </Link>
-            <Link
-              href="/contact"
-              className="bg-white/15 hover:bg-white/25 text-white px-8 py-3.5 rounded-xl font-bold transition-all border border-white/30 text-sm md:text-base"
-            >
-              Contact Us
-            </Link>
           </div>
         </div>
       </section>

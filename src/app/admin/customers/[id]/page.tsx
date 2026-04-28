@@ -3,11 +3,12 @@ import { notFound } from 'next/navigation'
 import { getCustomerById } from '@/lib/queries'
 import CustomerContactForm from '@/components/admin/CustomerContactForm'
 import CustomerActionButton from '@/components/admin/CustomerActionButton'
+import AdminSupportChat from '@/components/admin/AdminSupportChat'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function CustomerDetailPage({ params }: { params: { id: string } }) {
+export default async function CustomerDetailPage({ params, searchParams }: { params: { id: string }, searchParams: { chat?: string } }) {
   let customer: any
   try {
     customer = await getCustomerById(params.id)
@@ -120,6 +121,8 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
 
         <CustomerContactForm customerId={customer.id} />
       </div>
+
+      <AdminSupportChat customerId={customer.id} autoOpen={searchParams.chat === 'true'} />
 
       <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
         <div className="px-5 py-4 border-b border-border-default">

@@ -23,6 +23,8 @@ CREATE TABLE users (
     last_login TIMESTAMP WITH TIME ZONE,
     is_active BOOLEAN DEFAULT TRUE,
     is_guest BOOLEAN DEFAULT FALSE,
+    is_flagged BOOLEAN DEFAULT FALSE,
+    flag_reason TEXT,
     session_id TEXT UNIQUE,
     merged_to_user_id UUID REFERENCES users(id) ON DELETE SET NULL
 );

@@ -11,7 +11,7 @@ export default function ReturnPolicyPage() {
       {/* Page Header */}
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
             Return Policy
           </h1>
           <p className="text-foreground-secondary">

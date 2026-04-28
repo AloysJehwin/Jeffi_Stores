@@ -27,7 +27,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
         </Link>
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">
+            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
               Order #{order.order_number || order.id.slice(0, 8)}
             </h1>
             <p className="text-foreground-secondary mt-1">

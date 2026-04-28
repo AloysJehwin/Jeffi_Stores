@@ -39,7 +39,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Brands</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Brands</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage product brands</p>
         </div>
         <Link
@@ -53,7 +53,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
       <div className="grid grid-cols-3 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Brands</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{totalBrands}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalBrands}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Active</p>

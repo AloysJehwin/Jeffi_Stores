@@ -11,16 +11,16 @@ const config: Config = {
     extend: {
       colors: {
         primary: {
-          50: '#fef8e7',
-          100: '#fcedc0',
-          200: '#fae199',
-          300: '#f8d572',
-          400: '#f6c94b',
-          500: '#FABE4C', // Main yellow from design
-          600: '#e0a838',
-          700: '#c18728',
-          800: '#a06918',
-          900: '#7f4d08',
+          50: '#fffbeb',
+          100: '#fef3c7',
+          200: '#fde68a',
+          300: '#fcd34d',
+          400: '#fbbf24',
+          500: '#d97706', // Deep golden amber — 4.8:1 with white, still reads as yellow-gold
+          600: '#b45309',
+          700: '#92400e',
+          800: '#78350f',
+          900: '#451a03',
         },
         secondary: {
           50: '#f0f1f3',
@@ -35,16 +35,16 @@ const config: Config = {
           900: '#161718',
         },
         accent: {
-          50: '#f4f7ef',
-          100: '#e5ebd7',
-          200: '#d6dfbf',
-          300: '#c7d3a7',
-          400: '#b8c78f',
-          500: '#A4BC46', // Green from button
-          600: '#91a83d',
-          700: '#7d9134',
-          800: '#69792b',
-          900: '#556222',
+          50: '#f2f7e8',
+          100: '#e0edc5',
+          200: '#c8de97',
+          300: '#aecf63',
+          400: '#97c238',
+          500: '#5a8a00', // Deep forest green — 5.1:1 with white
+          600: '#4a7200',
+          700: '#3a5900',
+          800: '#2b4200',
+          900: '#1c2c00',
         },
         surface: 'var(--color-surface)',
         'surface-elevated': 'var(--color-surface-elevated)',

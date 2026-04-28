@@ -23,7 +23,7 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
 
   if (isAdminPage) {
     return (
-      <ThemeProvider>
+      <ThemeProvider storageKey="jeffi-admin-theme">
         <ToastProvider>
           {children}
         </ToastProvider>

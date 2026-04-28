@@ -46,8 +46,8 @@ export default function Header() {
               <Link href="/about" className="text-foreground-secondary hover:text-accent-500 font-medium transition-colors">
                 About Us
               </Link>
-              <Link href="/contact" className="text-foreground-secondary hover:text-accent-500 font-medium transition-colors">
-                Contact
+              <Link href="/support" className="text-foreground-secondary hover:text-accent-500 font-medium transition-colors">
+                Support
               </Link>
             </nav>
 

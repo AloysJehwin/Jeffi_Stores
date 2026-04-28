@@ -362,13 +362,21 @@ export default async function ProductDetailPage({
                     className="group"
                   >
                     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow">
-                      <div className="relative h-48 bg-surface-elevated overflow-hidden">
+                      <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
                         {relatedPrimaryImage ? (
-                          <img
-                            src={relatedPrimaryImage.image_url}
-                            alt={relatedProduct.name}
-                            className="w-full h-full object-cover"
-                          />
+                          <>
+                            <img
+                              src={relatedPrimaryImage.image_url}
+                              alt=""
+                              aria-hidden="true"
+                              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
+                            />
+                            <img
+                              src={relatedPrimaryImage.image_url}
+                              alt={relatedProduct.name}
+                              className="relative w-full h-full object-contain"
+                            />
+                          </>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <svg className="w-16 h-16 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">

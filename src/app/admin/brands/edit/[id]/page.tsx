@@ -47,7 +47,7 @@ export default async function EditBrandPage({ params }: { params: { id: string }
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Edit Brand</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Edit Brand</h1>
         <p className="text-foreground-secondary mt-1">Update brand information</p>
       </div>
 
