@@ -15,19 +15,19 @@ export default function Header() {
   return (
     <>
       <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default sticky top-0 z-40">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-20">
+        <div className="container mx-auto px-3 sm:px-4">
+          <div className="flex items-center justify-between h-14 sm:h-16 lg:h-20">
             {/* Logo */}
             <Link href="/" className="flex items-center">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <img
                   src="/images/logo.png"
                   alt="Jeffi Stores Logo"
-                  className="h-12 w-auto"
+                  className="h-8 sm:h-10 lg:h-12 w-auto"
                 />
                 <div>
-                  <div className="text-xl font-bold text-secondary-500 dark:text-primary-400">Jeffi Stores</div>
-                  <div className="text-xs text-foreground-muted">Hardware & Tools</div>
+                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400">Jeffi Stores</div>
+                  <div className="hidden sm:block text-xs text-foreground-muted">Hardware & Tools</div>
                 </div>
               </div>
             </Link>
