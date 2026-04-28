@@ -117,7 +117,8 @@ export default function ProductForm({ categories, brands, action, product, produ
       }
 
       await action(formData)
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
       setError('Failed to save product. Please try again.')
       setIsSubmitting(false)
     }
