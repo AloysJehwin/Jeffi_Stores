@@ -41,121 +41,80 @@ export default async function HomePage() {
     <div className="bg-surface">
 
       {/* ── Hero ── */}
-      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden min-h-[88vh] flex items-center">
-        <div className="absolute inset-0 bg-[url('/images/Welcome.png')] bg-right-bottom bg-no-repeat bg-contain opacity-20 md:opacity-0 pointer-events-none" />
+      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden">
+        <div className="container mx-auto px-5 pt-10 pb-8 md:py-24 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 items-center">
 
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24 relative z-10 w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-
-            <div className="max-w-xl">
-              <span className="inline-block bg-white/20 backdrop-blur-sm text-white text-xs sm:text-sm font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-5 border border-white/30">
+            <div>
+              <span className="inline-block bg-white/20 backdrop-blur-sm text-white text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4 border border-white/30">
                 Hardware &amp; Industrial Tools
               </span>
 
-              <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold text-white leading-[1.05] mb-5 tracking-tight">
+              <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white leading-[1.05] mb-4 tracking-tight">
                 Jeffi
                 <br />
                 <span className="text-secondary-500">Stores</span>
               </h1>
 
-              <p className="text-lg sm:text-xl md:text-2xl text-white/80 mb-8 leading-relaxed">
-                Your trusted source for industrial machinery parts, tools, and hardware —
-                for manufacturing, construction, and repairs.
+              <p className="text-base sm:text-lg md:text-2xl text-white/80 mb-6 leading-relaxed max-w-sm md:max-w-none">
+                Industrial machinery parts, tools, and hardware — for manufacturing, construction, and repairs.
               </p>
 
-              <div className="flex flex-wrap gap-3 mb-10">
+              <div className="flex gap-3 mb-8">
                 <Link
                   href="/products"
-                  className="bg-secondary-500 hover:bg-secondary-600 text-white px-8 py-4 rounded-xl font-bold transition-all text-base shadow-xl shadow-secondary-900/30 hover:scale-[1.02]"
+                  className="bg-secondary-500 hover:bg-secondary-600 text-white px-6 py-3 rounded-xl font-bold transition-all text-sm sm:text-base shadow-lg"
                 >
                   Shop Now
                 </Link>
                 <Link
                   href="/categories"
-                  className="bg-white/15 hover:bg-white/25 text-white px-8 py-4 rounded-xl font-semibold transition-all text-base border border-white/40 backdrop-blur-sm hover:scale-[1.02]"
+                  className="bg-white/15 hover:bg-white/25 text-white px-6 py-3 rounded-xl font-semibold transition-all text-sm sm:text-base border border-white/40"
                 >
-                  Browse Categories
+                  Browse
                 </Link>
               </div>
 
-              <div className="flex items-center gap-8 pt-8 border-t border-white/20">
+              <div className="flex items-center gap-6 pt-6 border-t border-white/20">
                 <div>
-                  <p className="text-3xl sm:text-4xl font-black text-white">500+</p>
-                  <p className="text-white/60 text-sm mt-1 font-medium">Products</p>
+                  <p className="text-2xl sm:text-3xl font-black text-white">500+</p>
+                  <p className="text-white/60 text-xs sm:text-sm mt-0.5 font-medium">Products</p>
                 </div>
-                <div className="w-px h-10 bg-white/20" />
+                <div className="w-px h-8 bg-white/20" />
                 <div>
-                  <p className="text-3xl sm:text-4xl font-black text-white">50+</p>
-                  <p className="text-white/60 text-sm mt-1 font-medium">Brands</p>
+                  <p className="text-2xl sm:text-3xl font-black text-white">50+</p>
+                  <p className="text-white/60 text-xs sm:text-sm mt-0.5 font-medium">Brands</p>
                 </div>
-                <div className="w-px h-10 bg-white/20" />
+                <div className="w-px h-8 bg-white/20" />
                 <div>
-                  <p className="text-3xl sm:text-4xl font-black text-white">24/7</p>
-                  <p className="text-white/60 text-sm mt-1 font-medium">Support</p>
+                  <p className="text-2xl sm:text-3xl font-black text-white">24/7</p>
+                  <p className="text-white/60 text-xs sm:text-sm mt-0.5 font-medium">Support</p>
                 </div>
               </div>
             </div>
 
-            <div className="hidden md:flex items-center justify-center relative">
-              <div className="absolute w-[420px] h-[420px] rounded-full bg-white/10 blur-3xl -z-10" />
+            <div className="flex justify-center md:justify-end">
               <img
                 src="/images/Welcome.png"
                 alt="Industrial hardware and tools"
-                className="w-full max-w-lg object-contain drop-shadow-2xl"
-                style={{ filter: 'drop-shadow(0 30px 60px rgba(0,0,0,0.25))' }}
+                className="w-56 sm:w-72 md:w-full md:max-w-lg object-contain drop-shadow-2xl"
+                style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
               />
             </div>
           </div>
         </div>
-
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-surface to-transparent pointer-events-none" />
       </section>
-
-      {/* ── Trust bar ── */}
-      <div className="bg-secondary-500 text-white">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-3 divide-x divide-white/10">
-            {[
-              {
-                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />,
-                title: 'Fast Delivery',
-                sub: 'Reliable dispatch, pan India',
-              },
-              {
-                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />,
-                title: 'Genuine Products',
-                sub: 'Sourced from top manufacturers',
-              },
-              {
-                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />,
-                title: '24/7 Expert Support',
-                sub: 'Always here when you need us',
-              },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3 py-4 px-4 sm:px-8">
-                <svg className="w-6 h-6 text-primary-400 shrink-0 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {item.icon}
-                </svg>
-                <div>
-                  <p className="font-bold text-sm sm:text-base">{item.title}</p>
-                  <p className="text-white/50 text-xs sm:text-sm hidden sm:block">{item.sub}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* ── Categories ── */}
       {mainCategories.length > 0 && (
-        <section className="py-12 md:py-20 bg-surface">
+        <section className="py-8 md:py-20 bg-surface">
           <div className="container mx-auto px-4">
-            <div className="flex items-end justify-between mb-8">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <p className="text-accent-500 text-sm font-bold uppercase tracking-widest mb-1">Browse</p>
-                <h2 className="text-3xl md:text-4xl font-extrabold text-foreground">Shop by Category</h2>
+                <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-0.5">Browse</p>
+                <h2 className="text-2xl md:text-4xl font-extrabold text-foreground">Shop by Category</h2>
               </div>
-              <Link href="/categories" className="text-base text-accent-500 hover:text-accent-600 font-semibold flex items-center gap-1 shrink-0 mb-1">
+              <Link href="/categories" className="text-sm text-accent-500 hover:text-accent-600 font-semibold flex items-center gap-1 shrink-0">
                 View All
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -163,21 +122,21 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <div className="flex gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-4 lg:grid-cols-8 md:overflow-visible scrollbar-hide">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3 md:grid-cols-4 lg:grid-cols-8">
               {mainCategories.map((category) => (
                 <Link
                   key={category.id}
                   href={`/categories/${category.slug}`}
-                  className="group flex-shrink-0 w-32 md:w-auto"
+                  className="group"
                 >
-                  <div className="flex flex-col items-center text-center gap-3 p-4 rounded-2xl bg-surface-elevated border border-border-default hover:border-primary-400 hover:shadow-lg hover:-translate-y-1 transition-all duration-200">
-                    <div className="w-14 h-14 bg-primary-50 dark:bg-primary-900/20 rounded-2xl flex items-center justify-center group-hover:bg-primary-100 dark:group-hover:bg-primary-900/40 transition-colors">
+                  <div className="flex flex-col items-center text-center gap-2 p-3 rounded-xl bg-surface-elevated border border-border-default hover:border-primary-400 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+                    <div className="w-11 h-11 sm:w-14 sm:h-14 bg-primary-50 dark:bg-primary-900/20 rounded-xl flex items-center justify-center group-hover:bg-primary-100 transition-colors">
                       <CategoryIcon
                         categoryName={category.name}
-                        className="w-7 h-7 text-primary-600 dark:text-primary-400"
+                        className="w-6 h-6 sm:w-7 sm:h-7 text-primary-600 dark:text-primary-400"
                       />
                     </div>
-                    <span className="text-sm font-semibold text-foreground group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight">
+                    <span className="text-xs font-semibold text-foreground group-hover:text-primary-600 transition-colors leading-tight">
                       {category.name}
                     </span>
                   </div>
@@ -190,14 +149,14 @@ export default async function HomePage() {
 
       {/* ── Featured Products ── */}
       {featuredProducts.length > 0 && (
-        <section className="py-12 md:py-20 bg-surface-secondary">
+        <section className="py-8 md:py-20 bg-surface-secondary">
           <div className="container mx-auto px-4">
-            <div className="flex items-end justify-between mb-8">
+            <div className="flex items-center justify-between mb-5">
               <div>
-                <p className="text-accent-500 text-sm font-bold uppercase tracking-widest mb-1">Handpicked</p>
-                <h2 className="text-3xl md:text-4xl font-extrabold text-foreground">Featured Products</h2>
+                <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-0.5">Handpicked</p>
+                <h2 className="text-2xl md:text-4xl font-extrabold text-foreground">Featured Products</h2>
               </div>
-              <Link href="/products" className="text-base text-accent-500 hover:text-accent-600 font-semibold flex items-center gap-1 shrink-0 mb-1">
+              <Link href="/products" className="text-sm text-accent-500 hover:text-accent-600 font-semibold flex items-center gap-1 shrink-0">
                 View All
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -205,7 +164,7 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
               {featuredProducts.map((product) => {
                 const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                 const hasVariants = product.has_variants
@@ -220,7 +179,7 @@ export default async function HomePage() {
 
                 return (
                   <Link key={product.id} href={`/products/${product.slug}`} className="group">
-                    <div className="bg-surface-elevated rounded-2xl shadow-sm border border-border-default overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-200 h-full flex flex-col">
+                    <div className="bg-surface-elevated rounded-xl shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-all duration-200 h-full flex flex-col">
                       <div className="relative aspect-square bg-surface overflow-hidden">
                         {primaryImage ? (
                           <img
@@ -230,40 +189,40 @@ export default async function HomePage() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-surface-secondary">
-                            <svg className="w-14 h-14 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                           </div>
                         )}
                         {mrpDiscount > 0 && (
-                          <div className="absolute top-2 left-2 bg-accent-500 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-sm">
+                          <div className="absolute top-2 left-2 bg-accent-500 text-white px-1.5 py-0.5 rounded text-xs font-bold">
                             {mrpDiscount}% off
                           </div>
                         )}
                         {effectiveStock === 0 && (
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <span className="bg-white text-secondary-700 text-xs font-bold px-3 py-1.5 rounded-full">Out of Stock</span>
+                            <span className="bg-white text-secondary-700 text-xs font-bold px-2 py-1 rounded-full">Out of Stock</span>
                           </div>
                         )}
                       </div>
-                      <div className="p-3 md:p-4 flex flex-col flex-1">
+                      <div className="p-2.5 md:p-4 flex flex-col flex-1">
                         {(product.categories?.name || product.brands?.name) && (
-                          <p className="text-xs sm:text-sm text-foreground-muted mb-1">{product.categories?.name || product.brands?.name}</p>
+                          <p className="text-xs text-foreground-muted mb-0.5 truncate">{product.categories?.name || product.brands?.name}</p>
                         )}
-                        <h3 className="font-semibold text-sm sm:text-base text-foreground mb-2 group-hover:text-primary-600 transition-colors line-clamp-2 leading-snug flex-1">
+                        <h3 className="font-semibold text-xs sm:text-sm text-foreground mb-1.5 group-hover:text-primary-600 transition-colors line-clamp-2 leading-snug flex-1">
                           {product.name}
                         </h3>
-                        <div className="flex items-baseline gap-2 mt-auto">
-                          <span className="text-base sm:text-lg font-extrabold text-primary-600 dark:text-primary-400">
+                        <div className="flex items-baseline gap-1.5 mt-auto flex-wrap">
+                          <span className="text-sm sm:text-base font-extrabold text-primary-600 dark:text-primary-400">
                             {hasVariants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN')}
                           </span>
                           {mrp && mrp > Number(displayPrice) && (
-                            <span className="text-xs sm:text-sm text-foreground-muted line-through">
+                            <span className="text-xs text-foreground-muted line-through">
                               ₹{mrp.toLocaleString('en-IN')}
                             </span>
                           )}
                         </div>
-                        <p className={`text-xs sm:text-sm font-medium mt-1 ${effectiveStock > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        <p className={`text-xs font-medium mt-1 ${effectiveStock > 0 ? 'text-green-600' : 'text-red-500'}`}>
                           {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
                         </p>
                       </div>
@@ -273,10 +232,10 @@ export default async function HomePage() {
               })}
             </div>
 
-            <div className="text-center mt-10">
+            <div className="text-center mt-7 md:mt-10">
               <Link
                 href="/products"
-                className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-10 py-4 rounded-xl font-bold transition-all shadow-lg shadow-primary-500/30 hover:scale-[1.02] text-base"
+                className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-8 py-3 md:px-10 md:py-4 rounded-xl font-bold transition-all shadow-lg text-sm md:text-base"
               >
                 View All Products
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -289,13 +248,13 @@ export default async function HomePage() {
       )}
 
       {/* ── Why Jeffi Stores ── */}
-      <section className="py-12 md:py-20 bg-surface">
+      <section className="py-8 md:py-20 bg-surface">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-10">
-            <p className="text-accent-500 text-sm font-bold uppercase tracking-widest mb-1">Why choose us</p>
-            <h2 className="text-3xl md:text-4xl font-extrabold text-foreground">Built for Industry</h2>
+          <div className="text-center mb-6 md:mb-10">
+            <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-1">Why choose us</p>
+            <h2 className="text-2xl md:text-4xl font-extrabold text-foreground">Built for Industry</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
             {[
               {
                 icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />,
@@ -313,16 +272,15 @@ export default async function HomePage() {
                 desc: 'Our expert team is always available to help you source the right product.',
               },
             ].map((item, i) => (
-              <div key={i} className="relative group bg-surface-elevated rounded-2xl border border-border-default p-8 hover:border-primary-300 hover:shadow-lg transition-all duration-200 overflow-hidden">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-primary-50 dark:bg-primary-900/10 rounded-bl-[3rem] -z-0 group-hover:bg-primary-100 dark:group-hover:bg-primary-900/20 transition-colors" />
-                <div className="relative z-10">
-                  <div className="w-14 h-14 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center mb-5">
-                    <svg className="w-7 h-7 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      {item.icon}
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-foreground mb-2">{item.title}</h3>
-                  <p className="text-base text-foreground-secondary leading-relaxed">{item.desc}</p>
+              <div key={i} className="flex sm:flex-col items-start sm:items-start gap-4 bg-surface-elevated rounded-xl border border-border-default p-5 md:p-8">
+                <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="w-6 h-6 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {item.icon}
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base md:text-lg font-bold text-foreground mb-1">{item.title}</h3>
+                  <p className="text-sm text-foreground-secondary leading-relaxed">{item.desc}</p>
                 </div>
               </div>
             ))}
@@ -331,58 +289,58 @@ export default async function HomePage() {
       </section>
 
       {/* ── About ── */}
-      <section className="py-12 md:py-20 bg-surface-secondary">
+      <section className="py-8 md:py-20 bg-surface-secondary">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-20 items-center">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-20 items-center">
+            <div className="relative rounded-2xl overflow-hidden shadow-xl">
               <img
                 src="/images/Working.png"
                 alt="Jeffi Stores team"
-                className="w-full h-72 md:h-[420px] object-cover"
+                className="w-full h-52 sm:h-72 md:h-[420px] object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/50 via-transparent to-transparent" />
-              <div className="absolute bottom-5 left-5 right-5">
-                <div className="bg-white dark:bg-secondary-800 rounded-2xl px-5 py-4 shadow-xl flex items-center gap-4">
-                  <div className="w-12 h-12 bg-primary-500 rounded-xl flex items-center justify-center shrink-0">
-                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="absolute bottom-4 left-4 right-4">
+                <div className="bg-white dark:bg-secondary-800 rounded-xl px-4 py-3 shadow-lg flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary-500 rounded-lg flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </div>
                   <div>
-                    <p className="font-bold text-foreground text-base">Serving across India</p>
-                    <p className="text-foreground-secondary text-sm">Manufacturing · Construction · Repairs</p>
+                    <p className="font-bold text-foreground text-sm">Serving across India</p>
+                    <p className="text-foreground-secondary text-xs">Manufacturing · Construction · Repairs</p>
                   </div>
                 </div>
               </div>
             </div>
 
             <div>
-              <p className="text-accent-500 text-sm font-bold uppercase tracking-widest mb-3">About Us</p>
-              <h2 className="text-3xl md:text-5xl font-extrabold text-foreground mb-5 leading-tight">
+              <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-2 mt-2 md:mt-0">About Us</p>
+              <h2 className="text-2xl md:text-5xl font-extrabold text-foreground mb-4 leading-tight">
                 Your Trusted<br />Hardware Partner
               </h2>
-              <p className="text-base md:text-lg text-foreground-secondary mb-4 leading-relaxed">
+              <p className="text-sm md:text-lg text-foreground-secondary mb-3 leading-relaxed">
                 Jeffi Stores is built for industry — offering machinery parts, fasteners, tools, and electrical components for manufacturing, construction, and industrial repairs.
               </p>
-              <p className="text-base md:text-lg text-foreground-secondary mb-8 leading-relaxed">
+              <p className="text-sm md:text-lg text-foreground-secondary mb-6 leading-relaxed">
                 We combine product breadth with expert service so your operations stay seamless and efficient.
               </p>
 
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-surface rounded-2xl border border-border-default p-5">
-                  <p className="text-3xl sm:text-4xl font-black text-primary-600">10+</p>
-                  <p className="text-sm text-foreground-secondary mt-1">Years in Business</p>
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="bg-surface rounded-xl border border-border-default p-4">
+                  <p className="text-2xl sm:text-3xl font-black text-primary-600">10+</p>
+                  <p className="text-xs sm:text-sm text-foreground-secondary mt-0.5">Years in Business</p>
                 </div>
-                <div className="bg-surface rounded-2xl border border-border-default p-5">
-                  <p className="text-3xl sm:text-4xl font-black text-primary-600">1000+</p>
-                  <p className="text-sm text-foreground-secondary mt-1">Happy Customers</p>
+                <div className="bg-surface rounded-xl border border-border-default p-4">
+                  <p className="text-2xl sm:text-3xl font-black text-primary-600">1000+</p>
+                  <p className="text-xs sm:text-sm text-foreground-secondary mt-0.5">Happy Customers</p>
                 </div>
               </div>
 
               <Link
                 href="/about"
-                className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-7 py-4 rounded-xl font-bold transition-all text-base shadow-lg shadow-primary-500/25 hover:scale-[1.02]"
+                className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-bold transition-all text-sm md:text-base shadow-lg"
               >
                 Learn More About Us
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -395,25 +353,24 @@ export default async function HomePage() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="relative py-16 md:py-24 overflow-hidden bg-gradient-to-br from-primary-600 to-primary-700">
-        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E")` }} />
+      <section className="relative py-10 md:py-24 overflow-hidden bg-gradient-to-br from-primary-600 to-primary-700">
         <div className="container mx-auto px-4 text-center relative z-10">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-4 leading-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-5xl font-extrabold text-white mb-3 leading-tight">
             Ready to stock up?
           </h2>
-          <p className="text-white/75 mb-10 max-w-lg mx-auto text-base md:text-lg leading-relaxed">
+          <p className="text-white/75 mb-7 max-w-lg mx-auto text-sm md:text-lg leading-relaxed">
             Browse our full catalogue of industrial hardware, tools, and components — fast delivery across India.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
               href="/products"
-              className="bg-secondary-500 hover:bg-secondary-600 text-white px-10 py-4 rounded-xl font-bold transition-all shadow-xl hover:scale-[1.02] text-base"
+              className="bg-secondary-500 hover:bg-secondary-600 text-white px-8 py-3.5 rounded-xl font-bold transition-all shadow-xl text-sm md:text-base"
             >
               Browse Products
             </Link>
             <Link
               href="/contact"
-              className="bg-white/15 hover:bg-white/25 text-white px-10 py-4 rounded-xl font-bold transition-all border border-white/30 backdrop-blur-sm hover:scale-[1.02] text-base"
+              className="bg-white/15 hover:bg-white/25 text-white px-8 py-3.5 rounded-xl font-bold transition-all border border-white/30 text-sm md:text-base"
             >
               Contact Us
             </Link>
