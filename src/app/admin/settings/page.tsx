@@ -40,7 +40,7 @@ export default async function SettingsPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Settings</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Settings</h1>
         <p className="text-foreground-secondary mt-1">Manage your account and system settings</p>
       </div>
 
@@ -321,7 +321,7 @@ export default async function SettingsPage() {
             <div className="p-4 sm:p-6 space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-foreground-secondary">Total Admins</span>
-                <span className="text-lg font-bold text-secondary-500">{allAdmins.length}</span>
+                <span className="text-lg font-bold text-secondary-500 dark:text-foreground">{allAdmins.length}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-foreground-secondary">Active Admins</span>

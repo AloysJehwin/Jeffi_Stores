@@ -52,7 +52,7 @@ export default async function EditCategoryPage({ params }: { params: { id: strin
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Edit Category</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Edit Category</h1>
         <p className="text-foreground-secondary mt-1">Update category information</p>
       </div>
 

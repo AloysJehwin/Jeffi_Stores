@@ -13,6 +13,7 @@ interface Session {
   id: string
   status: string
   created_at: string
+  admin_name?: string
 }
 
 interface Props {
@@ -73,9 +74,11 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
   const [activeCategory, setActiveCategory] = useState(QUICK_REPLIES[0].category)
   const [isClosingReply, setIsClosingReply] = useState(false)
   const [adminUsername, setAdminUsername] = useState<string>('')
+  const [sessionClosed, setSessionClosed] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastMessageIdRef = useRef<string | null>(null)
+  const greetedRef = useRef(false)
 
   useEffect(() => {
     loadSession()
@@ -108,6 +111,14 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
       if (!sessionRes.ok) { setIsLoading(false); return }
       const data = await sessionRes.json()
       if (data.session) {
+        const existingAdmin = data.session.admin_name
+        if (existingAdmin && existingAdmin !== username) {
+          setSession(data.session)
+          setSessionClosed(false)
+          setMessages([])
+          setIsLoading(false)
+          return
+        }
         setSession(data.session)
         await loadMessages(data.session.id, username)
       }
@@ -126,7 +137,8 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
         return
       }
       const adminUser = username || adminUsername
-      if (adminUser) {
+      if (adminUser && !greetedRef.current) {
+        greetedRef.current = true
         await autoGreet(sessionId, adminUser)
       }
     } catch {}
@@ -150,9 +162,22 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
 
   async function pollMessages(sessionId: string) {
     try {
-      const res = await fetch(`/api/admin/support/sessions/${sessionId}/messages`)
-      if (!res.ok) return
-      const data = await res.json()
+      const [msgsRes, sessionRes] = await Promise.all([
+        fetch(`/api/admin/support/sessions/${sessionId}/messages`),
+        fetch(`/api/admin/support/customers/${customerId}`),
+      ])
+
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json()
+        if (!sessionData.session || sessionData.session.status !== 'open') {
+          if (pollRef.current) clearInterval(pollRef.current)
+          setSessionClosed(true)
+          setShowQuickReplies(false)
+        }
+      }
+
+      if (!msgsRes.ok) return
+      const data = await msgsRes.json()
       if (!data.messages?.length) return
       const latest = data.messages[data.messages.length - 1]
       if (latest.id !== lastMessageIdRef.current) {
@@ -218,6 +243,22 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
     )
   }
 
+  const takenByOther = session.admin_name && session.admin_name !== adminUsername
+
+  if (takenByOther) {
+    return (
+      <div className="bg-surface-elevated rounded-xl border border-amber-400/40 p-5">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+          <h2 className="font-semibold text-foreground">Support Chat</h2>
+        </div>
+        <p className="text-sm text-foreground-muted">
+          This session is already being handled by <span className="font-semibold text-foreground">{session.admin_name}</span>.
+        </p>
+      </div>
+    )
+  }
+
   const activeCategoryReplies = QUICK_REPLIES.find(c => c.category === activeCategory)?.replies ?? []
 
   return (
@@ -227,8 +268,10 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-secondary transition-colors"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
-          <span className="font-semibold text-foreground">Live Support Chat</span>
+          <div className={`w-2.5 h-2.5 rounded-full ${sessionClosed ? 'bg-foreground-muted' : 'bg-green-500 animate-pulse'}`} />
+          <span className="font-semibold text-foreground">
+            {sessionClosed ? 'Support Chat (Ended)' : 'Live Support Chat'}
+          </span>
           <span className="text-xs text-foreground-muted bg-surface px-2 py-0.5 rounded-full border border-border-default">
             {messages.length} message{messages.length !== 1 ? 's' : ''}
           </span>
@@ -266,7 +309,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
             <div ref={bottomRef} />
           </div>
 
-          {showQuickReplies && (
+          {showQuickReplies && !sessionClosed && (
             <div className="border-t border-border-default bg-surface-secondary">
               <div className="flex gap-1 px-4 pt-3 pb-2 overflow-x-auto">
                 {QUICK_REPLIES.map(cat => (
@@ -298,38 +341,42 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
           )}
 
           <div className="px-4 py-3 border-t border-border-default">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowQuickReplies(v => !v)}
-                title="Quick replies"
-                className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${
-                  showQuickReplies
-                    ? 'bg-accent-500 border-accent-500 text-white'
-                    : 'border-border-default text-foreground-secondary hover:border-accent-400 hover:text-accent-500'
-                }`}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </button>
-              <input
-                type="text"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Reply to customer..."
-                className="flex-1 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-              />
-              <button
-                onClick={() => sendMessage(undefined, isClosingReply)}
-                disabled={isSending || !input.trim()}
-                className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              </button>
-            </div>
+            {sessionClosed ? (
+              <p className="text-sm text-foreground-muted text-center py-1">This session has been closed by the customer.</p>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowQuickReplies(v => !v)}
+                  title="Quick replies"
+                  className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${
+                    showQuickReplies
+                      ? 'bg-accent-500 border-accent-500 text-white'
+                      : 'border-border-default text-foreground-secondary hover:border-accent-400 hover:text-accent-500'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </button>
+                <input
+                  type="text"
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Reply to customer..."
+                  className="flex-1 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+                />
+                <button
+                  onClick={() => sendMessage(undefined, isClosingReply)}
+                  disabled={isSending || !input.trim()}
+                  className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

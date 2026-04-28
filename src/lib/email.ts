@@ -1439,15 +1439,16 @@ export async function sendSupportEscalationEmail(
   customerName: string,
   customerEmail: string,
   customerId: string,
-  sessionId: string
+  sessionId: string,
+  adminEmails: string[]
 ): Promise<{ success: boolean; error?: unknown }> {
-  const supportEmail = process.env.SUPPORT_EMAIL || 'aloysjehwin@gmail.com'
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.com'
   const chatLink = `${appUrl}/admin/customers/${customerId}?chat=true`
+  const recipients = adminEmails.length > 0 ? adminEmails : [process.env.SUPPORT_EMAIL || 'aloysjehwin@gmail.com']
 
   const mailOptions = {
     from: `"Jeffi Stores" <${process.env.SES_FROM_EMAIL}>`,
-    to: supportEmail,
+    to: recipients.join(', '),
     subject: `Support Request from ${customerName}`,
     html: `
       <!DOCTYPE html><html><head><style>

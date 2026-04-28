@@ -260,7 +260,7 @@ export default async function EditProductPage({ params }: { params: { id: string
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Edit Product</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Edit Product</h1>
         <p className="text-foreground-secondary mt-1">Update product information</p>
       </div>
 

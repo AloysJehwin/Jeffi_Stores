@@ -35,7 +35,7 @@ export default async function AddBrandPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Add New Brand</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Add New Brand</h1>
         <p className="text-foreground-secondary mt-1">Create a new product brand</p>
       </div>
 

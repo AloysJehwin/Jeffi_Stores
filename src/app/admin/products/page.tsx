@@ -21,7 +21,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Products</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Products</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
         </div>
         <Link
@@ -36,19 +36,19 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{products?.length || 0}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{products?.length || 0}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{categories?.length || 0}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{categories?.length || 0}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Brands</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{brands?.length || 0}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{brands?.length || 0}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Active Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
             {products?.filter(p => p.is_active).length || 0}
           </p>
         </div>

@@ -72,7 +72,7 @@ export default async function CategoryDetailPage({
             <span className="text-foreground font-medium">{category.name}</span>
           </nav>
 
-          <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
             {category.name}
           </h1>
           {category.description && (

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, queryMany } from '@/lib/db'
 import { sendSupportEscalationEmail } from '@/lib/email'
 
 export async function GET(request: NextRequest) {
@@ -50,7 +50,12 @@ export async function POST(request: NextRequest) {
 
     if (user) {
       const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
-      await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id)
+      const admins = await queryMany(
+        `SELECT u.email FROM admins a JOIN users u ON u.id = a.user_id WHERE a.is_active = true AND u.email IS NOT NULL`,
+        []
+      )
+      const adminEmails = admins.map((a: any) => a.email)
+      await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id, adminEmails)
     }
 
     return NextResponse.json({ session })

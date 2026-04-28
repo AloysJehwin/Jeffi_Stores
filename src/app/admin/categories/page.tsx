@@ -23,7 +23,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Categories</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Categories</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
         </div>
         <Link
@@ -37,15 +37,15 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{totalCategories}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCategories}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Main Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{mainCategoriesCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{mainCategoriesCount}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Subcategories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{subCategoriesCount}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{subCategoriesCount}</p>
         </div>
       </div>
 

@@ -27,7 +27,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500">Orders</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Orders</h1>
         <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
       </div>
 
@@ -35,7 +35,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Orders</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 mt-2">{totalOrders}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalOrders}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Pending</p>

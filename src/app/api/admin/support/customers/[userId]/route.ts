@@ -13,7 +13,7 @@ export async function GET(
     }
 
     const session = await queryOne(
-      `SELECT id, status, created_at FROM support_sessions
+      `SELECT id, status, created_at, admin_name FROM support_sessions
        WHERE user_id = $1 AND status = 'open'
        ORDER BY created_at DESC LIMIT 1`,
       [params.userId]

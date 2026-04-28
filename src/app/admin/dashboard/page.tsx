@@ -1,5 +1,6 @@
 import { getDashboardStats, getRecentOrders } from '@/lib/queries'
 import { headers } from 'next/headers'
+import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
 
 export default async function AdminDashboard() {
   const headersList = headers()
@@ -19,6 +20,9 @@ export default async function AdminDashboard() {
           Here is what is happening with your store today.
         </p>
       </div>
+
+      {/* Support Requests Alert */}
+      <SupportRequestsAlert />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
