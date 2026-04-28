@@ -338,7 +338,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         <MobileAccountHeader />
         <div className="container mx-auto px-4 py-4 pb-16 lg:py-8 lg:pb-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="hidden lg:block lg:col-span-1">
+            <div className="hidden lg:block lg:col-span-1 lg:self-start lg:sticky lg:top-24">
               <AccountSidebar />
             </div>
             <div className="lg:col-span-3">
@@ -368,7 +368,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="hidden lg:block lg:col-span-1">
+          <div className="hidden lg:block lg:col-span-1 lg:self-start lg:sticky lg:top-24">
             <AccountSidebar />
           </div>
 

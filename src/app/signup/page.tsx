@@ -2,17 +2,32 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
+import { useToast } from '@/contexts/ToastContext'
+import { Suspense } from 'react'
 
-export default function SignupPage() {
+export default function SignupPageWrapper() {
+  return (
+    <Suspense>
+      <SignupPage />
+    </Suspense>
+  )
+}
+
+function SignupPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromLogin = searchParams.get('from') === 'login'
+  const prefillEmail = searchParams.get('email') || ''
+
   const { signup } = useAuth()
   const { refreshCart } = useCart()
+  const { showToast } = useToast()
 
   const [step, setStep] = useState<'email' | 'otp' | 'details'>('email')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(prefillEmail)
   const [otp, setOtp] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -20,7 +35,6 @@ export default function SignupPage() {
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const [otpSent, setOtpSent] = useState(false)
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,7 +54,6 @@ export default function SignupPage() {
         throw new Error(data.error || 'Failed to send OTP')
       }
 
-      setOtpSent(true)
       setStep('otp')
     } catch (err: any) {
       setError(err.message)
@@ -67,7 +80,6 @@ export default function SignupPage() {
         throw new Error(data.error || 'Invalid OTP')
       }
 
-      // OTP verified successfully, move to details step
       setStep('details')
     } catch (err: any) {
       setError(err.message)
@@ -122,7 +134,7 @@ export default function SignupPage() {
         throw new Error(data.error || 'Failed to resend OTP')
       }
 
-      alert('OTP sent successfully!')
+      showToast('OTP sent successfully!', 'success')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -141,6 +153,14 @@ export default function SignupPage() {
               Join Jeffi Stores for the best hardware deals
             </p>
           </div>
+
+          {fromLogin && step === 'email' && (
+            <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                No account found for <strong>{prefillEmail}</strong>. Create one to continue.
+              </p>
+            </div>
+          )}
 
           {error && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">

@@ -45,6 +45,10 @@ function LoginPage() {
       const data = await response.json()
 
       if (!response.ok) {
+        if (data.userNotFound) {
+          router.push(`/signup?email=${encodeURIComponent(email)}&from=login`)
+          return
+        }
         throw new Error(data.error || 'Failed to send OTP')
       }
 
