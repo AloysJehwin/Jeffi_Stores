@@ -17,12 +17,10 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
   const { user, logout } = useAuth()
   const { cartCount } = useCart()
 
-  // Close on route change
   useEffect(() => {
     onClose()
   }, [pathname])
 
-  // Lock body scroll
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -34,18 +32,15 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
-      {/* Drawer */}
       <div
         className={`fixed top-0 left-0 bottom-0 z-50 w-[80vw] max-w-[320px] bg-surface-elevated shadow-xl transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div className="flex flex-col h-full overflow-y-auto">
-          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border-default">
             <Link href="/" className="flex items-center gap-2" onClick={onClose}>
               <img src="/images/logo.png" alt="Jeffi Stores" className="h-10 w-auto" />
@@ -63,14 +58,13 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
             </button>
           </div>
 
-          {/* Navigation */}
           <nav className="flex flex-col p-4 gap-1">
             {[
               { href: '/', label: 'Home' },
               { href: '/products', label: 'Products' },
               { href: '/categories', label: 'Categories' },
               { href: '/about', label: 'About Us' },
-              { href: '/contact', label: 'Contact' },
+              { href: '/support', label: 'Support' },
             ].map(link => (
               <Link
                 key={link.href}
@@ -88,7 +82,6 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
 
           <div className="border-t border-border-default mx-4" />
 
-          {/* Cart & Wishlist */}
           <div className="flex flex-col p-4 gap-1">
             <Link
               href="/cart"
@@ -111,7 +104,6 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
 
           <div className="border-t border-border-default mx-4" />
 
-          {/* User Section */}
           <div className="flex flex-col p-4 gap-1">
             {user ? (
               <>
@@ -156,7 +148,6 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
             )}
           </div>
 
-          {/* Theme Toggle */}
           <div className="mt-auto p-4 border-t border-border-default">
             <div className="flex items-center justify-between px-4">
               <span className="text-sm text-foreground-muted">Theme</span>

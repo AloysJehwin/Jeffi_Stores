@@ -3,6 +3,7 @@ import { logoutAction } from './logout-action'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import AdminMobileNav from '@/components/admin/AdminMobileNav'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export const metadata = {
   title: 'Admin Panel - Jeffi Stores',
@@ -60,45 +61,41 @@ export default async function AdminLayout({
   return (
     <div className="min-h-screen">
       <nav className="bg-secondary-500 dark:bg-secondary-700 text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Mobile menu + Logo */}
-            <div className="flex items-center">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between h-14">
+            <div className="flex items-center gap-2 shrink-0">
               <AdminMobileNav
                 navLinks={filteredNavLinks}
                 username={session?.username || 'Admin'}
                 role={session?.role || 'user'}
               />
-              <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
               </svg>
-              <h2 className="text-xl font-bold">Jeffi Stores Admin</h2>
+              <span className="text-base font-bold whitespace-nowrap">Jeffi Admin</span>
             </div>
 
-            {/* Nav Links */}
-            <div className="hidden md:block">
-              <div className="flex items-center space-x-6">
-                {filteredNavLinks.map(link => (
-                    <a
-                      key={link.href}
-                      href={link.href}
-                      className="hover:text-primary-500 transition-colors font-medium"
-                    >
-                      {link.label}
-                    </a>
-                  ))}
-              </div>
+            <div className="hidden md:flex items-center gap-1 overflow-x-auto">
+              {filteredNavLinks.map(link => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors whitespace-nowrap"
+                >
+                  {link.label}
+                </a>
+              ))}
             </div>
 
-            {/* User Menu */}
-            <div className="flex items-center gap-4">
-              <span className="hidden sm:inline text-sm">
-                {session?.username || 'Admin'} <span className="text-gray-300">({session?.role || 'user'})</span>
+            <div className="flex items-center gap-2 shrink-0">
+              <ThemeToggle variant="admin" />
+              <span className="hidden lg:inline text-sm whitespace-nowrap">
+                {session?.username || 'Admin'} <span className="text-gray-300 text-xs">({session?.role || 'user'})</span>
               </span>
               <form action={logoutAction}>
                 <button
                   type="submit"
-                  className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  className="bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
                 >
                   Logout
                 </button>

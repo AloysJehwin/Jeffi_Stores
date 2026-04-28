@@ -65,11 +65,17 @@ export default function ProductImageGallery({ images, productName }: ProductImag
           onMouseMove={handleMouseMove}
           onClick={() => setShowLightbox(true)}
         >
-          <div className="w-full aspect-square relative overflow-hidden flex items-center justify-center">
+          <div className="w-full aspect-[5/3] relative overflow-hidden flex items-center justify-center">
+            <img
+              src={currentImage.image_url}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
+            />
             <img
               src={currentImage.image_url}
               alt={`${productName} - Image ${selectedImageIndex + 1}`}
-              className={`w-full h-full object-cover transition-transform duration-300 ${
+              className={`relative w-full h-full object-contain transition-transform duration-300 ${
                 isZoomed ? 'scale-150' : 'scale-100'
               }`}
               style={
@@ -110,7 +116,7 @@ export default function ProductImageGallery({ images, productName }: ProductImag
                 <img
                   src={image.thumbnail_url}
                   alt={`${productName} - Thumbnail ${index + 1}`}
-                  className="w-full h-20 object-cover rounded-md"
+                  className="w-full h-20 object-contain bg-surface-secondary rounded-md"
                 />
               </div>
             ))}
@@ -192,7 +198,7 @@ export default function ProductImageGallery({ images, productName }: ProductImag
                   <img
                     src={image.thumbnail_url}
                     alt={`Thumbnail ${index + 1}`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain bg-surface-secondary"
                   />
                 </button>
               ))}

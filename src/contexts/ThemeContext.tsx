@@ -13,18 +13,20 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({ children, storageKey = 'jeffi-theme' }: { children: ReactNode; storageKey?: string }) {
   const [theme, setThemeState] = useState<Theme>('light')
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light')
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem('jeffi-theme') as Theme | null
+    const sessionStored = sessionStorage.getItem(storageKey) as Theme | null
+    const localStored = localStorage.getItem(storageKey) as Theme | null
+    const stored = sessionStored ?? localStored
     if (stored && ['light', 'dark', 'system'].includes(stored)) {
       setThemeState(stored)
     }
     setMounted(true)
-  }, [])
+  }, [storageKey])
 
   useEffect(() => {
     if (!mounted) return
@@ -58,7 +60,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme)
-    localStorage.setItem('jeffi-theme', newTheme)
+    sessionStorage.setItem(storageKey, newTheme)
+    localStorage.setItem(storageKey, newTheme)
   }
 
   const toggleTheme = () => {

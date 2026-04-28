@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('jeffi-theme');if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})()`,
+            __html: `(function(){try{var k=location.pathname.startsWith('/admin')?'jeffi-admin-theme':'jeffi-theme';var t=sessionStorage.getItem(k)||localStorage.getItem(k);if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})()`,
           }}
         />
       </head>
