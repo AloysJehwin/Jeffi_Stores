@@ -49,12 +49,23 @@ jobs:
           script: |
             set -e
             cd /opt/jeffi-stores
-            export $(grep -v '^#' .env.production | grep DATABASE_URL)
-            for f in database/migration-*.sql; do
-              echo "Running $f..."
-              psql "$DATABASE_URL" -f "$f"
-            done
-            echo "All migrations complete."
+            docker compose -f docker-compose.prod.yml exec -T app node -e "
+              const { Pool } = require('pg');
+              const fs = require('fs');
+              const path = require('path');
+              const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+              (async () => {
+                const dir = '/app/database';
+                const files = fs.readdirSync(dir).filter(f => f.startsWith('migration-') && f.endsWith('.sql')).sort();
+                for (const f of files) {
+                  process.stdout.write('Running ' + f + '...');
+                  await pool.query(fs.readFileSync(path.join(dir, f), 'utf8'));
+                  process.stdout.write(' done\n');
+                }
+                process.stdout.write('All migrations complete.\n');
+                await pool.end();
+              })().catch(e => { process.stderr.write(e.message + '\n'); process.exit(1); });
+            "
 
       - name: Invalidate CloudFront cache
         uses: chetan/invalidate-cloudfront-action@v2

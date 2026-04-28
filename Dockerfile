@@ -56,6 +56,17 @@ COPY --from=deps /app/node_modules/js-md5 ./node_modules/js-md5
 COPY --from=deps /app/node_modules/linebreak ./node_modules/linebreak
 COPY --from=deps /app/node_modules/png-js ./node_modules/png-js
 
+# Copy database migration files
+COPY --from=builder --chown=nextjs:nodejs /app/database ./database
+
+# Copy pg module for migration runner
+COPY --from=deps /app/node_modules/pg ./node_modules/pg
+COPY --from=deps /app/node_modules/pg-pool ./node_modules/pg-pool
+COPY --from=deps /app/node_modules/pg-protocol ./node_modules/pg-protocol
+COPY --from=deps /app/node_modules/pg-types ./node_modules/pg-types
+COPY --from=deps /app/node_modules/pgpass ./node_modules/pgpass
+COPY --from=deps /app/node_modules/pg-connection-string ./node_modules/pg-connection-string
+
 USER nextjs
 
 EXPOSE 3000
