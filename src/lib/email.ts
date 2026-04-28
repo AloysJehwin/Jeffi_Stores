@@ -1,6 +1,5 @@
 import nodemailer from 'nodemailer'
 
-// Create transporter using AWS SES SMTP
 const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
   port: 465,
@@ -106,10 +105,8 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
 
   try {
     const info = await transporter.sendMail(mailOptions)
-    console.log('OTP email sent:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('Email sending error:', error)
     return { success: false, error }
   }
 }
@@ -207,10 +204,8 @@ export async function sendWelcomeEmail(email: string, name: string) {
 
   try {
     const info = await transporter.sendMail(mailOptions)
-    console.log('Welcome email sent:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('Email sending error:', error)
     return { success: false, error }
   }
 }
@@ -375,10 +370,8 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
 
   try {
     const info = await transporter.sendMail(mailOptions)
-    console.log('Order confirmation email sent:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('Email sending error:', error)
     return { success: false, error }
   }
 }
@@ -509,15 +502,12 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], us
 
   try {
     const info = await transporter.sendMail(mailOptions)
-    console.log('New order notification sent:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('Email sending error:', error)
     return { success: false, error }
   }
 }
 
-// Send order status update notification
 export async function sendOrderStatusUpdate(
   customerEmail: string,
   customerName: string,
@@ -712,15 +702,12 @@ export async function sendOrderStatusUpdate(
 
   try {
     const info = await transporter.sendMail(mailOptions)
-    console.log('Order status update email sent:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('Email sending error:', error)
     return { success: false, error }
   }
 }
 
-// Send payment status update notification
 export async function sendPaymentStatusUpdate(
   customerEmail: string,
   customerName: string,
@@ -926,10 +913,8 @@ export async function sendPaymentStatusUpdate(
 
   try {
     const info = await transporter.sendMail(mailOptions)
-    console.log('Payment status update email sent:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('Email sending error:', error)
     return { success: false, error }
   }
 }
@@ -1090,10 +1075,8 @@ export async function sendAdminCertificateEmail(
 
   try {
     const info = await transporter.sendMail(mailOptions)
-    console.log('Admin certificate email sent:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('Admin certificate email error:', error)
     return { success: false, error }
   }
 }
@@ -1259,10 +1242,8 @@ export async function sendNewReviewNotification(review: any, user: any, product:
 
   try {
     const info = await transporter.sendMail(mailOptions)
-    console.log('New review notification email sent:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('Email sending error:', error)
     return { success: false, error }
   }
 }
@@ -1359,10 +1340,59 @@ export async function sendPaymentFailedAdminNotification(
 
   try {
     const info = await transporter.sendMail(mailOptions)
-    console.log('Payment failed admin notification sent:', info.messageId)
     return { success: true, messageId: info.messageId }
   } catch (error) {
-    console.error('Payment failed admin notification error:', error)
+    return { success: false, error }
+  }
+}
+
+export async function sendAdminContactEmail(
+  email: string,
+  name: string,
+  subject: string,
+  message: string
+) {
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: email,
+    subject,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
+            .header { text-align: center; padding-bottom: 20px; border-bottom: 3px solid #f97316; margin-bottom: 30px; }
+            .logo { font-size: 28px; font-weight: bold; color: #f97316; }
+            .message-box { background-color: #fff; border-left: 4px solid #f97316; padding: 20px; border-radius: 4px; margin: 20px 0; white-space: pre-wrap; }
+            .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 13px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">Jeffi Stores</div>
+              <p style="color: #666; margin: 4px 0 0;">Hardware &amp; Tools</p>
+            </div>
+            <p>Hello ${name || 'Valued Customer'},</p>
+            <p>You have received a message from the Jeffi Stores team:</p>
+            <div class="message-box">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            <div class="footer">
+              <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
+              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
     return { success: false, error }
   }
 }
