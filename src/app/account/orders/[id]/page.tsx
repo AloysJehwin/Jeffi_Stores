@@ -39,6 +39,7 @@ interface OrderDetails {
   paymentStatus: string
   createdAt: string
   notes: string | null
+  trackingUrl: string | null
   shippingAddress: {
     full_name: string
     address_line1: string
@@ -404,7 +405,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(order.status)}`}>
-                    {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status}
+                    {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status === 'cancel_rejected' ? 'Cancellation Rejected' : order.status}
                   </span>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
                     Payment: {order.paymentStatus}
@@ -491,6 +492,34 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   <p className="text-orange-800 dark:text-orange-300 text-sm">
                     Your cancellation request is pending review by our team. You will receive an email once it is approved or rejected.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Tracking Banner */}
+            {order.status === 'shipped' && order.trackingUrl && (
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex gap-3 items-start">
+                    <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    <div>
+                      <p className="text-blue-900 dark:text-blue-200 font-semibold text-sm">Your order has been shipped!</p>
+                      <p className="text-blue-700 dark:text-blue-300 text-xs mt-0.5">Click below to track your shipment in real time.</p>
+                    </div>
+                  </div>
+                  <a
+                    href={order.trackingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors inline-flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Track Order
+                  </a>
                 </div>
               </div>
             )}

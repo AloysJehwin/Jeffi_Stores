@@ -72,6 +72,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
           </style>
         </head>
         <body>
+          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Your Jeffi Stores OTP is ${otp} — valid for 10 minutes. Do not share.</span>
           <div class="container">
             <div class="header">
               <div class="logo">Jeffi Stores</div>
@@ -83,6 +84,14 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
             <p>Thank you for registering with Jeffi Stores. Please use the following One-Time Password (OTP) to verify your email address:</p>
 
             <div class="otp-box">${otp}</div>
+
+            <p style="text-align: center; margin: -10px 0 20px;">
+              <a href="mailto:?body=${otp}"
+                 onclick="navigator.clipboard && navigator.clipboard.writeText('${otp}'); return false;"
+                 style="display: inline-block; background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; padding: 8px 20px; border-radius: 6px; font-size: 13px; text-decoration: none; font-weight: 600; cursor: pointer;">
+                📋 Copy OTP
+              </a>
+            </p>
 
             <div class="info">
               <strong>This OTP will expire in 10 minutes.</strong>
@@ -165,6 +174,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
           </style>
         </head>
         <body>
+          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Welcome to Jeffi Stores! Your account is ready — shop industrial tools, hardware and more.</span>
           <div class="container">
             <div class="header">
               <div class="logo">Jeffi Stores</div>
@@ -282,6 +292,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
           </style>
         </head>
         <body>
+          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Order confirmed! We've received your order and will keep you updated on dispatch.</span>
           <div class="container">
             <div class="header">
               <div class="logo">Jeffi Stores</div>
@@ -516,7 +527,8 @@ export async function sendOrderStatusUpdate(
   newStatus: string,
   previousStatus?: string,
   invoicePdfBuffer?: Buffer | null,
-  cancellationNote?: string
+  cancellationNote?: string,
+  trackingUrl?: string
 ) {
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
     pending: {
@@ -644,6 +656,7 @@ export async function sendOrderStatusUpdate(
           </style>
         </head>
         <body>
+          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${statusInfo.title} — Order #${orderNumber}. ${statusInfo.message}</span>
           <div class="container">
             <div class="header">
               <div class="logo">Jeffi Stores</div>
@@ -675,9 +688,20 @@ export async function sendOrderStatusUpdate(
             </div>
 
             ${newStatus === 'shipped' ? `
-              <div class="info-box">
-                <h4 style="margin-top: 0;">Tracking Information</h4>
-                <p>You can track your order by logging into your account.</p>
+              <div class="info-box" style="background-color: #f0f9ff; border-left-color: #2563eb;">
+                <h4 style="margin-top: 0; color: #1e40af;">Your order is on its way!</h4>
+                ${trackingUrl ? `
+                <p style="margin-bottom: 12px;">Use the link below to track your shipment in real time:</p>
+                <p style="text-align: center; margin: 0;">
+                  <a href="${trackingUrl}" target="_blank"
+                     style="display: inline-block; background-color: #2563eb; color: white; padding: 10px 24px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 14px;">
+                    Track Your Order
+                  </a>
+                </p>
+                <p style="font-size: 12px; color: #64748b; margin-top: 10px; word-break: break-all;">
+                  Or copy this link: <a href="${trackingUrl}" style="color: #2563eb;">${trackingUrl}</a>
+                </p>
+                ` : `<p>You can track your order by logging into your account.</p>`}
               </div>
             ` : ''}
 
@@ -847,6 +871,7 @@ export async function sendPaymentStatusUpdate(
           </style>
         </head>
         <body>
+          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${paymentInfo.title} — Order #${orderNumber}. ${paymentInfo.message}</span>
           <div class="container">
             <div class="header">
               <div class="logo">Jeffi Stores</div>

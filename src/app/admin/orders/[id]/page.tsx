@@ -176,7 +176,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               <h2 className="text-lg font-semibold text-foreground">Update Order Status</h2>
             </div>
             <div className="p-4 sm:p-6">
-              <UpdateOrderStatus orderId={order.id} currentStatus={order.status} currentPaymentStatus={order.payment_status} />
+              <UpdateOrderStatus orderId={order.id} currentStatus={order.status} currentPaymentStatus={order.payment_status} currentTrackingUrl={order.tracking_url} />
             </div>
           </div>
           )}

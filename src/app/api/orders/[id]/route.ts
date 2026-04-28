@@ -55,6 +55,7 @@ export async function GET(
       paymentStatus: order.payment_status,
       createdAt: order.created_at,
       notes: order.notes,
+      trackingUrl: order.tracking_url || null,
       shippingAddress: order.shipping_address,
       items: orderItems.map((item: any) => ({
         id: item.id,
@@ -86,7 +87,11 @@ export async function PATCH(
 
     const orderId = params.id
     const body = await request.json()
-    const { status, payment_status } = body
+    const { status, payment_status, tracking_url } = body
+
+    if (status === 'shipped' && !tracking_url?.trim()) {
+      return NextResponse.json({ error: 'A tracking URL is required when marking an order as shipped.' }, { status: 400 })
+    }
 
     const currentOrder = await queryOne(`
       SELECT
@@ -144,6 +149,12 @@ export async function PATCH(
       paramIndex++
     }
 
+    if (status === 'shipped' && tracking_url?.trim()) {
+      updates.push(`tracking_url = $${paramIndex}`)
+      values.push(tracking_url.trim())
+      paramIndex++
+    }
+
     values.push(orderId)
 
     await query(
@@ -188,7 +199,9 @@ export async function PATCH(
           orderId,
           status,
           currentOrder.status,
-          invoicePdfBuffer
+          invoicePdfBuffer,
+          undefined,
+          status === 'shipped' ? tracking_url?.trim() : undefined
         )
         statusEmailSent = statusResult.success
       }
