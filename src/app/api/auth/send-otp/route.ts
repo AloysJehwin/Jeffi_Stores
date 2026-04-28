@@ -12,13 +12,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
     }
 
-    // If signup, check if email already exists
     if (isSignup) {
       const existingUser = await queryOne(
         'SELECT id FROM users WHERE email = $1',
@@ -29,22 +27,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Email already registered' }, { status: 400 })
       }
     } else {
-      // For login, check if user exists
       const existingUser = await queryOne(
         'SELECT id, first_name FROM users WHERE email = $1',
         [email.toLowerCase()]
       )
 
       if (!existingUser) {
-        return NextResponse.json({ error: 'No account found with this email' }, { status: 404 })
+        return NextResponse.json({ error: 'No account found with this email. Please sign up first.', userNotFound: true }, { status: 404 })
       }
     }
 
-    // Generate and store OTP
     const otp = generateOTP()
     storeOTP(email, otp)
 
-    // Send OTP email
     const emailResult = await sendOTPEmail(email, otp)
 
     if (!emailResult.success) {
@@ -59,7 +54,7 @@ export async function POST(request: NextRequest) {
       email: email.toLowerCase(),
     })
   } catch (error) {
-    console.error('Send OTP error:', error)
     return NextResponse.json({ error: 'Failed to send OTP' }, { status: 500 })
   }
 }
+
