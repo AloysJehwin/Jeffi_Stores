@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
-import DeleteProductButton from '@/components/admin/DeleteProductButton'
+import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import ProductImage from '@/components/admin/ProductImage'
 import AdminFilters from '@/components/admin/AdminFilters'
 
@@ -137,7 +137,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                     <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 font-medium">
                       Edit
                     </Link>
-                    <DeleteProductButton productId={product.id} productName={product.name} />
+                    <DeactivateProductButton productId={product.id} productName={product.name} />
                   </div>
                 </div>
               </div>
@@ -250,7 +250,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                       >
                         Edit
                       </Link>
-                      <DeleteProductButton productId={product.id} productName={product.name} />
+                      <DeactivateProductButton productId={product.id} productName={product.name} />
                     </td>
                   </tr>
                 ))

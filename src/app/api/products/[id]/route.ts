@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryMany } from '@/lib/db'
-import { deleteProductImage } from '@/lib/s3'
+import { query, queryOne } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 
-export async function DELETE(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -13,34 +12,38 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const body = await request.json()
     const productId = params.id
 
-    // Get all images for the product
-    const images = await queryMany(
-      'SELECT * FROM product_images WHERE product_id = $1',
-      [productId]
-    )
+    const allowedFields: Record<string, unknown> = {}
+    if (typeof body.is_active === 'boolean') allowedFields.is_active = body.is_active
 
-    // Delete images from S3
-    if (images && images.length > 0) {
-      for (const image of images) {
-        try {
-          await deleteProductImage(image.s3_key, image.s3_thumbnail_key)
-        } catch (err) {
-          console.error('Error deleting image from S3:', err)
-        }
-      }
+    if (Object.keys(allowedFields).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }
 
-    // Delete product (images will be cascade deleted due to ON DELETE CASCADE)
-    await query('DELETE FROM products WHERE id = $1', [productId])
+    const keys = Object.keys(allowedFields)
+    const values = Object.values(allowedFields)
+    const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ')
+
+    const updated = await queryOne(
+      `UPDATE products SET ${setClause}, updated_at = NOW() WHERE id = $${keys.length + 1} RETURNING id`,
+      [...values, productId]
+    )
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    console.error('Delete error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete product' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message || 'Failed to update product' }, { status: 500 })
   }
+}
+
+export async function DELETE() {
+  return NextResponse.json(
+    { error: 'Products cannot be deleted. Set is_active = false to deactivate.' },
+    { status: 405 }
+  )
 }
