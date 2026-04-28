@@ -12,6 +12,12 @@
     --color-foreground-muted: #9CA3AF;
     --color-border: #E5E7EB;
     --color-border-secondary: #D1D5DB;
+
+    /* Brand colors — light mode */
+    --primary-500: #f59e0b;
+    --primary-600: #d97706;
+    --accent-500: #7cb900;
+    --accent-600: #5a8a00;
   }
 
   .dark {
@@ -23,7 +29,32 @@
     --color-foreground-muted: #9CA3AF;
     --color-border: #3f4150;
     --color-border-secondary: #4a4c5e;
+
+    /* Brand colors — dark mode (deeper for WCAG contrast on dark surfaces) */
+    --primary-500: #d97706;
+    --primary-600: #b45309;
+    --accent-500: #5a8a00;
+    --accent-600: #4a7200;
   }
+
+  /* Remap brand utility classes to CSS vars so they shift with theme */
+  .bg-primary-500 { background-color: var(--primary-500) !important; }
+  .bg-primary-600 { background-color: var(--primary-600) !important; }
+  .hover\:bg-primary-600:hover { background-color: var(--primary-600) !important; }
+  .text-primary-500 { color: var(--primary-500) !important; }
+  .text-primary-600 { color: var(--primary-600) !important; }
+  .border-primary-500 { border-color: var(--primary-500) !important; }
+
+  .bg-accent-500 { background-color: var(--accent-500) !important; }
+  .bg-accent-600 { background-color: var(--accent-600) !important; }
+  .hover\:bg-accent-500:hover { background-color: var(--accent-500) !important; }
+  .hover\:bg-accent-600:hover { background-color: var(--accent-600) !important; }
+  .text-accent-500 { color: var(--accent-500) !important; }
+  .text-accent-600 { color: var(--accent-600) !important; }
+  .border-accent-500 { border-color: var(--accent-500) !important; }
+  .border-b-accent-500 { border-bottom-color: var(--accent-500) !important; }
+  .focus\:ring-accent-500:focus { --tw-ring-color: var(--accent-500) !important; }
+  .group:hover .group-hover\:text-accent-600 { color: var(--accent-600) !important; }
 
   * {
     @apply border-0 p-0 m-0 box-border;
