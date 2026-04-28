@@ -41,8 +41,8 @@ export default async function HomePage() {
     <div className="bg-surface">
 
       {/* ── Hero ── */}
-      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden">
-        <div className="container mx-auto px-5 py-8 sm:py-12 md:py-16 relative z-10 w-full">
+      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden md:min-h-[calc(100vh-5rem)] md:flex md:items-center">
+        <div className="container mx-auto px-5 py-10 sm:py-12 md:py-16 relative z-10 w-full">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-16 items-center">
 
             <div>
@@ -50,24 +50,24 @@ export default async function HomePage() {
                 Hardware &amp; Industrial Tools
               </span>
 
-              <h1 className="text-4xl sm:text-6xl md:text-8xl font-extrabold text-white leading-[1.05] mb-4 sm:mb-6 tracking-tight">
+              <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-extrabold text-white leading-[1.05] mb-4 sm:mb-6 tracking-tight">
                 Jeffi <span className="text-secondary-500">Stores</span>
               </h1>
 
-              <p className="text-base sm:text-xl md:text-2xl text-white/80 mb-6 sm:mb-8 leading-relaxed max-w-sm md:max-w-none">
+              <p className="text-base sm:text-lg md:text-2xl lg:text-3xl text-white/80 mb-6 sm:mb-8 leading-relaxed max-w-sm md:max-w-none">
                 Industrial machinery parts, tools, and hardware — for manufacturing, construction, and repairs.
               </p>
 
               <div className="flex gap-3 sm:gap-4 mb-6 sm:mb-10">
                 <Link
                   href="/products"
-                  className="bg-secondary-500 hover:bg-secondary-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold transition-all text-sm sm:text-base md:text-lg shadow-lg"
+                  className="bg-secondary-500 hover:bg-secondary-600 text-white px-6 sm:px-8 py-3 md:py-4 rounded-xl font-bold transition-all text-sm sm:text-base md:text-lg shadow-lg"
                 >
                   Shop Now
                 </Link>
                 <Link
                   href="/categories"
-                  className="bg-white/15 hover:bg-white/25 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-semibold transition-all text-sm sm:text-base md:text-lg border border-white/40"
+                  className="bg-white/15 hover:bg-white/25 text-white px-6 sm:px-8 py-3 md:py-4 rounded-xl font-semibold transition-all text-sm sm:text-base md:text-lg border border-white/40"
                 >
                   Browse
                 </Link>
