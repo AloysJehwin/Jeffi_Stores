@@ -209,87 +209,94 @@ export default function WishlistPage() {
             const isAddingToCart = addingToCart.has(item.product_id)
 
             return (
-              <div key={item.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow">
+              <div key={item.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow group">
                 {/* Product Image */}
-                <Link href={`/products/${item.products.slug}`} className="block relative h-64 bg-surface-elevated overflow-hidden">
+                <Link href={`/products/${item.products.slug}`} className="block relative aspect-[5/3] border-b border-border-default overflow-hidden mx-3 mt-3 rounded-lg">
                   {primaryImage ? (
-                    <img
-                      src={primaryImage.thumbnail_url}
-                      alt={item.products.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <>
+                      <img
+                        src={primaryImage.thumbnail_url}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
+                      />
+                      <img
+                        src={primaryImage.thumbnail_url}
+                        alt={item.products.name}
+                        className="relative w-full h-full object-contain"
+                      />
+                    </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <svg className="w-24 h-24 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-20 h-20 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
                     </div>
                   )}
 
                   {mrpDiscount > 0 && (
-                    <div className="absolute top-4 right-4 bg-accent-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                    <div className="absolute top-3 right-3 bg-accent-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
                       {mrpDiscount}% off
                     </div>
                   )}
-
-                  {/* Remove Button */}
-                  <button
-                    onClick={() => handleRemove(item.product_id)}
-                    className="absolute top-4 left-4 bg-surface-elevated rounded-full p-2 shadow-md hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                  >
-                    <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </Link>
 
                 {/* Product Info */}
-                <div className="p-4">
-                  <Link href={`/products/${item.products.slug}`} className="text-lg font-semibold text-foreground hover:text-accent-600 dark:hover:text-accent-400 transition-colors line-clamp-2 mb-2">
+                <div className="p-4 flex flex-col">
+                  {/* Remove Button */}
+                  <button
+                    onClick={() => handleRemove(item.product_id)}
+                    className="self-end mb-1 p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                    aria-label="Remove from wishlist"
+                  >
+                    <svg className="w-4 h-4 text-red-500 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  <Link href={`/products/${item.products.slug}`} className="font-semibold text-base text-foreground group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[3rem] mb-2">
                     {item.products.name}
                   </Link>
 
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                      {hasVariants ? 'From ' : ''}₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                    {mrp && mrp > Number(price) && (
-                      <span className="text-sm text-foreground-muted line-through">
-                        ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div className="mt-auto">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
+                        {hasVariants ? 'From ' : ''}₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-foreground-muted mb-4">Inclusive of all taxes</p>
+                      {mrp && mrp > Number(price) && (
+                        <span className="text-sm text-foreground-muted line-through">
+                          ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-foreground-muted mb-3">Inclusive of all taxes</p>
 
-                  {/* Stock Status */}
-                  <div className="mb-4">
-                    {isInStock ? (
-                      <span className="text-sm text-green-600 font-medium">In Stock</span>
-                    ) : (
-                      <span className="text-sm text-red-600 font-medium">Out of Stock</span>
-                    )}
-                  </div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className={`text-xs font-medium ${isInStock ? 'text-green-600' : 'text-red-600'}`}>
+                        {isInStock ? 'In Stock' : 'Out of Stock'}
+                      </span>
+                    </div>
 
-                  {/* Add to Cart Button */}
-                  <button
-                    onClick={() => handleAddToCart(item.product_id)}
-                    disabled={!isInStock || isAddingToCart}
-                    className="w-full bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-border-default disabled:text-foreground-muted disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isAddingToCart ? (
-                      <>
-                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                        Adding...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        Add to Cart
-                      </>
-                    )}
-                  </button>
+                    <button
+                      onClick={() => handleAddToCart(item.product_id)}
+                      disabled={!isInStock || isAddingToCart}
+                      className="w-full bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-border-default disabled:text-foreground-muted disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                    >
+                      {isAddingToCart ? (
+                        <>
+                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          Add to Cart
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             )

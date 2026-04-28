@@ -25,7 +25,7 @@ export default async function SupportPage() {
     <div className="bg-surface min-h-screen">
       <div className="px-4 sm:px-6 xl:px-10 py-8 md:py-10">
         <div className="mb-8">
-          <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-1">Help & Support</p>
+          <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-1">Help &amp; Support</p>
           <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">How can we help?</h1>
           <p className="text-foreground-secondary mt-2">Chat with our support bot or get connected to a live agent.</p>
         </div>
@@ -77,12 +77,12 @@ export default async function SupportPage() {
               <h2 className="font-bold text-foreground mb-3">Business Hours</h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-foreground-secondary">Mon – Fri</span>
-                  <span className="text-foreground font-semibold">9:00 AM – 7:00 PM</span>
+                  <span className="text-foreground-secondary">Mon &ndash; Fri</span>
+                  <span className="text-foreground font-semibold">9:00 AM &ndash; 7:00 PM</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-foreground-secondary">Saturday</span>
-                  <span className="text-foreground font-semibold">9:00 AM – 6:00 PM</span>
+                  <span className="text-foreground font-semibold">9:00 AM &ndash; 6:00 PM</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-foreground-secondary">Sunday</span>
@@ -121,7 +121,7 @@ export default async function SupportPage() {
 
           <div className="lg:col-span-2">
             {user ? (
-              <div className="rounded-xl border border-border-default overflow-hidden shadow-sm" style={{ height: '75vh', minHeight: '560px' }}>
+              <div className="rounded-xl border border-border-default overflow-hidden shadow-sm" style={{ height: '70vh', minHeight: '480px', maxHeight: '700px' }}>
                 <SupportChat />
               </div>
             ) : (
