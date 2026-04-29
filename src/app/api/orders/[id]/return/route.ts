@@ -44,7 +44,7 @@ export async function POST(
     }
 
     const order = await queryOne(
-      `SELECT o.id, o.status, o.order_number, o.delivered_at, o.updated_at, o.user_id,
+`SELECT o.id, o.status, o.order_number, o.delivered_at, o.updated_at, o.user_id,
               o.customer_name, o.customer_email,
               u.first_name, u.last_name, u.email AS user_email
        FROM orders o
@@ -59,7 +59,7 @@ export async function POST(
       return NextResponse.json({ error: 'Only delivered orders can be returned.' }, { status: 400 })
     }
 
-    const deliveredAt = new Date(order.delivered_at || order.updated_at)
+const deliveredAt = new Date(order.delivered_at || order.updated_at)
     const windowExpiry = new Date(deliveredAt.getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000)
     if (new Date() > windowExpiry) {
       return NextResponse.json({ error: `Return window has closed. Returns must be requested within ${RETURN_WINDOW_DAYS} days of delivery.` }, { status: 400 })
