@@ -46,6 +46,8 @@ interface OrderDetails {
   deliveredAt: string | null
   notes: string | null
   trackingUrl: string | null
+  originalOrderId: string | null
+  originalOrderNumber: string | null
   shippingAddress: {
     full_name: string
     address_line1: string
@@ -462,6 +464,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   <h2 className="text-xl font-bold text-foreground">
                     Order #{order.orderNumber}
                   </h2>
+                  {order.originalOrderId && order.originalOrderNumber && (
+                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-0.5">
+                      Replacement for{' '}
+                      <a href={`/account/orders/${order.originalOrderId}`} className="underline hover:text-blue-800 dark:hover:text-blue-300">
+                        #{order.originalOrderNumber}
+                      </a>
+                    </p>
+                  )}
                   <p className="text-sm text-foreground-secondary mt-1">
                     Placed on {new Date(order.createdAt).toLocaleDateString('en-IN', {
                       day: 'numeric',
@@ -629,11 +639,19 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             {order.status === 'returned' && (
               <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
                 <p className="text-purple-800 dark:text-purple-300 text-sm font-medium">Resolved</p>
-                <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
-                  {returnRequest?.type === 'replacement' && returnRequest.replacement_order_id
-                    ? 'Your replacement order has been created and confirmed.'
-                    : 'Your refund has been processed. It may take 5–7 business days to reflect in your account.'}
-                </p>
+                {returnRequest?.type === 'replacement' && returnRequest.replacement_order_id ? (
+                  <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
+                    Your replacement order{' '}
+                    <a href={`/account/orders/${returnRequest.replacement_order_id}`} className="underline font-medium">
+                      #{returnRequest.replacement_order_number || returnRequest.replacement_order_id.slice(0, 8)}
+                    </a>{' '}
+                    has been created and confirmed.
+                  </p>
+                ) : (
+                  <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
+                    Your refund has been processed. It may take 5–7 business days to reflect in your account.
+                  </p>
+                )}
               </div>
             )}
 

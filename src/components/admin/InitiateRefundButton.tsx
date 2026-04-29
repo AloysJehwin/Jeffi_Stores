@@ -8,9 +8,10 @@ interface InitiateRefundButtonProps {
   orderId: string
   orderNumber: string
   amount: number
+  isReturn?: boolean
 }
 
-export default function InitiateRefundButton({ orderId, orderNumber, amount }: InitiateRefundButtonProps) {
+export default function InitiateRefundButton({ orderId, orderNumber, amount, isReturn }: InitiateRefundButtonProps) {
   const [showConfirm, setShowConfirm] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const { showToast } = useToast()
@@ -43,7 +44,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount }: I
       </div>
       <div className="p-4 sm:p-6">
         <p className="text-sm text-foreground-secondary mb-4">
-          This order was cancelled but the payment of{' '}
+          This order was {isReturn ? 'returned' : 'cancelled'} but the payment of{' '}
           <span className="font-semibold text-foreground">₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>{' '}
           has not yet been refunded. Initiating a refund will trigger it via Razorpay and notify the customer by email.
         </p>

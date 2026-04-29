@@ -36,6 +36,14 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
               Order #{order.order_number || order.id.slice(0, 8)}
             </h1>
+            {order.original_order_id && order.original_order_number && (
+              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
+                Replacement for{' '}
+                <Link href={`/admin/orders/${order.original_order_id}`} className="underline hover:text-blue-800 dark:hover:text-blue-300">
+                  #{order.original_order_number}
+                </Link>
+              </p>
+            )}
             <p className="text-foreground-secondary mt-1">
               Placed on {new Date(order.created_at).toLocaleDateString('en-IN')} at{' '}
               {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
@@ -204,11 +212,12 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           )}
 
-          {order.status === 'cancelled' && order.payment_status === 'paid' && (
+          {(order.status === 'cancelled' || order.status === 'returned') && order.payment_status === 'paid' && (
             <InitiateRefundButton
               orderId={order.id}
               orderNumber={order.order_number || order.id.slice(0, 8)}
               amount={Number(order.total_amount)}
+              isReturn={order.status === 'returned'}
             />
           )}
 
