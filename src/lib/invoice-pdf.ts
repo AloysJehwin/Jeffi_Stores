@@ -644,9 +644,9 @@ export function generateInvoicePDF(
       doc.save()
       doc.translate(cx, cy)
       doc.rotate(-45)
-      doc.strokeColor('#cc0000').lineWidth(3).rect(-160, -42, 320, 84).stroke()
-      doc.font('Helvetica-Bold').fontSize(64).fillColor('#cc0000').fillOpacity(0.18)
-      doc.text('CANCELLED', -160, -30, { width: 320, align: 'center', lineBreak: false })
+      doc.strokeColor('#cc0000').lineWidth(3).rect(-200, -36, 400, 72).stroke()
+      doc.font('Helvetica-Bold').fontSize(52).fillColor('#cc0000').fillOpacity(0.18)
+      doc.text('CANCELLED', -200, -24, { width: 400, align: 'center', lineBreak: false })
       doc.restore()
     }
 
