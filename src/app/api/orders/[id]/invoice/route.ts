@@ -45,7 +45,8 @@ export async function GET(
       [orderId]
     )
 
-    if (invoiceRecord?.pdf_url && order.status !== 'cancelled') {
+    const isVoided = order.status === 'cancelled' || order.status === 'returned'
+    if (invoiceRecord?.pdf_url && !isVoided) {
       return NextResponse.redirect(invoiceRecord.pdf_url)
     }
 
@@ -142,12 +143,14 @@ export async function GET(
       }
     }
 
-    const isCancelled = order.status === 'cancelled'
+    const isCancelled = isVoided
 
-    const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, isCancelled)
+    const voidLabel = order.status === 'returned' ? 'RETURNED' : 'CANCELLED'
+    const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, isCancelled, voidLabel)
 
     const safeFileName = order.invoice_number.replace(/\//g, '-')
-    const downloadName = isCancelled ? `${safeFileName}-CANCELLED.pdf` : `${safeFileName}.pdf`
+    const voidSuffix = order.status === 'returned' ? '-RETURNED' : order.status === 'cancelled' ? '-CANCELLED' : ''
+    const downloadName = isVoided ? `${safeFileName}${voidSuffix}.pdf` : `${safeFileName}.pdf`
 
     if (!isCancelled) {
       const fy = getFinancialYear(new Date(order.invoice_date || order.created_at))
