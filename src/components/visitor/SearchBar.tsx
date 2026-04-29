@@ -65,7 +65,6 @@ export default function SearchBar() {
           setProducts(data.products || [])
         }
       } catch (error) {
-        console.error('Search error:', error)
       } finally {
         setIsLoading(false)
       }
@@ -104,7 +103,7 @@ export default function SearchBar() {
 
       {/* Search Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-96 max-w-[calc(100vw-2rem)] bg-surface-elevated rounded-lg shadow-xl border border-border-default z-50">
+        <div className="fixed inset-x-0 top-16 mx-3 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:mx-0 w-auto sm:w-96 bg-surface-elevated rounded-lg shadow-xl border border-border-default z-50">
           {/* Search Input */}
           <form onSubmit={handleSearchSubmit} className="p-4 border-b border-border-default">
             <div className="relative">
