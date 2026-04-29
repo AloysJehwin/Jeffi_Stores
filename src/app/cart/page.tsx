@@ -165,8 +165,8 @@ export default function CartPage() {
                           ) : (
                             <div className="flex items-center border border-border-secondary rounded-lg">
                               <button
-                                onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                                disabled={isUpdating || item.quantity <= 1}
+                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) - 1)}
+                                disabled={isUpdating || Number(item.quantity) <= 1}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -179,8 +179,8 @@ export default function CartPage() {
                                 ) : Math.round(Number(item.quantity))}
                               </span>
                               <button
-                                onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                                disabled={isUpdating || item.quantity >= stockQty}
+                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) + 1)}
+                                disabled={isUpdating || Number(item.quantity) >= stockQty}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
