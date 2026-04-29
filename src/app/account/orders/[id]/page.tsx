@@ -668,7 +668,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   <div>
                     <p className="text-sm font-medium text-foreground-secondary mb-2">What would you like?</p>
                     <div className="flex gap-3">
-                      {(['refund', 'replacement'] as const).map((t) => (
+                      {(['refund', 'replacement'] as const).filter(t => !(t === 'replacement' && order.originalOrderId)).map((t) => (
                         <label key={t} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="radio"
