@@ -15,7 +15,6 @@ export async function POST(request: NextRequest) {
 
     const userId = authUser.userId
 
-    // Get user details
     const user = await queryOne('SELECT * FROM users WHERE id = $1', [userId])
 
     if (!user) {
@@ -26,7 +25,6 @@ export async function POST(request: NextRequest) {
     const { shippingAddress, notes, paymentMethod } = body
     const isRazorpayPayment = paymentMethod === 'razorpay'
 
-    // Check for existing pending+unpaid Razorpay order to prevent duplicates
     const existingUnpaidOrder = await queryOne(
       `SELECT o.id, o.order_number FROM orders o
        INNER JOIN payments p ON p.order_id = o.id AND p.payment_gateway = 'razorpay'
@@ -43,11 +41,8 @@ export async function POST(request: NextRequest) {
       }, { status: 409 })
     }
 
-    // Get session_id for cart — use authenticated userId since orders require login
-    // The session_id cookie may still be a guest string, so always use the verified userId
     const cartUserId = userId
 
-    // Get cart items
     const cartItems = await queryMany(`
       SELECT
         ci.*,
@@ -74,13 +69,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
     }
 
-    // Check stock availability
     for (const item of cartItems) {
       const stockQty = item.variant ? item.variant.stock_quantity : item.products.stock_quantity
       const itemName = item.variant
         ? `${item.products.name} (${item.variant.variant_name})`
         : item.products.name
-      if (stockQty < item.quantity) {
+      if ((item.buy_mode === 'unit' || !item.buy_mode) && stockQty < item.quantity) {
         return NextResponse.json(
           { error: `${itemName} is out of stock or has insufficient quantity` },
           { status: 400 }
@@ -88,29 +82,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Calculate totals
     const subtotal = cartItems.reduce((sum: number, item: any) => {
+      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
+        return sum + (parseFloat(item.price_at_addition) * parseFloat(item.quantity))
+      }
       const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
-      return sum + (parseFloat(price) * item.quantity)
+      return sum + (parseFloat(price) * parseFloat(item.quantity))
     }, 0)
 
-    // Calculate tax (back-calculated from GST-inclusive prices)
     const taxAmount = cartItems.reduce((sum: number, item: any) => {
-      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+      const lineTotal = item.buy_mode === 'weight' || item.buy_mode === 'length'
+        ? parseFloat(item.price_at_addition) * parseFloat(item.quantity)
+        : parseFloat(item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price) * parseFloat(item.quantity)
       const gstRate = parseFloat(item.products.gst_percentage || '0')
-      const itemTotal = parseFloat(price) * item.quantity
-      const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))
-      return sum + itemTax
+      return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
     }, 0)
 
-    const total = subtotal // Prices are GST-inclusive, tax is informational
+    const total = subtotal
 
-    // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
-    // Use a transaction for the entire order creation
     const order = await withTransaction(async (client) => {
-      // Create shipping address
       let shippingAddressId = null
       let billingAddressId = null
 
@@ -118,7 +110,6 @@ export async function POST(request: NextRequest) {
         const fullName = shippingAddress.fullName || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
         const phone = shippingAddress.phone || user.phone || '0000000000'
 
-        // Check if user already has this exact address
         const existingAddress = await client.query(
           `SELECT id FROM addresses
            WHERE user_id = $1 AND address_line1 = $2 AND city = $3 AND postal_code = $4
@@ -147,7 +138,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // GST breakdown calculation
       let orderTaxableAmount = 0
       let orderCgst = 0
       let orderSgst = 0
@@ -155,17 +145,19 @@ export async function POST(request: NextRequest) {
       let isIGST = false
 
       if (isGSTEnabled) {
-        // Determine IGST vs CGST/SGST based on buyer state
         const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'
         const buyerState = shippingAddress?.state || ''
         isIGST = isInterState(buyerState, sellerStateCode)
       }
 
-      // Calculate per-item GST breakdown
       const itemsWithGST = cartItems.map((item: any) => {
-        const unitPrice = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+        const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+        const unitPrice = isCustomQty
+          ? parseFloat(item.price_at_addition)
+          : parseFloat(item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price)
+        const qty = parseFloat(item.quantity)
         const gstRate = parseFloat(item.products.gst_percentage || '0')
-        const itemTotal = parseFloat(unitPrice) * item.quantity
+        const itemTotal = unitPrice * qty
 
         if (isGSTEnabled) {
           const gst = calculateGST(itemTotal, gstRate, isIGST)
@@ -180,13 +172,11 @@ export async function POST(request: NextRequest) {
         return { item, unitPrice, gstRate, itemTotal, itemTax }
       })
 
-      // Round order-level totals
       orderTaxableAmount = Math.round(orderTaxableAmount * 100) / 100
       orderCgst = Math.round(orderCgst * 100) / 100
       orderSgst = Math.round(orderSgst * 100) / 100
       orderIgst = Math.round(orderIgst * 100) / 100
 
-      // Create order
       const orderResult = await client.query(
         `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, tax_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
@@ -200,12 +190,11 @@ export async function POST(request: NextRequest) {
 
       const createdOrder = orderResult.rows[0]
 
-      // Create order items
       for (const { item, unitPrice, gstRate, itemTotal, gst, itemTax } of itemsWithGST) {
         const tax = isGSTEnabled && gst ? gst.totalTax : (itemTax || 0)
         await client.query(
-          `INSERT INTO order_items (order_id, product_id, variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+          `INSERT INTO order_items (order_id, product_id, variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
           [createdOrder.id, item.product_id, item.variant?.id || null,
            item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name,
            item.variant?.sku || item.products.sku,
@@ -216,26 +205,28 @@ export async function POST(request: NextRequest) {
            isGSTEnabled && gst ? gst.taxableAmount : 0,
            isGSTEnabled && gst ? gst.cgst : 0,
            isGSTEnabled && gst ? gst.sgst : 0,
-           isGSTEnabled && gst ? gst.igst : 0]
+           isGSTEnabled && gst ? gst.igst : 0,
+           item.buy_mode || 'unit',
+           item.buy_unit || null]
         )
       }
 
-      // Update stock (variant stock or product stock)
       for (const item of cartItems) {
-        if (item.variant) {
-          await client.query(
-            'UPDATE product_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-            [item.quantity, item.variant.id]
-          )
-        } else {
-          await client.query(
-            'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-            [item.quantity, item.product_id]
-          )
+        if (item.buy_mode === 'unit' || !item.buy_mode) {
+          if (item.variant) {
+            await client.query(
+              'UPDATE product_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+              [item.quantity, item.variant.id]
+            )
+          } else {
+            await client.query(
+              'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+              [item.quantity, item.product_id]
+            )
+          }
         }
       }
 
-      // Clear cart (skip for Razorpay — cleared after payment verification)
       if (!isRazorpayPayment) {
         await client.query('DELETE FROM cart_items WHERE user_id = $1', [cartUserId])
       }
@@ -243,9 +234,11 @@ export async function POST(request: NextRequest) {
       return createdOrder
     })
 
-    // Build order items for email
     const orderItems = cartItems.map((item: any) => {
-      const unitPrice = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+      const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+      const unitPrice = isCustomQty
+        ? parseFloat(item.price_at_addition)
+        : parseFloat(item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price)
       return {
         order_id: order.id,
         product_id: item.product_id,
@@ -253,19 +246,15 @@ export async function POST(request: NextRequest) {
         product_sku: item.variant?.sku || item.products.sku,
         quantity: item.quantity,
         unit_price: unitPrice,
-        total_price: parseFloat(unitPrice) * item.quantity,
+        total_price: unitPrice * parseFloat(item.quantity),
+        buy_mode: item.buy_mode || 'unit',
+        buy_unit: item.buy_unit || null,
       }
     })
 
-    // Send emails (skip for Razorpay — sent after payment verification)
     if (!isRazorpayPayment) {
-      sendOrderConfirmationEmail(user.email, order, orderItems, null).catch(err =>
-        console.error('Failed to send order confirmation email:', err)
-      )
-
-      sendNewOrderNotification(order, orderItems, user).catch(err =>
-        console.error('Failed to send new order notification:', err)
-      )
+      sendOrderConfirmationEmail(user.email, order, orderItems, null).catch(() => {})
+      sendNewOrderNotification(order, orderItems, user).catch(() => {})
     }
 
     return NextResponse.json({
@@ -278,8 +267,7 @@ export async function POST(request: NextRequest) {
       },
       requiresPayment: isRazorpayPayment,
     })
-  } catch (error) {
-    console.error('Order creation error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

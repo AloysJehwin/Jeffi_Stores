@@ -14,6 +14,8 @@ interface OrderItem {
   quantity: number
   unit_price: number
   total_price: number
+  buy_mode?: string
+  buy_unit?: string | null
   products: {
     slug: string
     product_images: Array<{
@@ -270,9 +272,9 @@ export default function OrdersPage() {
                                 >
                                   {item.product_name}
                                 </Link>
-                                <p className="text-sm text-foreground-secondary">Quantity: {item.quantity}</p>
+                                <p className="text-sm text-foreground-secondary">Quantity: {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : item.quantity}</p>
                                 <p className="text-sm font-semibold text-foreground mt-1">
-                                  ₹{item.unit_price.toLocaleString('en-IN')} × {item.quantity} = ₹{item.total_price.toLocaleString('en-IN')}
+                                  ₹{item.unit_price.toLocaleString('en-IN')} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : item.quantity} = ₹{item.total_price.toLocaleString('en-IN')}
                                 </p>
                               </div>
                             </div>

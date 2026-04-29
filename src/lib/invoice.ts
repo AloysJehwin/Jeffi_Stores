@@ -159,6 +159,8 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     cgst_amount: parseFloat(item.cgst_amount || '0'),
     sgst_amount: parseFloat(item.sgst_amount || '0'),
     igst_amount: parseFloat(item.igst_amount || '0'),
+    buy_mode: item.buy_mode || 'unit',
+    buy_unit: item.buy_unit || null,
   }))
 
   const buyerAddress: InvoiceBuyerAddress = {

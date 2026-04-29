@@ -331,7 +331,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
                 ${orderItems.map(item => `
                   <tr>
                     <td>${item.product_name}</td>
-                    <td>${item.quantity}</td>
+                    <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : item.quantity}</td>
                     <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                   </tr>
                 `).join('')}
@@ -482,7 +482,7 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], us
                   <tr>
                     <td>${item.product_name}</td>
                     <td>${item.product_sku}</td>
-                    <td>${item.quantity}</td>
+                    <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : item.quantity}</td>
                     <td>₹${item.unit_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                     <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                   </tr>

@@ -97,7 +97,10 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                           <p className="text-sm text-foreground-muted">{item.variant_name}</p>
                         )}
                         <p className="text-sm text-foreground-secondary mt-1">
-                          Quantity: {item.quantity} × Rs. {Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          {item.buy_mode === 'weight' || item.buy_mode === 'length'
+                            ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''} × Rs. ${Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/${item.buy_unit}`
+                            : `Quantity: ${item.quantity} × Rs. ${Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                          }
                         </p>
                       </div>
                       <div className="text-right">

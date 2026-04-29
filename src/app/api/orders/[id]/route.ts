@@ -31,7 +31,7 @@ export async function GET(
     }
 
     const orderItems = await queryMany(`
-      SELECT oi.id, oi.product_id, oi.product_name, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price,
+      SELECT oi.id, oi.product_id, oi.product_name, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price, oi.buy_mode, oi.buy_unit,
         json_build_object('slug', p.slug, 'product_images',
           COALESCE(
             (SELECT json_agg(pi ORDER BY pi.display_order)
@@ -65,6 +65,8 @@ export async function GET(
         quantity: item.quantity,
         unitPrice: parseFloat(item.unit_price),
         totalPrice: parseFloat(item.total_price),
+        buyMode: item.buy_mode || 'unit',
+        buyUnit: item.buy_unit || null,
         products: item.products,
       })),
     }

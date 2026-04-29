@@ -59,7 +59,7 @@ export default async function AdminLayout({
   const filteredNavLinks = navLinks.filter(link => hasScope(role, scopes, link.scope))
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col bg-surface-secondary">
       <nav className="bg-secondary-500 dark:bg-secondary-700 text-white shadow-lg">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-14">
@@ -104,7 +104,7 @@ export default async function AdminLayout({
           </div>
         </div>
       </nav>
-      <main className="bg-surface min-h-screen pb-20 md:pb-0">
+      <main className="bg-surface-secondary flex-1 pb-20 md:pb-0">
         {children}
       </main>
     </div>

@@ -208,7 +208,7 @@ function CheckoutReviewPage() {
                         )}
                         <div className="flex items-center justify-between mt-2">
                           <p className="text-sm text-foreground-secondary">
-                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.quantity}
+                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : item.quantity}
                           </p>
                           <p className="text-sm font-semibold text-foreground">
                             ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}

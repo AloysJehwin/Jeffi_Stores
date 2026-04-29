@@ -27,6 +27,8 @@ export interface InvoiceOrderItem {
   cgst_amount: number
   sgst_amount: number
   igst_amount: number
+  buy_mode?: string
+  buy_unit?: string | null
 }
 
 export interface InvoiceOrder {
@@ -338,6 +340,11 @@ export function generateInvoicePDF(
 
       const item = items[i]
       const unitExcl = item.taxable_amount / item.quantity
+      const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+      const qtyLabel = isCustomQty && item.buy_unit
+        ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit}`
+        : `${item.quantity} NOS`
+      const perLabel = isCustomQty && item.buy_unit ? item.buy_unit : 'NOS'
 
       let cx = LM
       const rowData = [
@@ -345,10 +352,10 @@ export function generateInvoicePDF(
         item.product_name,
         item.hsn_code || '',
         `${item.gst_rate} %`,
-        `${item.quantity} NOS`,
+        qtyLabel,
         fmt(item.unit_price),
         fmt(unitExcl),
-        'NOS',
+        perLabel,
         '',
         fmt(item.taxable_amount),
       ]

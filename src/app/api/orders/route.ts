@@ -7,23 +7,20 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secr
 
 export async function GET(request: NextRequest) {
   try {
-    // Get auth token
     const token = cookies().get('auth_token')?.value
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Verify JWT
     let userId: string
     try {
       const { payload } = await jwtVerify(token, JWT_SECRET)
       userId = payload.userId as string
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // Fetch orders with order items and product details
     const orders = await queryMany(`
       SELECT
         o.id, o.order_number, o.created_at, o.status, o.payment_status,
@@ -37,6 +34,7 @@ export async function GET(request: NextRequest) {
             json_build_object(
               'id', oi.id, 'product_id', oi.product_id, 'product_name', oi.product_name,
               'quantity', oi.quantity, 'unit_price', oi.unit_price, 'total_price', oi.total_price,
+              'buy_mode', oi.buy_mode, 'buy_unit', oi.buy_unit,
               'products', json_build_object(
                 'slug', pr.slug,
                 'product_images', COALESCE(
@@ -58,8 +56,7 @@ export async function GET(request: NextRequest) {
     `, [userId])
 
     return NextResponse.json({ orders })
-  } catch (error) {
-    console.error('Error in orders API:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

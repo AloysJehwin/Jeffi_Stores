@@ -296,6 +296,10 @@ export default async function ProductDetailPage({
                 variants={hasVariants ? product.product_variants : []}
                 variantType={product.variant_type || 'Variant'}
                 initialSkuParam={skuParam}
+                weightRate={product.weight_rate ? Number(product.weight_rate) : null}
+                weightUnit={product.weight_unit || null}
+                lengthRate={product.length_rate ? Number(product.length_rate) : null}
+                lengthUnit={product.length_unit || null}
               />
 
               {/* Product Specifications */}

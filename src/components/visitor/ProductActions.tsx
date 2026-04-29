@@ -15,6 +15,13 @@ interface Variant {
   sale_price: number | null
   wholesale_price: number | null
   stock_quantity: number
+  pricing_type?: string
+  unit?: string
+  numeric_value?: number | null
+  weight_rate?: number | null
+  weight_unit?: string | null
+  length_rate?: number | null
+  length_unit?: string | null
 }
 
 interface ProductActionsProps {
@@ -30,12 +37,34 @@ interface ProductActionsProps {
   variants: Variant[]
   variantType: string
   initialSkuParam?: string
+  weightRate?: number | null
+  weightUnit?: string | null
+  lengthRate?: number | null
+  lengthUnit?: string | null
+}
+
+const MODE_LABELS: Record<string, string> = {
+  unit: 'By Piece',
+  weight: 'By Weight',
+  length: 'By Length',
+}
+
+function getPerUnitRate(price: number, numeric_value: number, unit: string): string {
+  if (!price || !numeric_value || numeric_value === 0) return ''
+  let rate = price / numeric_value
+  let label = `/${unit}`
+  if (unit === 'g') {
+    rate = (price / numeric_value) * 100
+    label = '/100g'
+  }
+  return `₹${rate.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${label}`
 }
 
 export default function ProductActions({
   productId, productName, sku, stockQuantity,
   basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
   variants, variantType, initialSkuParam,
+  weightRate, weightUnit, lengthRate, lengthUnit,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast, showConfirm } = useToast()
@@ -46,18 +75,39 @@ export default function ProductActions({
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false)
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [quantity, setQuantity] = useState(1)
+  const [customQty, setCustomQty] = useState('1')
+
+  const pricingTypes = Array.from(new Set(variants.map(v => v.pricing_type || 'unit')))
+  const hasMultipleModes = pricingTypes.length > 1
+
+  const [selectedMode, setSelectedMode] = useState<string>(() => {
+    if (variants.length === 0) return 'unit'
+    if (initialSkuParam) {
+      const match = variants.find(v => v.sku === initialSkuParam)
+      if (match) return match.pricing_type || 'unit'
+    }
+    return pricingTypes[0] || 'unit'
+  })
+
+  const modeVariants = variants.filter(v => (v.pricing_type || 'unit') === selectedMode)
+
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() => {
     if (variants.length === 0) return null
     if (initialSkuParam) {
       const match = variants.find(v => v.sku === initialSkuParam)
       if (match) return match.id
     }
-    return variants[0].id
+    return modeVariants[0]?.id ?? variants[0].id
   })
 
   const hasVariants = variants.length > 0
   const selectedVariant = variants.find(v => v.id === selectedVariantId)
   const displaySku = hasVariants && selectedVariant ? selectedVariant.sku : sku
+
+  useEffect(() => {
+    const first = variants.filter(v => (v.pricing_type || 'unit') === selectedMode)[0]
+    if (first) setSelectedVariantId(first.id)
+  }, [selectedMode])
 
   useEffect(() => {
     if (!hasVariants || !selectedVariant) return
@@ -81,6 +131,69 @@ export default function ProductActions({
     ? Math.round(((effectiveMrp - effectivePrice) / effectiveMrp) * 100)
     : 0
 
+  const perUnitRate = selectedVariant?.pricing_type && selectedVariant.pricing_type !== 'unit'
+    && selectedVariant.numeric_value && selectedVariant.unit
+    ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
+    : null
+
+  const activeWeightRate = hasVariants
+    ? (selectedVariant?.weight_rate ?? null)
+    : (weightRate ?? null)
+  const activeWeightUnit = hasVariants
+    ? (selectedVariant?.weight_unit ?? weightUnit ?? 'kg')
+    : (weightUnit ?? 'kg')
+  const activeLengthRate = hasVariants
+    ? (selectedVariant?.length_rate ?? null)
+    : (lengthRate ?? null)
+  const activeLengthUnit = hasVariants
+    ? (selectedVariant?.length_unit ?? lengthUnit ?? 'm')
+    : (lengthUnit ?? 'm')
+
+  const nonVariantBuyModes: string[] = ['unit']
+  if (!hasVariants) {
+    if (activeWeightRate) nonVariantBuyModes.push('weight')
+    if (activeLengthRate) nonVariantBuyModes.push('length')
+  }
+  const hasNonVariantCustomModes = !hasVariants && nonVariantBuyModes.length > 1
+
+  const [buyMode, setBuyMode] = useState<string>('unit')
+
+  useEffect(() => {
+    setBuyMode('unit')
+    setCustomQty('1')
+    setQuantity(1)
+  }, [selectedVariantId])
+
+  const currentRate = buyMode === 'weight' ? activeWeightRate : buyMode === 'length' ? activeLengthRate : null
+  const currentUnit = buyMode === 'weight' ? activeWeightUnit : buyMode === 'length' ? activeLengthUnit : null
+
+  const variantHasCustomWeight = hasVariants && (activeWeightRate != null)
+  const variantHasCustomLength = hasVariants && (activeLengthRate != null)
+  const variantCustomModes: string[] = hasVariants
+    ? ['unit', ...(variantHasCustomWeight ? ['weight'] : []), ...(variantHasCustomLength ? ['length'] : [])]
+    : []
+  const variantHasMultipleBuyModes = variantCustomModes.length > 1
+
+  const parsedCustomQty = parseFloat(customQty) || 0
+  const customTotal = currentRate ? parsedCustomQty * currentRate : 0
+
+  useEffect(() => {
+    if (buyMode !== 'unit') return
+    setCustomQty('1')
+  }, [buyMode])
+
+  useEffect(() => {
+    if (hasNonVariantCustomModes && !nonVariantBuyModes.includes(buyMode)) {
+      setBuyMode('unit')
+    }
+  }, [weightRate, lengthRate])
+
+  useEffect(() => {
+    if (hasVariants && !variantCustomModes.includes(buyMode)) {
+      setBuyMode('unit')
+    }
+  }, [selectedVariantId])
+
   useEffect(() => {
     setQuantity(1)
   }, [selectedVariantId])
@@ -101,7 +214,12 @@ export default function ProductActions({
   const handleAddToCart = async () => {
     setIsAddingToCart(true)
     try {
-      await addToCart(productId, quantity, selectedVariantId || undefined)
+      const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
+      if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
+        showToast('Enter a valid quantity', 'error')
+        return
+      }
+      await addToCart(productId, finalQty, selectedVariantId || undefined, buyMode, currentUnit || undefined)
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')
@@ -113,7 +231,13 @@ export default function ProductActions({
   const handleBuyNow = async () => {
     setIsBuyingNow(true)
     try {
-      await addToCart(productId, quantity, selectedVariantId || undefined)
+      const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
+      if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
+        showToast('Enter a valid quantity', 'error')
+        setIsBuyingNow(false)
+        return
+      }
+      await addToCart(productId, finalQty, selectedVariantId || undefined, buyMode, currentUnit || undefined)
       router.push('/cart')
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')
@@ -176,29 +300,57 @@ export default function ProductActions({
       </div>
 
       {hasVariants && (
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-2">
-            Select {variantType}
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {variants.map((variant) => (
-              <button
-                key={variant.id}
-                type="button"
-                onClick={() => setSelectedVariantId(variant.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                  selectedVariantId === variant.id
-                    ? 'bg-accent-500 text-white border-accent-500'
-                    : variant.stock_quantity > 0
-                      ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
-                      : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
-                }`}
-                disabled={variant.stock_quantity === 0}
-              >
-                {variant.variant_name}
-                {variant.stock_quantity === 0 && ' (Out of Stock)'}
-              </button>
-            ))}
+        <div className="space-y-3">
+          {hasMultipleModes && (
+            <div>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                Buy by
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {pricingTypes.map(pt => (
+                  <button
+                    key={pt}
+                    type="button"
+                    onClick={() => setSelectedMode(pt)}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                      selectedMode === pt
+                        ? 'bg-primary-600 text-white border-primary-600'
+                        : 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-primary-400'
+                    }`}
+                  >
+                    {MODE_LABELS[pt] || pt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+              {hasMultipleModes
+                ? (selectedMode === 'unit' ? 'Select Variant' : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`)
+                : `Select ${variantType || 'Variant'}`}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {modeVariants.map((variant) => (
+                <button
+                  key={variant.id}
+                  type="button"
+                  onClick={() => setSelectedVariantId(variant.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                    selectedVariantId === variant.id
+                      ? 'bg-accent-500 text-white border-accent-500'
+                      : variant.stock_quantity > 0
+                        ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
+                        : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
+                  }`}
+                  disabled={variant.stock_quantity === 0}
+                >
+                  {variant.variant_name}
+                  {variant.stock_quantity === 0 && ' (Out of Stock)'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -216,6 +368,11 @@ export default function ProductActions({
                 </span>
               )}
             </div>
+            {perUnitRate && (
+              <p className="text-sm font-medium text-accent-600 dark:text-accent-400 mb-2">
+                {perUnitRate}
+              </p>
+            )}
             {mrpDiscount > 0 && (
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
@@ -258,30 +415,83 @@ export default function ProductActions({
         </>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-foreground-secondary mb-2">Quantity</label>
-        <div className="flex items-center border border-border-secondary rounded-lg w-fit">
-          <button
-            onClick={() => setQuantity(Math.max(1, quantity - 1))}
-            disabled={quantity <= 1}
-            className="px-4 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-            </svg>
-          </button>
-          <span className="px-6 py-2 border-x border-border-secondary min-w-[80px] text-center font-semibold">{quantity}</span>
-          <button
-            onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
-            disabled={quantity >= effectiveStock}
-            className="px-4 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
+      {(hasNonVariantCustomModes || variantHasMultipleBuyModes) && (
+        <div>
+          <label className="block text-sm font-medium text-foreground-secondary mb-2">How to buy</label>
+          <div className="flex flex-wrap gap-2">
+            {(hasVariants ? variantCustomModes : nonVariantBuyModes).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setBuyMode(mode)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                  buyMode === mode
+                    ? 'bg-primary-600 text-white border-primary-600'
+                    : 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-primary-400'
+                }`}
+              >
+                {MODE_LABELS[mode] || mode}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {(buyMode === 'weight' || buyMode === 'length') && currentRate ? (
+        <div>
+          <label className="block text-sm font-medium text-foreground-secondary mb-2">
+            Enter quantity ({currentUnit})
+          </label>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden">
+              <input
+                type="number"
+                min="0.001"
+                step="0.001"
+                value={customQty}
+                onChange={e => setCustomQty(e.target.value)}
+                className="w-28 px-3 py-2 text-center font-semibold bg-surface text-foreground focus:outline-none"
+              />
+              <span className="px-3 py-2 bg-surface-secondary text-foreground-secondary text-sm font-medium border-l border-border-secondary">
+                {currentUnit}
+              </span>
+            </div>
+            {parsedCustomQty > 0 && (
+              <div className="text-sm text-foreground-secondary">
+                = <span className="font-semibold text-primary-600 dark:text-primary-400">
+                  Rs. {customTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-xs ml-1">({parsedCustomQty} {currentUnit} × Rs. {currentRate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{currentUnit})</span>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div>
+          <label className="block text-sm font-medium text-foreground-secondary mb-2">Quantity</label>
+          <div className="flex items-center border border-border-secondary rounded-lg w-fit">
+            <button
+              onClick={() => setQuantity(Math.max(1, quantity - 1))}
+              disabled={quantity <= 1}
+              className="px-4 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+              </svg>
+            </button>
+            <span className="px-6 py-2 border-x border-border-secondary min-w-[80px] text-center font-semibold">{quantity}</span>
+            <button
+              onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
+              disabled={quantity >= effectiveStock}
+              className="px-4 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         <button

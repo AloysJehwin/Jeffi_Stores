@@ -9,6 +9,8 @@ interface CartItem {
   variant_id: string | null
   quantity: number
   price_at_addition: number
+  buy_mode: string
+  buy_unit: string | null
   products: {
     id: string
     name: string
@@ -32,6 +34,13 @@ interface CartItem {
     sale_price: number | null
     wholesale_price: number | null
     stock_quantity: number
+    pricing_type?: string
+    unit?: string | null
+    numeric_value?: number | null
+    weight_rate?: number | null
+    weight_unit?: string | null
+    length_rate?: number | null
+    length_unit?: string | null
   } | null
 }
 
@@ -39,7 +48,7 @@ interface CartContextType {
   cartItems: CartItem[]
   cartCount: number
   isLoading: boolean
-  addToCart: (productId: string, quantity?: number, variantId?: string) => Promise<void>
+  addToCart: (productId: string, quantity?: number, variantId?: string, buyMode?: string, buyUnit?: string) => Promise<void>
   removeFromCart: (cartItemId: string) => Promise<void>
   updateQuantity: (cartItemId: string, quantity: number) => Promise<void>
   refreshCart: () => Promise<void>
@@ -85,12 +94,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
-  const addToCart = async (productId: string, quantity = 1, variantId?: string) => {
+  const addToCart = async (productId: string, quantity = 1, variantId?: string, buyMode = 'unit', buyUnit?: string) => {
     try {
       const response = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, quantity, variantId: variantId || null }),
+        body: JSON.stringify({ productId, quantity, variantId: variantId || null, buyMode, buyUnit: buyUnit || null }),
         credentials: 'include',
       })
 
@@ -148,6 +157,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getCartTotal = () => {
     return cartItems.reduce((total, item) => {
+      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
+        return total + item.price_at_addition * item.quantity
+      }
       const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
       return total + price * item.quantity
     }, 0)
@@ -155,6 +167,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getCartTax = () => {
     return cartItems.reduce((tax, item) => {
+      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
+        const gstRate = item.products.gst_percentage || 0
+        const itemTotal = item.price_at_addition * item.quantity
+        return tax + (itemTotal - itemTotal / (1 + gstRate / 100))
+      }
       const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
       const gstRate = item.products.gst_percentage || 0
       const itemTotal = price * item.quantity

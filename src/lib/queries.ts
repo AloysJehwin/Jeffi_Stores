@@ -340,6 +340,7 @@ export async function getOrder(id: string) {
             'variant_name', oi.variant_name, 'quantity', oi.quantity,
             'unit_price', oi.unit_price, 'discount_amount', oi.discount_amount,
             'tax_amount', oi.tax_amount, 'total_price', oi.total_price,
+            'buy_mode', oi.buy_mode, 'buy_unit', oi.buy_unit,
             'created_at', oi.created_at,
             'products', json_build_object('id', pr.id, 'name', pr.name, 'sku', pr.sku)
           )

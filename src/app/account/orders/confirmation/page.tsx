@@ -22,7 +22,10 @@ interface OrderDetails {
     id: string
     productName: string
     quantity: number
-    priceAtPurchase: number
+    unitPrice: number
+    totalPrice: number
+    buyMode?: string
+    buyUnit?: string | null
   }>
 }
 
@@ -118,10 +121,10 @@ function OrderConfirmationPage() {
               <div key={item.id} className="flex justify-between items-center pb-4 border-b border-border-default last:border-b-0">
                 <div className="flex-1">
                   <p className="font-medium text-foreground">{item.productName}</p>
-                  <p className="text-sm text-foreground-secondary">Quantity: {item.quantity}</p>
+                  <p className="text-sm text-foreground-secondary">Quantity: {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : item.quantity}</p>
                 </div>
                 <p className="font-semibold text-foreground">
-                  ₹{(item.priceAtPurchase * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{(item.unitPrice * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>
               </div>
             ))}

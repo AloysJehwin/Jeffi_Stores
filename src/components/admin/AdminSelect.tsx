@@ -23,6 +23,7 @@ interface AdminSelectProps {
   options: SelectOption[]
   onChange?: (value: string) => void
   className?: string
+  compact?: boolean
 }
 
 export default function AdminSelect({
@@ -39,6 +40,7 @@ export default function AdminSelect({
   options,
   onChange,
   className = '',
+  compact = false,
 }: AdminSelectProps) {
   const [internalValue, setInternalValue] = useState(defaultValue)
   const [isOpen, setIsOpen] = useState(false)
@@ -62,7 +64,6 @@ export default function AdminSelect({
     setIsOpen(false)
   }, [isControlled, onChange])
 
-  // Close on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -73,7 +74,6 @@ export default function AdminSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Calculate drop direction when opening
   useEffect(() => {
     if (isOpen && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect()
@@ -84,7 +84,6 @@ export default function AdminSelect({
     }
   }, [isOpen, options.length])
 
-  // Scroll highlighted item into view
   useEffect(() => {
     if (isOpen && highlightedIndex >= 0 && listRef.current) {
       const items = listRef.current.children
@@ -94,7 +93,6 @@ export default function AdminSelect({
     }
   }, [highlightedIndex, isOpen])
 
-  // Keyboard navigation
   function handleKeyDown(e: React.KeyboardEvent) {
     if (disabled) return
 
@@ -135,7 +133,6 @@ export default function AdminSelect({
     }
   }
 
-  // Group detection for rendering group headers
   let lastGroup: string | undefined
 
   return (
@@ -149,11 +146,9 @@ export default function AdminSelect({
         </label>
       )}
 
-      {/* Hidden input for form submission */}
       {name && <input type="hidden" name={name} value={currentValue} />}
 
       <div ref={containerRef} className="relative">
-        {/* Trigger button */}
         <button
           type="button"
           id={id}
@@ -171,7 +166,8 @@ export default function AdminSelect({
             }
           }}
           onKeyDown={handleKeyDown}
-          className={`w-full px-4 py-2.5 bg-surface border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center justify-between gap-2
+          className={`w-full bg-surface border rounded-lg text-left transition-all cursor-pointer flex items-center justify-between
+            ${compact ? 'px-2 py-0.5 text-xs gap-1' : 'px-4 py-2.5 text-sm gap-2'}
             ${isOpen ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-secondary hover:border-border-default'}
             ${error ? 'border-red-400 ring-red-500' : ''}
             ${disabled ? 'opacity-50 cursor-not-allowed bg-surface-secondary' : ''}
@@ -181,7 +177,7 @@ export default function AdminSelect({
             {displayLabel}
           </span>
           <svg
-            className={`w-4 h-4 text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+            className={`text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${compact ? 'w-3 h-3' : 'w-4 h-4'}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -191,16 +187,13 @@ export default function AdminSelect({
           </svg>
         </button>
 
-        {/* Dropdown panel */}
         {isOpen && (
           <div
             ref={dropdownRef}
             className={`absolute z-50 left-0 right-0 bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden
               ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'}
             `}
-            style={{
-              animation: 'adminSelectFadeIn 0.15s ease-out',
-            }}
+            style={{ animation: 'adminSelectFadeIn 0.15s ease-out' }}
           >
             <ul
               ref={listRef}

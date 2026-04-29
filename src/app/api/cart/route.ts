@@ -47,7 +47,10 @@ export async function GET(request: NextRequest) {
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'mrp', pv.mrp, 'sale_price', pv.sale_price,
-            'wholesale_price', pv.wholesale_price, 'stock_quantity', pv.stock_quantity
+            'wholesale_price', pv.wholesale_price, 'stock_quantity', pv.stock_quantity,
+            'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value,
+            'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
+            'length_rate', pv.length_rate, 'length_unit', pv.length_unit
           )
         ELSE NULL END AS variant
       FROM cart_items ci
@@ -65,13 +68,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { productId, quantity = 1, variantId } = body
+    const { productId, quantity = 1, variantId, buyMode = 'unit', buyUnit } = body
 
     const cookieStore = await cookies()
     const { userId } = await resolveUserId(cookieStore)
 
     const product = await queryOne(
-      'SELECT id, base_price, sale_price, stock_quantity FROM products WHERE id = $1',
+      'SELECT id, base_price, sale_price, stock_quantity, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
       [productId]
     )
     if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -81,34 +84,46 @@ export async function POST(request: NextRequest) {
 
     if (variantId) {
       const variant = await queryOne(
-        'SELECT id, price, sale_price, stock_quantity FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
+        'SELECT id, price, sale_price, stock_quantity, weight_rate, weight_unit, length_rate, length_unit FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
         [variantId, productId]
       )
       if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
-      priceAtAddition = variant.sale_price ?? variant.price ?? product.sale_price ?? product.base_price
+      if (buyMode === 'weight') {
+        priceAtAddition = variant.weight_rate ?? product.weight_rate ?? 0
+      } else if (buyMode === 'length') {
+        priceAtAddition = variant.length_rate ?? product.length_rate ?? 0
+      } else {
+        priceAtAddition = variant.sale_price ?? variant.price ?? product.sale_price ?? product.base_price
+      }
       stockToCheck = variant.stock_quantity
     } else {
-      priceAtAddition = product.sale_price || product.base_price
+      if (buyMode === 'weight') {
+        priceAtAddition = product.weight_rate ?? 0
+      } else if (buyMode === 'length') {
+        priceAtAddition = product.length_rate ?? 0
+      } else {
+        priceAtAddition = product.sale_price || product.base_price
+      }
       stockToCheck = product.stock_quantity
     }
 
-    if (stockToCheck < quantity) return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
-
     const existingItem = await queryOne(
-      'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3',
-      [userId, productId, variantId || null]
+      'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3 AND buy_mode = $4',
+      [userId, productId, variantId || null, buyMode]
     )
 
     if (existingItem) {
-      const newQuantity = existingItem.quantity + quantity
-      if (stockToCheck < newQuantity) return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
+      const newQuantity = Number(existingItem.quantity) + Number(quantity)
+      if (buyMode === 'unit' && stockToCheck < newQuantity) return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
       await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [newQuantity, existingItem.id])
       return NextResponse.json({ message: 'Cart updated', quantity: newQuantity })
     }
 
+    if (buyMode === 'unit' && stockToCheck < quantity) return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
+
     await query(
-      'INSERT INTO cart_items (user_id, product_id, variant_id, quantity, price_at_addition) VALUES ($1, $2, $3, $4, $5)',
-      [userId, productId, variantId || null, quantity, priceAtAddition]
+      'INSERT INTO cart_items (user_id, product_id, variant_id, quantity, price_at_addition, buy_mode, buy_unit) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [userId, productId, variantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
     )
     return NextResponse.json({ message: 'Item added to cart' })
   } catch {

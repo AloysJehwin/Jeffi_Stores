@@ -94,9 +94,14 @@ export default function CartPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               {cartItems.map((item) => {
                 const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+                const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                const price = isCustomQty
+                  ? item.price_at_addition
+                  : (item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price)
                 const stockQty = item.variant?.stock_quantity ?? item.products.stock_quantity
-                const itemTotal = price * item.quantity
+                const itemTotal = isCustomQty
+                  ? item.price_at_addition * item.quantity
+                  : price * item.quantity
                 const isUpdating = updatingItems.has(item.id)
 
                 return (
@@ -132,9 +137,9 @@ export default function CartPage() {
 
                         <div className="mt-2 flex items-center gap-4">
                           <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
                           </span>
-                          {item.products.sale_price && (
+                          {!isCustomQty && item.products.sale_price && (
                             <span className="text-sm text-foreground-muted line-through">
                               ₹{item.products.base_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </span>
@@ -150,31 +155,40 @@ export default function CartPage() {
 
                         {/* Quantity Controls */}
                         <div className="mt-4 flex items-center gap-4">
-                          <div className="flex items-center border border-border-secondary rounded-lg">
-                            <button
-                              onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                              disabled={isUpdating || item.quantity <= 1}
-                              className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                              </svg>
-                            </button>
-                            <span className="px-4 py-2 border-x border-border-secondary min-w-[60px] text-center flex items-center justify-center">
-                              {isUpdating ? (
-                                <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full"></div>
-                              ) : item.quantity}
-                            </span>
-                            <button
-                              onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                              disabled={isUpdating || item.quantity >= stockQty}
-                              className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                              </svg>
-                            </button>
-                          </div>
+                          {isCustomQty ? (
+                            <div className="flex items-center gap-2">
+                              <span className="px-3 py-2 border border-border-secondary rounded-lg bg-surface-secondary text-foreground font-semibold text-sm">
+                                {Number(item.quantity).toFixed(3)} {item.buy_unit ?? ''}
+                              </span>
+                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{item.buy_unit}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center border border-border-secondary rounded-lg">
+                              <button
+                                onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                                disabled={isUpdating || item.quantity <= 1}
+                                className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                </svg>
+                              </button>
+                              <span className="px-4 py-2 border-x border-border-secondary min-w-[60px] text-center flex items-center justify-center">
+                                {isUpdating ? (
+                                  <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full"></div>
+                                ) : item.quantity}
+                              </span>
+                              <button
+                                onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                                disabled={isUpdating || item.quantity >= stockQty}
+                                className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
 
                           <button
                             onClick={() => handleRemove(item.id)}

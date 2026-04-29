@@ -325,7 +325,7 @@ function CheckoutPage() {
                           <p className="text-sm text-foreground-muted">{item.variant.variant_name}</p>
                         )}
                         <p className="text-sm text-foreground-secondary mt-1">
-                          ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.quantity}
+                          ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : item.quantity}
                         </p>
                         <p className="text-sm font-semibold text-foreground mt-1">
                           ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
