@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import CustomSelect from './CustomSelect'
 
@@ -29,6 +29,10 @@ interface AddressFormModalProps {
 export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress }: AddressFormModalProps) {
   const { showToast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
+  const [pinLookupState, setPinLookupState] = useState<'idle' | 'loading' | 'found' | 'error'>('idle')
+  const [localities, setLocalities] = useState<string[]>([])
+  const pinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const [formData, setFormData] = useState({
     address_type: 'shipping',
     full_name: '',
@@ -58,6 +62,8 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
         phone: (editAddress.phone || '').replace(/^\+91/, ''),
         is_default: editAddress.is_default,
       })
+      setPinLookupState('found')
+      setLocalities([])
     } else {
       setFormData({
         address_type: 'shipping',
@@ -72,8 +78,38 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
         phone: '',
         is_default: true,
       })
+      setPinLookupState('idle')
+      setLocalities([])
     }
   }, [editAddress, isOpen])
+
+  const handlePincodeChange = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 6)
+    setFormData(prev => ({ ...prev, postal_code: digits, city: '', state: '', address_line2: '' }))
+    setPinLookupState('idle')
+    setLocalities([])
+
+    if (pinDebounceRef.current) clearTimeout(pinDebounceRef.current)
+
+    if (digits.length === 6) {
+      setPinLookupState('loading')
+      pinDebounceRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/pincode/${digits}`)
+          if (res.ok) {
+            const data = await res.json()
+            setFormData(prev => ({ ...prev, city: data.district, state: data.state }))
+            setLocalities(data.postOffices || [])
+            setPinLookupState('found')
+          } else {
+            setPinLookupState('error')
+          }
+        } catch {
+          setPinLookupState('error')
+        }
+      }, 400)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -102,12 +138,14 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
         const data = await response.json()
         showToast(data.error || 'Failed to save address', 'error')
       }
-    } catch (error) {
+    } catch {
       showToast('Failed to save address', 'error')
     } finally {
       setIsSaving(false)
     }
   }
+
+  const pinLookupDone = pinLookupState === 'found'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/30">
@@ -191,23 +229,113 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
                 value={formData.address_line1}
                 onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
                 className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                placeholder="Street address, P.O. box"
+                placeholder="House/Flat No., Street, Area"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="modal_address_line2" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Address Line 2
+              <label htmlFor="modal_postal_code" className="block text-sm font-medium text-foreground-secondary mb-2">
+                PIN Code *
               </label>
-              <input
-                id="modal_address_line2"
-                type="text"
-                value={formData.address_line2}
-                onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
-                className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                placeholder="Apartment, suite, unit, building, floor"
-              />
+              <div className="relative">
+                <input
+                  id="modal_postal_code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={formData.postal_code}
+                  onChange={(e) => handlePincodeChange(e.target.value)}
+                  className="w-full px-4 py-2 pr-10 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  placeholder="6-digit PIN code"
+                  required
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {pinLookupState === 'loading' && (
+                    <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full" />
+                  )}
+                  {pinLookupState === 'found' && (
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                  {pinLookupState === 'error' && (
+                    <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+              {pinLookupState === 'error' && (
+                <p className="mt-1 text-xs text-red-500">PIN code not found. Please check and try again.</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="modal_city" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  City / District *
+                </label>
+                <input
+                  id="modal_city"
+                  type="text"
+                  value={formData.city}
+                  readOnly={pinLookupDone}
+                  onChange={(e) => !pinLookupDone && setFormData({ ...formData, city: e.target.value })}
+                  className={`w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 ${
+                    pinLookupDone ? 'bg-surface-secondary cursor-not-allowed' : 'bg-surface'
+                  }`}
+                  placeholder="Auto-filled from PIN"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="modal_state" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  State *
+                </label>
+                <input
+                  id="modal_state"
+                  type="text"
+                  value={formData.state}
+                  readOnly={pinLookupDone}
+                  onChange={(e) => !pinLookupDone && setFormData({ ...formData, state: e.target.value })}
+                  className={`w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 ${
+                    pinLookupDone ? 'bg-surface-secondary cursor-not-allowed' : 'bg-surface'
+                  }`}
+                  placeholder="Auto-filled from PIN"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="modal_address_line2" className="block text-sm font-medium text-foreground-secondary mb-2">
+                Locality / Village
+              </label>
+              {localities.length > 0 ? (
+                <div className="flex gap-2">
+                  <select
+                    id="modal_address_line2"
+                    value={formData.address_line2}
+                    onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
+                    className="flex-1 px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  >
+                    <option value="">Select locality</option>
+                    {localities.map((loc) => (
+                      <option key={loc} value={loc}>{loc}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <input
+                  id="modal_address_line2"
+                  type="text"
+                  value={formData.address_line2}
+                  onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
+                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  placeholder="Area, Colony, Village"
+                />
+              )}
             </div>
 
             <div>
@@ -222,48 +350,6 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
                 className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
                 placeholder="Nearby landmark"
               />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="modal_city" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  City *
-                </label>
-                <input
-                  id="modal_city"
-                  type="text"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="modal_state" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  State *
-                </label>
-                <input
-                  id="modal_state"
-                  type="text"
-                  value={formData.state}
-                  onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="modal_postal_code" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  PIN Code *
-                </label>
-                <input
-                  id="modal_postal_code"
-                  type="text"
-                  value={formData.postal_code}
-                  onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                  required
-                />
-              </div>
             </div>
 
             <div className="flex items-center gap-2">

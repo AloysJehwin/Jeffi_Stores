@@ -175,7 +175,8 @@ export function generateInvoicePDF(
   items: InvoiceOrderItem[],
   business: InvoiceBusinessSettings,
   buyerAddress: InvoiceBuyerAddress,
-  billingAddress?: InvoiceBuyerAddress
+  billingAddress?: InvoiceBuyerAddress,
+  isCancelled?: boolean
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 28 })
@@ -634,6 +635,20 @@ export function generateInvoicePDF(
     doc.font(F).fontSize(7).text('SUBJECT TO RAIPUR JURISDICTION', LM, y, { width: pw, align: 'center' })
     y += 10
     doc.font(F).fontSize(6.5).text('This is a Computer Generated Invoice', LM, y, { width: pw, align: 'center' })
+
+    if (isCancelled) {
+      const pageW = 595.28
+      const pageH = 841.89
+      const cx = pageW / 2
+      const cy = pageH / 2
+      doc.save()
+      doc.translate(cx, cy)
+      doc.rotate(-45)
+      doc.strokeColor('#cc0000').lineWidth(3).rect(-160, -42, 320, 84).stroke()
+      doc.font('Helvetica-Bold').fontSize(64).fillColor('#cc0000').fillOpacity(0.18)
+      doc.text('CANCELLED', -160, -30, { width: 320, align: 'center', lineBreak: false })
+      doc.restore()
+    }
 
     doc.end()
   })
