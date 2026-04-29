@@ -147,7 +147,7 @@ export default function CartPage() {
                         </div>
 
                         {/* Stock Status */}
-                        {stockQty < item.quantity && (
+                        {stockQty < Number(item.quantity) && (
                           <p className="text-sm text-red-600 dark:text-red-400 mt-2">
                             Only {stockQty} left in stock
                           </p>
