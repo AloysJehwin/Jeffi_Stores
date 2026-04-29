@@ -45,7 +45,7 @@ export async function GET(
       [orderId]
     )
 
-    if (invoiceRecord?.pdf_url) {
+    if (invoiceRecord?.pdf_url && order.status !== 'cancelled') {
       return NextResponse.redirect(invoiceRecord.pdf_url)
     }
 
@@ -142,21 +142,27 @@ export async function GET(
       }
     }
 
-    const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress)
+    const isCancelled = order.status === 'cancelled'
 
-    const fy = getFinancialYear(new Date(order.invoice_date || order.created_at))
-    const s3Url = await uploadInvoicePDF(pdfBuffer, order.invoice_number, fy)
-
-    await query(
-      'UPDATE invoices SET pdf_url = $1 WHERE order_id = $2',
-      [s3Url, orderId]
-    )
+    const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, isCancelled)
 
     const safeFileName = order.invoice_number.replace(/\//g, '-')
+    const downloadName = isCancelled ? `${safeFileName}-CANCELLED.pdf` : `${safeFileName}.pdf`
+
+    if (!isCancelled) {
+      const fy = getFinancialYear(new Date(order.invoice_date || order.created_at))
+      const s3Url = await uploadInvoicePDF(pdfBuffer, order.invoice_number, fy)
+
+      await query(
+        'UPDATE invoices SET pdf_url = $1 WHERE order_id = $2',
+        [s3Url, orderId]
+      )
+    }
+
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${safeFileName}.pdf"`,
+        'Content-Disposition': `attachment; filename="${downloadName}"`,
         'Content-Length': String(pdfBuffer.length),
       },
     })
