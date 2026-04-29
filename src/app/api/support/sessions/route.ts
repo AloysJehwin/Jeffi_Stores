@@ -55,9 +55,9 @@ export async function POST(request: NextRequest) {
         []
       )
       const adminEmails = admins.map((a: any) => a.email)
-      try {
-        await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id, adminEmails)
-      } catch {}
+      const fallback = process.env.ADMIN_EMAIL
+      if (fallback && !adminEmails.includes(fallback)) adminEmails.push(fallback)
+      await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id, adminEmails)
     }
 
     return NextResponse.json({ session })
