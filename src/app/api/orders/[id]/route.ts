@@ -54,6 +54,7 @@ export async function GET(
       status: order.status,
       paymentStatus: order.payment_status,
       createdAt: order.created_at,
+      updatedAt: order.updated_at,
       deliveredAt: order.delivered_at || null,
       notes: order.notes,
       trackingUrl: order.tracking_url || null,
@@ -175,6 +176,10 @@ export async function PATCH(
       updates.push(`tracking_url = $${paramIndex}`)
       values.push(tracking_url.trim())
       paramIndex++
+    }
+
+    if (status === 'delivered') {
+      updates.push(`delivered_at = NOW()`)
     }
 
     values.push(orderId)

@@ -42,6 +42,7 @@ interface OrderDetails {
   status: string
   paymentStatus: string
   createdAt: string
+  updatedAt: string
   deliveredAt: string | null
   notes: string | null
   trackingUrl: string | null
@@ -349,14 +350,16 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   if (!user) return null
 
   const canReturn = order?.status === 'delivered' && !returnRequest && (() => {
-    if (!order.deliveredAt) return false
-    const expiry = new Date(order.deliveredAt).getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000
+    const deliveryDate = order.deliveredAt || order.updatedAt
+    if (!deliveryDate) return false
+    const expiry = new Date(deliveryDate).getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000
     return Date.now() <= expiry
   })()
 
   const returnWindowExpired = order?.status === 'delivered' && !returnRequest && (() => {
-    if (!order.deliveredAt) return false
-    const expiry = new Date(order.deliveredAt).getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000
+    const deliveryDate = order.deliveredAt || order.updatedAt
+    if (!deliveryDate) return false
+    const expiry = new Date(deliveryDate).getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000
     return Date.now() > expiry
   })()
 
