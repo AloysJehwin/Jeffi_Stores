@@ -54,6 +54,7 @@ export default async function AdminLayout({
     { href: '/admin/orders', label: 'Orders', scope: 'orders' },
     { href: '/admin/customers', label: 'Customers', scope: 'customers' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews' },
+    { href: '/admin/inflation', label: 'Inflation', scope: 'settings' },
     { href: '/admin/settings', label: 'Settings', scope: 'settings' },
   ]
 
@@ -62,10 +63,10 @@ export default async function AdminLayout({
   const usernameInitial = (session?.username || 'A')[0].toUpperCase()
 
   return (
-    <div className="min-h-screen flex flex-row bg-surface-secondary">
+    <div className="h-screen overflow-hidden flex flex-row bg-surface-secondary">
       {/* Left sidebar — desktop only */}
-      <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white sticky top-0 h-screen">
-        <div className="flex items-center gap-2 px-4 py-4 border-b border-white/10">
+      <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto">
+        <div className="flex items-center gap-2 px-4 h-12 border-b border-white/10 shrink-0">
           <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
           </svg>
@@ -115,7 +116,7 @@ export default async function AdminLayout({
           </div>
         </div>
 
-        <main className="flex-1 bg-surface-secondary">
+        <main className="flex-1 bg-surface-secondary overflow-y-auto">
           {children}
         </main>
       </div>

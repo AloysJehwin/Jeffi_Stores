@@ -100,6 +100,20 @@ function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string):
   }
 }
 
+function toInclusive(val: string, rate: number, mode: 'inclusive' | 'exclusive'): string {
+  const n = parseFloat(val)
+  if (!val || isNaN(n)) return val
+  if (mode === 'exclusive') return String(Math.round(n * (1 + rate / 100) * 100) / 100)
+  return val
+}
+
+function inclusivePreview(val: string, rate: number, mode: 'inclusive' | 'exclusive'): string | null {
+  if (mode !== 'exclusive') return null
+  const n = parseFloat(val)
+  if (!val || isNaN(n) || n <= 0) return null
+  return `= ₹${(Math.round(n * (1 + rate / 100) * 100) / 100).toFixed(2)} incl. GST`
+}
+
 export default function ProductForm({ categories, brands, action, product, productId }: ProductFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -116,6 +130,13 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [lengthRate, setLengthRate] = useState(product?.length_rate != null ? String(product.length_rate) : '')
   const [lengthUnit, setLengthUnit] = useState(product?.length_unit || 'm')
   const [lengthEnabled, setLengthEnabled] = useState(product?.length_rate != null)
+  const [gstMode, setGstMode] = useState<'inclusive' | 'exclusive'>('inclusive')
+  const [gstRate, setGstRate] = useState<number>(product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18)
+
+  const [basePrice, setBasePrice] = useState(product?.base_price != null ? String(product.base_price) : '')
+  const [mrp, setMrp] = useState(product?.mrp != null ? String(product.mrp) : '')
+  const [salePrice, setSalePrice] = useState(product?.sale_price != null ? String(product.sale_price) : '')
+  const [wholesalePrice, setWholesalePrice] = useState(product?.wholesale_price != null ? String(product.wholesale_price) : '')
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
     if (product?.product_variants && product.product_variants.length > 0) {
@@ -240,9 +261,26 @@ export default function ProductForm({ categories, brands, action, product, produ
       formData.set('weight_unit', weightEnabled ? weightUnit : '')
       formData.set('length_rate', lengthEnabled ? lengthRate : '')
       formData.set('length_unit', lengthEnabled ? lengthUnit : '')
+
+      if (!hasVariants) {
+        formData.set('base_price', toInclusive(basePrice, gstRate, gstMode))
+        formData.set('mrp', toInclusive(mrp, gstRate, gstMode))
+        formData.set('sale_price', toInclusive(salePrice, gstRate, gstMode))
+        formData.set('wholesale_price', toInclusive(wholesalePrice, gstRate, gstMode))
+      }
+
       if (hasVariants) {
         formData.set('variant_type', variantType)
-        formData.set('variants_json', JSON.stringify(variants))
+        const convertedVariants = variants.map(v => ({
+          ...v,
+          price: toInclusive(v.price, gstRate, gstMode),
+          mrp: toInclusive(v.mrp, gstRate, gstMode),
+          sale_price: toInclusive(v.sale_price, gstRate, gstMode),
+          wholesale_price: toInclusive(v.wholesale_price, gstRate, gstMode),
+          weight_rate: v.weight_rate_on ? toInclusive(v.weight_rate, gstRate, gstMode) : v.weight_rate,
+          length_rate: v.length_rate_on ? toInclusive(v.length_rate, gstRate, gstMode) : v.length_rate,
+        }))
+        formData.set('variants_json', JSON.stringify(convertedVariants))
       }
 
       await action(formData)
@@ -385,7 +423,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           {!hasVariants && (
           <div>
             <label htmlFor="mrp" className="block text-sm font-medium text-foreground-secondary mb-2">
-              MRP (Rs.)
+              MRP (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
             </label>
             <input
               type="number"
@@ -393,10 +431,14 @@ export default function ProductForm({ categories, brands, action, product, produ
               name="mrp"
               step="0.01"
               min="0"
-              defaultValue={product?.mrp}
+              value={mrp}
+              onChange={e => setMrp(e.target.value)}
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Maximum Retail Price"
             />
+            {inclusivePreview(mrp, gstRate, gstMode) && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(mrp, gstRate, gstMode)}</p>
+            )}
           </div>
           )}
 
@@ -404,7 +446,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           {!hasVariants && (
             <div>
               <label htmlFor="base_price" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Selling Price (Rs.) *
+                Selling Price (Rs.) * {gstMode === 'exclusive' ? '(excl. GST)' : '(incl. GST)'}
               </label>
               <input
                 type="number"
@@ -413,34 +455,69 @@ export default function ProductForm({ categories, brands, action, product, produ
                 required={!hasVariants}
                 step="0.01"
                 min="0"
-                defaultValue={product?.base_price}
+                value={basePrice}
+                onChange={e => setBasePrice(e.target.value)}
                 className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                placeholder="Price incl. GST"
+                placeholder={gstMode === 'exclusive' ? 'Price excl. GST' : 'Price incl. GST'}
               />
-              <p className="text-xs text-foreground-muted mt-1">GST-inclusive price the customer pays</p>
+              {inclusivePreview(basePrice, gstRate, gstMode)
+                ? <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(basePrice, gstRate, gstMode)}</p>
+                : <p className="text-xs text-foreground-muted mt-1">GST-inclusive price the customer pays</p>
+              }
             </div>
           )}
 
-          {/* GST Rate */}
-          <AdminSelect
-            id="gst_percentage"
-            name="gst_percentage"
-            label="GST Rate *"
-            defaultValue={product?.gst_percentage != null ? String(parseFloat(product.gst_percentage)) : '18'}
-            options={[
-              { value: '0', label: '0% GST' },
-              { value: '5', label: '5% GST' },
-              { value: '12', label: '12% GST' },
-              { value: '18', label: '18% GST' },
-              { value: '28', label: '28% GST' },
-            ]}
-          />
+          {/* GST Rate + Entry Mode */}
+          <div className="md:col-span-2">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex-1 min-w-[140px]">
+                <AdminSelect
+                  id="gst_percentage"
+                  name="gst_percentage"
+                  label="GST Rate *"
+                  value={String(gstRate)}
+                  onChange={(v) => setGstRate(parseFloat(v))}
+                  options={[
+                    { value: '0', label: '0% GST' },
+                    { value: '5', label: '5% GST' },
+                    { value: '12', label: '12% GST' },
+                    { value: '18', label: '18% GST' },
+                    { value: '28', label: '28% GST' },
+                  ]}
+                />
+              </div>
+              <div className="pb-0.5">
+                <p className="text-xs font-medium text-foreground-secondary mb-1.5">Price entry mode</p>
+                <div className="flex rounded-lg border border-border-secondary overflow-hidden text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setGstMode('inclusive')}
+                    className={`px-3 py-1.5 transition-colors ${gstMode === 'inclusive' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-elevated'}`}
+                  >
+                    GST Inclusive
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGstMode('exclusive')}
+                    className={`px-3 py-1.5 transition-colors ${gstMode === 'exclusive' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-elevated'}`}
+                  >
+                    GST Exclusive
+                  </button>
+                </div>
+              </div>
+            </div>
+            {gstMode === 'exclusive' && gstRate > 0 && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1.5">
+                Prices will be converted to inclusive before saving (×{(1 + gstRate / 100).toFixed(2)})
+              </p>
+            )}
+          </div>
 
           {/* Sale Price — hidden when has variants */}
           {!hasVariants && (
           <div>
             <label htmlFor="sale_price" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Sale Price (Rs.)
+              Sale Price (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
             </label>
             <input
               type="number"
@@ -448,10 +525,14 @@ export default function ProductForm({ categories, brands, action, product, produ
               name="sale_price"
               step="0.01"
               min="0"
-              defaultValue={product?.sale_price}
+              value={salePrice}
+              onChange={e => setSalePrice(e.target.value)}
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Discounted price (optional)"
             />
+            {inclusivePreview(salePrice, gstRate, gstMode) && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(salePrice, gstRate, gstMode)}</p>
+            )}
           </div>
           )}
 
@@ -459,7 +540,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           {!hasVariants && (
           <div>
             <label htmlFor="wholesale_price" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Wholesale Price (Rs.)
+              Wholesale Price (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
             </label>
             <input
               type="number"
@@ -467,10 +548,14 @@ export default function ProductForm({ categories, brands, action, product, produ
               name="wholesale_price"
               step="0.01"
               min="0"
-              defaultValue={product?.wholesale_price}
+              value={wholesalePrice}
+              onChange={e => setWholesalePrice(e.target.value)}
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Bulk price (optional)"
             />
+            {inclusivePreview(wholesalePrice, gstRate, gstMode) && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(wholesalePrice, gstRate, gstMode)}</p>
+            )}
           </div>
           )}
 
@@ -823,12 +908,13 @@ export default function ProductForm({ categories, brands, action, product, produ
 
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price *</label>
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price {gstMode === 'exclusive' ? '(excl. GST) *' : '*'}</label>
                                   <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => updateVariant(index, 'price', e.target.value)} className={inputCls} placeholder="0.00" required />
                                   {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
+                                  {inclusivePreview(variant.price, gstRate, gstMode) && <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{inclusivePreview(variant.price, gstRate, gstMode)}</p>}
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP</label>
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP {gstMode === 'exclusive' ? '(excl.)' : ''}</label>
                                   <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className={inputCls} placeholder="0.00" />
                                 </div>
                                 <div>

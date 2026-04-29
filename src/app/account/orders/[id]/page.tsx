@@ -6,6 +6,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
+import CustomSelect from '@/components/visitor/CustomSelect'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
@@ -131,7 +132,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   } | null>(null)
   const [showReturnForm, setShowReturnForm] = useState(false)
   const [returnType, setReturnType] = useState<'refund' | 'replacement'>('refund')
-  const [returnReason, setReturnReason] = useState('defective')
+  const [returnReason, setReturnReason] = useState('')
   const [returnDescription, setReturnDescription] = useState('')
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false)
   const [returnError, setReturnError] = useState('')
@@ -234,6 +235,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     setIsSubmittingReturn(true)
     setReturnError('')
     setReturnSuccess('')
+    if (!returnReason) {
+      setReturnError('Please select a reason.')
+      return
+    }
     try {
       const response = await fetch(`/api/orders/${params.id}/return`, {
         method: 'POST',
@@ -685,17 +690,18 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-1">Reason</label>
-                    <select
+                    <CustomSelect
                       value={returnReason}
-                      onChange={e => setReturnReason(e.target.value)}
-                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                    >
-                      <option value="defective">Defective product</option>
-                      <option value="wrong_item">Wrong item sent</option>
-                      <option value="not_as_described">Not as described</option>
-                      <option value="damaged">Damaged in transit</option>
-                      <option value="other">Other</option>
-                    </select>
+                      placeholder="Select a reason…"
+                      options={[
+                        { value: 'defective', label: 'Defective product' },
+                        { value: 'wrong_item', label: 'Wrong item sent' },
+                        { value: 'not_as_described', label: 'Not as described' },
+                        { value: 'damaged', label: 'Damaged in transit' },
+                        { value: 'other', label: 'Other' },
+                      ]}
+                      onChange={val => setReturnReason(val)}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-1">Description <span className="text-foreground-muted">(optional)</span></label>
