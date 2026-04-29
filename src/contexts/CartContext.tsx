@@ -58,17 +58,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const fetchCart = async () => {
     try {
-      console.log('Fetching cart...')
-      const response = await fetch('/api/cart')
+      const response = await fetch('/api/cart', { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
-        console.log('Cart data received:', data)
         setCartItems(data.items || [])
-      } else {
-        console.error('Cart fetch failed:', response.status, response.statusText)
       }
-    } catch (error) {
-      console.error('Failed to fetch cart:', error)
+    } catch {
     } finally {
       setIsLoading(false)
     }
@@ -78,11 +73,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     fetchCart()
   }, [])
 
-  // Re-fetch cart when user changes (login/logout)
   useEffect(() => {
     const currentUserId = user?.id ?? null
     if (prevUserIdRef.current === undefined) {
-      // Initial mount — skip, the [] effect handles it
       prevUserIdRef.current = currentUserId
       return
     }
@@ -98,6 +91,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId, quantity, variantId: variantId || null }),
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -107,7 +101,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || 'Failed to add to cart')
       }
     } catch (error) {
-      console.error('Add to cart error:', error)
       throw error
     }
   }
@@ -116,6 +109,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/cart?id=${cartItemId}`, {
         method: 'DELETE',
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -124,7 +118,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         throw new Error('Failed to remove from cart')
       }
     } catch (error) {
-      console.error('Remove from cart error:', error)
       throw error
     }
   }
@@ -135,6 +128,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cartItemId, quantity }),
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -144,7 +138,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         throw new Error(data.error || 'Failed to update quantity')
       }
     } catch (error) {
-      console.error('Update quantity error:', error)
       throw error
     }
   }
@@ -174,7 +167,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCartItems([])
   }
 
-  const cartCount = cartItems.reduce((count, item) => count + item.quantity, 0)
+  const cartCount = cartItems.length
 
   return (
     <CartContext.Provider
