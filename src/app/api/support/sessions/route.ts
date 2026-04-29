@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const existing = await queryOne(
-      `SELECT id FROM support_sessions WHERE user_id = $1 AND status = 'open' LIMIT 1`,
+      `SELECT id, status, created_at FROM support_sessions WHERE user_id = $1 AND status = 'open' LIMIT 1`,
       [authUser.userId]
     )
     if (existing) {
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ session })
-  } catch {
-    return NextResponse.json({ error: 'Failed' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Failed to create session' }, { status: 500 })
   }
 }

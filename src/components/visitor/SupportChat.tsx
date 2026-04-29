@@ -127,15 +127,19 @@ export default function SupportChat() {
     try {
       const res = await fetch('/api/support/sessions', { method: 'POST', credentials: 'include' })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      if (res.status === 401) {
+        showToast('Please sign in to connect to a support agent.', 'error')
+        return
+      }
+      if (!res.ok) throw new Error(data.error || `Server error (${res.status})`)
       setSession(data.session)
       setMode('live')
       setShowConnectPrompt(false)
       setMessages([{ id: 'live-start', sender: 'bot', message: 'You are now connected to the support queue. A support agent will join shortly.' }])
       lastMessageIdRef.current = null
       showToast('Support agent notified. We will respond shortly.', 'success')
-    } catch {
-      showToast('Failed to connect. Please try again.', 'error')
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to connect. Please try again.', 'error')
     } finally {
       setIsConnecting(false)
     }

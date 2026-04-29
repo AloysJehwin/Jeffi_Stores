@@ -147,6 +147,12 @@ CREATE TABLE products (
     views_count INT DEFAULT 0,
     sales_count INT DEFAULT 0,
 
+    -- Custom quantity selling rates (null = mode not available)
+    weight_rate DECIMAL(12,2),    -- price per weight unit
+    weight_unit VARCHAR(10),       -- kg | g | lb
+    length_rate DECIMAL(12,2),    -- price per length unit
+    length_unit VARCHAR(10),       -- m | cm | mm | ft
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
@@ -202,6 +208,13 @@ CREATE TABLE product_variants (
     mpn VARCHAR(100),          -- Manufacturer Part Number
     gtin VARCHAR(50),          -- GTIN/EAN/barcode
     attributes JSONB, -- {"size": "M10", "length": "50mm", "grade": "8.8"}
+    pricing_type VARCHAR(20) NOT NULL DEFAULT 'unit', -- unit | weight | length
+    unit VARCHAR(20),           -- kg, g, lb, m, cm, mm, ft, pcs
+    numeric_value DECIMAL(10, 3), -- quantity this variant represents (e.g. 500 for 500g)
+    weight_rate DECIMAL(12,2),    -- price per weight unit for custom-quantity buying
+    weight_unit VARCHAR(10),       -- kg | g | lb
+    length_rate DECIMAL(12,2),    -- price per length unit for custom-quantity buying
+    length_unit VARCHAR(10),       -- m | cm | mm | ft
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -254,8 +267,10 @@ CREATE TABLE cart_items (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     product_id UUID REFERENCES products(id) ON DELETE CASCADE,
     variant_id UUID REFERENCES product_variants(id) ON DELETE CASCADE,
-    quantity INT NOT NULL DEFAULT 1,
+    quantity DECIMAL(10,3) NOT NULL DEFAULT 1,
     price_at_addition DECIMAL(12, 2) NOT NULL,
+    buy_mode VARCHAR(10) NOT NULL DEFAULT 'unit',  -- unit | weight | length
+    buy_unit VARCHAR(10),                           -- kg, m, etc. for weight/length mode
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
@@ -336,7 +351,7 @@ CREATE TABLE order_items (
     product_sku VARCHAR(100),
     variant_name VARCHAR(255),
 
-    quantity INT NOT NULL,
+    quantity DECIMAL(10,3) NOT NULL,
     unit_price DECIMAL(12, 2) NOT NULL,
     discount_amount DECIMAL(12, 2) DEFAULT 0,
     tax_amount DECIMAL(12, 2) DEFAULT 0,
@@ -349,6 +364,8 @@ CREATE TABLE order_items (
     cgst_amount DECIMAL(12, 2) DEFAULT 0,
     sgst_amount DECIMAL(12, 2) DEFAULT 0,
     igst_amount DECIMAL(12, 2) DEFAULT 0,
+    buy_mode VARCHAR(10) NOT NULL DEFAULT 'unit',  -- unit | weight | length
+    buy_unit VARCHAR(10),                           -- kg, m, etc.
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
