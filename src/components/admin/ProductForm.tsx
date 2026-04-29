@@ -846,14 +846,29 @@ export default function ProductForm({ categories, brands, action, product, produ
                           <span className="text-sm font-semibold text-foreground">
                             {PRICING_TYPE_LABELS[group.pricing_type]}
                           </span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             <span className="text-xs text-foreground-muted">Unit:</span>
-                            <AdminSelect
-                              value={group.unit}
-                              onChange={(val) => updateGroupUnit(group.pricing_type, val)}
-                              options={unitOptions.map(u => ({ value: u, label: u }))}
-                              className="w-24"
-                            />
+                            <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const idx = unitOptions.indexOf(group.unit)
+                                  updateGroupUnit(group.pricing_type, unitOptions[(idx - 1 + unitOptions.length) % unitOptions.length])
+                                }}
+                                className="px-2 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none"
+                              >‹</button>
+                              <span className="px-2 py-1.5 text-sm font-medium text-foreground min-w-[2.5rem] text-center border-x border-border-secondary">
+                                {group.unit}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const idx = unitOptions.indexOf(group.unit)
+                                  updateGroupUnit(group.pricing_type, unitOptions[(idx + 1) % unitOptions.length])
+                                }}
+                                className="px-2 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none"
+                              >›</button>
+                            </div>
                           </div>
                         </div>
                       </div>
