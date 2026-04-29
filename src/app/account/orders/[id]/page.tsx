@@ -127,7 +127,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [returnRequest, setReturnRequest] = useState<{
     id: string; type: string; status: string; reason: string;
     description?: string | null; admin_notes?: string | null;
-    replacement_order_id?: string | null;
+    replacement_order_id?: string | null; replacement_order_number?: string | null;
   } | null>(null)
   const [showReturnForm, setShowReturnForm] = useState(false)
   const [returnType, setReturnType] = useState<'refund' | 'replacement'>('refund')
