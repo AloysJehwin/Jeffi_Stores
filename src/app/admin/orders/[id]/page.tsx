@@ -78,6 +78,16 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             }`}>
               Status: {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status === 'cancel_rejected' ? 'Cancellation Rejected' : order.status.replace(/_/g, ' ')}
             </span>
+            <a
+              href={`/api/admin/packing-slips/${order.id}`}
+              download
+              className="px-4 py-2 text-sm font-semibold rounded-full bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 transition-colors inline-flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              Packing Slip
+            </a>
             {!order.original_order_id && (order.invoice_number ? (
               <a
                 href={`/api/orders/${order.id}/invoice`}

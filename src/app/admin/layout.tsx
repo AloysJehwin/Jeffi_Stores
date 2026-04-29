@@ -52,6 +52,8 @@ export default async function AdminLayout({
     { href: '/admin/categories', label: 'Categories', scope: 'categories' },
     { href: '/admin/brands', label: 'Brands', scope: 'brands' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders' },
+    { href: '/admin/packing-slips', label: 'Packing Slips', scope: 'orders' },
+    { href: '/admin/scan', label: 'QuickScan', scope: 'orders', mobileOnly: true },
     { href: '/admin/customers', label: 'Customers', scope: 'customers' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews' },
     { href: '/admin/inflation', label: 'Inflation', scope: 'settings' },
@@ -59,6 +61,7 @@ export default async function AdminLayout({
   ]
 
   const filteredNavLinks = navLinks.filter(link => hasScope(role, scopes, link.scope))
+  const desktopNavLinks = filteredNavLinks.filter(link => !('mobileOnly' in link && link.mobileOnly))
 
   const usernameInitial = (session?.username || 'A')[0].toUpperCase()
 
@@ -73,7 +76,7 @@ export default async function AdminLayout({
           <span className="text-base font-bold">Jeffi Admin</span>
         </div>
 
-        <AdminSidebarNav navLinks={filteredNavLinks} />
+        <AdminSidebarNav navLinks={desktopNavLinks} />
       </aside>
 
       {/* Right column: top bar + content */}

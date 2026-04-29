@@ -52,7 +52,9 @@ export async function middleware(request: NextRequest) {
   if (isAdminPath) {
     const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:') ||
                        hostname === '127.0.0.1' || hostname.startsWith('127.0.0.1:') ||
-                       hostname.startsWith('app:')
+                       hostname.startsWith('app:') ||
+                       hostname.startsWith('192.168.') || hostname.startsWith('10.') ||
+                       hostname.endsWith('.ngrok-free.app') || hostname.endsWith('.ngrok-free.dev')
 
     if (pathname === '/admin/login') {
       const response = NextResponse.next()
