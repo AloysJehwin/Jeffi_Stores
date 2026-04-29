@@ -212,7 +212,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           )}
 
-          {(order.status === 'cancelled' || order.status === 'returned') && order.payment_status === 'paid' && (
+          {(order.status === 'cancelled' || order.status === 'returned') && order.payment_status === 'paid' && returnRequest?.type !== 'replacement' && (
             <InitiateRefundButton
               orderId={order.id}
               orderNumber={order.order_number || order.id.slice(0, 8)}
