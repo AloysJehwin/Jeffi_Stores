@@ -192,7 +192,7 @@ export async function POST(
 
         await withTransaction(async (client) => {
           await client.query(
-            `UPDATE orders SET status = 'returned', updated_at = NOW() WHERE id = $1`,
+            `UPDATE orders SET status = 'returned', payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
             [orderId]
           )
           await client.query(
@@ -206,7 +206,8 @@ export async function POST(
           for (const item of itemsResult.rows) {
             await client.query(
               'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-[parseFloat(item.quantity), item.product_id]            )
+              [parseFloat(item.quantity), item.product_id]
+            )
           }
         })
 

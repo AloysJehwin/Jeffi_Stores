@@ -178,7 +178,8 @@ export function generateInvoicePDF(
   business: InvoiceBusinessSettings,
   buyerAddress: InvoiceBuyerAddress,
   billingAddress?: InvoiceBuyerAddress,
-  isCancelled?: boolean
+  isCancelled?: boolean,
+  voidLabel?: string
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 28 })
@@ -648,12 +649,13 @@ export function generateInvoicePDF(
       const pageH = 841.89
       const cx = pageW / 2
       const cy = pageH / 2
+      const label = voidLabel ?? 'CANCELLED'
       doc.save()
       doc.translate(cx, cy)
       doc.rotate(-45)
       doc.strokeColor('#cc0000').lineWidth(3).rect(-200, -36, 400, 72).stroke()
       doc.font('Helvetica-Bold').fontSize(52).fillColor('#cc0000').fillOpacity(0.18)
-      doc.text('CANCELLED', -200, -24, { width: 400, align: 'center', lineBreak: false })
+      doc.text(label, -200, -24, { width: 400, align: 'center', lineBreak: false })
       doc.restore()
     }
 
