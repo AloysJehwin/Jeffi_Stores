@@ -31,8 +31,10 @@ interface VariantRow {
   numeric_value: string
   weight_rate: string
   weight_unit: string
+  weight_rate_on: boolean
   length_rate: string
   length_unit: string
+  length_rate_on: boolean
   _isDeleted?: boolean
 }
 
@@ -93,8 +95,8 @@ function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string):
     variant_name: '', price: '', mrp: '', sale_price: '', wholesale_price: '',
     stock_quantity: '0', mpn: '', gtin: '',
     pricing_type, unit, numeric_value: '',
-    weight_rate: '', weight_unit: 'kg',
-    length_rate: '', length_unit: 'm',
+    weight_rate: '', weight_unit: 'kg', weight_rate_on: false,
+    length_rate: '', length_unit: 'm', length_rate_on: false,
   }
 }
 
@@ -110,8 +112,10 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [variantType, setVariantType] = useState(product?.variant_type ?? '')
   const [weightRate, setWeightRate] = useState(product?.weight_rate != null ? String(product.weight_rate) : '')
   const [weightUnit, setWeightUnit] = useState(product?.weight_unit || 'kg')
+  const [weightEnabled, setWeightEnabled] = useState(product?.weight_rate != null)
   const [lengthRate, setLengthRate] = useState(product?.length_rate != null ? String(product.length_rate) : '')
   const [lengthUnit, setLengthUnit] = useState(product?.length_unit || 'm')
+  const [lengthEnabled, setLengthEnabled] = useState(product?.length_rate != null)
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
     if (product?.product_variants && product.product_variants.length > 0) {
@@ -130,8 +134,10 @@ export default function ProductForm({ categories, brands, action, product, produ
         numeric_value: v.numeric_value != null ? String(v.numeric_value) : '',
         weight_rate: v.weight_rate != null ? String(v.weight_rate) : '',
         weight_unit: v.weight_unit || 'kg',
+        weight_rate_on: v.weight_rate != null,
         length_rate: v.length_rate != null ? String(v.length_rate) : '',
         length_unit: v.length_unit || 'm',
+        length_rate_on: v.length_rate != null,
       }))
     }
     return []
@@ -197,13 +203,13 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
   }
 
-  function updateVariant(index: number, field: keyof VariantRow, value: string) {
+  function updateVariant(index: number, field: keyof VariantRow, value: string | boolean) {
     const updated = [...variants]
     const row = { ...updated[index], [field]: value }
     if ((field === 'numeric_value' || field === 'unit') && row.pricing_type !== 'unit') {
       row.variant_name = buildVariantName(
-        field === 'numeric_value' ? value : row.numeric_value,
-        field === 'unit' ? value : row.unit,
+        field === 'numeric_value' ? (value as string) : row.numeric_value,
+        field === 'unit' ? (value as string) : row.unit,
         row.pricing_type
       )
     }
@@ -230,10 +236,10 @@ export default function ProductForm({ categories, brands, action, product, produ
       formData.append('existing_images_to_keep', JSON.stringify(existingImagesToKeep))
 
       formData.set('has_variants', hasVariants ? 'true' : 'false')
-      formData.set('weight_rate', weightRate)
-      formData.set('weight_unit', weightUnit)
-      formData.set('length_rate', lengthRate)
-      formData.set('length_unit', lengthUnit)
+      formData.set('weight_rate', weightEnabled ? weightRate : '')
+      formData.set('weight_unit', weightEnabled ? weightUnit : '')
+      formData.set('length_rate', lengthEnabled ? lengthRate : '')
+      formData.set('length_unit', lengthEnabled ? lengthUnit : '')
       if (hasVariants) {
         formData.set('variant_type', variantType)
         formData.set('variants_json', JSON.stringify(variants))
@@ -515,16 +521,16 @@ export default function ProductForm({ categories, brands, action, product, produ
                 <div className="flex items-center gap-2 mb-2">
                   <button
                     type="button"
-                    onClick={() => setWeightRate(weightRate !== '' ? '' : '0')}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${weightRate !== '' ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                    onClick={() => { setWeightEnabled(!weightEnabled); if (weightEnabled) setWeightRate('') }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${weightEnabled ? 'bg-accent-500' : 'bg-border-secondary'}`}
                     role="switch"
-                    aria-checked={weightRate !== ''}
+                    aria-checked={weightEnabled}
                   >
-                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${weightRate !== '' ? 'translate-x-4' : 'translate-x-0'}`} />
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${weightEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
                   </button>
                   <label className="text-xs font-medium text-foreground-secondary">Rate per {weightUnit} / weight unit (Rs.)</label>
                 </div>
-                {weightRate !== '' && (
+                {weightEnabled && (
                   <>
                     <div className="flex gap-2">
                       <input
@@ -551,16 +557,16 @@ export default function ProductForm({ categories, brands, action, product, produ
                 <div className="flex items-center gap-2 mb-2">
                   <button
                     type="button"
-                    onClick={() => setLengthRate(lengthRate !== '' ? '' : '0')}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${lengthRate !== '' ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                    onClick={() => { setLengthEnabled(!lengthEnabled); if (lengthEnabled) setLengthRate('') }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${lengthEnabled ? 'bg-accent-500' : 'bg-border-secondary'}`}
                     role="switch"
-                    aria-checked={lengthRate !== ''}
+                    aria-checked={lengthEnabled}
                   >
-                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${lengthRate !== '' ? 'translate-x-4' : 'translate-x-0'}`} />
+                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${lengthEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
                   </button>
                   <label className="text-xs font-medium text-foreground-secondary">Rate per {lengthUnit} / length unit (Rs.)</label>
                 </div>
-                {lengthRate !== '' && (
+                {lengthEnabled && (
                   <>
                     <div className="flex gap-2">
                       <input
@@ -850,16 +856,16 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => updateVariant(index, 'weight_rate', variant.weight_rate ? '' : '0')}
-                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.weight_rate !== '' ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                                    onClick={() => { updateVariant(index, 'weight_rate_on', !variant.weight_rate_on); if (variant.weight_rate_on) updateVariant(index, 'weight_rate', '') }}
+                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.weight_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
                                     role="switch"
-                                    aria-checked={variant.weight_rate !== ''}
+                                    aria-checked={variant.weight_rate_on}
                                   >
-                                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.weight_rate !== '' ? 'translate-x-4' : 'translate-x-0'}`} />
+                                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.weight_rate_on ? 'translate-x-4' : 'translate-x-0'}`} />
                                   </button>
                                   <span className="text-xs font-medium text-foreground-secondary">Also sell by weight</span>
                                 </div>
-                                {variant.weight_rate !== '' && (
+                                {variant.weight_rate_on && (
                                   <div className="flex items-center gap-2 pl-11">
                                     <span className="text-xs text-foreground-muted">Rate (Rs.)</span>
                                     <input type="number" step="0.01" min="0" value={variant.weight_rate} onChange={(e) => updateVariant(index, 'weight_rate', e.target.value)} className="w-24 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs" placeholder="e.g. 200" required />
@@ -871,16 +877,16 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => updateVariant(index, 'length_rate', variant.length_rate ? '' : '0')}
-                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.length_rate !== '' ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                                    onClick={() => { updateVariant(index, 'length_rate_on', !variant.length_rate_on); if (variant.length_rate_on) updateVariant(index, 'length_rate', '') }}
+                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.length_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
                                     role="switch"
-                                    aria-checked={variant.length_rate !== ''}
+                                    aria-checked={variant.length_rate_on}
                                   >
-                                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.length_rate !== '' ? 'translate-x-4' : 'translate-x-0'}`} />
+                                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.length_rate_on ? 'translate-x-4' : 'translate-x-0'}`} />
                                   </button>
                                   <span className="text-xs font-medium text-foreground-secondary">Also sell by length</span>
                                 </div>
-                                {variant.length_rate !== '' && (
+                                {variant.length_rate_on && (
                                   <div className="flex items-center gap-2 pl-11">
                                     <span className="text-xs text-foreground-muted">Rate (Rs.)</span>
                                     <input type="number" step="0.01" min="0" value={variant.length_rate} onChange={(e) => updateVariant(index, 'length_rate', e.target.value)} className="w-24 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs" placeholder="e.g. 50" required />
@@ -1013,16 +1019,16 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <div className="flex items-center gap-1.5">
                                         <button
                                           type="button"
-                                          onClick={() => updateVariant(index, 'weight_rate', variant.weight_rate !== '' ? '' : '0')}
-                                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.weight_rate !== '' ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                                          onClick={() => { updateVariant(index, 'weight_rate_on', !variant.weight_rate_on); if (variant.weight_rate_on) updateVariant(index, 'weight_rate', '') }}
+                                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.weight_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
                                           role="switch"
-                                          aria-checked={variant.weight_rate !== ''}
+                                          aria-checked={variant.weight_rate_on}
                                           title="Also sell by weight"
                                         >
-                                          <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${variant.weight_rate !== '' ? 'translate-x-3' : 'translate-x-0'}`} />
+                                          <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${variant.weight_rate_on ? 'translate-x-3' : 'translate-x-0'}`} />
                                         </button>
                                         <span className="text-xs text-foreground-muted whitespace-nowrap">Wt.</span>
-                                        {variant.weight_rate !== '' && (
+                                        {variant.weight_rate_on && (
                                           <>
                                             <input type="number" step="0.01" min="0" value={variant.weight_rate} onChange={(e) => updateVariant(index, 'weight_rate', e.target.value)} className="w-16 px-1.5 py-0.5 border border-border-secondary rounded bg-surface text-foreground focus:ring-1 focus:ring-accent-500 text-xs" placeholder="Rate" required />
                                             <div className="flex items-center border border-border-secondary rounded bg-surface overflow-hidden">
@@ -1040,16 +1046,16 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <div className="flex items-center gap-1.5">
                                         <button
                                           type="button"
-                                          onClick={() => updateVariant(index, 'length_rate', variant.length_rate !== '' ? '' : '0')}
-                                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.length_rate !== '' ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                                          onClick={() => { updateVariant(index, 'length_rate_on', !variant.length_rate_on); if (variant.length_rate_on) updateVariant(index, 'length_rate', '') }}
+                                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.length_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
                                           role="switch"
-                                          aria-checked={variant.length_rate !== ''}
+                                          aria-checked={variant.length_rate_on}
                                           title="Also sell by length"
                                         >
-                                          <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${variant.length_rate !== '' ? 'translate-x-3' : 'translate-x-0'}`} />
+                                          <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${variant.length_rate_on ? 'translate-x-3' : 'translate-x-0'}`} />
                                         </button>
                                         <span className="text-xs text-foreground-muted whitespace-nowrap">Len.</span>
-                                        {variant.length_rate !== '' && (
+                                        {variant.length_rate_on && (
                                           <>
                                             <input type="number" step="0.01" min="0" value={variant.length_rate} onChange={(e) => updateVariant(index, 'length_rate', e.target.value)} className="w-16 px-1.5 py-0.5 border border-border-secondary rounded bg-surface text-foreground focus:ring-1 focus:ring-accent-500 text-xs" placeholder="Rate" required />
                                             <div className="flex items-center border border-border-secondary rounded bg-surface overflow-hidden">
