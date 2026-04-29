@@ -185,7 +185,7 @@ export default function CheckoutPage() {
                         <div className="flex-1">
                           <h3 className="font-semibold text-gray-900">{item.products.name}</h3>
                           <p className="text-sm text-gray-600 mt-1">
-                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.quantity}
+                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
                           </p>
                           <p className="text-sm font-semibold text-gray-900 mt-1">
                             ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
