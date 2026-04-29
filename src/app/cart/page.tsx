@@ -157,9 +157,24 @@ export default function CartPage() {
                         <div className="mt-4 flex items-center gap-4">
                           {isCustomQty ? (
                             <div className="flex items-center gap-2">
-                              <span className="px-3 py-2 border border-border-secondary rounded-lg bg-surface-secondary text-foreground font-semibold text-sm">
-                                {Number(item.quantity).toFixed(3)} {item.buy_unit ?? ''}
-                              </span>
+                              <input
+                                type="number"
+                                min="0.001"
+                                step="0.001"
+                                defaultValue={Number(item.quantity).toFixed(3)}
+                                onBlur={(e) => {
+                                  const val = parseFloat(e.target.value)
+                                  if (!isNaN(val) && val > 0 && val !== Number(item.quantity)) {
+                                    handleQuantityChange(item.id, val)
+                                  } else {
+                                    e.target.value = Number(item.quantity).toFixed(3)
+                                  }
+                                }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                disabled={isUpdating}
+                                className="w-24 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground font-semibold text-sm text-center focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
+                              />
+                              <span className="text-sm text-foreground-muted">{item.buy_unit}</span>
                               <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{item.buy_unit}</span>
                             </div>
                           ) : (
