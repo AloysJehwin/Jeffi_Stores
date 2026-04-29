@@ -77,7 +77,7 @@ export default async function AdminLayout({
       </aside>
 
       {/* Right column: top bar + content */}
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
 
         {/* Top bar — admin profile & actions */}
         <div className="flex items-center justify-between px-4 h-12 bg-surface-elevated border-b border-border-default shrink-0 shadow-sm">
