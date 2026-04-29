@@ -98,12 +98,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2 w-fit max-w-sm pointer-events-none">
+      {toasts.length > 0 && (
+      <div
+        className="fixed z-50 grid gap-2 max-w-sm pointer-events-none justify-items-end"
+        style={{ bottom: 'max(16px, env(safe-area-inset-bottom, 16px))', right: '16px', top: 'unset', height: 'fit-content' }}
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
             className={`
-              pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border
+              pointer-events-auto self-end flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border
               transform transition-all duration-300 ease-in-out
               animate-slide-in-right
               ${
@@ -154,6 +158,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           </div>
         ))}
       </div>
+      )}
     </ToastContext.Provider>
   )
 }
