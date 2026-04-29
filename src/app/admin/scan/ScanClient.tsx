@@ -282,7 +282,7 @@ export default function ScanClient() {
           </div>
           <div>
             <p className="text-lg font-semibold text-white">Order not found</p>
-            <p className="text-gray-400 text-sm mt-1">This QR code doesn't match any order.</p>
+            <p className="text-gray-400 text-sm mt-1">This QR code does not match any order.</p>
           </div>
           <button onClick={reset} className="w-full max-w-xs py-3.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors">
             Try Again
