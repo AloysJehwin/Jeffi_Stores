@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import ThemeToggle from '@/components/ThemeToggle'
 
 interface NavLink {
   href: string
@@ -92,14 +91,6 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
               </a>
             ))}
           </nav>
-
-          {/* Theme toggle */}
-          <div className="p-4 border-t border-white/10">
-            <div className="flex items-center justify-between px-2">
-              <span className="text-sm text-gray-400">Theme</span>
-              <ThemeToggle variant="admin" />
-            </div>
-          </div>
         </div>
       </div>
     </>
