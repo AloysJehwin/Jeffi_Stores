@@ -238,7 +238,7 @@ export async function POST(
             `INSERT INTO orders (
               user_id, order_number, status, payment_status, subtotal, tax_amount,
               shipping_amount, discount_amount, total_amount, shipping_address_id,
-              customer_name, customer_email, notes
+              customer_name, customer_email, notes, original_order_id
             )
             SELECT user_id,
               'RPL-' || order_number,
@@ -246,7 +246,8 @@ export async function POST(
               'paid',
               subtotal, tax_amount, shipping_amount, discount_amount, total_amount,
               shipping_address_id, customer_name, customer_email,
-              'Replacement for order #' || order_number
+              'Replacement for order #' || order_number,
+              id
             FROM orders WHERE id = $1
             RETURNING id, order_number`,
             [orderId]
@@ -264,7 +265,8 @@ export async function POST(
             )
             await client.query(
               'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-[parseFloat(item.quantity), item.product_id]            )
+              [parseFloat(item.quantity), item.product_id]
+            )
           }
 
           await client.query(

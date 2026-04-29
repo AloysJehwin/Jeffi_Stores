@@ -355,9 +355,11 @@ export async function getOrder(id: string) {
       COALESCE(
         (SELECT json_agg(pay) FROM payments pay WHERE pay.order_id = o.id),
         '[]'::json
-      ) AS payments
+      ) AS payments,
+      orig.order_number AS original_order_number
     FROM orders o
     LEFT JOIN users u ON o.user_id = u.id
+    LEFT JOIN orders orig ON orig.id = o.original_order_id
     WHERE o.id = $1
   `, [id])
 

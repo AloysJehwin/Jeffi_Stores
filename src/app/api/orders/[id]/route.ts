@@ -21,8 +21,10 @@ export async function GET(
         (SELECT row_to_json(a) FROM (
           SELECT full_name, address_line1, address_line2, landmark, city, state, postal_code, phone
           FROM addresses WHERE id = o.shipping_address_id
-        ) a) AS shipping_address
+        ) a) AS shipping_address,
+        orig.order_number AS original_order_number
       FROM orders o
+      LEFT JOIN orders orig ON orig.id = o.original_order_id
       WHERE o.id = $1 AND o.user_id = $2
     `, [orderId, authUser.userId])
 
@@ -58,6 +60,8 @@ export async function GET(
       deliveredAt: order.delivered_at || null,
       notes: order.notes,
       trackingUrl: order.tracking_url || null,
+      originalOrderId: order.original_order_id || null,
+      originalOrderNumber: order.original_order_number || null,
       shippingAddress: order.shipping_address,
       items: orderItems.map((item: any) => ({
         id: item.id,

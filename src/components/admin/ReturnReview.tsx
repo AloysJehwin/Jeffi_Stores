@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 interface ReturnRequest {
   id: string
@@ -140,7 +141,12 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       {returnRequest.replacement_order_id && replacementOrderNumber && (
         <div>
           <p className="text-sm text-foreground-secondary mb-1">Replacement order</p>
-          <p className="text-sm text-foreground font-medium">#{replacementOrderNumber}</p>
+          <Link
+            href={`/admin/orders/${returnRequest.replacement_order_id}`}
+            className="text-sm font-medium text-accent-500 hover:text-accent-600 underline"
+          >
+            #{replacementOrderNumber}
+          </Link>
         </div>
       )}
 

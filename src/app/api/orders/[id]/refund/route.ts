@@ -18,7 +18,7 @@ export async function POST(
 
     const order = await queryOne(`
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
-        o.customer_name, o.customer_email,
+        o.customer_name, o.customer_email, o.original_order_id,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -29,8 +29,8 @@ export async function POST(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    if (order.status !== 'cancelled') {
-      return NextResponse.json({ error: 'Refund can only be initiated for cancelled orders.' }, { status: 400 })
+    if (order.status !== 'cancelled' && order.status !== 'returned') {
+      return NextResponse.json({ error: 'Refund can only be initiated for cancelled or returned orders.' }, { status: 400 })
     }
 
     if (order.payment_status !== 'paid') {
@@ -41,11 +41,13 @@ export async function POST(
       return NextResponse.json({ error: 'Payment gateway is not configured.' }, { status: 400 })
     }
 
+    const paymentOrderId = order.original_order_id || orderId
+
     const paymentRecord = await queryOne(
       `SELECT id, transaction_id, amount, gateway_response FROM payments
        WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed'
        LIMIT 1`,
-      [orderId]
+      [paymentOrderId]
     )
 
     if (!paymentRecord || !paymentRecord.transaction_id) {
