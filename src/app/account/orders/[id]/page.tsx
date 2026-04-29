@@ -8,6 +8,8 @@ import { useCart } from '@/contexts/CartContext'
 import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
+const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
+const RETURN_WINDOW_DAYS = 7
 const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 
 interface OrderItem {
@@ -40,6 +42,7 @@ interface OrderDetails {
   status: string
   paymentStatus: string
   createdAt: string
+  deliveredAt: string | null
   notes: string | null
   trackingUrl: string | null
   shippingAddress: {
@@ -71,6 +74,15 @@ function getStatusColor(status: string) {
       return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
     case 'cancelled':
       return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+    case 'return_requested':
+      return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+    case 'return_approved':
+    case 'return_received':
+      return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+    case 'return_rejected':
+      return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+    case 'returned':
+      return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
     default:
       return 'bg-surface-secondary text-foreground'
   }
@@ -109,6 +121,19 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const autoCancelTriggeredRef = useRef(false)
   const { refreshCart } = useCart()
 
+  const [returnRequest, setReturnRequest] = useState<{
+    id: string; type: string; status: string; reason: string;
+    description?: string | null; admin_notes?: string | null;
+    replacement_order_id?: string | null;
+  } | null>(null)
+  const [showReturnForm, setShowReturnForm] = useState(false)
+  const [returnType, setReturnType] = useState<'refund' | 'replacement'>('refund')
+  const [returnReason, setReturnReason] = useState('defective')
+  const [returnDescription, setReturnDescription] = useState('')
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false)
+  const [returnError, setReturnError] = useState('')
+  const [returnSuccess, setReturnSuccess] = useState('')
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login?redirect=/account/orders')
@@ -127,6 +152,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       }
       const data = await response.json()
       setOrder(data.order)
+
+      const retRes = await fetch(`/api/orders/${params.id}/return`)
+      if (retRes.ok) {
+        const retData = await retRes.json()
+        setReturnRequest(retData.returnRequest || null)
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -193,6 +224,28 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       setError(err.message)
     } finally {
       setIsCancelling(false)
+    }
+  }
+
+  const handleSubmitReturn = async () => {
+    setIsSubmittingReturn(true)
+    setReturnError('')
+    setReturnSuccess('')
+    try {
+      const response = await fetch(`/api/orders/${params.id}/return`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: returnType, reason: returnReason, description: returnDescription || undefined }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to submit return request')
+      setReturnSuccess('Your return request has been submitted. Our team will review it shortly.')
+      setShowReturnForm(false)
+      await fetchOrder()
+    } catch (err: any) {
+      setReturnError(err.message)
+    } finally {
+      setIsSubmittingReturn(false)
     }
   }
 
@@ -294,6 +347,18 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   }
 
   if (!user) return null
+
+  const canReturn = order?.status === 'delivered' && !returnRequest && (() => {
+    if (!order.deliveredAt) return false
+    const expiry = new Date(order.deliveredAt).getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000
+    return Date.now() <= expiry
+  })()
+
+  const returnWindowExpired = order?.status === 'delivered' && !returnRequest && (() => {
+    if (!order.deliveredAt) return false
+    const expiry = new Date(order.deliveredAt).getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000
+    return Date.now() > expiry
+  })()
 
   const MobileAccountHeader = () => (
     <>
@@ -407,7 +472,13 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(order.status)}`}>
-                    {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status === 'cancel_rejected' ? 'Cancellation Rejected' : order.status}
+                    {order.status === 'cancel_requested' ? 'Cancellation Requested'
+                      : order.status === 'cancel_rejected' ? 'Cancellation Rejected'
+                      : order.status === 'return_requested' ? 'Return Requested'
+                      : order.status === 'return_approved' ? 'Return Approved'
+                      : order.status === 'return_received' ? 'Return Received'
+                      : order.status === 'return_rejected' ? 'Return Rejected'
+                      : order.status}
                   </span>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
                     Payment: {order.paymentStatus}
@@ -420,6 +491,20 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     >
                       {order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Cancel Order' : 'Request Cancellation'}
                     </button>
+                  )}
+                  {canReturn && !showReturnForm && (
+                    <button
+                      type="button"
+                      onClick={() => setShowReturnForm(true)}
+                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/50 border border-orange-200 dark:border-orange-800 transition-colors"
+                    >
+                      Request Return / Replacement
+                    </button>
+                  )}
+                  {returnWindowExpired && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 cursor-not-allowed">
+                      Return window closed ({RETURN_WINDOW_DAYS} days from delivery)
+                    </span>
                   )}
                   {order.invoiceNumber && (
                     <a
@@ -494,6 +579,138 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   <p className="text-orange-800 dark:text-orange-300 text-sm">
                     Your cancellation request is pending review by our team. You will receive an email once it is approved or rejected.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Return Status Banners */}
+            {returnSuccess && (
+              <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <p className="text-green-800 dark:text-green-300 text-sm">{returnSuccess}</p>
+              </div>
+            )}
+
+            {order.status === 'return_requested' && (
+              <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-orange-800 dark:text-orange-300 text-sm">Return request submitted — awaiting admin review.</p>
+                </div>
+              </div>
+            )}
+
+            {order.status === 'return_approved' && (
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-blue-800 dark:text-blue-300 text-sm font-medium">Return Approved</p>
+                <p className="text-blue-700 dark:text-blue-300 text-sm mt-1">Please ship the item back. A team member will contact you with return shipping instructions.</p>
+              </div>
+            )}
+
+            {order.status === 'return_received' && (
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-blue-800 dark:text-blue-300 text-sm">Item received — processing your {returnRequest?.type === 'replacement' ? 'replacement order' : 'refund'}.</p>
+              </div>
+            )}
+
+            {order.status === 'return_rejected' && (
+              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <p className="text-red-800 dark:text-red-300 text-sm font-medium">Return Request Rejected</p>
+                {returnRequest?.admin_notes && (
+                  <p className="text-red-700 dark:text-red-300 text-sm mt-1">{returnRequest.admin_notes}</p>
+                )}
+              </div>
+            )}
+
+            {order.status === 'returned' && (
+              <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                <p className="text-purple-800 dark:text-purple-300 text-sm font-medium">Resolved</p>
+                <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
+                  {returnRequest?.type === 'replacement' && returnRequest.replacement_order_id
+                    ? 'Your replacement order has been created and confirmed.'
+                    : 'Your refund has been processed. It may take 5–7 business days to reflect in your account.'}
+                </p>
+              </div>
+            )}
+
+            {/* Return Request Form */}
+            {showReturnForm && (
+              <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 sm:p-6">
+                <h3 className="text-lg font-bold text-orange-900 dark:text-orange-300 mb-4">Request Return / Replacement</h3>
+                {returnError && (
+                  <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
+                    {returnError}
+                  </div>
+                )}
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground-secondary mb-2">What would you like?</p>
+                    <div className="flex gap-3">
+                      {(['refund', 'replacement'] as const).map((t) => (
+                        <label key={t} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="returnType"
+                            value={t}
+                            checked={returnType === t}
+                            onChange={() => setReturnType(t)}
+                            className="accent-accent-500"
+                          />
+                          <span className="text-sm text-foreground capitalize">{t}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-1">Reason</label>
+                    <select
+                      value={returnReason}
+                      onChange={e => setReturnReason(e.target.value)}
+                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                    >
+                      <option value="defective">Defective product</option>
+                      <option value="wrong_item">Wrong item sent</option>
+                      <option value="not_as_described">Not as described</option>
+                      <option value="damaged">Damaged in transit</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-1">Description <span className="text-foreground-muted">(optional)</span></label>
+                    <textarea
+                      value={returnDescription}
+                      onChange={e => setReturnDescription(e.target.value)}
+                      rows={3}
+                      maxLength={500}
+                      placeholder="Please describe the issue in detail..."
+                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm resize-none"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1">{returnDescription.length}/500</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSubmitReturn}
+                      disabled={isSubmittingReturn}
+                      className="flex-1 px-4 py-2.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {isSubmittingReturn ? (
+                        <>
+                          <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                          Submitting...
+                        </>
+                      ) : 'Submit Request'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowReturnForm(false); setReturnError('') }}
+                      disabled={isSubmittingReturn}
+                      className="px-4 py-2.5 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
