@@ -59,7 +59,6 @@ export default function ProductActions({
   const selectedVariant = variants.find(v => v.id === selectedVariantId)
   const displaySku = hasVariants && selectedVariant ? selectedVariant.sku : sku
 
-  // Update URL when variant changes
   useEffect(() => {
     if (!hasVariants || !selectedVariant) return
     const url = new URL(window.location.href)
@@ -67,7 +66,6 @@ export default function ProductActions({
     window.history.replaceState(null, '', url.toString())
   }, [selectedVariantId, hasVariants, selectedVariant])
 
-  // Compute effective price, mrp, wholesale based on variant selection
   const effectivePrice = hasVariants
     ? (selectedVariant?.sale_price ?? selectedVariant?.price ?? salePrice ?? basePrice)
     : (salePrice ?? basePrice)
@@ -77,34 +75,26 @@ export default function ProductActions({
   const effectiveWholesalePrice = hasVariants
     ? (selectedVariant?.wholesale_price != null ? Number(selectedVariant.wholesale_price) : wholesalePrice)
     : wholesalePrice
-  const effectiveStock = hasVariants
-    ? (selectedVariant?.stock_quantity ?? 0)
-    : stockQuantity
+  const effectiveStock = hasVariants ? (selectedVariant?.stock_quantity ?? 0) : stockQuantity
 
   const mrpDiscount = effectiveMrp && effectiveMrp > effectivePrice
     ? Math.round(((effectiveMrp - effectivePrice) / effectiveMrp) * 100)
     : 0
 
-  // Reset quantity when variant changes
   useEffect(() => {
     setQuantity(1)
   }, [selectedVariantId])
 
-  // Check if product is in wishlist on mount and when user changes
   useEffect(() => {
     const checkWishlistStatus = async () => {
       try {
-        const response = await fetch('/api/wishlist')
+        const response = await fetch('/api/wishlist', { credentials: 'include' })
         if (response.ok) {
           const data = await response.json()
-          const isInList = data.items?.some((item: any) => item.product_id === productId)
-          setIsInWishlist(isInList)
+          setIsInWishlist(data.items?.some((item: any) => item.product_id === productId))
         }
-      } catch (error) {
-        console.error('Failed to check wishlist status:', error)
-      }
+      } catch {}
     }
-
     checkWishlistStatus()
   }, [productId, user])
 
@@ -114,10 +104,20 @@ export default function ProductActions({
       await addToCart(productId, quantity, selectedVariantId || undefined)
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
-      console.error('Add to cart error:', error)
       showToast(error.message || 'Failed to add to cart', 'error')
     } finally {
       setIsAddingToCart(false)
+    }
+  }
+
+  const handleBuyNow = async () => {
+    setIsBuyingNow(true)
+    try {
+      await addToCart(productId, quantity, selectedVariantId || undefined)
+      router.push('/cart')
+    } catch (error: any) {
+      showToast(error.message || 'Failed to add to cart', 'error')
+      setIsBuyingNow(false)
     }
   }
 
@@ -139,10 +139,7 @@ export default function ProductActions({
     setIsAddingToWishlist(true)
     try {
       if (isInWishlist) {
-        const response = await fetch(`/api/wishlist?productId=${productId}`, {
-          method: 'DELETE',
-        })
-
+        const response = await fetch(`/api/wishlist?productId=${productId}`, { method: 'DELETE', credentials: 'include' })
         if (response.ok) {
           setIsInWishlist(false)
           showToast('Removed from wishlist', 'success')
@@ -155,8 +152,8 @@ export default function ProductActions({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ productId }),
+          credentials: 'include',
         })
-
         if (response.ok) {
           setIsInWishlist(true)
           showToast('Added to wishlist!', 'success')
@@ -165,33 +162,19 @@ export default function ProductActions({
           showToast(data.message || 'Failed to add to wishlist', 'error')
         }
       }
-    } catch (error) {
+    } catch {
       showToast('Failed to update wishlist', 'error')
     } finally {
       setIsAddingToWishlist(false)
     }
   }
 
-  const handleBuyNow = async () => {
-    setIsBuyingNow(true)
-    try {
-      await addToCart(productId, quantity, selectedVariantId || undefined)
-      router.push('/cart')
-    } catch (error: any) {
-      console.error('Buy now error:', error)
-      showToast(error.message || 'Failed to add to cart', 'error')
-      setIsBuyingNow(false)
-    }
-  }
-
   return (
     <div className="space-y-4">
-      {/* Dynamic SKU */}
       <div className="text-sm text-foreground-secondary">
         SKU: <span className="font-medium text-foreground">{displaySku}</span>
       </div>
 
-      {/* Variant Selector */}
       {hasVariants && (
         <div>
           <label className="block text-sm font-medium text-foreground-secondary mb-2">
@@ -220,7 +203,6 @@ export default function ProductActions({
         </div>
       )}
 
-      {/* Price display for variant products */}
       {hasVariants && (
         <>
           <div className="bg-surface rounded-lg p-6">
@@ -245,8 +227,7 @@ export default function ProductActions({
               </div>
             )}
             <p className="text-xs text-foreground-muted">
-              Inclusive of all taxes
-              {gstPercentage ? ` (${gstPercentage}% GST)` : ''}
+              Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
             </p>
             {effectiveWholesalePrice && (
               <div className="mt-3 pt-3 border-t border-border-default">
@@ -257,16 +238,13 @@ export default function ProductActions({
             )}
           </div>
 
-          {/* Stock status for variant */}
           <div>
             {effectiveStock > 0 ? (
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span className="text-green-700 dark:text-green-400 font-semibold">
-                  In Stock ({effectiveStock} available)
-                </span>
+                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock ({effectiveStock} available)</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -280,11 +258,8 @@ export default function ProductActions({
         </>
       )}
 
-      {/* Quantity Selector */}
       <div>
-        <label className="block text-sm font-medium text-foreground-secondary mb-2">
-          Quantity
-        </label>
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">Quantity</label>
         <div className="flex items-center border border-border-secondary rounded-lg w-fit">
           <button
             onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -295,9 +270,7 @@ export default function ProductActions({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
             </svg>
           </button>
-          <span className="px-6 py-2 border-x border-border-secondary min-w-[80px] text-center font-semibold">
-            {quantity}
-          </span>
+          <span className="px-6 py-2 border-x border-border-secondary min-w-[80px] text-center font-semibold">{quantity}</span>
           <button
             onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
             disabled={quantity >= effectiveStock}
@@ -310,7 +283,6 @@ export default function ProductActions({
         </div>
       </div>
 
-      {/* Action Buttons */}
       <div className="space-y-3">
         <button
           onClick={handleBuyNow}
@@ -318,17 +290,9 @@ export default function ProductActions({
           className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
           {isBuyingNow ? (
-            <>
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-              Processing...
-            </>
+            <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />Processing...</>
           ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Buy Now
-            </>
+            <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>Buy Now</>
           )}
         </button>
 
@@ -338,17 +302,9 @@ export default function ProductActions({
           className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
         >
           {isAddingToCart ? (
-            <>
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full"></div>
-              Adding...
-            </>
+            <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />Adding...</>
           ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              Add to Cart
-            </>
+            <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>Add to Cart</>
           )}
         </button>
 
@@ -356,33 +312,22 @@ export default function ProductActions({
           onClick={handleToggleWishlist}
           disabled={isAddingToWishlist}
           className={`w-full px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-            isInWishlist
-              ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary border border-border-secondary'
+            isInWishlist ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary border border-border-secondary'
           }`}
         >
           {isAddingToWishlist ? (
-            <>
-              <div className={`animate-spin w-5 h-5 border-2 ${isInWishlist ? 'border-white' : 'border-foreground-secondary'} border-t-transparent rounded-full`}></div>
-              {isInWishlist ? 'Removing...' : 'Adding...'}
-            </>
+            <><div className={`animate-spin w-5 h-5 border-2 ${isInWishlist ? 'border-white' : 'border-foreground-secondary'} border-t-transparent rounded-full`} />{isInWishlist ? 'Removing...' : 'Adding...'}</>
           ) : (
-            <>
-              <svg className="w-5 h-5" fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
-              {isInWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
-            </>
+            <><svg className="w-5 h-5" fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>{isInWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}</>
           )}
         </button>
       </div>
 
-      {/* Contact Buttons */}
       <div className="pt-4 border-t border-border-default">
         <p className="text-sm text-foreground-secondary mb-3">Need help with your order?</p>
         <div className="space-y-2">
           <a
-            href={`tel:+918903031299`}
+            href="tel:+918903031299"
             className="w-full bg-surface-elevated hover:bg-surface-secondary border border-border-secondary text-foreground-secondary px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
