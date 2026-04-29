@@ -567,9 +567,9 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                         {item.variantName && (
                           <p className="text-sm text-foreground-muted">{item.variantName}</p>
                         )}
-                        <p className="text-sm text-foreground-secondary mt-1">Quantity: {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : item.quantity}</p>
+                        <p className="text-sm text-foreground-secondary mt-1">Quantity: {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))}</p>
                         <p className="text-sm font-semibold text-foreground mt-1">
-                          {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })} x {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : item.quantity} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                          {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })} x {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
                         </p>
                       </div>
                     </div>

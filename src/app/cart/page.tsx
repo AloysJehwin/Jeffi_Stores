@@ -176,7 +176,7 @@ export default function CartPage() {
                               <span className="px-4 py-2 border-x border-border-secondary min-w-[60px] text-center flex items-center justify-center">
                                 {isUpdating ? (
                                   <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full"></div>
-                                ) : item.quantity}
+                                ) : Math.round(Number(item.quantity))}
                               </span>
                               <button
                                 onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
