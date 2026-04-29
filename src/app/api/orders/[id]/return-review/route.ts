@@ -172,8 +172,7 @@ export async function POST(
                 for (const item of itemsResult.rows) {
                   await client.query(
                     'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-                    [parseFloat(item.quantity), item.product_id]
-                  )
+[parseFloat(item.quantity), item.product_id]                  )
                 }
               })
 
@@ -207,8 +206,7 @@ export async function POST(
           for (const item of itemsResult.rows) {
             await client.query(
               'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-              [parseFloat(item.quantity), item.product_id]
-            )
+[parseFloat(item.quantity), item.product_id]            )
           }
         })
 
@@ -265,8 +263,7 @@ export async function POST(
             )
             await client.query(
               'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-              [parseFloat(item.quantity), item.product_id]
-            )
+[parseFloat(item.quantity), item.product_id]            )
           }
 
           await client.query(

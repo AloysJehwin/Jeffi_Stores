@@ -216,12 +216,12 @@ export async function POST(request: NextRequest) {
           if (item.variant) {
             await client.query(
               'UPDATE product_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-              [item.quantity, item.variant.id]
+              [parseFloat(item.quantity), item.variant.id]
             )
           } else {
             await client.query(
               'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-              [item.quantity, item.product_id]
+              [parseFloat(item.quantity), item.product_id]
             )
           }
         }

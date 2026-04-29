@@ -19,7 +19,6 @@ export async function POST(
     const body = await request.json().catch(() => ({}))
     const restoreToCart = body?.restoreToCart === true
 
-    // Fetch order — must belong to the authenticated user
     const order = await queryOne(`
       SELECT o.id, o.order_number, o.status, o.payment_status, o.user_id, o.customer_name, o.customer_email,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
@@ -39,7 +38,6 @@ export async function POST(
       )
     }
 
-    // If order is pending + unpaid/failed, cancel immediately and restore stock
     if (order.status === 'pending' && (order.payment_status === 'unpaid' || order.payment_status === 'failed')) {
       const orderItems = await queryMany(
         'SELECT product_id, variant_id, quantity, unit_price FROM order_items WHERE order_id = $1',
@@ -49,17 +47,16 @@ export async function POST(
         if (item.variant_id) {
           await query(
             'UPDATE product_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-            [item.quantity, item.variant_id]
+            [parseFloat(item.quantity), item.variant_id]
           )
         } else {
           await query(
             'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-            [item.quantity, item.product_id]
+            [parseFloat(item.quantity), item.product_id]
           )
         }
       }
 
-      // Restore items to cart if requested
       if (restoreToCart) {
         for (const item of orderItems) {
           const existingCartItem = await queryOne(
@@ -87,13 +84,11 @@ export async function POST(
       return NextResponse.json({ success: true, directCancel: true, restoredToCart: restoreToCart })
     }
 
-    // Otherwise, set status to cancel_requested (admin will approve/reject)
     await query(
       `UPDATE orders SET status = 'cancel_requested', updated_at = NOW() WHERE id = $1`,
       [orderId]
     )
 
-    // Send notification email (fire-and-forget)
     const user = order.users
     const userEmail = user?.email || order.customer_email
     const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : order.customer_name
@@ -106,12 +101,11 @@ export async function POST(
         orderId,
         'cancel_requested',
         order.status
-      ).catch(err => console.error('Failed to send cancellation request email:', err))
+      ).catch(() => {})
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Order cancellation request error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to request cancellation' }, { status: 500 })
   }
 }
