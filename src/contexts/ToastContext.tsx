@@ -37,7 +37,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     
     setToasts((prev) => [...prev, newToast])
 
-    // Auto remove after 4 seconds
     setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id))
     }, 4000)
@@ -67,8 +66,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast, showConfirm }}>
       {children}
-      
-      {/* Confirmation Dialog */}
+
       {confirmDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/30">
           <div className="bg-surface-elevated rounded-lg shadow-xl max-w-md w-full p-6 animate-fade-in">
@@ -99,14 +97,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
-      
-      {/* Toast Container */}
-      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
+
+      <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
             className={`
-              flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border
+              pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border
               transform transition-all duration-300 ease-in-out
               animate-slide-in-right
               ${
@@ -120,7 +117,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               }
             `}
           >
-            {/* Icon */}
             <div className="flex-shrink-0">
               {toast.type === 'success' && (
                 <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -144,10 +140,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               )}
             </div>
 
-            {/* Message */}
             <p className="flex-1 text-sm font-medium">{toast.message}</p>
 
-            {/* Close Button */}
             <button
               onClick={() => removeToast(toast.id)}
               className="flex-shrink-0 text-foreground-muted hover:text-foreground-secondary transition-colors"
