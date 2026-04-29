@@ -78,7 +78,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             }`}>
               Status: {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status === 'cancel_rejected' ? 'Cancellation Rejected' : order.status.replace(/_/g, ' ')}
             </span>
-            {order.invoice_number ? (
+            {!order.original_order_id && (order.invoice_number ? (
               <a
                 href={`/api/orders/${order.id}/invoice`}
                 target="_blank"
@@ -92,7 +92,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               </a>
             ) : (order.payment_status === 'paid' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') && (
               <GenerateInvoiceButton orderId={order.id} />
-            )}
+            ))}
           </div>
         </div>
       </div>
