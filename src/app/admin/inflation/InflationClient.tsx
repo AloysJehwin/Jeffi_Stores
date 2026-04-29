@@ -50,6 +50,9 @@ interface InflationLog {
   applied_by: string
   applied_at: string
   snapshot: SnapshotProduct[] | null
+  is_rollback: boolean
+  rolled_back_at: string | null
+  rolled_back_by: string | null
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -81,6 +84,28 @@ export default function InflationClient({ categories }: { categories: Category[]
   const [logs, setLogs] = useState<InflationLog[]>([])
   const [logsLoading, setLogsLoading] = useState(true)
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
+  const [rollingBack, setRollingBack] = useState<string | null>(null)
+  const [rollbackError, setRollbackError] = useState<string | null>(null)
+
+  async function handleRollback(log: InflationLog) {
+    if (!confirm(`Roll back +${log.percentage}% inflation on "${log.category_name}"? This will restore all ${log.product_count} products to their previous prices.`)) return
+    setRollingBack(log.id)
+    setRollbackError(null)
+    try {
+      const res = await fetch('/api/admin/inflation/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ log_id: log.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Rollback failed')
+      fetchLogs()
+    } catch (e: any) {
+      setRollbackError(e.message)
+    } finally {
+      setRollingBack(null)
+    }
+  }
 
   const topCategories = categories.filter(c => !c.parent_category_id)
   const subCategories = categories.filter(c => c.parent_category_id)
@@ -313,6 +338,7 @@ export default function InflationClient({ categories }: { categories: Category[]
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
         <div className="px-4 sm:px-6 py-4 border-b border-border-default">
           <h2 className="text-base font-semibold text-foreground">Inflation History</h2>
+          {rollbackError && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{rollbackError}</p>}
         </div>
         {logsLoading ? (
           <p className="p-6 text-sm text-foreground-muted">Loading…</p>
@@ -329,6 +355,7 @@ export default function InflationClient({ categories }: { categories: Category[]
                   <th className="text-right py-2.5 px-3 font-medium text-foreground-secondary">Products</th>
                   <th className="text-left py-2.5 px-3 font-medium text-foreground-secondary">Applied by</th>
                   <th className="text-left py-2.5 px-3 font-medium text-foreground-secondary">Date</th>
+                  <th className="py-2.5 px-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
@@ -337,7 +364,7 @@ export default function InflationClient({ categories }: { categories: Category[]
                     <tr
                       key={log.id}
                       onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
-                      className={`transition-colors cursor-pointer ${log.snapshot ? 'hover:bg-surface' : ''} ${expandedLogId === log.id ? 'bg-surface' : ''}`}
+                      className={`transition-colors cursor-pointer ${log.snapshot ? 'hover:bg-surface' : ''} ${expandedLogId === log.id ? 'bg-surface' : ''} ${log.rolled_back_at ? 'opacity-60' : ''}`}
                     >
                       <td className="py-2.5 px-4 font-medium text-foreground">
                         <span className="flex items-center gap-1.5">
@@ -347,20 +374,44 @@ export default function InflationClient({ categories }: { categories: Category[]
                             </svg>
                           )}
                           {log.category_name}
+                          {log.is_rollback && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 uppercase tracking-wide ml-1">Rollback</span>
+                          )}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-right text-accent-600 dark:text-accent-400 font-semibold">+{log.percentage}%</td>
+                      <td className="py-2.5 px-3 text-right font-semibold">
+                        <span className={log.is_rollback ? 'text-orange-600 dark:text-orange-400' : 'text-accent-600 dark:text-accent-400'}>
+                          {log.is_rollback ? '−' : '+'}{log.percentage}%
+                        </span>
+                      </td>
                       <td className="py-2.5 px-3 text-foreground-secondary text-xs">{log.applied_fields.map(f => FIELD_LABELS[f] || f).join(', ')}</td>
                       <td className="py-2.5 px-3 text-right text-foreground">{log.product_count}</td>
                       <td className="py-2.5 px-3 text-foreground-secondary">{log.applied_by}</td>
                       <td className="py-2.5 px-3 text-foreground-muted text-xs whitespace-nowrap">
                         {new Date(log.applied_at).toLocaleDateString('en-IN')}{' '}
                         {new Date(log.applied_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        {log.rolled_back_at && (
+                          <span className="block text-orange-500 dark:text-orange-400">
+                            Rolled back {new Date(log.rolled_back_at).toLocaleDateString('en-IN')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right" onClick={e => e.stopPropagation()}>
+                        {!log.is_rollback && !log.rolled_back_at && log.snapshot && (
+                          <button
+                            type="button"
+                            disabled={rollingBack === log.id}
+                            onClick={() => handleRollback(log)}
+                            className="px-2.5 py-1 text-xs font-medium rounded border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                          >
+                            {rollingBack === log.id ? 'Rolling back…' : 'Rollback'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                     {expandedLogId === log.id && log.snapshot && (
                       <tr key={`${log.id}-detail`}>
-                        <td colSpan={6} className="p-0 bg-surface border-b border-border-default">
+                        <td colSpan={7} className="p-0 bg-surface border-b border-border-default">
                           <div className="overflow-x-auto">
                             <table className="w-full text-xs">
                               <thead className="bg-surface-secondary border-b border-border-default">
