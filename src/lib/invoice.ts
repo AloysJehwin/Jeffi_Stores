@@ -23,6 +23,8 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
 
   if (!order) return null
 
+  if (order.original_order_id) return null
+
   if (order.payment_status !== 'paid') return null
 
   if (order.status === 'pending' || order.status === 'cancelled') return null

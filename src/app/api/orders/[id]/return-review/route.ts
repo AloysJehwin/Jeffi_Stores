@@ -29,7 +29,7 @@ export async function POST(
 
     const order = await queryOne(`
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
-        o.customer_name, o.customer_email, o.user_id,
+        o.customer_name, o.customer_email, o.user_id, o.original_order_id,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -136,12 +136,17 @@ export async function POST(
       if (returnRequest.type === 'refund') {
         let refundFailed = false
 
-        if (order.payment_status === 'paid' && isRazorpayEnabled()) {
+        const paymentOrderId = order.original_order_id || orderId
+        const effectivePaymentStatus = order.original_order_id
+          ? (await queryOne(`SELECT payment_status FROM orders WHERE id = $1`, [paymentOrderId]))?.payment_status
+          : order.payment_status
+
+        if (effectivePaymentStatus === 'paid' && isRazorpayEnabled()) {
           const paymentRecord = await queryOne(
             `SELECT id, transaction_id, amount, gateway_response FROM payments
              WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed'
              LIMIT 1`,
-            [orderId]
+            [paymentOrderId]
           )
 
           if (paymentRecord && paymentRecord.transaction_id) {
@@ -157,6 +162,12 @@ export async function POST(
                   `UPDATE orders SET status = 'returned', payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
                   [orderId]
                 )
+                if (order.original_order_id) {
+                  await client.query(
+                    `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
+                    [order.original_order_id]
+                  )
+                }
                 await client.query(
                   `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
                   [JSON.stringify({ ...(typeof paymentRecord.gateway_response === 'string' ? JSON.parse(paymentRecord.gateway_response) : paymentRecord.gateway_response || {}), refund }), paymentRecord.id]
@@ -172,7 +183,8 @@ export async function POST(
                 for (const item of itemsResult.rows) {
                   await client.query(
                     'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-[parseFloat(item.quantity), item.product_id]                  )
+                    [parseFloat(item.quantity), item.product_id]
+                  )
                 }
               })
 
@@ -192,7 +204,7 @@ export async function POST(
 
         await withTransaction(async (client) => {
           await client.query(
-            `UPDATE orders SET status = 'returned', payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
+            `UPDATE orders SET status = 'returned', updated_at = NOW() WHERE id = $1`,
             [orderId]
           )
           await client.query(

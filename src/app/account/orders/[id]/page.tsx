@@ -519,7 +519,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       Return window closed ({RETURN_WINDOW_DAYS} days from delivery)
                     </span>
                   )}
-                  {order.invoiceNumber && (
+                  {order.invoiceNumber && !order.originalOrderId && (
                     <a
                       href={`/api/orders/${order.id}/invoice`}
                       target="_blank"
