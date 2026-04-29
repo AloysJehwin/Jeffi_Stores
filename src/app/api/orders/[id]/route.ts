@@ -54,6 +54,7 @@ export async function GET(
       status: order.status,
       paymentStatus: order.payment_status,
       createdAt: order.created_at,
+      deliveredAt: order.delivered_at || null,
       notes: order.notes,
       trackingUrl: order.tracking_url || null,
       shippingAddress: order.shipping_address,
@@ -109,19 +110,38 @@ export async function PATCH(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    if (currentOrder.status === 'cancelled') {
-      return NextResponse.json({ error: 'Cancelled orders cannot be modified' }, { status: 400 })
+    const VALID_TRANSITIONS: Record<string, string[]> = {
+      pending:          ['confirmed', 'cancel_requested', 'cancelled'],
+      confirmed:        ['processing', 'cancel_requested', 'cancelled'],
+      processing:       ['shipped', 'cancel_requested'],
+      shipped:          ['delivered'],
+      delivered:        ['return_requested'],
+      cancel_requested: ['cancelled', 'cancel_rejected'],
+      cancel_rejected:  [],
+      cancelled:        [],
+      return_requested: ['return_approved', 'return_rejected'],
+      return_approved:  ['return_received'],
+      return_received:  ['returned'],
+      return_rejected:  [],
+      returned:         [],
     }
 
-    if (currentOrder.status === 'delivered' && status && status !== 'delivered') {
-      return NextResponse.json({ error: 'Delivered orders cannot change status' }, { status: 400 })
+    const TERMINAL_STATUSES = ['cancelled', 'cancel_rejected', 'return_rejected', 'returned']
+
+    if (TERMINAL_STATUSES.includes(currentOrder.status)) {
+      return NextResponse.json({ error: `Orders with status '${currentOrder.status}' cannot be modified` }, { status: 400 })
     }
 
-    const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancel_requested', 'cancelled']
     const validPaymentStatuses = ['pending', 'paid', 'failed', 'refunded']
 
-    if (status && !validStatuses.includes(status)) {
-      return NextResponse.json({ error: `Invalid order status: ${status}` }, { status: 400 })
+    if (status && status !== currentOrder.status) {
+      const allowed = VALID_TRANSITIONS[currentOrder.status] ?? []
+      if (!allowed.includes(status)) {
+        return NextResponse.json(
+          { error: `Cannot transition order from '${currentOrder.status}' to '${status}'` },
+          { status: 400 }
+        )
+      }
     }
 
     if (payment_status && !validPaymentStatuses.includes(payment_status)) {

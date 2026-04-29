@@ -1,13 +1,16 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getOrder } from '@/lib/queries'
+import { getOrder, getReturnRequest } from '@/lib/queries'
 import UpdateOrderStatus from '@/components/admin/UpdateOrderStatus'
 import CancelReview from '@/components/admin/CancelReview'
+import ReturnReview from '@/components/admin/ReturnReview'
 import GenerateInvoiceButton from '@/components/admin/GenerateInvoiceButton'
 import InitiateRefundButton from '@/components/admin/InitiateRefundButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
 
 export default async function OrderDetailsPage({ params }: { params: { id: string } }) {
   const order = await getOrder(params.id).catch(() => null)
@@ -15,6 +18,9 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
   if (!order) {
     notFound()
   }
+
+  const returnRequest = await getReturnRequest(params.id).catch(() => null)
+  const isReturnStatus = RETURN_STATUSES.includes(order.status)
 
   return (
     <div className="p-4 sm:p-6">
@@ -50,15 +56,19 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                 : order.status === 'processing' || order.status === 'shipped'
                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-                : order.status === 'cancelled'
+                : order.status === 'cancelled' || order.status === 'return_rejected'
                 ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                : order.status === 'cancel_requested'
+                : order.status === 'cancel_requested' || order.status === 'return_requested'
                 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
                 : order.status === 'cancel_rejected'
                 ? 'bg-gray-100 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300'
+                : order.status === 'returned'
+                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                : order.status === 'return_approved' || order.status === 'return_received'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
                 : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
             }`}>
-              Status: {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status === 'cancel_rejected' ? 'Cancellation Rejected' : order.status}
+              Status: {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status === 'cancel_rejected' ? 'Cancellation Rejected' : order.status.replace(/_/g, ' ')}
             </span>
             {order.invoice_number ? (
               <a
@@ -165,6 +175,35 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           )}
 
+          {isReturnStatus && returnRequest && (
+            <div className={`bg-surface-elevated rounded-lg shadow-sm border-2 ${
+              order.status === 'return_rejected' || order.status === 'returned'
+                ? 'border-gray-200 dark:border-gray-700'
+                : 'border-orange-300 dark:border-orange-800'
+            }`}>
+              <div className={`px-6 py-4 border-b ${
+                order.status === 'return_rejected' || order.status === 'returned'
+                  ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30'
+                  : 'border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30'
+              }`}>
+                <h2 className={`text-lg font-semibold ${
+                  order.status === 'return_rejected' || order.status === 'returned'
+                    ? 'text-gray-700 dark:text-gray-300'
+                    : 'text-orange-900 dark:text-orange-300'
+                }`}>
+                  Return / {returnRequest.type === 'refund' ? 'Refund' : 'Replacement'} Request
+                </h2>
+              </div>
+              <div className="p-4 sm:p-6">
+                <ReturnReview
+                  orderId={order.id}
+                  returnRequest={returnRequest}
+                  replacementOrderNumber={returnRequest.replacement_order_number || null}
+                />
+              </div>
+            </div>
+          )}
+
           {order.status === 'cancelled' && order.payment_status === 'paid' && (
             <InitiateRefundButton
               orderId={order.id}
@@ -173,7 +212,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             />
           )}
 
-          {order.status !== 'cancelled' && (
+          {order.status !== 'cancelled' && !isReturnStatus && (
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Update Order Status</h2>

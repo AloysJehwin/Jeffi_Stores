@@ -364,3 +364,15 @@ export async function getOrder(id: string) {
   if (!order) throw new Error('Order not found')
   return order
 }
+
+export async function getReturnRequest(orderId: string) {
+  const returnRequest = await queryOne(`
+    SELECT rr.*, o2.order_number AS replacement_order_number
+    FROM return_requests rr
+    LEFT JOIN orders o2 ON o2.id = rr.replacement_order_id
+    WHERE rr.order_id = $1
+    ORDER BY rr.created_at DESC
+    LIMIT 1
+  `, [orderId])
+  return returnRequest || null
+}

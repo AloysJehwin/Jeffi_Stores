@@ -386,7 +386,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
   }
 }
 
-export async function sendNewOrderNotification(order: any, orderItems: any[], user: any) {
+export async function sendNewOrderNotification(order: any, orderItems: any[], _user: any) {
   const adminEmail = process.env.ADMIN_EMAIL || 'jeffistoress@gmail.com'
   
   const mailOptions = {
@@ -1473,6 +1473,96 @@ export async function sendSupportEscalationEmail(
           <a href="${chatLink}" class="cta">Open Support Chat</a>
         </div>
         <div class="footer"><p>Jeffi Stores Admin Notification — do not reply to this email.</p></div>
+      </div></body></html>
+    `,
+  }
+
+  try {
+    await transporter.sendMail(mailOptions)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+type ReturnEmailEvent = 'requested_admin' | 'approved' | 'rejected' | 'received' | 'replacement_created'
+
+export async function sendReturnStatusEmail(
+  recipientEmail: string | string[],
+  recipientName: string,
+  orderNumber: string,
+  orderId: string,
+  event: ReturnEmailEvent,
+  extra?: { adminNotes?: string; replacementOrderNumber?: string; returnType?: string; reason?: string; appUrl?: string }
+): Promise<{ success: boolean; error?: unknown }> {
+  const appUrl = extra?.appUrl || process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'
+  const orderLink = `${appUrl}/account/orders/${orderId}`
+  const to = Array.isArray(recipientEmail) ? recipientEmail.join(', ') : recipientEmail
+
+  const subjects: Record<ReturnEmailEvent, string> = {
+    requested_admin:    `Return/Replacement Request — Order #${orderNumber}`,
+    approved:           `Your Return Request Has Been Approved — Order #${orderNumber}`,
+    rejected:           `Your Return Request Was Not Approved — Order #${orderNumber}`,
+    received:           `We've Received Your Return — Order #${orderNumber}`,
+    replacement_created:`Your Replacement Order Has Been Created — Order #${orderNumber}`,
+  }
+
+  const bodies: Record<ReturnEmailEvent, string> = {
+    requested_admin: `
+      <p style="font-size:15px;font-weight:bold;color:#1f2937;">New Return / Replacement Request</p>
+      <p>A customer has submitted a return/replacement request for order <strong>#${orderNumber}</strong>.</p>
+      <div style="background:#fff7ed;border-left:4px solid #f97316;padding:16px;border-radius:4px;margin:20px 0">
+        <p style="margin:0 0 6px"><strong>Customer:</strong> ${recipientName}</p>
+        <p style="margin:0 0 6px"><strong>Type:</strong> ${extra?.returnType || 'N/A'}</p>
+        <p style="margin:0"><strong>Reason:</strong> ${extra?.reason || 'N/A'}</p>
+      </div>
+      <a href="${appUrl}/admin/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">Review Request</a>
+    `,
+    approved: `
+      <p>Your return/replacement request for order <strong>#${orderNumber}</strong> has been <strong style="color:#16a34a;">approved</strong>.</p>
+      <p>Please ship the item(s) back to us. Our team will contact you with the return shipping address and instructions shortly.</p>
+      <p>Once we receive and inspect the item, we will process your ${extra?.returnType === 'replacement' ? 'replacement shipment' : 'refund'} promptly.</p>
+      <a href="${orderLink}" style="display:inline-block;background:#5a8a00;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">View Order</a>
+    `,
+    rejected: `
+      <p>We have reviewed your return/replacement request for order <strong>#${orderNumber}</strong>.</p>
+      <p>Unfortunately, we are unable to approve this request at this time.</p>
+      ${extra?.adminNotes ? `<div style="background:#fef2f2;border-left:4px solid #ef4444;padding:16px;border-radius:4px;margin:16px 0"><p style="margin:0"><strong>Reason:</strong> ${extra.adminNotes}</p></div>` : ''}
+      <p>If you have questions, please contact our support team.</p>
+      <a href="${orderLink}" style="display:inline-block;background:#5a8a00;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">View Order</a>
+    `,
+    received: `
+      <p>We have received your returned item(s) for order <strong>#${orderNumber}</strong>.</p>
+      <p>Our team is now inspecting the item and will process your ${extra?.returnType === 'replacement' ? 'replacement shipment' : 'refund'} shortly. You will receive another notification once it is done.</p>
+      <a href="${orderLink}" style="display:inline-block;background:#5a8a00;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">View Order</a>
+    `,
+    replacement_created: `
+      <p>Great news! Your replacement order has been created for original order <strong>#${orderNumber}</strong>.</p>
+      ${extra?.replacementOrderNumber ? `<p>Your new order number is <strong>#${extra.replacementOrderNumber}</strong>. It has been confirmed and will be processed shortly.</p>` : ''}
+      <a href="${orderLink}" style="display:inline-block;background:#5a8a00;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">View Original Order</a>
+    `,
+  }
+
+  const mailOptions = {
+    from: `"Jeffi Stores" <${process.env.SES_FROM_EMAIL}>`,
+    to,
+    subject: subjects[event],
+    html: `
+      <!DOCTYPE html><html><head><style>
+        body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
+        .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+        .header{background:#5a8a00;padding:24px;text-align:center}
+        .logo{font-size:24px;font-weight:bold;color:#fff}
+        .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
+        .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
+      </style></head>
+      <body><div class="container">
+        <div class="header"><div class="logo">Jeffi Stores</div></div>
+        <div class="body">
+          ${event !== 'requested_admin' ? `<p>Hi ${recipientName},</p>` : ''}
+          ${bodies[event]}
+        </div>
+        <div class="footer"><p>Jeffi Stores — do not reply to this email.</p></div>
       </div></body></html>
     `,
   }
