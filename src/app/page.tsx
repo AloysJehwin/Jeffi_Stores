@@ -106,7 +106,7 @@ export default async function HomePage() {
               <img
                 src="/images/Welcome.png"
                 alt="Industrial hardware and tools"
-                className="w-64 sm:w-80 md:w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
+                className="w-80 sm:w-96 md:w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
                 style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
               />
             </div>
