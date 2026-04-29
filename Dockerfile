@@ -56,6 +56,12 @@ COPY --from=deps /app/node_modules/js-md5 ./node_modules/js-md5
 COPY --from=deps /app/node_modules/linebreak ./node_modules/linebreak
 COPY --from=deps /app/node_modules/png-js ./node_modules/png-js
 
+# Copy qrcode + bwip-js (used for packing slip PDF QR and barcode generation)
+COPY --from=deps /app/node_modules/qrcode ./node_modules/qrcode
+COPY --from=deps /app/node_modules/dijkstrajs ./node_modules/dijkstrajs
+COPY --from=deps /app/node_modules/encode-utf8 ./node_modules/encode-utf8
+COPY --from=deps /app/node_modules/bwip-js ./node_modules/bwip-js
+
 # Copy database migration files
 COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 
