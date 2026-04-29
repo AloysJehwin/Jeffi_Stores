@@ -147,7 +147,7 @@ export default function CartPage() {
                         </div>
 
                         {/* Stock Status */}
-                        {stockQty < item.quantity && (
+                        {stockQty < Number(item.quantity) && (
                           <p className="text-sm text-red-600 dark:text-red-400 mt-2">
                             Only {stockQty} left in stock
                           </p>
@@ -157,16 +157,31 @@ export default function CartPage() {
                         <div className="mt-4 flex items-center gap-4">
                           {isCustomQty ? (
                             <div className="flex items-center gap-2">
-                              <span className="px-3 py-2 border border-border-secondary rounded-lg bg-surface-secondary text-foreground font-semibold text-sm">
-                                {Number(item.quantity).toFixed(3)} {item.buy_unit ?? ''}
-                              </span>
+                              <input
+                                type="number"
+                                min="0.001"
+                                step="0.001"
+                                defaultValue={Number(item.quantity).toFixed(3)}
+                                onBlur={(e) => {
+                                  const val = parseFloat(e.target.value)
+                                  if (!isNaN(val) && val > 0 && val !== Number(item.quantity)) {
+                                    handleQuantityChange(item.id, val)
+                                  } else {
+                                    e.target.value = Number(item.quantity).toFixed(3)
+                                  }
+                                }}
+                                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                disabled={isUpdating}
+                                className="w-24 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground font-semibold text-sm text-center focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
+                              />
+                              <span className="text-sm text-foreground-muted">{item.buy_unit}</span>
                               <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{item.buy_unit}</span>
                             </div>
                           ) : (
                             <div className="flex items-center border border-border-secondary rounded-lg">
                               <button
-                                onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                                disabled={isUpdating || item.quantity <= 1}
+                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) - 1)}
+                                disabled={isUpdating || Number(item.quantity) <= 1}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -179,8 +194,8 @@ export default function CartPage() {
                                 ) : Math.round(Number(item.quantity))}
                               </span>
                               <button
-                                onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                                disabled={isUpdating || item.quantity >= stockQty}
+                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) + 1)}
+                                disabled={isUpdating || Number(item.quantity) >= stockQty}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
