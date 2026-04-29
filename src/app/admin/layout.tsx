@@ -3,6 +3,7 @@ import { logoutAction } from './logout-action'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import AdminMobileNav from '@/components/admin/AdminMobileNav'
+import AdminSidebarNav from '@/components/admin/AdminSidebarNav'
 import ThemeToggle from '@/components/ThemeToggle'
 
 export const metadata = {
@@ -58,55 +59,66 @@ export default async function AdminLayout({
 
   const filteredNavLinks = navLinks.filter(link => hasScope(role, scopes, link.scope))
 
+  const usernameInitial = (session?.username || 'A')[0].toUpperCase()
+
   return (
-    <div className="min-h-screen flex flex-col bg-surface-secondary">
-      <nav className="bg-secondary-500 dark:bg-secondary-700 text-white shadow-lg">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-2 shrink-0">
-              <AdminMobileNav
-                navLinks={filteredNavLinks}
-                username={session?.username || 'Admin'}
-                role={session?.role || 'user'}
-              />
-              <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
-              </svg>
-              <span className="text-base font-bold whitespace-nowrap">Jeffi Admin</span>
-            </div>
+    <div className="min-h-screen flex flex-row bg-surface-secondary">
+      {/* Left sidebar — desktop only */}
+      <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white sticky top-0 h-screen">
+        <div className="flex items-center gap-2 px-4 py-4 border-b border-white/10">
+          <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
+          </svg>
+          <span className="text-base font-bold">Jeffi Admin</span>
+        </div>
 
-            <div className="hidden md:flex items-center gap-1 overflow-x-auto">
-              {filteredNavLinks.map(link => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-white/10 transition-colors whitespace-nowrap"
-                >
-                  {link.label}
-                </a>
-              ))}
-            </div>
+        <AdminSidebarNav navLinks={filteredNavLinks} />
+      </aside>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <ThemeToggle variant="admin" />
-              <span className="hidden lg:inline text-sm whitespace-nowrap">
-                {session?.username || 'Admin'} <span className="text-gray-300 text-xs">({session?.role || 'user'})</span>
-              </span>
-              <form action={logoutAction}>
-                <button
-                  type="submit"
-                  className="bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
-                >
-                  Logout
-                </button>
-              </form>
+      {/* Right column: top bar + content */}
+      <div className="flex flex-col flex-1 min-w-0">
+
+        {/* Top bar — admin profile & actions */}
+        <div className="flex items-center justify-between px-4 h-12 bg-surface-elevated border-b border-border-default shrink-0 shadow-sm">
+          {/* Mobile: hamburger + logo */}
+          <div className="flex items-center gap-2 md:hidden">
+            <AdminMobileNav
+              navLinks={filteredNavLinks}
+              username={session?.username || 'Admin'}
+              role={session?.role || 'user'}
+            />
+            <span className="font-bold text-foreground text-sm">Jeffi Admin</span>
+          </div>
+          {/* Desktop: spacer */}
+          <div className="hidden md:block" />
+
+          {/* Right side: avatar + name + role + theme + logout */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-secondary-500 dark:bg-secondary-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                {usernameInitial}
+              </div>
+              <div className="hidden sm:block leading-tight">
+                <p className="text-xs font-semibold text-foreground leading-none">{session?.username || 'Admin'}</p>
+                <p className="text-[10px] text-foreground-muted capitalize">{session?.role || 'user'}</p>
+              </div>
             </div>
+            <ThemeToggle variant="admin" />
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors"
+              >
+                Logout
+              </button>
+            </form>
           </div>
         </div>
-      </nav>
-      <main className="bg-surface-secondary flex-1 pb-20 md:pb-0">
-        {children}
-      </main>
+
+        <main className="flex-1 bg-surface-secondary">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }
