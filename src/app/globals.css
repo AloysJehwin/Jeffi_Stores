@@ -78,7 +78,7 @@
     min-height: 100vh;
   }
 
-  body > div {
+  body > div:first-of-type {
     @apply bg-surface;
     min-height: 100vh;
   }
