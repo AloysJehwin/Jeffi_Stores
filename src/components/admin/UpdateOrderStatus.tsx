@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSelect from './AdminSelect'
 
@@ -11,6 +11,53 @@ interface UpdateOrderStatusProps {
   currentTrackingUrl?: string | null
 }
 
+const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
+  pending:          ['confirmed', 'cancel_requested', 'cancelled'],
+  confirmed:        ['processing', 'cancel_requested', 'cancelled'],
+  processing:       ['shipped', 'cancel_requested'],
+  shipped:          ['delivered'],
+  delivered:        [],
+  cancel_requested: ['cancelled', 'cancel_rejected'],
+  cancel_rejected:  [],
+  cancelled:        [],
+}
+
+const VALID_PAYMENT_TRANSITIONS: Record<string, string[]> = {
+  pending:  ['paid', 'failed'],
+  paid:     ['refunded'],
+  failed:   ['paid', 'pending'],
+  refunded: [],
+}
+
+const PAYMENT_ALLOWED_FOR_STATUS: Record<string, string[]> = {
+  pending:          ['pending', 'failed'],
+  confirmed:        ['pending', 'paid', 'failed'],
+  processing:       ['paid'],
+  shipped:          ['paid'],
+  delivered:        ['paid'],
+  cancel_requested: ['pending', 'paid', 'failed'],
+  cancel_rejected:  ['pending', 'paid', 'failed'],
+  cancelled:        ['pending', 'failed', 'refunded'],
+}
+
+const ALL_STATUS_OPTIONS = [
+  { value: 'pending',          label: 'Pending' },
+  { value: 'confirmed',        label: 'Confirmed' },
+  { value: 'processing',       label: 'Processing' },
+  { value: 'shipped',          label: 'Shipped' },
+  { value: 'delivered',        label: 'Delivered' },
+  { value: 'cancel_requested', label: 'Cancel Requested' },
+  { value: 'cancel_rejected',  label: 'Cancel Rejected' },
+  { value: 'cancelled',        label: 'Cancelled' },
+]
+
+const ALL_PAYMENT_OPTIONS = [
+  { value: 'pending',  label: 'Pending' },
+  { value: 'paid',     label: 'Paid' },
+  { value: 'failed',   label: 'Failed' },
+  { value: 'refunded', label: 'Refunded' },
+]
+
 export default function UpdateOrderStatus({ orderId, currentStatus, currentPaymentStatus, currentTrackingUrl }: UpdateOrderStatusProps) {
   const [status, setStatus] = useState(currentStatus)
   const [paymentStatus, setPaymentStatus] = useState(currentPaymentStatus)
@@ -18,11 +65,42 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [paymentAutoResetNote, setPaymentAutoResetNote] = useState<string | null>(null)
   const router = useRouter()
+
+  const allowedStatuses = [currentStatus, ...(VALID_STATUS_TRANSITIONS[currentStatus] ?? [])]
+  const allowedPaymentStatuses = [currentPaymentStatus, ...(VALID_PAYMENT_TRANSITIONS[currentPaymentStatus] ?? [])]
+
+  const statusOptions = ALL_STATUS_OPTIONS.filter(o => allowedStatuses.includes(o.value))
+  const allowedForStatus = PAYMENT_ALLOWED_FOR_STATUS[status] ?? []
+  const paymentOptions = ALL_PAYMENT_OPTIONS.filter(o =>
+    allowedPaymentStatuses.includes(o.value) && allowedForStatus.includes(o.value)
+  )
+
+  useEffect(() => {
+    const allowed = PAYMENT_ALLOWED_FOR_STATUS[status] ?? []
+    if (!allowed.includes(paymentStatus)) {
+      const firstValid = allowedPaymentStatuses.find(ps => allowed.includes(ps))
+      if (firstValid) {
+        setPaymentStatus(firstValid)
+        setPaymentAutoResetNote(`Payment status reset to "${firstValid}" — not compatible with order status "${status}".`)
+      }
+    } else {
+      setPaymentAutoResetNote(null)
+    }
+  }, [status])
+
+  const crossFieldError = !(PAYMENT_ALLOWED_FOR_STATUS[status] ?? []).includes(paymentStatus)
+    ? `Payment status "${paymentStatus}" is not valid for an order in "${status}" status.`
+    : null
 
   async function handleUpdate() {
     if (status === 'shipped' && !trackingUrl.trim()) {
       setError('A tracking URL is required when marking an order as shipped.')
+      return
+    }
+    if (crossFieldError) {
+      setError(crossFieldError)
       return
     }
 
@@ -43,7 +121,8 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       })
 
       if (!response.ok) {
-        throw new Error('Failed to update order')
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to update order')
       }
 
       const data = await response.json()
@@ -59,9 +138,10 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       }
 
       setSuccess(successMessage)
+      setPaymentAutoResetNote(null)
       router.refresh()
-    } catch {
-      setError('Failed to update order. Please try again.')
+    } catch (err: any) {
+      setError(err.message || 'Failed to update order. Please try again.')
     } finally {
       setIsUpdating(false)
     }
@@ -69,6 +149,15 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
 
   const hasChanges = status !== currentStatus || paymentStatus !== currentPaymentStatus ||
     (status === 'shipped' && trackingUrl.trim() !== (currentTrackingUrl || ''))
+
+  const isTerminal = (VALID_STATUS_TRANSITIONS[currentStatus]?.length === 0) &&
+    (VALID_PAYMENT_TRANSITIONS[currentPaymentStatus]?.length === 0)
+
+  if (isTerminal) {
+    return (
+      <p className="text-sm text-foreground-muted">This order is in a terminal state and cannot be modified.</p>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -84,35 +173,27 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
         </div>
       )}
 
+      {paymentAutoResetNote && (
+        <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-800 dark:text-blue-300 text-sm">
+          {paymentAutoResetNote}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <AdminSelect
           id="status"
           label="Order Status"
           value={status}
-          onChange={(val) => setStatus(val)}
-          options={[
-            { value: 'pending', label: 'Pending' },
-            { value: 'confirmed', label: 'Confirmed' },
-            { value: 'processing', label: 'Processing' },
-            { value: 'shipped', label: 'Shipped' },
-            { value: 'delivered', label: 'Delivered' },
-            { value: 'cancel_requested', label: 'Cancel Requested' },
-            { value: 'cancel_rejected', label: 'Cancel Rejected' },
-            { value: 'cancelled', label: 'Cancelled' },
-          ]}
+          onChange={(val) => { setStatus(val); setError(null) }}
+          options={statusOptions}
         />
 
         <AdminSelect
           id="payment_status"
           label="Payment Status"
           value={paymentStatus}
-          onChange={(val) => setPaymentStatus(val)}
-          options={[
-            { value: 'pending', label: 'Pending' },
-            { value: 'paid', label: 'Paid' },
-            { value: 'failed', label: 'Failed' },
-            { value: 'refunded', label: 'Refunded' },
-          ]}
+          onChange={(val) => { setPaymentStatus(val); setError(null); setPaymentAutoResetNote(null) }}
+          options={paymentOptions}
         />
       </div>
 
@@ -133,10 +214,16 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
         </div>
       )}
 
+      {crossFieldError && (
+        <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
+          {crossFieldError}
+        </div>
+      )}
+
       <button
         type="button"
         onClick={handleUpdate}
-        disabled={isUpdating || !hasChanges}
+        disabled={isUpdating || !hasChanges || !!crossFieldError}
         className="w-full px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isUpdating ? 'Updating...' : 'Update Order'}
