@@ -309,32 +309,29 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
             </div>
 
             <div>
-              <label htmlFor="modal_address_line2" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Locality / Village
-              </label>
               {localities.length > 0 ? (
-                <div className="flex gap-2">
-                  <select
+                <CustomSelect
+                  id="modal_address_line2"
+                  label="Locality / Village"
+                  value={formData.address_line2}
+                  onChange={(val) => setFormData({ ...formData, address_line2: val })}
+                  placeholder="Select locality"
+                  options={localities.map((loc) => ({ value: loc, label: loc }))}
+                />
+              ) : (
+                <div>
+                  <label htmlFor="modal_address_line2" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    Locality / Village
+                  </label>
+                  <input
                     id="modal_address_line2"
+                    type="text"
                     value={formData.address_line2}
                     onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
-                    className="flex-1 px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-                  >
-                    <option value="">Select locality</option>
-                    {localities.map((loc) => (
-                      <option key={loc} value={loc}>{loc}</option>
-                    ))}
-                  </select>
+                    className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    placeholder="Area, Colony, Village"
+                  />
                 </div>
-              ) : (
-                <input
-                  id="modal_address_line2"
-                  type="text"
-                  value={formData.address_line2}
-                  onChange={(e) => setFormData({ ...formData, address_line2: e.target.value })}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                  placeholder="Area, Colony, Village"
-                />
               )}
             </div>
 
