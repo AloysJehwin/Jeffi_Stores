@@ -86,10 +86,11 @@ export default function InflationClient({ categories }: { categories: Category[]
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
   const [rollingBack, setRollingBack] = useState<string | null>(null)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
+  const [confirmRollbackLog, setConfirmRollbackLog] = useState<InflationLog | null>(null)
 
   async function handleRollback(log: InflationLog) {
-    if (!confirm(`Roll back +${log.percentage}% inflation on "${log.category_name}"? This will restore all ${log.product_count} products to their previous prices.`)) return
     setRollingBack(log.id)
+    setConfirmRollbackLog(null)
     setRollbackError(null)
     try {
       const res = await fetch('/api/admin/inflation/rollback', {
@@ -398,14 +399,34 @@ export default function InflationClient({ categories }: { categories: Category[]
                       </td>
                       <td className="py-2.5 px-3 text-right" onClick={e => e.stopPropagation()}>
                         {!log.is_rollback && !log.rolled_back_at && log.snapshot && (
-                          <button
-                            type="button"
-                            disabled={rollingBack === log.id}
-                            onClick={() => handleRollback(log)}
-                            className="px-2.5 py-1 text-xs font-medium rounded border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                          >
-                            {rollingBack === log.id ? 'Rolling back…' : 'Rollback'}
-                          </button>
+                          confirmRollbackLog?.id === log.id ? (
+                            <div className="flex items-center gap-2 justify-end">
+                              <span className="text-xs text-foreground-secondary whitespace-nowrap">Are you sure?</span>
+                              <button
+                                type="button"
+                                disabled={rollingBack === log.id}
+                                onClick={() => handleRollback(log)}
+                                className="px-2.5 py-1 text-xs font-medium rounded bg-orange-600 hover:bg-orange-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                              >
+                                {rollingBack === log.id ? 'Rolling back…' : 'Yes, rollback'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmRollbackLog(null)}
+                                className="px-2.5 py-1 text-xs font-medium rounded border border-border-secondary text-foreground-secondary hover:bg-surface transition-colors whitespace-nowrap"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmRollbackLog(log)}
+                              className="px-2.5 py-1 text-xs font-medium rounded border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors whitespace-nowrap"
+                            >
+                              Rollback
+                            </button>
+                          )
                         )}
                       </td>
                     </tr>
