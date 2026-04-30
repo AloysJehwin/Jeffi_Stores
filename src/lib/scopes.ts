@@ -49,6 +49,24 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/customers'],
   },
   {
+    key: 'packing_slips',
+    label: 'Packing Slips',
+    description: 'Download and print packing slips',
+    routes: ['/admin/packing-slips'],
+  },
+  {
+    key: 'quick_scan',
+    label: 'QuickScan',
+    description: 'Scan and update order shipping status',
+    routes: ['/admin/scan'],
+  },
+  {
+    key: 'inflation',
+    label: 'Inflation / Pricing',
+    description: 'Bulk price adjustments via inflation tool',
+    routes: ['/admin/inflation'],
+  },
+  {
     key: 'settings',
     label: 'Settings',
     description: 'System settings and admin management',

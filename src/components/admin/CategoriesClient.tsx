@@ -8,6 +8,7 @@ import {
   DragOverlay,
   closestCenter,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragStartEvent,
@@ -31,6 +32,21 @@ interface Category {
   display_order: number
   is_active: boolean
   parent_category_id: string | null
+}
+
+function DragHandle({ attributes, listeners }: { attributes: any; listeners: any }) {
+  return (
+    <button
+      {...attributes}
+      {...listeners}
+      className="cursor-grab active:cursor-grabbing text-foreground-muted hover:text-foreground p-1 rounded touch-none"
+      title="Drag to reorder"
+    >
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+      </svg>
+    </button>
+  )
 }
 
 function SortableRow({
@@ -68,16 +84,7 @@ function SortableRow({
     >
       <td className="px-4 py-3 whitespace-nowrap">
         <div className={`flex items-center gap-2 ${isSubcat ? 'ml-8' : ''}`}>
-          <button
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing text-foreground-muted hover:text-foreground p-1 rounded touch-none"
-            title="Drag to reorder"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-            </svg>
-          </button>
+          <DragHandle attributes={attributes} listeners={listeners} />
           {!isSubcat && (
             <button
               onClick={onToggleCollapse}
@@ -129,6 +136,69 @@ function SortableRow({
   )
 }
 
+function SortableMobileCard({
+  category,
+  isSubcat,
+  collapsed,
+  onToggleCollapse,
+  subCount,
+}: {
+  category: Category
+  isSubcat: boolean
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+  subCount?: number
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: category.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 ${isSubcat ? 'ml-6' : ''}`}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <DragHandle attributes={attributes} listeners={listeners} />
+          {!isSubcat && subCount !== undefined && subCount > 0 && (
+            <button onClick={onToggleCollapse} className="text-foreground-muted">
+              <svg className={`w-4 h-4 transition-transform ${collapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
+          <div className="text-sm font-semibold text-foreground">
+            {isSubcat && <span className="text-foreground-muted mr-1">└</span>}
+            {category.name}
+          </div>
+          {!isSubcat && subCount !== undefined && subCount > 0 && (
+            <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">{subCount}</span>
+          )}
+        </div>
+        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${category.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+          {category.is_active ? 'Active' : 'Inactive'}
+        </span>
+      </div>
+      <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
+        <span>{category.slug}</span>
+        <span>Order: {category.display_order}</span>
+      </div>
+      <div className="flex items-center justify-end gap-3 text-sm">
+        <Link href={`/admin/categories/edit/${category.id}`} className="text-accent-500 font-medium">Edit</Link>
+        <DeleteCategoryButton categoryId={category.id} categoryName={category.name} />
+      </div>
+    </div>
+  )
+}
+
 export default function CategoriesClient({ initialCategories }: { initialCategories: Category[] }) {
   const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -137,7 +207,10 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   const [saving, setSaving] = useState(false)
   const router = useRouter()
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  )
 
   const mainCategories = categories.filter(c => !c.parent_category_id).sort((a, b) => a.display_order - b.display_order)
   const getSubcats = useCallback(
@@ -302,6 +375,8 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={flatOrder.map(c => c.id)} strategy={verticalListSortingStrategy}>
+
+          {/* Desktop table */}
           <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
             <table className="min-w-full divide-y divide-border-default">
               <thead className="bg-surface-secondary">
@@ -347,6 +422,35 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
               </tbody>
             </table>
           </div>
+
+          {/* Mobile cards */}
+          <div className="md:hidden space-y-2">
+            {mainCategories.length > 0 ? mainCategories.map(cat => {
+              const subcats = getSubcats(cat.id)
+              const isCollapsed = collapsed.has(cat.id)
+              return (
+                <div key={cat.id}>
+                  <SortableMobileCard
+                    category={cat}
+                    isSubcat={false}
+                    collapsed={isCollapsed}
+                    onToggleCollapse={() => toggleCollapse(cat.id)}
+                    subCount={subcats.length}
+                  />
+                  {!isCollapsed && subcats.map(sub => (
+                    <div key={sub.id} className="mt-2">
+                      <SortableMobileCard category={sub} isSubcat={true} />
+                    </div>
+                  ))}
+                </div>
+              )
+            }) : (
+              <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
+                No categories found.
+              </div>
+            )}
+          </div>
+
         </SortableContext>
 
         <DragOverlay>
@@ -357,66 +461,6 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
           )}
         </DragOverlay>
       </DndContext>
-
-      <div className="md:hidden space-y-3">
-        {mainCategories.map(cat => {
-          const subcats = getSubcats(cat.id)
-          const isCollapsed = collapsed.has(cat.id)
-          return (
-            <div key={cat.id}>
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {subcats.length > 0 && (
-                      <button onClick={() => toggleCollapse(cat.id)} className="text-foreground-muted">
-                        <svg className={`w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    )}
-                    <div className="text-sm font-semibold text-foreground">{cat.name}</div>
-                    {subcats.length > 0 && (
-                      <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">{subcats.length}</span>
-                    )}
-                  </div>
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
-                    {cat.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
-                  <span>{cat.slug}</span>
-                  <span>Order: {cat.display_order}</span>
-                </div>
-                <div className="flex items-center justify-end gap-3 text-sm">
-                  <Link href={`/admin/categories/edit/${cat.id}`} className="text-accent-500 font-medium">Edit</Link>
-                  <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} />
-                </div>
-              </div>
-
-              {!isCollapsed && subcats.map(sub => (
-                <div key={sub.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 ml-6 mt-2">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="text-sm text-foreground">
-                      <span className="text-foreground-muted mr-1">└</span>{sub.name}
-                    </div>
-                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
-                      {sub.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
-                    <span>{sub.slug}</span>
-                    <span>Order: {sub.display_order}</span>
-                  </div>
-                  <div className="flex items-center justify-end gap-3 text-sm">
-                    <Link href={`/admin/categories/edit/${sub.id}`} className="text-accent-500 font-medium">Edit</Link>
-                    <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }
