@@ -20,7 +20,7 @@ import { fileURLToPath } from 'url'
 const require = createRequire(import.meta.url)
 const { Pool } = require('pg')
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
 
 // ─── Images from manufacturer site ───────────────────────────────────────────
 // These are the Wix CDN URLs — they block hotlinking, so images must be
@@ -198,15 +198,16 @@ async function run() {
     const brandId = brandRes.rows[0].id
     console.log(`✓ Brand: GMF (${brandId})`)
 
-    // 3. Upsert categories
+    // 3. Upsert categories (parented under Fasteners)
+    const FASTENERS_PARENT_ID = '11111111-1111-1111-1111-111111111101'
     const catIds = {}
-    for (const cat of CATEGORIES) {
+    for (const [i, cat] of CATEGORIES.entries()) {
       const r = await client.query(`
-        INSERT INTO categories (name, slug, description, google_product_category, is_active)
-        VALUES ($1,$2,$3,$4,true)
-        ON CONFLICT (slug) DO UPDATE SET description=EXCLUDED.description
+        INSERT INTO categories (name, slug, description, google_product_category, parent_category_id, display_order, is_active)
+        VALUES ($1,$2,$3,$4,$5,$6,true)
+        ON CONFLICT (slug) DO UPDATE SET description=EXCLUDED.description, parent_category_id=EXCLUDED.parent_category_id
         RETURNING id
-      `, [cat.name, cat.slug, cat.description, cat.google_product_category])
+      `, [cat.name, cat.slug, cat.description, cat.google_product_category, FASTENERS_PARENT_ID, 20 + i])
       catIds[cat.slug] = r.rows[0].id
       console.log(`✓ Category: ${cat.name}`)
     }

@@ -26,6 +26,7 @@ services:
       - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - ./certbot-webroot:/var/www/certbot:ro
+      - ./certs:/etc/nginx/certs:ro
     depends_on:
       - app
     restart: always
