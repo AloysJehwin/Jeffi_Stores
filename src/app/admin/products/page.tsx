@@ -4,21 +4,31 @@ import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
 import AdminFilters from '@/components/admin/AdminFilters'
+import Pagination from '@/components/admin/Pagination'
+
+const PAGE_SIZE = 25
 
 export default async function ProductsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
-  const [products, categories, brands] = await Promise.all([
+  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+
+  const [{ products, total }, categories, brands, allProductsForStats] = await Promise.all([
     getFilteredProducts({
       category_id: searchParams.category_id,
       brand_id: searchParams.brand_id,
       is_active: searchParams.is_active,
       stock: searchParams.stock,
       search: searchParams.search,
+      page,
+      limit: PAGE_SIZE,
     }),
     getAllCategories(),
     getAllBrands(),
+    getFilteredProducts({}),
   ])
 
-  const featuredCount = products?.filter((p: any) => p.is_featured).length || 0
+  const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
+  const activeCount = allProductsForStats.products?.filter((p: any) => p.is_active).length || 0
+  const totalCount = allProductsForStats.total
 
   const allCats: any[] = categories || []
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
@@ -29,6 +39,18 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
       ...subs.map((sub: any) => ({ value: sub.id, label: sub.name, group: cat.name, indent: true })),
     ]
   })
+
+  const buildUrl = (p: number) => {
+    const params = new URLSearchParams()
+    if (searchParams.category_id) params.set('category_id', searchParams.category_id)
+    if (searchParams.brand_id) params.set('brand_id', searchParams.brand_id)
+    if (searchParams.is_active) params.set('is_active', searchParams.is_active)
+    if (searchParams.stock) params.set('stock', searchParams.stock)
+    if (searchParams.search) params.set('search', searchParams.search)
+    if (p > 1) params.set('page', String(p))
+    const qs = params.toString()
+    return `/admin/products${qs ? `?${qs}` : ''}`
+  }
 
   return (
     <div className="p-4 sm:p-6">
@@ -48,7 +70,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{products?.length || 0}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCount}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Featured</p>
@@ -63,40 +85,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Active Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
-            {products?.filter((p: any) => p.is_active).length || 0}
-          </p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{activeCount}</p>
         </div>
       </div>
 
       <AdminFilters
         filters={[
-          {
-            name: 'category_id',
-            label: 'Category',
-            options: categoryOptions,
-          },
-          {
-            name: 'brand_id',
-            label: 'Brand',
-            options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })),
-          },
-          {
-            name: 'is_active',
-            label: 'Status',
-            options: [
-              { value: 'true', label: 'Active' },
-              { value: 'false', label: 'Inactive' },
-            ],
-          },
-          {
-            name: 'stock',
-            label: 'Stock',
-            options: [
-              { value: 'low', label: 'Low Stock' },
-              { value: 'out', label: 'Out of Stock' },
-            ],
-          },
+          { name: 'category_id', label: 'Category', options: categoryOptions },
+          { name: 'brand_id', label: 'Brand', options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })) },
+          { name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
+          { name: 'stock', label: 'Stock', options: [{ value: 'low', label: 'Low Stock' }, { value: 'out', label: 'Out of Stock' }] },
         ]}
         searchPlaceholder="Search by name or SKU..."
         searchParam="search"
@@ -157,9 +155,10 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
           })
         ) : (
           <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
-            No products found. Add your first product to get started.
+            No products found.
           </div>
         )}
+        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
 
       <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
@@ -243,12 +242,15 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
               ) : (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-foreground-muted">
-                    No products found. Add your first product to get started.
+                    No products found.
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+        <div className="px-6 py-3 border-t border-border-default">
+          <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
         </div>
       </div>
     </div>

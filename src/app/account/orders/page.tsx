@@ -51,22 +51,28 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null)
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login?redirect=/account/orders')
     }
     if (user) {
-      fetchOrders()
+      fetchOrders(page)
     }
-  }, [user, isLoading, router])
+  }, [user, isLoading, router, page])
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (p: number) => {
+    setLoading(true)
     try {
-      const response = await fetch('/api/orders')
+      const response = await fetch(`/api/orders?page=${p}`)
       if (response.ok) {
         const data = await response.json()
         setOrders(data.orders || [])
+        setTotal(data.total || 0)
+        setPageSize(data.pageSize || 10)
       }
     } catch {
     } finally {
@@ -78,7 +84,7 @@ export default function OrdersPage() {
     setCancellingOrderId(orderId)
     try {
       await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
-      await fetchOrders()
+      await fetchOrders(page)
     } catch {
     } finally {
       setCancellingOrderId(null)
@@ -346,6 +352,32 @@ export default function OrdersPage() {
                     </div>
                   </div>
                 ))}
+
+                {total > pageSize && (
+                  <div className="flex items-center justify-between pt-4">
+                    <p className="text-sm text-foreground-muted">
+                      Showing <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}</span> of{' '}
+                      <span className="font-medium text-foreground">{total}</span> orders
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page <= 1}
+                        className="px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm text-foreground-muted">Page {page} of {Math.ceil(total / pageSize)}</span>
+                      <button
+                        onClick={() => setPage(p => p + 1)}
+                        disabled={page >= Math.ceil(total / pageSize)}
+                        className="px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

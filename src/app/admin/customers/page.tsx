@@ -1,19 +1,33 @@
 import Link from 'next/link'
 import { getCustomers } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
+import Pagination from '@/components/admin/Pagination'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function CustomersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
-  const { customers, total } = await getCustomers({
-    search: searchParams.search,
-    status: searchParams.status,
-  })
+const PAGE_SIZE = 25
 
-  const activeCount = customers?.filter((c: any) => c.is_active && !c.is_flagged).length || 0
-  const inactiveCount = customers?.filter((c: any) => !c.is_active && !c.is_flagged).length || 0
-  const flaggedCount = customers?.filter((c: any) => c.is_flagged).length || 0
+export default async function CustomersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+
+  const [{ customers, total }, allStats] = await Promise.all([
+    getCustomers({ search: searchParams.search, status: searchParams.status, page, limit: PAGE_SIZE }),
+    getCustomers({}),
+  ])
+
+  const activeCount = allStats.customers?.filter((c: any) => c.is_active && !c.is_flagged).length || 0
+  const inactiveCount = allStats.customers?.filter((c: any) => !c.is_active && !c.is_flagged).length || 0
+  const flaggedCount = allStats.customers?.filter((c: any) => c.is_flagged).length || 0
+
+  const buildUrl = (p: number) => {
+    const params = new URLSearchParams()
+    if (searchParams.status) params.set('status', searchParams.status)
+    if (searchParams.search) params.set('search', searchParams.search)
+    if (p > 1) params.set('page', String(p))
+    const qs = params.toString()
+    return `/admin/customers${qs ? `?${qs}` : ''}`
+  }
 
   return (
     <div className="p-4 sm:p-6">
@@ -25,7 +39,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Customers</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{total}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{allStats.total}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Active</p>
@@ -70,23 +84,17 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
                   {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown'}
                 </span>
                 <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                  customer.is_flagged
-                    ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                    : customer.is_active
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                    : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                  customer.is_flagged ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                  : customer.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                  : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
                 }`}>
                   {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>
               <p className="text-xs text-foreground-muted">{customer.email}</p>
               <div className="flex items-center justify-between mt-2">
-                <span className="text-xs text-foreground-muted">
-                  {Number(customer.order_count)} orders
-                </span>
-                <span className="text-xs text-foreground-muted">
-                  Joined {new Date(customer.created_at).toLocaleDateString('en-IN')}
-                </span>
+                <span className="text-xs text-foreground-muted">{Number(customer.order_count)} orders</span>
+                <span className="text-xs text-foreground-muted">Joined {new Date(customer.created_at).toLocaleDateString('en-IN')}</span>
               </div>
             </Link>
           ))
@@ -95,6 +103,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
             No customers found.
           </div>
         )}
+        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
 
       <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
@@ -127,43 +136,35 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
                       <div className="text-sm text-foreground">{customer.phone || '—'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">
-                        {new Date(customer.created_at).toLocaleDateString('en-IN')}
-                      </div>
+                      <div className="text-sm text-foreground">{new Date(customer.created_at).toLocaleDateString('en-IN')}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-foreground">{Number(customer.order_count)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        customer.is_flagged
-                          ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                          : customer.is_active
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                          : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                        customer.is_flagged ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                        : customer.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                        : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
                       }`}>
                         {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link
-                        href={`/admin/customers/${customer.id}`}
-                        className="text-accent-500 hover:text-accent-600"
-                      >
-                        View
-                      </Link>
+                      <Link href={`/admin/customers/${customer.id}`} className="text-accent-500 hover:text-accent-600">View</Link>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-foreground-muted">
-                    No customers found.
-                  </td>
+                  <td colSpan={7} className="px-6 py-12 text-center text-foreground-muted">No customers found.</td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+        <div className="px-6 py-3 border-t border-border-default">
+          <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
         </div>
       </div>
     </div>

@@ -56,8 +56,9 @@ export async function getAllProducts() {
       ) AS variant_stock_total
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    ORDER BY p.created_at DESC
+    ORDER BY p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC
   `)
   return products
 }
@@ -114,6 +115,8 @@ export async function getFilteredOrders(filters: {
   status?: string
   payment_status?: string
   search?: string
+  page?: number
+  limit?: number
 }) {
   const conditions: string[] = []
   const params: any[] = []
@@ -134,19 +137,27 @@ export async function getFilteredOrders(filters: {
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const limit = filters.limit || 25
+  const offset = ((filters.page || 1) - 1) * limit
 
-  return queryMany(`
-    SELECT
-      o.*,
-      json_build_object(
-        'id', u.id, 'email', u.email, 'first_name', u.first_name,
-        'last_name', u.last_name, 'phone', u.phone
-      ) AS users
-    FROM orders o
-    LEFT JOIN users u ON o.user_id = u.id
-    ${where}
-    ORDER BY o.created_at DESC
-  `, params)
+  const [orders, countResult] = await Promise.all([
+    queryMany(`
+      SELECT
+        o.*,
+        json_build_object(
+          'id', u.id, 'email', u.email, 'first_name', u.first_name,
+          'last_name', u.last_name, 'phone', u.phone
+        ) AS users
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      ${where}
+      ORDER BY o.created_at DESC
+      LIMIT $${i} OFFSET $${i + 1}
+    `, [...params, limit, offset]),
+    queryCount(`SELECT COUNT(*) FROM orders o ${where}`, params),
+  ])
+
+  return { orders, total: countResult }
 }
 
 export async function getFilteredProducts(filters: {
@@ -155,6 +166,8 @@ export async function getFilteredProducts(filters: {
   is_active?: string
   stock?: string
   search?: string
+  page?: number
+  limit?: number
 }) {
   const conditions: string[] = []
   const params: any[] = []
@@ -199,28 +212,37 @@ export async function getFilteredProducts(filters: {
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const limit = filters.limit || 25
+  const offset = ((filters.page || 1) - 1) * limit
 
-  return queryMany(`
-    SELECT
-      p.*,
-      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
-      json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
-      COALESCE(
-        (SELECT json_agg(pi ORDER BY pi.display_order)
-         FROM product_images pi WHERE pi.product_id = p.id),
-        '[]'::json
-      ) AS product_images,
-      COALESCE(
-        (SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
-        0
-      ) AS variant_stock_total,
-      (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN brands b ON p.brand_id = b.id
-    ${where}
-    ORDER BY p.is_featured DESC, p.created_at DESC
-  `, params)
+  const [products, total] = await Promise.all([
+    queryMany(`
+      SELECT
+        p.*,
+        json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+        json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
+        COALESCE(
+          (SELECT json_agg(pi ORDER BY pi.display_order)
+           FROM product_images pi WHERE pi.product_id = p.id),
+          '[]'::json
+        ) AS product_images,
+        COALESCE(
+          (SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+          0
+        ) AS variant_stock_total,
+        (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_category_id = pc.id
+      LEFT JOIN brands b ON p.brand_id = b.id
+      ${where}
+      ORDER BY p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC
+      LIMIT $${i} OFFSET $${i + 1}
+    `, [...params, limit, offset]),
+    queryCount(`SELECT COUNT(*) FROM products p ${where}`, params),
+  ])
+
+  return { products, total }
 }
 
 export async function getFilteredCategories(filters: {

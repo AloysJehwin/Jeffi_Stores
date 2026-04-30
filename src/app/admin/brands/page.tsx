@@ -1,12 +1,15 @@
 import Link from 'next/link'
-import { queryMany } from '@/lib/db'
+import { queryMany, queryCount } from '@/lib/db'
 import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
 import AdminFilters from '@/components/admin/AdminFilters'
+import Pagination from '@/components/admin/Pagination'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-async function getFilteredBrands(filters: { is_active?: string; search?: string }) {
+const PAGE_SIZE = 25
+
+async function getFilteredBrands(filters: { is_active?: string; search?: string; page?: number; limit?: number }) {
   const conditions: string[] = []
   const params: any[] = []
   let i = 1
@@ -22,18 +25,37 @@ async function getFilteredBrands(filters: { is_active?: string; search?: string 
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-  return queryMany(`SELECT * FROM brands ${where} ORDER BY name ASC`, params)
+  const limit = filters.limit || 25
+  const offset = ((filters.page || 1) - 1) * limit
+
+  const [brands, total] = await Promise.all([
+    queryMany(`SELECT * FROM brands ${where} ORDER BY name ASC LIMIT $${i} OFFSET $${i + 1}`, [...params, limit, offset]),
+    queryCount(`SELECT COUNT(*) FROM brands ${where}`, params),
+  ])
+
+  return { brands, total }
 }
 
 export default async function BrandsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
-  const brands = await getFilteredBrands({
-    is_active: searchParams.is_active,
-    search: searchParams.search,
-  })
+  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
 
-  const totalBrands = brands?.length || 0
-  const activeBrands = brands?.filter((b: any) => b.is_active).length || 0
+  const [{ brands, total }, allStats] = await Promise.all([
+    getFilteredBrands({ is_active: searchParams.is_active, search: searchParams.search, page, limit: PAGE_SIZE }),
+    getFilteredBrands({}),
+  ])
+
+  const totalBrands = allStats.total
+  const activeBrands = allStats.brands?.filter((b: any) => b.is_active).length || 0
   const inactiveBrands = totalBrands - activeBrands
+
+  const buildUrl = (p: number) => {
+    const params = new URLSearchParams()
+    if (searchParams.is_active) params.set('is_active', searchParams.is_active)
+    if (searchParams.search) params.set('search', searchParams.search)
+    if (p > 1) params.set('page', String(p))
+    const qs = params.toString()
+    return `/admin/brands${qs ? `?${qs}` : ''}`
+  }
 
   return (
     <div className="p-4 sm:p-6">
@@ -120,6 +142,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
             No brands found. Add your first brand to get started.
           </div>
         )}
+        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
 
       <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
@@ -190,6 +213,9 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
               )}
             </tbody>
           </table>
+        </div>
+        <div className="px-6 py-3 border-t border-border-default">
+          <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
         </div>
       </div>
     </div>
