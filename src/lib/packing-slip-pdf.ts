@@ -1,4 +1,5 @@
 import { queryMany } from '@/lib/db'
+import path from 'path'
 
 const PDFDocument = eval('require')('pdfkit')
 const QRCode = eval('require')('qrcode')
@@ -74,13 +75,15 @@ const ML = 36
 const MR = 36
 const CW = PAGE_W - ML - MR
 
-const NAVY = '#1e3a5f'
-const LIGHT_BG = '#f4f6f9'
+const GREEN_DARK = '#3d6b00'
+const GREEN_MID  = '#5a8a00'  // used for order bar bg
+const GREEN_MAIN = '#7cb900'  // used for total bar + footer
+const LIGHT_BG   = '#f4f9ea'
 const RULE_COLOR = '#cccccc'
-const TEXT_DARK = '#111111'
-const TEXT_MID = '#444444'
+const TEXT_DARK  = '#111111'
+const TEXT_MID   = '#444444'
 const TEXT_MUTED = '#666666'
-const TEXT_LIGHT = '#a8c4e0'
+const TEXT_LIGHT = '#d4edaa'
 
 async function generateQRBuffer(orderNumber: string): Promise<Buffer> {
   return QRCode.toBuffer(orderNumber, {
@@ -127,30 +130,35 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   try { barBuf = await generateBarcodeBuffer(order.order_number) } catch {}
 
   const QR_SIZE = 66
-
   const HEADER_H = 90
 
-  box(doc, 0, 0, PAGE_W, HEADER_H, NAVY)
+  const LOGO_SIZE = 58
+  const LOGO_PATH = path.join(process.cwd(), 'public', 'images', 'store-logo.png')
 
-  const textZoneW = CW - QR_SIZE - 16
+  box(doc, 0, 0, PAGE_W, HEADER_H, GREEN_DARK)
 
+  const textZoneW = CW - LOGO_SIZE - QR_SIZE - 24
+
+  try { doc.image(LOGO_PATH, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE }) } catch {}
+
+  const textX = ML + LOGO_SIZE + 12
   doc.font('Helvetica-Bold').fontSize(20).fillColor('#ffffff')
-  doc.text(store.name.toUpperCase(), ML, 14, { width: textZoneW, lineBreak: false })
+  doc.text(store.name.toUpperCase(), textX, 14, { width: textZoneW, lineBreak: false })
 
   doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_LIGHT)
   let hy = 38
   const addrLine = [store.address, store.city].filter(Boolean).join(', ')
   if (addrLine) {
-    doc.text(addrLine, ML, hy, { width: textZoneW, lineBreak: false })
+    doc.text(addrLine, textX, hy, { width: textZoneW, lineBreak: false })
     hy += 11
   }
   const contactParts = [store.phone && `Ph: ${store.phone}`, store.email].filter(Boolean)
   if (contactParts.length) {
-    doc.text(contactParts.join('  |  '), ML, hy, { width: textZoneW, lineBreak: false })
+    doc.text(contactParts.join('  |  '), textX, hy, { width: textZoneW, lineBreak: false })
     hy += 11
   }
-  doc.font('Helvetica-Bold').fontSize(9).fillColor('#dce8f5')
-  doc.text('PACKING SLIP', ML, hy, { width: textZoneW, lineBreak: false })
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(TEXT_LIGHT)
+  doc.text('PACKING SLIP', textX, hy, { width: textZoneW, lineBreak: false })
 
   if (qrBuf) {
     try { doc.image(qrBuf, PAGE_W - MR - QR_SIZE, Math.floor((HEADER_H - QR_SIZE) / 2), { width: QR_SIZE, height: QR_SIZE }) } catch {}
@@ -160,7 +168,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
   box(doc, ML, y, CW, 24, LIGHT_BG)
   doc.rect(ML, y, CW, 24).lineWidth(0.4).strokeColor(RULE_COLOR).stroke()
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY)
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(GREEN_DARK)
   doc.text(`ORDER: #${order.order_number}`, ML + 8, y + 8, { lineBreak: false })
   doc.font('Helvetica').fontSize(8).fillColor(TEXT_MID)
   doc.text(`Date: ${fmtDate(order.created_at)}`, ML + 8 + 200, y + 8, { lineBreak: false })
@@ -218,7 +226,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   hRule(doc, ML, y + HEADER_ROW_H, ML + COL1W, RULE_COLOR, 0.4)
   hRule(doc, COL2X, y + HEADER_ROW_H, COL2X + COL2W, RULE_COLOR, 0.4)
 
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY)
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(GREEN_DARK)
   doc.text('SHIP TO', ML + 8, y + 6, { lineBreak: false })
   doc.text('ORDER ITEMS', COL2X + 8, y + 6, { lineBreak: false })
 
@@ -249,7 +257,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
     const phone = addr.phone || order.customer_phone
     if (phone) {
-      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(NAVY)
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(GREEN_DARK)
       doc.text(`Ph: ${phone}`, ML + 8, addrY, { width: COL1W - 16, lineBreak: false })
     }
   } else {
@@ -262,8 +270,8 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
   let iy = y + HEADER_ROW_H + INNER_PAD
 
-  box(doc, COL2X + 1, iy, COL2W - 2, COL_HDR_H, '#edf0f5')
-  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(NAVY)
+  box(doc, COL2X + 1, iy, COL2W - 2, COL_HDR_H, '#e8f5c8')
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GREEN_DARK)
   doc.text('PRODUCT', tblX, iy + 5, { width: COL_PROD, lineBreak: false })
   doc.text('QTY', tblX + COL_PROD, iy + 5, { width: COL_QTY, align: 'center', lineBreak: false })
   doc.text('AMOUNT', tblX + COL_PROD + COL_QTY, iy + 5, { width: COL_AMT, align: 'right', lineBreak: false })
@@ -299,32 +307,34 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     doc.text(`-${rs(order.discount_amount)}`, tblX + COL_PROD + COL_QTY, totalBarY - 14, { width: COL_AMT, align: 'right', lineBreak: false })
   }
 
-  box(doc, COL2X + 1, totalBarY, COL2W - 2, TOTAL_BAR_H, NAVY)
+  box(doc, COL2X + 1, totalBarY, COL2W - 2, TOTAL_BAR_H, GREEN_MAIN)
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#ffffff')
   doc.text('TOTAL', tblX, totalBarY + 7, { width: COL_PROD + COL_QTY - 4, align: 'right', lineBreak: false })
   doc.text(rs(order.total_amount), tblX + COL_PROD + COL_QTY, totalBarY + 7, { width: COL_AMT, align: 'right', lineBreak: false })
 
   y = y + SECTION_H + 14
 
-  hRule(doc, ML, y, ML + CW, NAVY, 1)
+  hRule(doc, ML, y, ML + CW, GREEN_MID, 1)
   y += 12
 
   const INFO_COL_W = Math.floor(CW * 0.55)
   const INFO_COL2_X = ML + INFO_COL_W + 16
 
   const infoStartY = y
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY)
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(GREEN_DARK)
   doc.text('SELLER DETAILS', ML, y, { lineBreak: false })
   y += 11
   doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_MID)
 
-  const sellerAddrParts: string[] = []
-  if (store.name) sellerAddrParts.push(store.name)
-  if (store.address) sellerAddrParts.push(store.address)
-  if (store.city) sellerAddrParts.push(store.city)
-  doc.text(sellerAddrParts.join(', '), ML, y, { width: INFO_COL_W, lineBreak: false })
-  y += 11
-
+  if (store.name) {
+    doc.text(store.name, ML, y, { width: INFO_COL_W, lineBreak: false })
+    y += 10
+  }
+  if (store.address || store.city) {
+    const addrStr = [store.address, store.city].filter(Boolean).join(', ')
+    doc.text(addrStr, ML, y, { width: INFO_COL_W })
+    y = doc.y + 2
+  }
   if (store.phone) {
     doc.text(`Ph: ${store.phone}`, ML, y, { width: INFO_COL_W, lineBreak: false })
     y += 10
@@ -336,7 +346,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     doc.text(sellerLine2Parts.join('   |   '), ML, y, { width: INFO_COL_W, lineBreak: false })
   }
 
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY)
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(GREEN_DARK)
   doc.text('HANDLING INSTRUCTIONS', INFO_COL2_X, infoStartY, { width: CW - INFO_COL_W - 16, lineBreak: false })
   doc.font('Helvetica').fontSize(8).fillColor(TEXT_MID)
   doc.text('Handle with care. Keep dry.\nDo not bend or compress.', INFO_COL2_X, infoStartY + 11, { width: CW - INFO_COL_W - 16 })
@@ -357,7 +367,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     } catch {}
   }
 
-  box(doc, 0, footerY, PAGE_W, FOOTER_H, NAVY)
+  box(doc, 0, footerY, PAGE_W, FOOTER_H, GREEN_DARK)
   const footerParts = [
     `Thank you for shopping with ${store.name}`,
     store.web,
