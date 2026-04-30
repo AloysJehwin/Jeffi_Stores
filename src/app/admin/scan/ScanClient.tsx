@@ -17,7 +17,7 @@ type Stage =
   | 'looking_up'
   | 'found'
   | 'not_found'
-  | 'confirming'
+  | 'shipping'
   | 'updating'
   | 'done'
   | 'error'
@@ -127,45 +127,43 @@ export default function ScanClient() {
 
   async function selectStatus(s: string) {
     setSelectedStatus(s)
-    setTrackingUrl('')
     if (s === 'shipped') {
-      setStage('confirming')
-    } else {
-      setStage('updating')
-      try {
-        const body: Record<string, string> = {
-          status: s,
-          payment_status: order!.payment_status,
-        }
-        const res = await fetch(`/api/orders/${order!.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(30000),
-        })
-        let d: any = {}
-        try { d = await res.json() } catch {}
-        if (!res.ok) throw new Error(d.error || `Server error ${res.status}`)
-        setDoneStatus(s)
-        setStage('done')
-      } catch (e: any) {
-        setErrorMsg(e.message || 'Update failed')
-        setStage('error')
-      }
+      setTrackingUrl('')
+      setStage('shipping')
+      return
     }
-  }
-
-  async function confirmUpdate() {
-    if (!order) return
     setStage('updating')
     try {
       const body: Record<string, string> = {
-        status: selectedStatus,
+        status: s,
+        payment_status: order!.payment_status,
+      }
+      const res = await fetch(`/api/orders/${order!.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30000),
+      })
+      let d: any = {}
+      try { d = await res.json() } catch {}
+      if (!res.ok) throw new Error(d.error || `Server error ${res.status}`)
+      setDoneStatus(s)
+      setStage('done')
+    } catch (e: any) {
+      setErrorMsg(e.message || 'Update failed')
+      setStage('error')
+    }
+  }
+
+  async function confirmShipped() {
+    if (!order || !trackingUrl.trim()) return
+    setStage('updating')
+    try {
+      const body: Record<string, string> = {
+        status: 'shipped',
         payment_status: order.payment_status,
       }
-      if (selectedStatus === 'shipped' && trackingUrl.trim()) {
-        body.tracking_url = trackingUrl.trim()
-      }
+      if (trackingUrl.trim()) body.tracking_url = trackingUrl.trim()
       const res = await fetch(`/api/orders/${order.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -174,10 +172,8 @@ export default function ScanClient() {
       })
       let d: any = {}
       try { d = await res.json() } catch {}
-      if (!res.ok) {
-        throw new Error(d.error || `Server error ${res.status}`)
-      }
-      setDoneStatus(selectedStatus)
+      if (!res.ok) throw new Error(d.error || `Server error ${res.status}`)
+      setDoneStatus('shipped')
       setStage('done')
     } catch (e: any) {
       setErrorMsg(e.message || 'Update failed')
@@ -314,8 +310,8 @@ export default function ScanClient() {
         </div>
       )}
 
-      {(stage === 'found' || stage === 'confirming') && order && (
-        <div className="flex flex-col flex-1 p-6 gap-5">
+      {stage === 'found' && order && (
+        <div className="flex flex-col flex-1 p-6 gap-5 overflow-y-auto">
           <div className="flex items-center gap-3">
             <button onClick={reset} className="p-2 text-gray-400 hover:text-white">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -363,29 +359,40 @@ export default function ScanClient() {
               ))}
             </div>
           )}
+        </div>
+      )}
 
-          {stage === 'confirming' && selectedStatus === 'shipped' && (
-            <div className="space-y-2">
-              <label className="text-sm text-gray-400">Tracking URL <span className="text-gray-600">(optional)</span></label>
+      {stage === 'shipping' && order && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60">
+          <div className="bg-gray-900 rounded-t-3xl p-6 flex flex-col gap-4">
+            <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-1" />
+            <h3 className="text-lg font-bold text-white">Mark as Shipped</h3>
+            <p className="text-gray-400 text-sm -mt-2">#{order.order_number}</p>
+            <div className="space-y-1.5">
+              <label className="text-sm text-gray-300">Tracking URL <span className="text-red-400">*</span></label>
               <input
                 type="url"
                 placeholder="https://track.delhivery.com/..."
                 value={trackingUrl}
                 onChange={e => setTrackingUrl(e.target.value)}
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-secondary-500 text-sm"
+                autoFocus
               />
-              <p className="text-xs text-gray-500">Can be added later from the full order page.</p>
             </div>
-          )}
-
-          {stage === 'confirming' && (
             <button
-              onClick={confirmUpdate}
-              className="w-full py-4 bg-secondary-500 hover:bg-secondary-600 active:bg-secondary-700 text-white font-bold rounded-2xl text-base transition-colors mt-auto"
+              onClick={confirmShipped}
+              disabled={!trackingUrl.trim()}
+              className="w-full py-4 bg-secondary-500 hover:bg-secondary-600 active:bg-secondary-700 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-colors"
             >
-              Confirm — {statusLabel(selectedStatus)}
+              Confirm Shipped
             </button>
-          )}
+            <button
+              onClick={() => setStage('found')}
+              className="w-full py-3 text-gray-400 text-sm"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
