@@ -7,6 +7,8 @@ import AdminSelect from './AdminSelect'
 interface FilterOption {
   value: string
   label: string
+  group?: string
+  indent?: boolean
 }
 
 interface FilterConfig {
@@ -59,7 +61,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
   }
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 mb-6">
+    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 mb-6 sticky top-0 z-10">
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 sm:gap-4">
         {/* Dropdown Filters */}
         {filters.map((filter) => (

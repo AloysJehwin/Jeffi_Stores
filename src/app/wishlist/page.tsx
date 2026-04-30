@@ -155,7 +155,7 @@ export default function WishlistPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Wishlist</h1>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="hidden lg:block lg:col-span-1 lg:self-start lg:sticky lg:top-24">
+            <div className="hidden lg:block lg:col-span-1 lg:self-start lg:sticky lg:top-20">
               <AccountSidebar />
             </div>
             <div className="lg:col-span-3">
@@ -188,7 +188,7 @@ export default function WishlistPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="hidden lg:block lg:col-span-1 lg:self-start lg:sticky lg:top-24">
+          <div className="hidden lg:block lg:col-span-1 lg:self-start lg:sticky lg:top-20">
             <AccountSidebar />
           </div>
 

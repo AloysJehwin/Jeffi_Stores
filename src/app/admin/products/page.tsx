@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
+import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
 import AdminFilters from '@/components/admin/AdminFilters'
 
@@ -17,6 +18,18 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
     getAllBrands(),
   ])
 
+  const featuredCount = products?.filter((p: any) => p.is_featured).length || 0
+
+  const allCats: any[] = categories || []
+  const mainCats = allCats.filter((c: any) => !c.parent_category_id)
+  const categoryOptions = mainCats.flatMap((cat: any) => {
+    const subs = allCats.filter((c: any) => c.parent_category_id === cat.id)
+    return [
+      { value: cat.id, label: cat.name, group: cat.name },
+      ...subs.map((sub: any) => ({ value: sub.id, label: sub.name, group: cat.name, indent: true })),
+    ]
+  })
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -32,35 +45,36 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
         </Link>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Products</p>
           <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{products?.length || 0}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Featured</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
+            <span className={featuredCount >= 6 ? 'text-yellow-600 dark:text-yellow-400' : ''}>{featuredCount}</span>
+            <span className="text-base font-normal text-foreground-muted">/6</span>
+          </p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Categories</p>
           <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{categories?.length || 0}</p>
         </div>
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Brands</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{brands?.length || 0}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Active Products</p>
           <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
-            {products?.filter(p => p.is_active).length || 0}
+            {products?.filter((p: any) => p.is_active).length || 0}
           </p>
         </div>
       </div>
 
-      {/* Filters */}
       <AdminFilters
         filters={[
           {
             name: 'category_id',
             label: 'Category',
-            options: (categories || []).map((c: any) => ({ value: c.id, label: c.name })),
+            options: categoryOptions,
           },
           {
             name: 'brand_id',
@@ -88,7 +102,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
         searchParam="search"
       />
 
-      {/* Products - Mobile Cards */}
       <div className="md:hidden space-y-3">
         {products && products.length > 0 ? (
           products.map((product: any) => {
@@ -97,7 +110,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
             return (
               <div
                 key={product.id}
-                className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4"
+                className={`bg-surface-elevated rounded-lg shadow-sm border p-4 ${product.is_featured ? 'border-yellow-400 dark:border-yellow-600' : 'border-border-default'}`}
               >
                 <div className="flex items-start gap-3 mb-3">
                   <div className="flex-shrink-0 h-12 w-12">
@@ -134,9 +147,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                 <div className="flex items-center justify-between text-xs text-foreground-muted">
                   <span>{product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}</span>
                   <div className="flex items-center gap-3">
-                    <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 font-medium">
-                      Edit
-                    </Link>
+                    <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
+                    <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 font-medium">Edit</Link>
                     <DeactivateProductButton productId={product.id} productName={product.name} />
                   </div>
                 </div>
@@ -150,68 +162,44 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
         )}
       </div>
 
-      {/* Products Table - Desktop */}
       <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border-default">
             <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Product
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  SKU
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Category
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Brand
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Price
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Stock
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Product</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Brand</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Stock</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
               {products && products.length > 0 ? (
                 products.map((product: any) => (
-                  <tr key={product.id} className="hover:bg-surface-secondary">
+                  <tr key={product.id} className={`hover:bg-surface-secondary ${product.is_featured ? 'bg-yellow-50/40 dark:bg-yellow-900/5' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
+                      <div className="flex items-center gap-3">
                         <div className="flex-shrink-0 h-10 w-10">
                           <ProductImage
                             thumbnailUrl={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
                             altText={product.name}
                           />
                         </div>
-                        <div className="ml-4">
+                        <div>
                           <div className="text-sm font-medium text-foreground">{product.name}</div>
+                          {product.is_featured && (
+                            <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">★ Featured</div>
+                          )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">{product.sku}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">
-                        {product.categories?.name || 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">
-                        {product.brands?.name || 'N/A'}
-                      </div>
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">{product.sku}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">{product.categories?.name || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">{product.brands?.name || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-semibold text-primary-500">
                         {product.has_variants
@@ -244,13 +232,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link
-                        href={`/admin/products/edit/${product.id}`}
-                        className="text-accent-500 hover:text-accent-600 mr-4"
-                      >
-                        Edit
-                      </Link>
-                      <DeactivateProductButton productId={product.id} productName={product.name} />
+                      <div className="flex items-center justify-end gap-3">
+                        <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
+                        <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 hover:text-accent-600">Edit</Link>
+                        <DeactivateProductButton productId={product.id} productName={product.name} />
+                      </div>
                     </td>
                   </tr>
                 ))

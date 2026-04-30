@@ -161,8 +161,16 @@ export async function getFilteredProducts(filters: {
   let i = 1
 
   if (filters.category_id) {
-    conditions.push(`p.category_id = $${i++}`)
+    conditions.push(`p.category_id IN (
+      WITH RECURSIVE cat_tree AS (
+        SELECT id FROM categories WHERE id = $${i}
+        UNION ALL
+        SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id
+      )
+      SELECT id FROM cat_tree
+    )`)
     params.push(filters.category_id)
+    i++
   }
   if (filters.brand_id) {
     conditions.push(`p.brand_id = $${i++}`)
@@ -211,7 +219,7 @@ export async function getFilteredProducts(filters: {
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
     ${where}
-    ORDER BY p.created_at DESC
+    ORDER BY p.is_featured DESC, p.created_at DESC
   `, params)
 }
 

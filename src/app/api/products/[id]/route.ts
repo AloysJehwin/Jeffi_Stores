@@ -17,9 +17,24 @@ export async function PATCH(
 
     const allowedFields: Record<string, unknown> = {}
     if (typeof body.is_active === 'boolean') allowedFields.is_active = body.is_active
+    if (typeof body.is_featured === 'boolean') allowedFields.is_featured = body.is_featured
 
     if (Object.keys(allowedFields).length === 0) {
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+
+    // Enforce max 6 featured products
+    if (allowedFields.is_featured === true) {
+      const count = await queryOne<{ count: string }>(
+        `SELECT COUNT(*) as count FROM products WHERE is_featured = true AND id != $1`,
+        [productId]
+      )
+      if (Number(count?.count ?? 0) >= 6) {
+        return NextResponse.json(
+          { error: 'Maximum 6 featured products allowed. Unfeature another product first.' },
+          { status: 409 }
+        )
+      }
     }
 
     const keys = Object.keys(allowedFields)

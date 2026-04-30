@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
@@ -130,7 +130,16 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [lengthRate, setLengthRate] = useState(product?.length_rate != null ? String(product.length_rate) : '')
   const [lengthUnit, setLengthUnit] = useState(product?.length_unit || 'm')
   const [lengthEnabled, setLengthEnabled] = useState(product?.length_rate != null)
-  const [gstMode, setGstMode] = useState<'inclusive' | 'exclusive'>('inclusive')
+  const gstModeKey = `gstMode:${productId || 'new'}`
+  const [gstMode, setGstMode] = useState<'inclusive' | 'exclusive'>(() => {
+    if (typeof window === 'undefined') return 'inclusive'
+    return (localStorage.getItem(gstModeKey) as 'inclusive' | 'exclusive') || 'inclusive'
+  })
+
+  function changeGstMode(mode: 'inclusive' | 'exclusive') {
+    localStorage.setItem(gstModeKey, mode)
+    setGstMode(mode)
+  }
   const [gstRate, setGstRate] = useState<number>(product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18)
 
   const [basePrice, setBasePrice] = useState(product?.base_price != null ? String(product.base_price) : '')
@@ -276,6 +285,10 @@ export default function ProductForm({ categories, brands, action, product, produ
 
       if (!hasVariants) {
         formData.set('base_price', toInclusive(basePrice, gstRate, gstMode))
+        formData.set('mrp', toInclusive(mrp, gstRate, gstMode))
+        formData.set('sale_price', toInclusive(salePrice, gstRate, gstMode))
+        formData.set('wholesale_price', toInclusive(wholesalePrice, gstRate, gstMode))
+      } else {
         formData.set('mrp', toInclusive(mrp, gstRate, gstMode))
         formData.set('sale_price', toInclusive(salePrice, gstRate, gstMode))
         formData.set('wholesale_price', toInclusive(wholesalePrice, gstRate, gstMode))
@@ -503,14 +516,14 @@ export default function ProductForm({ categories, brands, action, product, produ
                 <div className="flex rounded-lg border border-border-secondary overflow-hidden text-xs font-medium">
                   <button
                     type="button"
-                    onClick={() => setGstMode('inclusive')}
+                    onClick={() => changeGstMode('inclusive')}
                     className={`px-3 py-1.5 transition-colors ${gstMode === 'inclusive' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-elevated'}`}
                   >
                     GST Inclusive
                   </button>
                   <button
                     type="button"
-                    onClick={() => setGstMode('exclusive')}
+                    onClick={() => changeGstMode('exclusive')}
                     className={`px-3 py-1.5 transition-colors ${gstMode === 'exclusive' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-elevated'}`}
                   >
                     GST Exclusive
