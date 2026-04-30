@@ -52,17 +52,16 @@ jobs:
             docker compose -f docker-compose.prod.yml exec -T app node -e "
               const { Pool } = require('pg');
               const fs = require('fs');
-              const path = require('path');
               const pool = new Pool({ connectionString: process.env.DATABASE_URL });
               (async () => {
-                const dir = '/app/database';
-                const files = fs.readdirSync(dir).filter(f => f.startsWith('migration-') && f.endsWith('.sql')).sort();
-                for (const f of files) {
-                  process.stdout.write('Running ' + f + '...');
-                  await pool.query(fs.readFileSync(path.join(dir, f), 'utf8'));
+                const sql = fs.readFileSync('/app/database/migration.sql', 'utf8').trim();
+                if (sql && !sql.startsWith('--')) {
+                  process.stdout.write('Running migration.sql...');
+                  await pool.query(sql);
                   process.stdout.write(' done\n');
+                } else {
+                  process.stdout.write('No pending migration.\n');
                 }
-                process.stdout.write('All migrations complete.\n');
                 await pool.end();
               })().catch(e => { process.stderr.write(e.message + '\n'); process.exit(1); });
             "

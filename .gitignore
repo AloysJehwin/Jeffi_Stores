@@ -35,8 +35,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Database
-/database
 
 # Temporary scripts & guides
 *.sh
