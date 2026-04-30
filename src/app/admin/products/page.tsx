@@ -147,7 +147,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                   <div className="flex items-center gap-3">
                     <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
                     <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 font-medium">Edit</Link>
-                    <DeactivateProductButton productId={product.id} productName={product.name} />
+                    <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
                   </div>
                 </div>
               </div>
@@ -234,7 +234,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                       <div className="flex items-center justify-end gap-3">
                         <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
                         <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 hover:text-accent-600">Edit</Link>
-                        <DeactivateProductButton productId={product.id} productName={product.name} />
+                        <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
                       </div>
                     </td>
                   </tr>

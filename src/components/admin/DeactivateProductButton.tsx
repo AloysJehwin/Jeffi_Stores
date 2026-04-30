@@ -7,34 +7,35 @@ import { useToast } from '@/contexts/ToastContext'
 interface DeactivateProductButtonProps {
   productId: string
   productName: string
+  isActive: boolean
 }
 
-export default function DeactivateProductButton({ productId, productName }: DeactivateProductButtonProps) {
+export default function DeactivateProductButton({ productId, productName, isActive }: DeactivateProductButtonProps) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const { showToast } = useToast()
   const router = useRouter()
 
-  async function handleDeactivate() {
+  async function handleToggle() {
     setIsUpdating(true)
 
     try {
       const response = await fetch(`/api/products/${productId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: false }),
+        body: JSON.stringify({ is_active: !isActive }),
       })
 
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || 'Failed to deactivate product')
+        throw new Error(data.error || `Failed to ${isActive ? 'deactivate' : 'activate'} product`)
       }
 
-      showToast(`"${productName}" has been deactivated.`, 'success')
+      showToast(`"${productName}" has been ${isActive ? 'deactivated' : 'activated'}.`, 'success')
       router.refresh()
       setShowConfirm(false)
     } catch (error: any) {
-      showToast(error.message || 'Failed to deactivate product. Please try again.', 'error')
+      showToast(error.message || 'Failed to update product. Please try again.', 'error')
     } finally {
       setIsUpdating(false)
     }
@@ -44,11 +45,11 @@ export default function DeactivateProductButton({ productId, productName }: Deac
     return (
       <div className="inline-flex items-center gap-2">
         <button
-          onClick={handleDeactivate}
+          onClick={handleToggle}
           disabled={isUpdating}
-          className="text-orange-600 hover:text-orange-900 font-semibold disabled:opacity-50"
+          className={`font-semibold disabled:opacity-50 ${isActive ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'}`}
         >
-          {isUpdating ? 'Deactivating...' : 'Confirm'}
+          {isUpdating ? (isActive ? 'Deactivating...' : 'Activating...') : 'Confirm'}
         </button>
         <button
           onClick={() => setShowConfirm(false)}
@@ -64,9 +65,9 @@ export default function DeactivateProductButton({ productId, productName }: Deac
   return (
     <button
       onClick={() => setShowConfirm(true)}
-      className="text-orange-600 hover:text-orange-900"
+      className={isActive ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'}
     >
-      Deactivate
+      {isActive ? 'Deactivate' : 'Activate'}
     </button>
   )
 }
