@@ -47,14 +47,14 @@ export async function POST(request: Request) {
 
       const cert = await queryOne<{ admin_id: string }>(
         `SELECT ac.admin_id FROM admin_certificates ac
-         JOIN admin_users au ON au.id = ac.admin_id
+         JOIN admins au ON au.id = ac.admin_id
          WHERE LOWER(ac.serial_number) = $1 AND ac.is_revoked = FALSE AND ac.expires_at > NOW()`,
         [serialHex]
       )
 
       if (cert) {
         const certOwner = await queryOne<{ role: string }>(
-          `SELECT role FROM admin_users WHERE id = $1`,
+          `SELECT role FROM admins WHERE id = $1`,
           [cert.admin_id]
         )
         const certBelongsToThisAccount = cert.admin_id === result.admin.id
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       }
     } else if (certCN && certCN !== 'Admin User') {
       const certOwnerAccount = await queryOne<{ id: string; role: string }>(
-        `SELECT id, role FROM admin_users WHERE username = $1`,
+        `SELECT id, role FROM admins WHERE username = $1`,
         [certCN]
       )
       const certBelongsToThisAccount = certOwnerAccount?.id === result.admin.id
