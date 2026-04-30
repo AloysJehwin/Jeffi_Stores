@@ -34,7 +34,8 @@ export async function middleware(request: NextRequest) {
     }
 
     const certCN = request.headers.get('x-client-cert-cn') || ''
-    if (certCN && !certCN.includes(' ') && payload.username !== certCN) {
+    const tokenCertCN = payload.authCertCN || payload.username
+    if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
       return NextResponse.json(
         { error: 'Certificate does not match authenticated user' },
         { status: 403 }
@@ -84,7 +85,8 @@ export async function middleware(request: NextRequest) {
     }
 
     const certCN = request.headers.get('x-client-cert-cn') || ''
-    if (certCN && !certCN.includes(' ') && payload.username !== certCN) {
+    const tokenCertCN = payload.authCertCN || payload.username
+    if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
       const response = NextResponse.redirect(new URL('/admin/login', request.url))
       response.cookies.delete('admin_token')
       return response

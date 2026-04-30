@@ -45,19 +45,22 @@ export async function POST(request: Request) {
     if (certSerial) {
       const serialHex = serialToHex(certSerial)
 
-      const cert = await queryOne(
-        `SELECT * FROM admin_certificates
-         WHERE LOWER(serial_number) = $1 AND admin_id = $2 AND is_revoked = FALSE AND expires_at > NOW()`,
-        [serialHex, result.admin.id]
+      const cert = await queryOne<{ admin_id: string }>(
+        `SELECT ac.admin_id FROM admin_certificates ac
+         JOIN admin_users au ON au.id = ac.admin_id
+         WHERE LOWER(ac.serial_number) = $1 AND ac.is_revoked = FALSE AND ac.expires_at > NOW()`,
+        [serialHex]
       )
 
-      if (!cert) {
-        const anyCert = await queryOne(
-          `SELECT * FROM admin_certificates WHERE LOWER(serial_number) = $1`,
-          [serialHex]
+      if (cert) {
+        const certOwner = await queryOne<{ role: string }>(
+          `SELECT role FROM admin_users WHERE id = $1`,
+          [cert.admin_id]
         )
+        const certBelongsToThisAccount = cert.admin_id === result.admin.id
+        const certOwnerIsSuperAdmin = certOwner?.role === 'super_admin'
 
-        if (anyCert) {
+        if (!certBelongsToThisAccount && !certOwnerIsSuperAdmin) {
           return NextResponse.json(
             { error: 'Certificate not authorized for this account' },
             { status: 403 }
@@ -65,7 +68,14 @@ export async function POST(request: Request) {
         }
       }
     } else if (certCN && certCN !== 'Admin User') {
-      if (certCN !== result.admin.username) {
+      const certOwnerAccount = await queryOne<{ id: string; role: string }>(
+        `SELECT id, role FROM admin_users WHERE username = $1`,
+        [certCN]
+      )
+      const certBelongsToThisAccount = certOwnerAccount?.id === result.admin.id
+      const certOwnerIsSuperAdmin = certOwnerAccount?.role === 'super_admin'
+
+      if (!certBelongsToThisAccount && !certOwnerIsSuperAdmin) {
         return NextResponse.json(
           { error: 'Certificate not authorized for this account' },
           { status: 403 }
@@ -78,6 +88,7 @@ export async function POST(request: Request) {
       username: result.admin.username,
       role: result.admin.role,
       scopes: result.admin.scopes || [],
+      authCertCN: certCN || undefined,
     })
 
     const response = NextResponse.json({
