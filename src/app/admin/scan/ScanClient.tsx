@@ -125,10 +125,34 @@ export default function ScanClient() {
     setStage('scanning')
   }
 
-  function selectStatus(s: string) {
+  async function selectStatus(s: string) {
     setSelectedStatus(s)
     setTrackingUrl('')
-    setStage('confirming')
+    if (s === 'shipped') {
+      setStage('confirming')
+    } else {
+      setStage('updating')
+      try {
+        const body: Record<string, string> = {
+          status: s,
+          payment_status: order!.payment_status,
+        }
+        const res = await fetch(`/api/orders/${order!.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(30000),
+        })
+        let d: any = {}
+        try { d = await res.json() } catch {}
+        if (!res.ok) throw new Error(d.error || `Server error ${res.status}`)
+        setDoneStatus(s)
+        setStage('done')
+      } catch (e: any) {
+        setErrorMsg(e.message || 'Update failed')
+        setStage('error')
+      }
+    }
   }
 
   async function confirmUpdate() {
