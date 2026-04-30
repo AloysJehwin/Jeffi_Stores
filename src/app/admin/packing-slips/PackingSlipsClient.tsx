@@ -169,6 +169,8 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
   }
 
   const hasActiveFilters = fromDate || toDate || customerSearch || statusFilter
+  const [filterOpen, setFilterOpen] = useState(false)
+  const activeCount = [fromDate, toDate, customerSearch, statusFilter].filter(Boolean).length
 
   return (
     <div className="p-4 sm:p-6">
@@ -178,10 +180,35 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
       </div>
 
       <div className="bg-surface-elevated rounded-lg border border-border-default shadow-sm mb-6">
-        <div className="px-6 py-4 border-b border-border-default">
-          <h2 className="text-base font-semibold text-foreground">Filter Orders</h2>
+        <div className="px-4 sm:px-6 py-4 border-b border-border-default sm:border-b-0">
+          {/* Mobile toggle */}
+          <button
+            type="button"
+            onClick={() => setFilterOpen(o => !o)}
+            className="sm:hidden w-full flex items-center justify-between text-sm font-medium text-foreground"
+          >
+            <span className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 010 2H4a1 1 0 01-1-1zm3 6a1 1 0 011-1h10a1 1 0 010 2H7a1 1 0 01-1-1zm4 6a1 1 0 011-1h4a1 1 0 010 2h-4a1 1 0 01-1-1z" />
+              </svg>
+              Filter Orders
+              {activeCount > 0 && (
+                <span className="inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full bg-accent-500 text-white text-xs font-semibold">
+                  {activeCount}
+                </span>
+              )}
+            </span>
+            <svg
+              className={`w-4 h-4 text-foreground-muted transition-transform ${filterOpen ? 'rotate-180' : ''}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {/* Desktop heading */}
+          <h2 className="hidden sm:block text-base font-semibold text-foreground">Filter Orders</h2>
         </div>
-        <div className="p-4 sm:p-6">
+        <div className={`${filterOpen ? 'block' : 'hidden'} sm:block p-4 sm:p-6`}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-medium text-foreground-secondary mb-1">From Date</label>
