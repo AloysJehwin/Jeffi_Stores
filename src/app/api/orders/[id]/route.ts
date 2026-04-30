@@ -193,70 +193,45 @@ export async function PATCH(
       values
     )
 
-    let invoicePdfBuffer: Buffer | null = null
-    const effectivePaymentStatus = payment_status || currentOrder.payment_status
-    if (statusChanged && (status === 'confirmed' || status === 'processing') && effectivePaymentStatus === 'paid') {
-      try {
-        invoicePdfBuffer = await generateOrderInvoice(orderId)
-      } catch (_err) {
-        invoicePdfBuffer = null
-      }
-    }
+    const response = NextResponse.json({ success: true })
 
-    const effectiveStatus = status || currentOrder.status
-    if (paymentStatusChanged && payment_status === 'paid' && (effectiveStatus === 'confirmed' || effectiveStatus === 'processing')) {
-      if (!invoicePdfBuffer) {
-        try {
-          invoicePdfBuffer = await generateOrderInvoice(orderId)
-        } catch (_err) {
-          invoicePdfBuffer = null
+    const notify = async () => {
+      let invoicePdfBuffer: Buffer | null = null
+      const effectivePaymentStatus = payment_status || currentOrder.payment_status
+      if (statusChanged && (status === 'confirmed' || status === 'processing') && effectivePaymentStatus === 'paid') {
+        try { invoicePdfBuffer = await generateOrderInvoice(orderId) } catch {}
+      }
+
+      const effectiveStatus = status || currentOrder.status
+      if (paymentStatusChanged && payment_status === 'paid' && (effectiveStatus === 'confirmed' || effectiveStatus === 'processing')) {
+        if (!invoicePdfBuffer) {
+          try { invoicePdfBuffer = await generateOrderInvoice(orderId) } catch {}
+        }
+      }
+
+      const user = currentOrder.users
+      const userEmail = user?.email || currentOrder.customer_email
+      const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : currentOrder.customer_name
+
+      if (userEmail && userName) {
+        if (statusChanged) {
+          await sendOrderStatusUpdate(
+            userEmail, userName, currentOrder.order_number, orderId, status,
+            currentOrder.status, invoicePdfBuffer, undefined,
+            status === 'shipped' ? tracking_url?.trim() : undefined
+          ).catch(() => {})
+        }
+        if (paymentStatusChanged) {
+          await sendPaymentStatusUpdate(
+            userEmail, userName, currentOrder.order_number, orderId,
+            payment_status, parseFloat(currentOrder.total_amount)
+          ).catch(() => {})
         }
       }
     }
 
-    const user = currentOrder.users
-    const userEmail = user?.email || currentOrder.customer_email
-    const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : currentOrder.customer_name
-
-    let statusEmailSent = false
-    let paymentEmailSent = false
-
-    if (userEmail && userName) {
-      if (statusChanged) {
-        const statusResult = await sendOrderStatusUpdate(
-          userEmail,
-          userName,
-          currentOrder.order_number,
-          orderId,
-          status,
-          currentOrder.status,
-          invoicePdfBuffer,
-          undefined,
-          status === 'shipped' ? tracking_url?.trim() : undefined
-        )
-        statusEmailSent = statusResult.success
-      }
-
-      if (paymentStatusChanged) {
-        const paymentResult = await sendPaymentStatusUpdate(
-          userEmail,
-          userName,
-          currentOrder.order_number,
-          orderId,
-          payment_status,
-          parseFloat(currentOrder.total_amount)
-        )
-        paymentEmailSent = paymentResult.success
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      notifications: {
-        statusEmailSent,
-        paymentEmailSent,
-      },
-    })
+    notify().catch(() => {})
+    return response
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || 'Failed to update order' },

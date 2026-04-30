@@ -128,8 +128,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
   const QR_SIZE = 66
 
-  const HEADER_TEXT_LINES = 1 + (store.address ? 1 : 0) + (store.city ? 1 : 0) + 1 + 1
-  const HEADER_H = 14 + (HEADER_TEXT_LINES * 11) + 14
+  const HEADER_H = 90
 
   box(doc, 0, 0, PAGE_W, HEADER_H, NAVY)
 
@@ -140,12 +139,9 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
   doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_LIGHT)
   let hy = 38
-  if (store.address) {
-    doc.text(store.address, ML, hy, { width: textZoneW, lineBreak: false })
-    hy += 11
-  }
-  if (store.city) {
-    doc.text(store.city, ML, hy, { width: textZoneW, lineBreak: false })
+  const addrLine = [store.address, store.city].filter(Boolean).join(', ')
+  if (addrLine) {
+    doc.text(addrLine, ML, hy, { width: textZoneW, lineBreak: false })
     hy += 11
   }
   const contactParts = [store.phone && `Ph: ${store.phone}`, store.email].filter(Boolean)
@@ -318,23 +314,26 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
   const infoStartY = y
   doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY)
-  doc.text('SELLER DETAILS', ML, y)
+  doc.text('SELLER DETAILS', ML, y, { lineBreak: false })
   y += 11
-  doc.font('Helvetica').fontSize(8).fillColor(TEXT_MID)
+  doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_MID)
 
-  const sellerParts: string[] = []
-  if (store.name) sellerParts.push(store.name)
-  if (store.address) sellerParts.push(store.address)
-  if (store.city) sellerParts.push(store.city)
-  doc.text(sellerParts.join(', '), ML, y, { width: INFO_COL_W })
+  const sellerAddrParts: string[] = []
+  if (store.name) sellerAddrParts.push(store.name)
+  if (store.address) sellerAddrParts.push(store.address)
+  if (store.city) sellerAddrParts.push(store.city)
+  doc.text(sellerAddrParts.join(', '), ML, y, { width: INFO_COL_W, lineBreak: false })
   y += 11
 
-  const contactParts2: string[] = []
-  if (store.phone) contactParts2.push(`Ph: ${store.phone}`)
-  if (store.email) contactParts2.push(`Email: ${store.email}`)
-  if (store.gstin) contactParts2.push(`GSTIN: ${store.gstin}`)
-  if (contactParts2.length) {
-    doc.text(contactParts2.join('   |   '), ML, y, { width: INFO_COL_W })
+  if (store.phone) {
+    doc.text(`Ph: ${store.phone}`, ML, y, { width: INFO_COL_W, lineBreak: false })
+    y += 10
+  }
+  const sellerLine2Parts: string[] = []
+  if (store.email) sellerLine2Parts.push(`Email: ${store.email}`)
+  if (store.gstin) sellerLine2Parts.push(`GSTIN: ${store.gstin}`)
+  if (sellerLine2Parts.length) {
+    doc.text(sellerLine2Parts.join('   |   '), ML, y, { width: INFO_COL_W, lineBreak: false })
   }
 
   doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY)

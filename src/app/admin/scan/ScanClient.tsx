@@ -146,7 +146,7 @@ export default function ScanClient() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(30000),
       })
       let d: any = {}
       try { d = await res.json() } catch {}
