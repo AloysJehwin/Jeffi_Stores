@@ -59,7 +59,14 @@ export async function POST(request: Request) {
         )
         const certBelongsToThisAccount = cert.admin_id === result.admin.id
         const certOwnerIsSuperAdmin = certOwner?.role === 'super_admin'
+        const loggingIntoSuperAdmin = result.admin.role === 'super_admin'
 
+        if (loggingIntoSuperAdmin && !certOwnerIsSuperAdmin) {
+          return NextResponse.json(
+            { error: 'Certificate not authorized for this account' },
+            { status: 403 }
+          )
+        }
         if (!certBelongsToThisAccount && !certOwnerIsSuperAdmin) {
           return NextResponse.json(
             { error: 'Certificate not authorized for this account' },
@@ -74,7 +81,14 @@ export async function POST(request: Request) {
       )
       const certBelongsToThisAccount = certOwnerAccount?.id === result.admin.id
       const certOwnerIsSuperAdmin = certOwnerAccount?.role === 'super_admin'
+      const loggingIntoSuperAdmin = result.admin.role === 'super_admin'
 
+      if (loggingIntoSuperAdmin && !certOwnerIsSuperAdmin) {
+        return NextResponse.json(
+          { error: 'Certificate not authorized for this account' },
+          { status: 403 }
+        )
+      }
       if (!certBelongsToThisAccount && !certOwnerIsSuperAdmin) {
         return NextResponse.json(
           { error: 'Certificate not authorized for this account' },
