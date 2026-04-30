@@ -11,8 +11,16 @@ async function getProducts(searchParams: any) {
   let paramIndex = 1
 
   if (searchParams.category) {
-    conditions.push(`p.category_id = $${paramIndex++}`)
+    conditions.push(`p.category_id IN (
+      WITH RECURSIVE cat_tree AS (
+        SELECT id FROM categories WHERE id = $${paramIndex}
+        UNION ALL
+        SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id
+      )
+      SELECT id FROM cat_tree
+    )`)
     params.push(searchParams.category)
+    paramIndex++
   }
 
   if (searchParams.brand) {
@@ -34,6 +42,7 @@ async function getProducts(searchParams: any) {
     base_price: 'p.base_price',
   }
   const sortColumn = allowedSortColumns[sortBy] || 'p.created_at'
+  const hasExplicitSort = !!searchParams.sort
 
   const whereClause = conditions.join(' AND ')
 
@@ -45,6 +54,10 @@ async function getProducts(searchParams: any) {
 
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const offset = (page - 1) * PAGE_SIZE
+
+  const orderBy = hasExplicitSort
+    ? `${sortColumn} ${sortOrder}`
+    : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
 
   const sql = `
     SELECT p.*,
@@ -59,9 +72,10 @@ async function getProducts(searchParams: any) {
       (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE ${whereClause}
-    ORDER BY ${sortColumn} ${sortOrder}
+    ORDER BY ${orderBy}
     LIMIT ${PAGE_SIZE} OFFSET ${offset}
   `
 
@@ -70,7 +84,7 @@ async function getProducts(searchParams: any) {
 }
 
 async function getCategories() {
-  return queryMany('SELECT id, name, slug FROM categories WHERE is_active = true ORDER BY name ASC')
+  return queryMany('SELECT id, name, slug, parent_category_id, display_order FROM categories WHERE is_active = true ORDER BY display_order ASC')
 }
 
 async function getBrands() {
@@ -100,6 +114,10 @@ export default async function ProductsPage({
 
   const start = (page - 1) * PAGE_SIZE + 1
   const end = Math.min(page * PAGE_SIZE, total)
+
+  const [allCats, setAllCats] = [categories as any[], null]
+  const mainCats = allCats.filter((c: any) => !c.parent_category_id)
+  const subCats = allCats.filter((c: any) => c.parent_category_id)
 
   return (
     <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
@@ -136,30 +154,48 @@ export default async function ProductsPage({
                 {/* Categories Filter */}
                 <div className="mb-6">
                   <h3 className="font-semibold text-foreground mb-3">Categories</h3>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <div className="space-y-1 max-h-64 overflow-y-auto">
                     <Link
                       href="/products"
                       className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                         !searchParams.category
-                          ? 'bg-accent-50 text-accent-700 font-medium'
+                          ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
                           : 'text-foreground-secondary hover:bg-surface-secondary'
                       }`}
                     >
                       All Categories
                     </Link>
-                    {categories.map((category) => (
-                      <Link
-                        key={category.id}
-                        href={`/products?category=${category.id}`}
-                        className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                          searchParams.category === category.id
-                            ? 'bg-accent-50 text-accent-700 font-medium'
-                            : 'text-foreground-secondary hover:bg-surface-secondary'
-                        }`}
-                      >
-                        {category.name}
-                      </Link>
-                    ))}
+                    {mainCats.map((cat: any) => {
+                      const subs = subCats.filter((s: any) => s.parent_category_id === cat.id)
+                      const isActive = searchParams.category === cat.id
+                      return (
+                        <div key={cat.id}>
+                          <Link
+                            href={`/products?category=${cat.id}`}
+                            className={`block px-3 py-2 rounded-lg text-sm transition-colors font-medium ${
+                              isActive
+                                ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400'
+                                : 'text-foreground hover:bg-surface-secondary'
+                            }`}
+                          >
+                            {cat.name}
+                          </Link>
+                          {subs.map((sub: any) => (
+                            <Link
+                              key={sub.id}
+                              href={`/products?category=${sub.id}`}
+                              className={`block pl-6 pr-3 py-1.5 rounded-lg text-sm transition-colors ${
+                                searchParams.category === sub.id
+                                  ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
+                                  : 'text-foreground-secondary hover:bg-surface-secondary'
+                              }`}
+                            >
+                              {sub.name}
+                            </Link>
+                          ))}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
 
@@ -171,13 +207,13 @@ export default async function ProductsPage({
                       href={searchParams.category ? `/products?category=${searchParams.category}` : '/products'}
                       className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                         !searchParams.brand
-                          ? 'bg-accent-50 text-accent-700 font-medium'
+                          ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
                           : 'text-foreground-secondary hover:bg-surface-secondary'
                       }`}
                     >
                       All Brands
                     </Link>
-                    {brands.map((brand) => {
+                    {brands.map((brand: any) => {
                       const params = new URLSearchParams()
                       if (searchParams.category) params.set('category', searchParams.category)
                       params.set('brand', brand.id)
@@ -188,7 +224,7 @@ export default async function ProductsPage({
                           href={`/products?${params.toString()}`}
                           className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                             searchParams.brand === brand.id
-                              ? 'bg-accent-50 text-accent-700 font-medium'
+                              ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
                               : 'text-foreground-secondary hover:bg-surface-secondary'
                           }`}
                         >
