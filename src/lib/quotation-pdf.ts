@@ -305,7 +305,7 @@ export function generateQuotationPDF(
     const amtW  = cols[7].w
     const amtX  = R - amtW
     const slW   = cols[0].w
-    const hdrH  = 22
+    const hdrH  = 26
     const rowH  = 14
 
     const subtotal = items.reduce((s, i) => s + i.amount, 0)
@@ -324,8 +324,8 @@ export function generateQuotationPDF(
       let cx = LM
       for (const col of cols) {
         rect(doc, cx, y, col.w, hdrH)
-        doc.font(FB).fontSize(6.5).text(
-          col.label, cx + 2, y + (col.label.includes('\n') ? 3 : 7),
+        doc.font(FB).fontSize(7.5).text(
+          col.label, cx + 2, y + (col.label.includes('\n') ? 4 : 9),
           { width: col.w - 4, align: col.align }
         )
         cx += col.w
