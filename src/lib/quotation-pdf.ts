@@ -1,3 +1,4 @@
+import path from 'path'
 const PDFDocument = eval('require')('pdfkit')
 
 export interface QuotationBusiness {
@@ -78,10 +79,6 @@ function fmt(amount: number): string {
   return amount.toLocaleString('en-IN', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
 }
 
-function fmtTotal(amount: number): string {
-  return amount.toLocaleString('en-IN', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
-}
-
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
   const day = String(d.getDate()).padStart(2, '0')
@@ -116,38 +113,6 @@ function drawVLine(doc: any, x: number, y1: number, y2: number) {
   doc.moveTo(x, y1).lineTo(x, y2).stroke()
 }
 
-interface AddressBlock {
-  name: string
-  addr1: string
-  addr2: string | null
-  city: string
-  state: string
-  gstin: string | null
-}
-
-function renderAddressBlock(
-  doc: any, label: string, addr: AddressBlock,
-  LM: number, pw: number, startY: number
-): number {
-  let y = startY
-  doc.font('Helvetica').fontSize(6).text(label, LM + 3, y + 2, { width: pw - 6 })
-  y += 10
-  doc.font('Helvetica-Bold').fontSize(7)
-  const lines = [addr.name, addr.addr1, addr.addr2, addr.city].filter(Boolean)
-  const addrText = lines.join('\n')
-  doc.text(addrText, LM + 3, y, { width: pw * 0.55 - 6 })
-  y += doc.heightOfString(addrText, { width: pw * 0.55 - 6 }) + 2
-  const stateCode = getStateCode(addr.state)
-  if (addr.gstin) {
-    doc.font('Helvetica').fontSize(7).text(`GSTIN/UIN : ${addr.gstin}`, LM + 3, y, { width: pw * 0.55 - 6 })
-    y += 9
-  }
-  doc.font('Helvetica').fontSize(7).text(`State Name : ${addr.state}${stateCode ? ', Code : ' + stateCode : ''}`, LM + 3, y, { width: pw * 0.55 - 6 })
-  y += 11
-  drawRect(doc, LM, startY, pw, y - startY)
-  return y
-}
-
 export function generateQuotationPDF(
   data: QuotationData,
   items: QuotationItem[],
@@ -172,56 +137,105 @@ export function generateQuotationPDF(
 
     let y = 28
 
-    doc.font(FB).fontSize(12).text('Quotation', LM, y, { width: pw, align: 'center' })
-    y += 16
+    // ── Title ──────────────────────────────────────────────────────────────
+    doc.font(FB).fontSize(14).text('Quotation', LM, y, { width: pw, align: 'center' })
+    y += 20
 
+    // ── Header: Logo + Seller | Meta grid ──────────────────────────────────
     const topY = y
-    const sellerW = pw * 0.55
-    const metaW = pw - sellerW
+    // Seller block is 55% of page width; meta block is 45%
+    const sellerW = Math.round(pw * 0.55)
     const metaX = LM + sellerW
-    const metaHalfW = metaW / 2
+    const metaW = pw - sellerW
 
+    // Logo: 28×28 px, left-padded 3, vertically centred in first ~30px
+    const logoPath = path.join(process.cwd(), 'public', 'images', 'logo.png')
+    const logoSize = 28
+    const logoX = LM + 3
+    const logoY = topY + 3
+    try {
+      doc.image(logoPath, logoX, logoY, { width: logoSize, height: logoSize })
+    } catch { /* logo missing — skip */ }
+
+    // Business name + address to the right of logo
+    const bizX = logoX + logoSize + 4
+    const bizW = sellerW - logoSize - 10
     let sy = topY + 3
-    const sellerX = LM + 3
-    doc.font(FB).fontSize(9).text(business.tradeName.toUpperCase(), sellerX, sy, { width: sellerW - 6 })
-    sy += 11
+    doc.font(FB).fontSize(9).text(business.tradeName.toUpperCase(), bizX, sy, { width: bizW })
+    sy += 12
     doc.font(F).fontSize(7)
-    const addrText = business.address.split(',').map((s: string) => s.trim()).join(',\n')
-    doc.text(addrText, sellerX, sy, { width: sellerW - 6 })
-    sy += doc.heightOfString(addrText, { width: sellerW - 6 }) + 2
-    doc.text(`GSTIN/UIN: ${business.gstin}`, sellerX, sy, { width: sellerW - 6 })
+    const addrLines = business.address.split(',').map((s: string) => s.trim())
+    for (const line of addrLines) {
+      doc.text(line, bizX, sy, { width: bizW })
+      sy += 9
+    }
+    doc.text(`GSTIN/UIN: ${business.gstin}`, bizX, sy, { width: bizW })
     sy += 9
-    doc.text(`State Name : ${business.state}, Code : ${business.stateCode}`, sellerX, sy, { width: sellerW - 6 })
+    doc.text(`State Name : ${business.state}, Code : ${business.stateCode}`, bizX, sy, { width: bizW })
     sy += 9
     if (business.email) {
-      doc.text(`E-Mail : ${business.email}`, sellerX, sy, { width: sellerW - 6 })
+      doc.text(`E-Mail : ${business.email}`, bizX, sy, { width: bizW })
       sy += 9
     }
 
-    const metaRowH = 18
-    const metaRows = [
-      { left: 'Invoice No.', leftVal: data.quote_number, right: 'e-Way Bill No.', rightVal: '' },
-      { left: 'Dated', leftVal: formatDate(data.quote_date), right: '', rightVal: '' },
-      { left: 'Delivery Note', leftVal: '', right: 'Mode/Terms of Payment', rightVal: '' },
-      { left: 'Reference No. & Date.', leftVal: '', right: 'Other References', rightVal: '' },
-      { left: "Buyer's Order No.", leftVal: '', right: 'Dated', rightVal: '' },
-      { left: 'Dispatch Doc No.', leftVal: '', right: 'Delivery Note Date', rightVal: '' },
-      { left: 'Dispatched through', leftVal: '', right: 'Destination', rightVal: '' },
-    ]
+    // Meta grid — 3-column first row (Invoice No | e-Way Bill No | Dated)
+    // then 2-column rows below
+    const metaRowH = 16
+    const col3W = Math.round(metaW / 3)   // Invoice No column
+    const col3bW = Math.round(metaW / 3)  // e-Way Bill No column
+    const col3cW = metaW - col3W - col3bW // Dated column
+    const halfW = Math.round(metaW / 2)
+    const halfW2 = metaW - halfW
 
     let my = topY
-    for (const row of metaRows) {
-      drawRect(doc, metaX, my, metaHalfW, metaRowH)
-      drawRect(doc, metaX + metaHalfW, my, metaHalfW, metaRowH)
-      doc.font(F).fontSize(6)
-      doc.text(row.left, metaX + 2, my + 2, { width: metaHalfW - 4 })
-      doc.text(row.right, metaX + metaHalfW + 2, my + 2, { width: metaHalfW - 4 })
-      doc.font(FB).fontSize(7)
-      if (row.leftVal) doc.text(row.leftVal, metaX + 2, my + 9, { width: metaHalfW - 4 })
-      if (row.rightVal) doc.text(row.rightVal, metaX + metaHalfW + 2, my + 9, { width: metaHalfW - 4 })
-      my += metaRowH
-    }
 
+    // Row 1: Invoice No | e-Way Bill No | Dated
+    drawRect(doc, metaX, my, col3W, metaRowH)
+    drawRect(doc, metaX + col3W, my, col3bW, metaRowH)
+    drawRect(doc, metaX + col3W + col3bW, my, col3cW, metaRowH)
+    doc.font(F).fontSize(6).text('Invoice No.', metaX + 2, my + 2, { width: col3W - 4 })
+    doc.font(FB).fontSize(7).text(data.quote_number, metaX + 2, my + 8, { width: col3W - 4 })
+    doc.font(F).fontSize(6).text('e-Way Bill No.', metaX + col3W + 2, my + 2, { width: col3bW - 4 })
+    doc.font(F).fontSize(6).text('Dated', metaX + col3W + col3bW + 2, my + 2, { width: col3cW - 4 })
+    doc.font(FB).fontSize(7).text(formatDate(data.quote_date), metaX + col3W + col3bW + 2, my + 8, { width: col3cW - 4 })
+    my += metaRowH
+
+    // Row 2: Delivery Note | Mode/Terms of Payment
+    drawRect(doc, metaX, my, halfW, metaRowH)
+    drawRect(doc, metaX + halfW, my, halfW2, metaRowH)
+    doc.font(F).fontSize(6).text('Delivery Note', metaX + 2, my + 2, { width: halfW - 4 })
+    doc.font(F).fontSize(6).text('Mode/Terms of Payment', metaX + halfW + 2, my + 2, { width: halfW2 - 4 })
+    my += metaRowH
+
+    // Row 3: Reference No. & Date | Other References
+    drawRect(doc, metaX, my, halfW, metaRowH)
+    drawRect(doc, metaX + halfW, my, halfW2, metaRowH)
+    doc.font(F).fontSize(6).text('Reference No. & Date.', metaX + 2, my + 2, { width: halfW - 4 })
+    doc.font(F).fontSize(6).text('Other References', metaX + halfW + 2, my + 2, { width: halfW2 - 4 })
+    my += metaRowH
+
+    // Row 4: Buyer's Order No | Dated
+    drawRect(doc, metaX, my, halfW, metaRowH)
+    drawRect(doc, metaX + halfW, my, halfW2, metaRowH)
+    doc.font(F).fontSize(6).text("Buyer's Order No.", metaX + 2, my + 2, { width: halfW - 4 })
+    doc.font(F).fontSize(6).text('Dated', metaX + halfW + 2, my + 2, { width: halfW2 - 4 })
+    my += metaRowH
+
+    // Row 5: Dispatch Doc No | Delivery Note Date
+    drawRect(doc, metaX, my, halfW, metaRowH)
+    drawRect(doc, metaX + halfW, my, halfW2, metaRowH)
+    doc.font(F).fontSize(6).text('Dispatch Doc No.', metaX + 2, my + 2, { width: halfW - 4 })
+    doc.font(F).fontSize(6).text('Delivery Note Date', metaX + halfW + 2, my + 2, { width: halfW2 - 4 })
+    my += metaRowH
+
+    // Row 6: Dispatched through | Destination
+    drawRect(doc, metaX, my, halfW, metaRowH)
+    drawRect(doc, metaX + halfW, my, halfW2, metaRowH)
+    doc.font(F).fontSize(6).text('Dispatched through', metaX + 2, my + 2, { width: halfW - 4 })
+    doc.font(F).fontSize(6).text('Destination', metaX + halfW + 2, my + 2, { width: halfW2 - 4 })
+    my += metaRowH
+
+    // Row 7: Terms of Delivery (full width)
     drawRect(doc, metaX, my, metaW, metaRowH)
     doc.font(F).fontSize(6).text('Terms of Delivery', metaX + 2, my + 2, { width: metaW - 4 })
     my += metaRowH
@@ -230,7 +244,48 @@ export function generateQuotationPDF(
     drawRect(doc, LM, topY, sellerW, sellerEndY - topY)
     y = sellerEndY
 
-    const consigneeAddr: AddressBlock = {
+    // ── Address blocks ────────────────────────────────────────────────────
+    function renderAddressBlock(
+      label: string,
+      name: string, addr1: string, addr2: string | null,
+      city: string, state: string, gstin: string | null
+    ): number {
+      const startY = y
+      const addrW = pw * 0.55
+      const rightX = LM + addrW
+      const rightW = pw - addrW
+
+      let ay = startY + 2
+      doc.font(F).fontSize(6.5).text(label, LM + 3, ay, { width: addrW - 6 })
+      ay += 9
+
+      doc.font(FB).fontSize(8).text(name, LM + 3, ay, { width: addrW - 6 })
+      ay += 11
+
+      doc.font(F).fontSize(7.5)
+      if (addr1) { doc.text(addr1, LM + 3, ay, { width: addrW - 6 }); ay += 10 }
+      if (addr2) { doc.text(addr2, LM + 3, ay, { width: addrW - 6 }); ay += 10 }
+      if (city) { doc.text(city, LM + 3, ay, { width: addrW - 6 }); ay += 10 }
+
+      if (gstin) {
+        doc.font(F).fontSize(7).text(`GSTIN/UIN : ${gstin}`, LM + 3, ay, { width: addrW - 6 })
+        ay += 9
+      }
+      const stateCode = getStateCode(state)
+      doc.font(F).fontSize(7).text(
+        `State Name : ${state}${stateCode ? ', Code : ' + stateCode : ''}`,
+        LM + 3, ay, { width: addrW - 6 }
+      )
+      ay += 10
+
+      const blockH = ay - startY + 2
+      drawRect(doc, LM, startY, pw, blockH)
+      // vertical divider splitting address left / right meta columns
+      drawVLine(doc, rightX, startY, startY + blockH)
+      return startY + blockH
+    }
+
+    const consigneeAddr = {
       name: data.consignee_name,
       addr1: data.consignee_addr1,
       addr2: data.consignee_addr2,
@@ -238,9 +293,14 @@ export function generateQuotationPDF(
       state: data.consignee_state,
       gstin: data.consignee_gstin,
     }
-    y = renderAddressBlock(doc, 'Consignee (Ship to)', consigneeAddr, LM, pw, y)
 
-    const buyerAddr: AddressBlock = data.buyer_same ? consigneeAddr : {
+    y = renderAddressBlock(
+      'Consignee (Ship to)',
+      consigneeAddr.name, consigneeAddr.addr1, consigneeAddr.addr2,
+      consigneeAddr.city, consigneeAddr.state, consigneeAddr.gstin
+    )
+
+    const buyerAddr = data.buyer_same ? consigneeAddr : {
       name: data.buyer_name,
       addr1: data.buyer_addr1,
       addr2: data.buyer_addr2,
@@ -248,29 +308,40 @@ export function generateQuotationPDF(
       state: data.buyer_state,
       gstin: data.buyer_gstin,
     }
-    y = renderAddressBlock(doc, 'Buyer (Bill to)', buyerAddr, LM, pw, y)
 
-    const itemCols = [
-      { label: 'Sl\nNo.', w: 22, align: 'center' as const },
-      { label: 'Description of Goods', w: 160, align: 'left' as const },
-      { label: 'HSN/SAC', w: 52, align: 'center' as const },
-      { label: 'Quantity', w: 52, align: 'center' as const },
-      { label: 'Rate', w: 62, align: 'right' as const },
-      { label: 'per', w: 30, align: 'center' as const },
-      { label: 'Disc. %', w: 38, align: 'center' as const },
-      { label: 'Amount', w: 62, align: 'right' as const },
+    y = renderAddressBlock(
+      'Buyer (Bill to)',
+      buyerAddr.name, buyerAddr.addr1, buyerAddr.addr2,
+      buyerAddr.city, buyerAddr.state, buyerAddr.gstin
+    )
+
+    // ── Item table ────────────────────────────────────────────────────────
+    // Column raw widths (will be scaled to page width)
+    const itemColDefs = [
+      { label: 'Sl\nNo.', w: 20,  align: 'center' as const },
+      { label: 'Description of Goods', w: 168, align: 'left'   as const },
+      { label: 'HSN/SAC',              w: 44,  align: 'center' as const },
+      { label: 'Quantity',             w: 52,  align: 'right'  as const },
+      { label: 'Rate',                 w: 60,  align: 'right'  as const },
+      { label: 'per',                  w: 28,  align: 'center' as const },
+      { label: 'Disc. %',              w: 36,  align: 'center' as const },
+      { label: 'Amount',               w: 60,  align: 'right'  as const },
     ]
-    const rawTotal = itemCols.reduce((s, c) => s + c.w, 0)
-    const colScale = pw / rawTotal
-    itemCols.forEach(c => { c.w = Math.round(c.w * colScale) })
+    const rawSum = itemColDefs.reduce((s, c) => s + c.w, 0)
+    const sc = pw / rawSum
+    const itemCols = itemColDefs.map((c, i) => ({ ...c, w: Math.round(c.w * sc) }))
+    // fix rounding
     itemCols[itemCols.length - 1].w += pw - itemCols.reduce((s, c) => s + c.w, 0)
 
-    const headerH = 22
-    const rowH = 14
-    const amountColW = itemCols[itemCols.length - 1].w
+    const amountColW = itemCols[7].w
     const amountColX = R - amountColW
-    const descLabelX = LM + itemCols[0].w + 8
+    // x position of description column start (for CGST/SGST label placement)
+    const descColX = LM + itemCols[0].w
 
+    const headerH = 20
+    const rowH = 14
+
+    // totals
     const subtotal = items.reduce((s, i) => s + i.amount, 0)
     const cgst = items.reduce((s, i) => s + i.amount * i.gst_rate / 200, 0)
     const sgst = cgst
@@ -278,8 +349,8 @@ export function generateQuotationPDF(
     const totalAmt = Math.round(rawTotalAmt)
     const roundOff = totalAmt - rawTotalAmt
 
-    const summaryRows = 1 + 2 + (Math.abs(roundOff) >= 0.005 ? 1 : 0) + 1
-    const summaryHeight = summaryRows * rowH
+    const summaryRowCount = 1 + 2 + (Math.abs(roundOff) >= 0.005 ? 1 : 0) + 1
+    const summaryHeight = summaryRowCount * rowH + 4
 
     let tableTop = y
 
@@ -288,7 +359,7 @@ export function generateQuotationPDF(
       doc.font(FB).fontSize(6.5)
       for (const col of itemCols) {
         drawRect(doc, cx, y, col.w, headerH)
-        doc.text(col.label, cx + 2, y + 3, { width: col.w - 4, align: col.align })
+        doc.text(col.label, cx + 2, y + (col.label.includes('\n') ? 3 : 6), { width: col.w - 4, align: col.align })
         cx += col.w
       }
       y += headerH
@@ -306,7 +377,6 @@ export function generateQuotationPDF(
     function checkPageBreak(needed: number) {
       if (y + needed > pageBottom) {
         closeTableSegment()
-        doc.font('Helvetica-Oblique').fontSize(6).text('Continued on next page...', LM, y + 2, { width: pw, align: 'center' })
         doc.addPage()
         y = LM
         tableTop = y
@@ -317,16 +387,19 @@ export function generateQuotationPDF(
     drawTableHeader()
 
     for (let i = 0; i < items.length; i++) {
+      const item = items[i]
       const isLast = i === items.length - 1
       checkPageBreak(isLast ? rowH + summaryHeight : rowH)
-      const item = items[i]
+
       const disc = item.discount_pct > 0 ? `${Number(item.discount_pct).toFixed(0)} %` : ''
+      const qtyStr = `${Number(item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${item.unit}`
+
       const rowData = [
         String(i + 1),
         item.description,
         item.hsn_code || '',
-        `${Number(item.quantity).toFixed(3)} ${item.unit}`,
-        Number(item.rate).toFixed(4),
+        qtyStr,
+        Number(item.rate).toLocaleString('en-IN', { minimumFractionDigits: 4, maximumFractionDigits: 4 }),
         item.unit,
         disc,
         fmt(item.amount),
@@ -334,145 +407,188 @@ export function generateQuotationPDF(
       let cx = LM
       for (let j = 0; j < itemCols.length; j++) {
         const col = itemCols[j]
-        doc.font(j === 1 ? FB : F).fontSize(7)
-        doc.text(rowData[j], cx + 2, y + 2, { width: col.w - 4, align: col.align, lineBreak: false })
+        // description (col 1), quantity (col 3), amount (col 7) are bold like the sample
+        const isBold = j === 1 || j === 3 || j === 7
+        doc.font(isBold ? FB : F).fontSize(7)
+        doc.text(rowData[j], cx + 2, y + 3, { width: col.w - 4, align: col.align, lineBreak: false })
         cx += col.w
       }
       y += rowH
     }
 
+    // Subtotal row
     checkPageBreak(rowH)
     drawHLine(doc, LM, R, y)
-    doc.font(F).fontSize(7).text(fmt(subtotal), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+    doc.font(FB).fontSize(7).text(
+      fmt(subtotal),
+      amountColX + 2, y + 3, { width: amountColW - 4, align: 'right' }
+    )
     y += rowH
 
+    // CGST row — label right-aligned into description col, bold italic
     checkPageBreak(rowH)
     drawHLine(doc, LM, R, y)
-    doc.font(FBI).fontSize(8).text('CGST', descLabelX, y + 2, { width: 60 })
-    doc.font(F).fontSize(7).text(fmt(cgst), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+    doc.font(FBI).fontSize(7.5).text('CGST', descColX + 2, y + 3,
+      { width: amountColX - descColX - 8, align: 'right' })
+    doc.font(F).fontSize(7).text(fmt(cgst), amountColX + 2, y + 3,
+      { width: amountColW - 4, align: 'right' })
     y += rowH
 
+    // SGST row
     checkPageBreak(rowH)
     drawHLine(doc, LM, R, y)
-    doc.font(FBI).fontSize(8).text('SGST', descLabelX, y + 2, { width: 60 })
-    doc.font(F).fontSize(7).text(fmt(sgst), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+    doc.font(FBI).fontSize(7.5).text('SGST', descColX + 2, y + 3,
+      { width: amountColX - descColX - 8, align: 'right' })
+    doc.font(F).fontSize(7).text(fmt(sgst), amountColX + 2, y + 3,
+      { width: amountColW - 4, align: 'right' })
     y += rowH
 
+    // Round Off row (only if non-trivial)
     if (Math.abs(roundOff) >= 0.005) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('ROUND OFF', descLabelX, y + 2, { width: 80 })
-      doc.font(F).fontSize(7).text(fmtTotal(roundOff), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      doc.font(FBI).fontSize(7.5).text('ROUND OFF', descColX + 2, y + 3,
+        { width: amountColX - descColX - 8, align: 'right' })
+      doc.font(F).fontSize(7).text(fmt(roundOff), amountColX + 2, y + 3,
+        { width: amountColW - 4, align: 'right' })
       y += rowH
     }
 
-    checkPageBreak(22)
-    const totalRowY = y
+    // Total row — taller, with ₹ symbol, bold
+    checkPageBreak(20)
     drawHLine(doc, LM, R, y)
-    y += 3
-    doc.font(FB).fontSize(7).text('Total', LM + itemCols[0].w + 2, y + 3, { width: 50, align: 'right' })
-    doc.font(FB).fontSize(9).text(`₹ ${fmtTotal(totalAmt)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
-    y += 18
+    // "Total" label right-aligned before amount column
+    doc.font(FB).fontSize(8).text('Total', descColX + 2, y + 4,
+      { width: amountColX - descColX - 8, align: 'right' })
+    doc.font(FB).fontSize(9).text(`₹ ${fmt(totalAmt)}`, amountColX + 2, y + 3,
+      { width: amountColW - 4, align: 'right' })
+    y += 20
 
     closeTableSegment()
-    drawVLine(doc, amountColX, tableTop, y)
 
+    // ── Amount in words ───────────────────────────────────────────────────
     const wordsY = y
-    doc.font(F).fontSize(7).text('Amount Chargeable (in words)', LM + 3, y + 2)
-    doc.font(F).fontSize(7).text('E. & O.E', R - 50, y + 2, { width: 48, align: 'right' })
+    doc.font(F).fontSize(6.5).text('Amount Chargeable (in words)', LM + 3, y + 2)
+    doc.font(F).fontSize(7).text('E. & O.E', R - 55, y + 2, { width: 53, align: 'right' })
     y += 11
     doc.font(FB).fontSize(8).text(`INR ${numberToWords(totalAmt)} Only`, LM + 3, y)
-    y += 13
+    y += 14
     drawRect(doc, LM, wordsY, pw, y - wordsY)
 
+    // ── HSN summary table ─────────────────────────────────────────────────
     if (y + 60 > pageBottom) { doc.addPage(); y = LM }
     const hsnY = y
-    const hsnMap = new Map<string, { taxable: number; gstRate: number; cgst: number; sgst: number }>()
+
+    // Build HSN map
+    const hsnMap = new Map<string, { taxable: number; gstRate: number; cgstAmt: number; sgstAmt: number }>()
     for (const item of items) {
       const key = (item.hsn_code || 'N/A') + '__' + item.gst_rate
-      const ex = hsnMap.get(key) || { taxable: 0, gstRate: item.gst_rate, cgst: 0, sgst: 0 }
+      const ex = hsnMap.get(key) || { taxable: 0, gstRate: item.gst_rate, cgstAmt: 0, sgstAmt: 0 }
       ex.taxable += item.amount
-      ex.cgst += item.amount * item.gst_rate / 200
-      ex.sgst += item.amount * item.gst_rate / 200
+      ex.cgstAmt += item.amount * item.gst_rate / 200
+      ex.sgstAmt += item.amount * item.gst_rate / 200
       hsnMap.set(key, ex)
     }
 
-    const hsnFlatCols = [
-      { label: 'HSN/SAC', w: 130, align: 'left' as const },
-      { label: 'Taxable\nValue', w: 80, align: 'right' as const },
-      { label: 'Rate', w: 40, align: 'center' as const },
-      { label: 'Amount', w: 60, align: 'right' as const },
-      { label: 'Rate', w: 40, align: 'center' as const },
-      { label: 'Amount', w: 60, align: 'right' as const },
-      { label: 'Total\nTax Amount', w: 70, align: 'right' as const },
+    // HSN table columns (raw widths, scaled)
+    const hsnDefs = [
+      { label: 'HSN/SAC',         w: 130, align: 'left'  as const },
+      { label: 'Taxable\nValue',  w: 85,  align: 'right' as const },
+      { label: 'Rate',            w: 35,  align: 'center' as const },
+      { label: 'Amount',          w: 65,  align: 'right' as const },
+      { label: 'Rate',            w: 35,  align: 'center' as const },
+      { label: 'Amount',          w: 65,  align: 'right' as const },
+      { label: 'Total\nTax Amount', w: 65, align: 'right' as const },
     ]
-    const hsnRaw = hsnFlatCols.reduce((s, c) => s + c.w, 0)
-    const hsnSc = pw / hsnRaw
-    hsnFlatCols.forEach(c => { c.w = Math.round(c.w * hsnSc) })
-    hsnFlatCols[hsnFlatCols.length - 1].w += pw - hsnFlatCols.reduce((s, c) => s + c.w, 0)
+    const hsnRawSum = hsnDefs.reduce((s, c) => s + c.w, 0)
+    const hsnSc = pw / hsnRawSum
+    const hsnCols = hsnDefs.map(c => ({ ...c, w: Math.round(c.w * hsnSc) }))
+    hsnCols[hsnCols.length - 1].w += pw - hsnCols.reduce((s, c) => s + c.w, 0)
 
-    const hsnH1 = 12
-    const hsnH2 = 12
+    const hsnH1 = 11  // top sub-header row height
+    const hsnH2 = 11  // bottom sub-header row height
     let cx = LM
+
+    // Header row 1: HSN/SAC | Taxable Value | CGST (span) | SGST/UTGST (span) | Total Tax Amount
     doc.font(FB).fontSize(6.5)
-    drawRect(doc, cx, y, hsnFlatCols[0].w, hsnH1 + hsnH2)
-    doc.text('HSN/SAC', cx + 2, y + hsnH1 / 2, { width: hsnFlatCols[0].w - 4, align: 'left' })
-    cx += hsnFlatCols[0].w
-    drawRect(doc, cx, y, hsnFlatCols[1].w, hsnH1 + hsnH2)
-    doc.text('Taxable\nValue', cx + 2, y + 2, { width: hsnFlatCols[1].w - 4, align: 'right' })
-    cx += hsnFlatCols[1].w
-    const cgstW = hsnFlatCols[2].w + hsnFlatCols[3].w
-    drawRect(doc, cx, y, cgstW, hsnH1)
-    doc.text('CGST', cx + 2, y + 3, { width: cgstW - 4, align: 'center' })
-    const sgstW = hsnFlatCols[4].w + hsnFlatCols[5].w
-    drawRect(doc, cx + cgstW, y, sgstW, hsnH1)
-    doc.text('SGST/UTGST', cx + cgstW + 2, y + 3, { width: sgstW - 4, align: 'center' })
-    drawRect(doc, cx + cgstW + sgstW, y, hsnFlatCols[6].w, hsnH1 + hsnH2)
-    doc.text('Total\nTax Amount', cx + cgstW + sgstW + 2, y + 2, { width: hsnFlatCols[6].w - 4, align: 'right' })
+
+    drawRect(doc, cx, y, hsnCols[0].w, hsnH1 + hsnH2)
+    doc.text('HSN/SAC', cx + 2, y + (hsnH1 + hsnH2) / 2 - 3, { width: hsnCols[0].w - 4, align: 'left' })
+    cx += hsnCols[0].w
+
+    drawRect(doc, cx, y, hsnCols[1].w, hsnH1 + hsnH2)
+    doc.text('Taxable\nValue', cx + 2, y + 2, { width: hsnCols[1].w - 4, align: 'right' })
+    cx += hsnCols[1].w
+
+    const cgstSpanW = hsnCols[2].w + hsnCols[3].w
+    drawRect(doc, cx, y, cgstSpanW, hsnH1)
+    doc.text('CGST', cx + 2, y + 3, { width: cgstSpanW - 4, align: 'center' })
+
+    const sgstSpanW = hsnCols[4].w + hsnCols[5].w
+    drawRect(doc, cx + cgstSpanW, y, sgstSpanW, hsnH1)
+    doc.text('SGST/UTGST', cx + cgstSpanW + 2, y + 3, { width: sgstSpanW - 4, align: 'center' })
+
+    drawRect(doc, cx + cgstSpanW + sgstSpanW, y, hsnCols[6].w, hsnH1 + hsnH2)
+    doc.text('Total\nTax Amount', cx + cgstSpanW + sgstSpanW + 2, y + 2,
+      { width: hsnCols[6].w - 4, align: 'right' })
     y += hsnH1
 
-    cx = LM + hsnFlatCols[0].w + hsnFlatCols[1].w
+    // Header row 2: sub-headers for CGST and SGST columns
+    cx = LM + hsnCols[0].w + hsnCols[1].w
     for (let i = 2; i <= 5; i++) {
-      drawRect(doc, cx, y, hsnFlatCols[i].w, hsnH2)
-      doc.font(FB).fontSize(6.5).text(hsnFlatCols[i].label, cx + 2, y + 3, { width: hsnFlatCols[i].w - 4, align: hsnFlatCols[i].align })
-      cx += hsnFlatCols[i].w
+      drawRect(doc, cx, y, hsnCols[i].w, hsnH2)
+      doc.font(FB).fontSize(6.5).text(hsnCols[i].label, cx + 2, y + 3,
+        { width: hsnCols[i].w - 4, align: hsnCols[i].align })
+      cx += hsnCols[i].w
     }
     y += hsnH2
 
-    let hsnTotalTaxable = 0, hsnTotalTax = 0
+    // Data rows
+    let hsnTotalTaxable = 0, hsnTotalCgst = 0, hsnTotalSgst = 0
     doc.font(F).fontSize(7)
     for (const [key, vals] of hsnMap) {
       const hsn = key.split('__')[0]
       const halfRate = vals.gstRate / 2
-      const totalTax = vals.cgst + vals.sgst
+      const totalTax = vals.cgstAmt + vals.sgstAmt
       hsnTotalTaxable += vals.taxable
-      hsnTotalTax += totalTax
+      hsnTotalCgst += vals.cgstAmt
+      hsnTotalSgst += vals.sgstAmt
       cx = LM
-      const rowData = [hsn, fmt(vals.taxable), `${halfRate}%`, fmt(vals.cgst), `${halfRate}%`, fmt(vals.sgst), fmt(totalTax)]
-      for (let j = 0; j < hsnFlatCols.length; j++) {
-        doc.text(rowData[j], cx + 2, y + 2, { width: hsnFlatCols[j].w - 4, align: hsnFlatCols[j].align })
-        cx += hsnFlatCols[j].w
+      const rowData = [
+        hsn,
+        fmt(vals.taxable),
+        `${halfRate}%`,
+        fmt(vals.cgstAmt),
+        `${halfRate}%`,
+        fmt(vals.sgstAmt),
+        fmt(totalTax),
+      ]
+      for (let j = 0; j < hsnCols.length; j++) {
+        doc.text(rowData[j], cx + 2, y + 2, { width: hsnCols[j].w - 4, align: hsnCols[j].align })
+        cx += hsnCols[j].w
       }
       y += 12
     }
 
+    // Total row
     drawHLine(doc, LM, R, y)
     y += 1
     cx = LM
     doc.font(FB).fontSize(7)
-    doc.text('Total', cx + 2, y + 2, { width: hsnFlatCols[0].w - 4, align: 'right' })
-    cx += hsnFlatCols[0].w
-    doc.text(fmt(hsnTotalTaxable), cx + 2, y + 2, { width: hsnFlatCols[1].w - 4, align: 'right' })
-    cx += hsnFlatCols[1].w + hsnFlatCols[2].w
-    doc.text(fmt(cgst), cx + 2, y + 2, { width: hsnFlatCols[3].w - 4, align: 'right' })
-    cx += hsnFlatCols[3].w + hsnFlatCols[4].w
-    doc.text(fmt(sgst), cx + 2, y + 2, { width: hsnFlatCols[5].w - 4, align: 'right' })
-    cx += hsnFlatCols[5].w
-    doc.text(fmt(hsnTotalTax), cx + 2, y + 2, { width: hsnFlatCols[6].w - 4, align: 'right' })
+    doc.text('Total', cx + 2, y + 2, { width: hsnCols[0].w - 4, align: 'right' })
+    cx += hsnCols[0].w
+    doc.text(fmt(hsnTotalTaxable), cx + 2, y + 2, { width: hsnCols[1].w - 4, align: 'right' })
+    cx += hsnCols[1].w + hsnCols[2].w  // skip Rate col
+    doc.text(fmt(hsnTotalCgst), cx + 2, y + 2, { width: hsnCols[3].w - 4, align: 'right' })
+    cx += hsnCols[3].w + hsnCols[4].w  // skip Rate col
+    doc.text(fmt(hsnTotalSgst), cx + 2, y + 2, { width: hsnCols[5].w - 4, align: 'right' })
+    cx += hsnCols[5].w
+    doc.text(fmt(hsnTotalCgst + hsnTotalSgst), cx + 2, y + 2, { width: hsnCols[6].w - 4, align: 'right' })
     y += 14
 
     drawRect(doc, LM, hsnY, pw, y - hsnY)
 
+    // ── Tax amount in words ───────────────────────────────────────────────
     const taxWordsY = y
     const totalTaxAmt = cgst + sgst
     doc.font(F).fontSize(7).text('Tax Amount (in words) : ', LM + 3, y + 3, { continued: true })
@@ -480,31 +596,37 @@ export function generateQuotationPDF(
     y += 14
     drawRect(doc, LM, taxWordsY, pw, y - taxWordsY)
 
+    // ── Declaration + Bank Details ────────────────────────────────────────
     if (y + 110 > pageBottom) { doc.addPage(); y = LM }
     const bottomY = y
-    const bottomH = 70
-    const declW = pw * 0.48
-    const bankW = pw - declW
+    const bottomH = 68
+    const declW = Math.round(pw * 0.50)
     const bankX = LM + declW
+    const bankW = pw - declW
 
     doc.font(FB).fontSize(7).text('Declaration', LM + 3, y + 3)
-    y += 10
-    doc.font(F).fontSize(6.5).text('We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.', LM + 3, y, { width: declW - 6 })
+    y += 11
+    doc.font(F).fontSize(6.5).text(
+      'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
+      LM + 3, y, { width: declW - 6 }
+    )
 
     let by = bottomY + 3
-    doc.font(F).fontSize(7).text("Company's Bank Details", bankX + 2, by, { width: bankW - 4 })
+    doc.font(F).fontSize(7).text("Company's Bank Details", bankX + 3, by, { width: bankW - 6 })
     by += 10
-    const bankLabelW = 90
-    const bankValX = bankX + bankLabelW + 10
-    const bankValW = bankW - bankLabelW - 14
+
+    // Bank details: "Label :" left, bold value right of colon
     const bankDetails = [
-      { label: 'Bank Name', value: business.bankName.toUpperCase() },
+      { label: 'Bank Name', value: business.bankName },
       { label: 'A/c No.', value: business.bankAccount },
       { label: 'Branch & IFS Code', value: `${business.bankBranch} & ${business.bankIfsc}` },
     ]
+    const labelW = 80
+    const valX = bankX + labelW + 6
+    const valW = bankW - labelW - 10
     for (const bd of bankDetails) {
-      doc.font(F).fontSize(6.5).text(`${bd.label}  :`, bankX + 2, by, { width: bankLabelW })
-      doc.font(FB).fontSize(6.5).text(bd.value, bankValX, by, { width: bankValW })
+      doc.font(F).fontSize(6.5).text(`${bd.label}  :`, bankX + 3, by, { width: labelW })
+      doc.font(FB).fontSize(6.5).text(bd.value, valX, by, { width: valW })
       by += 9
     }
 
@@ -512,14 +634,17 @@ export function generateQuotationPDF(
     drawRect(doc, LM, bottomY, declW, bottomH)
     drawRect(doc, bankX, bottomY, bankW, bottomH)
 
-    const sigY = y
+    // Authorised signatory box
     const sigH = 30
-    drawRect(doc, LM, sigY, declW, sigH)
-    drawRect(doc, LM + declW, sigY, bankW, sigH)
-    doc.font(FB).fontSize(7).text(`for ${business.tradeName.toUpperCase()}`, LM + declW + 2, sigY + 3, { width: bankW - 4, align: 'right' })
-    doc.font(F).fontSize(7).text('Authorised Signatory', LM + declW + 2, sigY + sigH - 12, { width: bankW - 4, align: 'right' })
+    drawRect(doc, LM, y, declW, sigH)
+    drawRect(doc, bankX, y, bankW, sigH)
+    doc.font(FB).fontSize(7).text(`for ${business.tradeName.toUpperCase()}`, bankX + 2, y + 4,
+      { width: bankW - 4, align: 'right' })
+    doc.font(F).fontSize(7).text('Authorised Signatory', bankX + 2, y + sigH - 11,
+      { width: bankW - 4, align: 'right' })
+    y += sigH + 8
 
-    y = sigY + sigH + 8
+    // ── Footer ────────────────────────────────────────────────────────────
     doc.font(F).fontSize(7).text('SUBJECT TO RAIPUR JURISDICTION', LM, y, { width: pw, align: 'center' })
     y += 10
     doc.font(F).fontSize(6.5).text('This is a Computer Generated Invoice', LM, y, { width: pw, align: 'center' })
