@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 interface QuoteItem {
   id?: string
@@ -87,6 +88,7 @@ function todayISO() {
 }
 
 export default function QuotationsClient() {
+  const { showConfirm } = useToast()
   const [view, setView] = useState<View>('list')
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
@@ -286,7 +288,14 @@ export default function QuotationsClient() {
   }
 
   async function deleteQuote(id: string) {
-    if (!confirm('Delete this draft quotation?')) return
+    const confirmed = await showConfirm({
+      title: 'Delete Quotation',
+      message: 'Delete this draft quotation? This cannot be undone.',
+      confirmText: 'Delete',
+      type: 'danger',
+      onConfirm: () => {},
+    })
+    if (!confirmed) return
     try {
       const res = await fetch(`/api/admin/quotations/${id}`, { method: 'DELETE' })
       if (!res.ok) { const d = await res.json(); throw new Error(d.error) }
@@ -405,6 +414,7 @@ export default function QuotationsClient() {
   }
 
   const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500'
+  const selectCls = inputCls + ' appearance-none cursor-pointer'
   const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
   if (view === 'list') {
@@ -688,7 +698,7 @@ export default function QuotationsClient() {
                   </td>
                   <td className="py-1.5 pr-2">
                     <select value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)}
-                      className={inputCls}>
+                      className={selectCls}>
                       {UNITS.map(u => <option key={u}>{u}</option>)}
                     </select>
                   </td>
@@ -779,7 +789,7 @@ export default function QuotationsClient() {
                 <select
                   value={prodCategory}
                   onChange={e => { setProdCategory(e.target.value); loadProducts(prodSearch, e.target.value) }}
-                  className={inputCls}
+                  className={selectCls}
                 >
                   <option value="">All Categories</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
