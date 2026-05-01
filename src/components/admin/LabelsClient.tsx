@@ -54,7 +54,7 @@ function BarcodePlaceholder({ width, height }: { width: number; height: number }
         return <rect key={i} x={x} y={0} width={w} height={height * 0.78} fill="#222"/>
       })}
       <text x={width / 2} y={height} textAnchor="middle" fontSize={height * 0.18} fill="#333" fontFamily="monospace">
-        {Array.from({ length: 13 }).map(() => Math.floor(Math.random() * 10)).join('')}
+        4006381333931
       </text>
     </svg>
   )
