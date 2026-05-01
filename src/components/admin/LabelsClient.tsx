@@ -512,7 +512,6 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           <div className="flex gap-2 mb-3">
             <div className="flex-1 min-w-0">
               <AdminSelect
-                compact
                 value={selectedMainCat}
                 placeholder="All categories"
                 options={[
@@ -525,7 +524,6 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
             {subCategories.length > 0 && (
               <div className="flex-1 min-w-0">
                 <AdminSelect
-                  compact
                   value={selectedSubCat}
                   placeholder="All subcategories"
                   options={[
