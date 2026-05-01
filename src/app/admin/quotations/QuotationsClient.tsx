@@ -374,7 +374,7 @@ export default function QuotationsClient() {
         const params = new URLSearchParams({ limit: '40' })
         if (q.trim()) params.set('q', q.trim())
         if (catId) params.set('category_id', catId)
-        const res = await fetch(`/api/admin/labels/products?${params}`)
+        const res = await fetch(`/api/admin/quotations/products?${params}`)
         const data = await res.json()
         setProdResults(data.products || [])
       } finally {
@@ -892,7 +892,7 @@ export default function QuotationsClient() {
                 ))
               })()}
             </div>
-            {prodSearch.trim() && !prodLoading && (
+            {prodSearch.trim() && (
               <div className="p-3 border-t border-border-default bg-surface-secondary">
                 <button
                   type="button"
