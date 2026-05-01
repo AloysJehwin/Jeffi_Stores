@@ -892,7 +892,7 @@ export default function QuotationsClient() {
                 ))
               })()}
             </div>
-            {prodSearch.trim() && (
+            {prodSearch.trim() && productModalRow !== null && !items[productModalRow]?.product_id && (
               <div className="p-3 border-t border-border-default bg-surface-secondary">
                 <button
                   type="button"
