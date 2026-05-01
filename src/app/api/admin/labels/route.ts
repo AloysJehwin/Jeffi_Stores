@@ -35,8 +35,9 @@ export async function POST(request: NextRequest) {
       const rows = await queryMany<LabelProduct>(
         `SELECT p.id, p.id AS product_id, NULL AS variant_id,
                 p.name, NULL AS variant_name,
-                p.sku, p.slug, p.mrp, p.sale_price, p.base_price, p.gtin,
-                b.name AS brand_name
+                p.sku, p.slug, p.mrp, p.sale_price, p.base_price,
+                COALESCE(p.gst_percentage, 0) AS gst_percentage,
+                p.gtin, b.name AS brand_name
          FROM products p
          LEFT JOIN brands b ON b.id = p.brand_id
          WHERE p.id = ANY($1::uuid[])`,
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
                 COALESCE(pv.mrp, 0) AS mrp,
                 pv.sale_price,
                 COALESCE(pv.price, p.base_price) AS base_price,
+                COALESCE(p.gst_percentage, 0) AS gst_percentage,
                 COALESCE(pv.gtin, p.gtin) AS gtin,
                 b.name AS brand_name
          FROM product_variants pv

@@ -13,6 +13,7 @@ export interface LabelProduct {
   mrp: number | null
   sale_price: number | null
   base_price: number
+  gst_percentage: number
   brand_name?: string | null
   gtin?: string | null
 }
@@ -78,28 +79,32 @@ function drawPrice(
   mainSize: number,
   subSize: number
 ): number {
-  const price = p.sale_price ?? p.base_price
-  const base = p.base_price
-  const showExGst = !!(p.sale_price && p.sale_price > 0 && base && base > 0 && Math.abs(p.sale_price - base) > 0.5)
+  const exGst = p.sale_price ?? p.base_price
+  if (!exGst || exGst === 0) return py
 
-  if (!price || price === 0) return py
+  const gstFactor = 1 + (p.gst_percentage || 0) / 100
+  const incGst = Math.round(exGst * gstFactor)
+  const showExGst = p.gst_percentage > 0
 
-  if (p.mrp && p.mrp > 0 && p.mrp !== price) {
-    doc.font('Helvetica').fontSize(subSize).fillColor('#888888')
-    const mrpText = fmtShort(p.mrp)
-    const mrpW = doc.widthOfString(mrpText)
-    doc.text(mrpText, px, py, { lineBreak: false })
-    doc.moveTo(px, py + subSize * 0.6).lineTo(px + mrpW, py + subSize * 0.6).stroke('#aaaaaa')
-    py += subSize + 1.5
+  if (p.mrp && p.mrp > 0) {
+    const mrpIncGst = Math.round(p.mrp * gstFactor)
+    if (mrpIncGst !== incGst) {
+      doc.font('Helvetica').fontSize(subSize).fillColor('#888888')
+      const mrpText = fmtShort(mrpIncGst)
+      const mrpW = doc.widthOfString(mrpText)
+      doc.text(mrpText, px, py, { lineBreak: false })
+      doc.moveTo(px, py + subSize * 0.6).lineTo(px + mrpW, py + subSize * 0.6).stroke('#aaaaaa')
+      py += subSize + 1.5
+    }
   }
 
   doc.font('Helvetica-Bold').fontSize(mainSize).fillColor('#c0392b')
-  doc.text(fmtShort(price), px, py, { width: availW, lineBreak: false })
+  doc.text(`Rs. ${incGst}`, px, py, { width: availW, lineBreak: false })
   py += mainSize + 1.5
 
   if (showExGst) {
     doc.font('Helvetica').fontSize(subSize - 0.5).fillColor('#777777')
-    doc.text(`ex. GST ${fmtShort(base)}`, px, py, { width: availW, lineBreak: false })
+    doc.text(`ex. GST Rs. ${Math.round(exGst)}`, px, py, { width: availW, lineBreak: false })
     py += subSize + 1
   }
 

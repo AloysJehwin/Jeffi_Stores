@@ -20,6 +20,7 @@ interface ProductResult {
   mrp: number | null
   sale_price: number | null
   base_price: number
+  gst_percentage: number
   brand_name: string | null
   gtin: string | null
 }
@@ -38,25 +39,27 @@ function fmtPrice(p: number | null | undefined): string {
   return `Rs. ${Number(p).toFixed(0)}`
 }
 
-function PriceBlock({ salePrice, mrp, base, mainSize, subSize, gap }: {
-  salePrice: number | null
+function PriceBlock({ exGst, mrp, gstPct, mainSize, subSize, gap }: {
+  exGst: number | null
   mrp: number | null
-  base: number | null
+  gstPct: number
   mainSize: number
   subSize: number
   gap: number
 }) {
-  const price = salePrice ?? base
-  if (!price || price === 0) return null
-  const showExGst = salePrice && salePrice > 0 && base && base > 0 && Math.abs(salePrice - base) > 0.5
+  if (!exGst || exGst === 0) return null
+  const gstFactor = 1 + (gstPct || 0) / 100
+  const incGst = Math.round(exGst * gstFactor)
+  const mrpIncGst = mrp && mrp > 0 ? Math.round(mrp * gstFactor) : null
+  const showExGst = gstPct > 0
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap }}>
-      {mrp && mrp > 0 && mrp !== price && (
-        <span style={{ fontSize: subSize, color: '#aaa', textDecoration: 'line-through', lineHeight: 1 }}>{fmtPrice(mrp)}</span>
+      {mrpIncGst && mrpIncGst !== incGst && (
+        <span style={{ fontSize: subSize, color: '#aaa', textDecoration: 'line-through', lineHeight: 1 }}>Rs. {mrpIncGst}</span>
       )}
-      <span style={{ fontSize: mainSize, fontWeight: 700, color: '#c0392b', lineHeight: 1 }}>{fmtPrice(price)}</span>
+      <span style={{ fontSize: mainSize, fontWeight: 700, color: '#c0392b', lineHeight: 1 }}>Rs. {incGst}</span>
       {showExGst && (
-        <span style={{ fontSize: subSize - 1, color: '#888', lineHeight: 1 }}>ex. GST {fmtPrice(base)}</span>
+        <span style={{ fontSize: subSize - 1, color: '#888', lineHeight: 1 }}>ex. GST Rs. {Math.round(exGst)}</span>
       )}
     </div>
   )
@@ -139,10 +142,9 @@ function LabelPreview({ size, product, scale }: {
   const variantName = product?.variant_name || null
   const sku = product?.sku || 'SKU-001'
   const brand = product?.brand_name || null
-  const price = product ? (product.sale_price ?? product.base_price) : null
-  const salePrice = product?.sale_price ?? null
-  const basePrice = product?.base_price ?? null
+  const exGst = product ? (product.sale_price ?? product.base_price) : null
   const mrp = product?.mrp ?? null
+  const gstPct = product?.gst_percentage ?? 0
   const barcodeText = product?.gtin || product?.sku || '0000000000000'
 
   const barH = Math.round(h * 0.22)
@@ -174,7 +176,7 @@ function LabelPreview({ size, product, scale }: {
             <div style={{ fontSize: varFs, color: '#555', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
           )}
           <div style={{ marginTop: 1 }}>
-            <PriceBlock salePrice={salePrice} mrp={mrp} base={basePrice} mainSize={nameFs} subSize={varFs * 0.85} gap={0} />
+            <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={nameFs} subSize={varFs * 0.85} gap={0} />
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
@@ -198,14 +200,14 @@ function LabelPreview({ size, product, scale }: {
           {variantName && (
             <div style={{ fontSize: varFs, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>{variantName}</div>
           )}
-          {price && price > 0 && (
+          {exGst && exGst > 0 && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: Math.round(3 * scale), flexWrap: 'wrap' }}>
-              {mrp && mrp > 0 && mrp !== price && (
-                <span style={{ fontSize: exGstFs, color: '#aaa', textDecoration: 'line-through' }}>{fmtPrice(mrp)}</span>
+              {mrp && mrp > 0 && Math.round(mrp * (1 + gstPct / 100)) !== Math.round(exGst * (1 + gstPct / 100)) && (
+                <span style={{ fontSize: exGstFs, color: '#aaa', textDecoration: 'line-through' }}>Rs. {Math.round(mrp * (1 + gstPct / 100))}</span>
               )}
-              <span style={{ fontSize: priceFs, fontWeight: 700, color: '#c0392b' }}>{fmtPrice(price)}</span>
-              {basePrice && basePrice > 0 && salePrice && salePrice > 0 && Math.abs(salePrice - basePrice) > 0.5 && (
-                <span style={{ fontSize: exGstFs, color: '#888' }}>ex.GST {fmtPrice(basePrice)}</span>
+              <span style={{ fontSize: priceFs, fontWeight: 700, color: '#c0392b' }}>Rs. {Math.round(exGst * (1 + gstPct / 100))}</span>
+              {gstPct > 0 && (
+                <span style={{ fontSize: exGstFs, color: '#888' }}>ex.GST Rs. {Math.round(exGst)}</span>
               )}
             </div>
           )}
@@ -226,7 +228,7 @@ function LabelPreview({ size, product, scale }: {
             <div style={{ fontSize: smallFontSize, color: '#333', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
           )}
           <div style={{ marginTop: 2 }}>
-            <PriceBlock salePrice={salePrice} mrp={mrp} base={basePrice} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
+            <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: barH + pad + 1, left: pad, right: pad, fontSize: smallFontSize * 0.85, color: '#777', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
@@ -253,7 +255,7 @@ function LabelPreview({ size, product, scale }: {
           )}
           <div style={{ fontSize: smallFontSize * 0.9, color: '#666', marginTop: 2 }}>SKU: {sku}</div>
           <div style={{ marginTop: 3 }}>
-            <PriceBlock salePrice={salePrice} mrp={mrp} base={basePrice} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
+            <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
@@ -287,7 +289,7 @@ function LabelPreview({ size, product, scale }: {
             <div style={{ fontSize: Math.round(smallFontSize * 0.85), color: '#888', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{brand}</div>
           )}
           <div style={{ marginTop: 3 }}>
-            <PriceBlock salePrice={salePrice} mrp={mrp} base={basePrice} mainSize={priceFontSize} subSize={smallFontSize * 0.9} gap={1} />
+            <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize} subSize={smallFontSize * 0.9} gap={1} />
           </div>
         </div>
         {/* SKU row above barcode */}
