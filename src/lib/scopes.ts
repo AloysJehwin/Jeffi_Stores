@@ -55,6 +55,12 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/packing-slips'],
   },
   {
+    key: 'labels',
+    label: 'Label Generator',
+    description: 'Generate and download product labels with QR codes and barcodes',
+    routes: ['/admin/labels'],
+  },
+  {
     key: 'quick_scan',
     label: 'QuickScan',
     description: 'Scan and update order shipping status',
@@ -88,6 +94,7 @@ export function getScopeForPath(pathname: string): string | null {
     }
   }
 
+  if (pathname.startsWith('/api/admin/labels')) return 'labels'
   if (pathname.startsWith('/api/admin/users')) return 'settings'
   if (pathname.startsWith('/api/admin/certificates')) return 'settings'
   if (pathname.startsWith('/api/admin/reviews')) return 'reviews'
