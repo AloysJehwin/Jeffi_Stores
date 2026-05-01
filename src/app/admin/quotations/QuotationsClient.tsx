@@ -16,6 +16,7 @@ interface QuoteItem {
   amount: number
   product_id?: string | null
   variant_id?: string | null
+  is_draft_product?: boolean
 }
 
 interface Quotation {
@@ -407,6 +408,7 @@ export default function QuotationsClient() {
         discount_pct: discPct,
         product_id: p.product_id,
         variant_id: p.variant_id || null,
+        is_draft_product: false,
       }
       updated.amount = calcItemAmount(updated)
       return updated
@@ -429,7 +431,7 @@ export default function QuotationsClient() {
       if (!res.ok) throw new Error(data.error)
       setItems(prev => prev.map((item, i) => {
         if (i !== productModalRow) return item
-        const updated = { ...item, description: data.name, product_id: data.id }
+        const updated = { ...item, description: data.name, product_id: data.id, is_draft_product: true }
         updated.amount = calcItemAmount(updated)
         return updated
       }))
@@ -703,6 +705,13 @@ export default function QuotationsClient() {
                     <div className="flex gap-1 items-center">
                       <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)}
                         placeholder="Description of goods" className={inputCls + ' min-w-[160px]'} />
+                      {item.product_id && (
+                        <span
+                          title={item.is_draft_product ? 'Draft product — click to edit' : 'Linked to product'}
+                          onClick={() => item.is_draft_product && window.open(`/admin/products/edit/${item.product_id}`, '_blank')}
+                          className={`shrink-0 w-2.5 h-2.5 rounded-full ${item.is_draft_product ? 'bg-yellow-400 cursor-pointer' : 'bg-green-500'}`}
+                        />
+                      )}
                       <button onClick={() => openProductModal(idx)} title="Pick from products"
                         className="shrink-0 p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors border border-border-default rounded">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
