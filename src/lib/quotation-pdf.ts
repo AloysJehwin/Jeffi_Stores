@@ -282,6 +282,9 @@ export function generateQuotationPDF(
       rect(doc, metaX, my, metaW, y + addrTotalH - my)
     }
 
+    vline(doc, metaX, topY, y + addrTotalH)
+    rect(doc, LM, topY, pw, y + addrTotalH - topY)
+
     y = y + addrTotalH
 
     const colDefs = [
