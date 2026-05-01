@@ -146,7 +146,7 @@ export function generateQuotationPDF(
     const leftW  = Math.round(pw * 0.55)
     const metaX  = LM + leftW
     const metaW  = pw - leftW
-    const metaRowH = 18
+    const metaRowH = 26
     const hw   = Math.round(metaW / 2)
     const hw2  = metaW - hw
 
@@ -190,8 +190,8 @@ export function generateQuotationPDF(
     doc.text('Invoice No.',    metaX + 2,              topY + 2, { width: c3w - 4 })
     doc.text('e-Way Bill No.', metaX + c3w + 2,        topY + 2, { width: c3bw - 4 })
     doc.text('Dated',          metaX + c3w + c3bw + 2, topY + 2, { width: c3cw - 4 })
-    doc.font(FB).fontSize(7.5).text(data.quote_number, metaX + 2, topY + 10, { width: c3w - 4 })
-    doc.font(FB).fontSize(9).text(formatDate(data.quote_date), metaX + c3w + c3bw + 2, topY + 9, { width: c3cw - 4 })
+    doc.font(FB).fontSize(7.5).text(data.quote_number, metaX + 2, topY + 11, { width: c3w - 4 })
+    doc.font(FB).fontSize(9).text(formatDate(data.quote_date), metaX + c3w + c3bw + 2, topY + 10, { width: c3cw - 4 })
 
     let my = topY + metaRowH
     if (my < topY + sellerH) {
