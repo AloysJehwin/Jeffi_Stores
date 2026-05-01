@@ -12,15 +12,15 @@ export async function GET(request: NextRequest) {
 
     const rows = await queryMany<any>(
       `SELECT DISTINCT ON (u.id)
-         u.id, u.full_name, u.email,
+         u.id, (u.first_name || ' ' || u.last_name) AS full_name, u.email,
          cp.company_name, cp.gst_number,
          a.full_name AS addr_name, a.address_line1, a.address_line2, a.city, a.state
        FROM users u
        LEFT JOIN customer_profiles cp ON cp.user_id = u.id
        LEFT JOIN addresses a ON a.user_id = u.id AND a.is_default = true
        WHERE u.is_guest = false
-         AND (u.full_name ILIKE $1 OR u.email ILIKE $1 OR cp.company_name ILIKE $1)
-       ORDER BY u.id, u.full_name ASC
+         AND ((u.first_name || ' ' || u.last_name) ILIKE $1 OR u.email ILIKE $1 OR cp.company_name ILIKE $1)
+       ORDER BY u.id ASC
        LIMIT 10`,
       [`%${q}%`]
     )
