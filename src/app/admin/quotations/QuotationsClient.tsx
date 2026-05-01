@@ -131,6 +131,8 @@ export default function QuotationsClient() {
   const [prodResults, setProdResults] = useState<ProductResult[]>([])
   const [prodLoading, setProdLoading] = useState(false)
   const prodTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [prodCategory, setProdCategory] = useState('')
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
   const cgst = items.reduce((s, i) => s + i.amount * i.gst_rate / 200, 0)
@@ -339,23 +341,37 @@ export default function QuotationsClient() {
     setProductModalRow(rowIdx)
     setProdSearch('')
     setProdResults([])
+    setProdCategory('')
     setProductModalOpen(true)
+    if (categories.length === 0) {
+      fetch('/api/categories')
+        .then(r => r.json())
+        .then(d => setCategories((d.categories || []).map((c: any) => ({ id: c.id, name: c.name }))))
+        .catch(() => {})
+    }
+    loadProducts('', '')
   }
 
-  function searchProducts(q: string) {
-    setProdSearch(q)
+  function loadProducts(q: string, catId: string) {
     if (prodTimer.current) clearTimeout(prodTimer.current)
-    if (!q.trim()) { setProdResults([]); return }
     prodTimer.current = setTimeout(async () => {
       setProdLoading(true)
       try {
-        const res = await fetch(`/api/admin/labels/products?q=${encodeURIComponent(q)}&limit=20`)
+        const params = new URLSearchParams({ limit: '40' })
+        if (q.trim()) params.set('q', q.trim())
+        if (catId) params.set('category_id', catId)
+        const res = await fetch(`/api/admin/labels/products?${params}`)
         const data = await res.json()
         setProdResults(data.products || [])
       } finally {
         setProdLoading(false)
       }
-    }, 300)
+    }, q ? 300 : 0)
+  }
+
+  function searchProducts(q: string) {
+    setProdSearch(q)
+    loadProducts(q, prodCategory)
   }
 
   function selectProduct(p: ProductResult) {
@@ -749,7 +765,17 @@ export default function QuotationsClient() {
                 </svg>
               </button>
             </div>
-            <div className="p-4 border-b border-border-default">
+            <div className="p-4 border-b border-border-default space-y-2">
+              {categories.length > 0 && (
+                <select
+                  value={prodCategory}
+                  onChange={e => { setProdCategory(e.target.value); loadProducts(prodSearch, e.target.value) }}
+                  className={inputCls}
+                >
+                  <option value="">All Categories</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              )}
               <input
                 autoFocus type="text" value={prodSearch}
                 onChange={e => searchProducts(e.target.value)}
@@ -758,11 +784,8 @@ export default function QuotationsClient() {
             </div>
             <div className="flex-1 overflow-y-auto">
               {prodLoading && <p className="p-4 text-center text-foreground-secondary text-sm">Searching…</p>}
-              {!prodLoading && prodSearch && prodResults.length === 0 && (
+              {!prodLoading && prodResults.length === 0 && (
                 <p className="p-4 text-center text-foreground-secondary text-sm">No products found</p>
-              )}
-              {!prodLoading && !prodSearch && (
-                <p className="p-4 text-center text-foreground-secondary text-sm">Type to search products</p>
               )}
               {prodResults.map(p => (
                 <button key={p.id} onClick={() => selectProduct(p)}
