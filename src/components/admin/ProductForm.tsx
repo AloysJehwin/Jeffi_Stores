@@ -344,14 +344,13 @@ export default function ProductForm({ categories, brands, action, product, produ
             />
           </div>
 
-          {/* SKU (read-only if editing) */}
           {product?.sku && (
             <div>
               <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 SKU
               </label>
-              <div className="w-full px-4 py-2 border border-border-default rounded-lg bg-surface text-foreground-secondary font-mono text-sm">
-                {product.sku}
+              <div className="w-full px-4 py-2 border border-border-default rounded-lg bg-surface text-foreground-secondary font-mono text-sm uppercase">
+                {product.sku.toUpperCase()}
               </div>
               <p className="text-xs text-foreground-muted mt-1">Auto-generated, cannot be changed</p>
             </div>

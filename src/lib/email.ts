@@ -1440,8 +1440,8 @@ export async function sendSupportEscalationEmail(
   sessionId: string,
   adminEmails: string[]
 ): Promise<{ success: boolean; error?: unknown }> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.com'
-  const chatLink = `${appUrl}/admin/customers/${customerId}?chat=true`
+  const adminBaseUrl = process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'
+  const chatLink = `${adminBaseUrl}/admin/customers/${customerId}?chat=true`
   const recipients = adminEmails.length > 0 ? adminEmails : [process.env.SUPPORT_EMAIL || 'aloysjehwin@gmail.com']
 
   const mailOptions = {
@@ -1473,6 +1473,54 @@ export async function sendSupportEscalationEmail(
           <a href="${chatLink}" class="cta">Open Support Chat</a>
         </div>
         <div class="footer"><p>Jeffi Stores Admin Notification — do not reply to this email.</p></div>
+      </div></body></html>
+    `,
+  }
+
+  try {
+    await transporter.sendMail(mailOptions)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+export async function sendAgentConnectedEmail(
+  customerName: string,
+  customerEmail: string,
+  agentName: string
+): Promise<{ success: boolean; error?: unknown }> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'
+  const chatLink = `${appUrl}/support`
+
+  const mailOptions = {
+    from: `"Jeffi Stores Support" <${process.env.SES_FROM_EMAIL}>`,
+    to: customerEmail,
+    subject: `A support agent has joined your chat`,
+    html: `
+      <!DOCTYPE html><html><head><style>
+        body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
+        .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+        .header{background:#f97316;padding:24px;text-align:center}
+        .logo{font-size:24px;font-weight:bold;color:#fff}
+        .body{padding:28px}
+        .info-box{background:#fff7ed;border-left:4px solid #f97316;padding:16px;border-radius:4px;margin:20px 0}
+        .cta{display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;margin-top:16px}
+        .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
+      </style></head>
+      <body><div class="container">
+        <div class="header"><div class="logo">Jeffi Stores</div></div>
+        <div class="body">
+          <p style="font-size:16px;font-weight:bold;color:#1f2937;">Hi ${customerName}, your support agent is here!</p>
+          <p>A support agent has joined your chat and is ready to help you.</p>
+          <div class="info-box">
+            <p style="margin:0"><strong>Agent:</strong> ${agentName}</p>
+          </div>
+          <p>Click below to return to the chat:</p>
+          <a href="${chatLink}" class="cta">Return to Chat</a>
+          <p style="margin-top:24px;font-size:13px;color:#6b7280;">If you no longer need assistance, you can close the chat from the support page.</p>
+        </div>
+        <div class="footer"><p>Jeffi Stores Support — do not reply to this email.</p></div>
       </div></body></html>
     `,
   }
