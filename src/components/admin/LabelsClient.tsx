@@ -393,9 +393,9 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          product_ids: selectedProducts.map(p => p.id),
+          product_ids: selectedProducts.flatMap(p => Array(p.copies * copies).fill(p.id)),
           size: selectedSize,
-          copies,
+          copies: 1,
           sheet: outputMode === 'sheet',
         }),
       })
