@@ -41,7 +41,7 @@ async function createProduct(formData: FormData) {
 
   let sku: string
   try {
-    sku = await generateProductSku(categoryId || null)
+    sku = (await generateProductSku(categoryId || null)).toUpperCase()
   } catch {
     sku = `PRD-${Date.now().toString(36).toUpperCase()}`
   }
