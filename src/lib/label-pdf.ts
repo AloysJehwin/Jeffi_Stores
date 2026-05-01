@@ -253,8 +253,9 @@ async function render80x20(doc: any, p: LabelProduct, x: number, y: number, w: n
   const pad = 2.5
   const barH = 7 * MM
   const barcodeText = p.gtin || p.sku
-  const nameColW = w * 0.5
-  const priceColW = w * 0.32
+  const contentW = 60 * MM
+  const nameColW = contentW * 0.55
+  const priceColW = contentW * 0.38
   const priceX = x + nameColW + 2
 
   doc.font('Helvetica-Bold').fontSize(6)
@@ -277,11 +278,8 @@ async function render80x20(doc: any, p: LabelProduct, x: number, y: number, w: n
 
   const barBuf = await makeBarcodeBuffer(barcodeText, 3)
   if (barBuf) {
-    doc.image(barBuf, x + pad, y + h - pad - barH, { width: w * 0.55, height: barH })
+    doc.image(barBuf, x + pad, y + h - pad - barH, { width: contentW - pad * 2, height: barH })
   }
-
-  doc.fillColor('#000000').font('Helvetica').fontSize(4.5)
-  doc.text(p.sku, x + w * 0.57, y + h - pad - barH + 1, { width: w * 0.4, lineBreak: false })
 }
 
 type RenderFn = (doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) => Promise<void>

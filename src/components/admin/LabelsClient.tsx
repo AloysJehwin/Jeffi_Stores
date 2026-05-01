@@ -159,27 +159,31 @@ function LabelPreview({ size, product, scale }: {
   if (size.size === '80x20') {
     const nameFs = Math.round(6 * scale)
     const varFs = Math.round(5 * scale)
-    const nameColW = Math.round(w * 0.5)
-    const priceColW = Math.round(w * 0.3)
+    const contentW = Math.round(w * 0.75)
+    const nameColW = Math.round(contentW * 0.55)
+    const priceColW = Math.round(contentW * 0.38)
     return (
       <div style={base}>
-        <div style={{ position: 'absolute', top: pad, left: pad, width: nameColW - pad * 2, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: pad, left: pad, width: nameColW - pad, overflow: 'hidden' }}>
           <div style={{ fontSize: nameFs, fontWeight: 700, lineHeight: 1.2, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</div>
           {variantName && (
             <div style={{ fontSize: varFs, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{variantName}</div>
           )}
         </div>
         {price && price > 0 && (
-          <div style={{ position: 'absolute', top: pad, right: pad, width: priceColW, textAlign: 'right', fontSize: Math.round(7 * scale), fontWeight: 700, color: '#c0392b' }}>
+          <div style={{ position: 'absolute', top: pad, left: pad + nameColW, width: priceColW, textAlign: 'right', fontSize: Math.round(7 * scale), fontWeight: 700, color: '#c0392b' }}>
             {fmtPrice(price)}
           </div>
         )}
         <div style={{ position: 'absolute', bottom: pad, left: pad }}>
-          <BarcodePlaceholder width={Math.round(w * 0.52)} height={barH} text={barcodeText} />
+          <BarcodePlaceholder width={contentW - pad * 2} height={barH} text={barcodeText} />
         </div>
-        <div style={{ position: 'absolute', bottom: pad + Math.round(barH * 0.2), left: pad + Math.round(w * 0.54), fontSize: Math.round(4.5 * scale), color: '#555' }}>
-          {sku}
-        </div>
+        <div style={{
+          position: 'absolute', top: 0, right: 0,
+          width: w - contentW, height: h,
+          background: 'repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 6px)',
+          borderLeft: '1px dashed #d1d5db',
+        }} />
       </div>
     )
   }
