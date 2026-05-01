@@ -80,7 +80,7 @@ function drawPrice(
 ): number {
   const price = p.sale_price ?? p.base_price
   const base = p.base_price
-  const showExGst = base && base > 0 && Math.abs(price - base) > 0.5
+  const showExGst = !!(p.sale_price && p.sale_price > 0 && base && base > 0 && Math.abs(p.sale_price - base) > 0.5)
 
   if (!price || price === 0) return py
 

@@ -38,16 +38,17 @@ function fmtPrice(p: number | null | undefined): string {
   return `Rs. ${Number(p).toFixed(0)}`
 }
 
-function PriceBlock({ price, mrp, base, mainSize, subSize, gap }: {
-  price: number | null
+function PriceBlock({ salePrice, mrp, base, mainSize, subSize, gap }: {
+  salePrice: number | null
   mrp: number | null
   base: number | null
   mainSize: number
   subSize: number
   gap: number
 }) {
+  const price = salePrice ?? base
   if (!price || price === 0) return null
-  const showExGst = base && base > 0 && Math.abs(price - base) > 0.5
+  const showExGst = salePrice && salePrice > 0 && base && base > 0 && Math.abs(salePrice - base) > 0.5
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap }}>
       {mrp && mrp > 0 && mrp !== price && (
@@ -139,6 +140,7 @@ function LabelPreview({ size, product, scale }: {
   const sku = product?.sku || 'SKU-001'
   const brand = product?.brand_name || null
   const price = product ? (product.sale_price ?? product.base_price) : null
+  const salePrice = product?.sale_price ?? null
   const basePrice = product?.base_price ?? null
   const mrp = product?.mrp ?? null
   const barcodeText = product?.gtin || product?.sku || '0000000000000'
@@ -172,7 +174,7 @@ function LabelPreview({ size, product, scale }: {
             <div style={{ fontSize: varFs, color: '#555', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
           )}
           <div style={{ marginTop: 1 }}>
-            <PriceBlock price={price} mrp={mrp} base={basePrice} mainSize={nameFs} subSize={varFs * 0.85} gap={0} />
+            <PriceBlock salePrice={salePrice} mrp={mrp} base={basePrice} mainSize={nameFs} subSize={varFs * 0.85} gap={0} />
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
@@ -202,7 +204,7 @@ function LabelPreview({ size, product, scale }: {
                 <span style={{ fontSize: exGstFs, color: '#aaa', textDecoration: 'line-through' }}>{fmtPrice(mrp)}</span>
               )}
               <span style={{ fontSize: priceFs, fontWeight: 700, color: '#c0392b' }}>{fmtPrice(price)}</span>
-              {basePrice && basePrice > 0 && Math.abs(price - basePrice) > 0.5 && (
+              {basePrice && basePrice > 0 && salePrice && salePrice > 0 && Math.abs(salePrice - basePrice) > 0.5 && (
                 <span style={{ fontSize: exGstFs, color: '#888' }}>ex.GST {fmtPrice(basePrice)}</span>
               )}
             </div>
@@ -224,7 +226,7 @@ function LabelPreview({ size, product, scale }: {
             <div style={{ fontSize: smallFontSize, color: '#333', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
           )}
           <div style={{ marginTop: 2 }}>
-            <PriceBlock price={price} mrp={mrp} base={basePrice} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
+            <PriceBlock salePrice={salePrice} mrp={mrp} base={basePrice} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: barH + pad + 1, left: pad, right: pad, fontSize: smallFontSize * 0.85, color: '#777', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
@@ -251,7 +253,7 @@ function LabelPreview({ size, product, scale }: {
           )}
           <div style={{ fontSize: smallFontSize * 0.9, color: '#666', marginTop: 2 }}>SKU: {sku}</div>
           <div style={{ marginTop: 3 }}>
-            <PriceBlock price={price} mrp={mrp} base={basePrice} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
+            <PriceBlock salePrice={salePrice} mrp={mrp} base={basePrice} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
@@ -285,7 +287,7 @@ function LabelPreview({ size, product, scale }: {
             <div style={{ fontSize: Math.round(smallFontSize * 0.85), color: '#888', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{brand}</div>
           )}
           <div style={{ marginTop: 3 }}>
-            <PriceBlock price={price} mrp={mrp} base={basePrice} mainSize={priceFontSize} subSize={smallFontSize * 0.9} gap={1} />
+            <PriceBlock salePrice={salePrice} mrp={mrp} base={basePrice} mainSize={priceFontSize} subSize={smallFontSize * 0.9} gap={1} />
           </div>
         </div>
         {/* SKU row above barcode */}
