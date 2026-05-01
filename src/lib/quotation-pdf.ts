@@ -402,7 +402,7 @@ export function generateQuotationPDF(
 
     if (hasRound) {
       hline(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('ROUND OFF', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right' })
+      doc.font(FBI).fontSize(7).text('ROUND OFF', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right', lineBreak: false })
       doc.font(F).fontSize(7).text(fmt4(roundOff), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
       y += rowH
     }
@@ -414,12 +414,14 @@ export function generateQuotationPDF(
 
     closePageTable(y)
 
+    const wordsText = `INR ${numberToWords(total)} Only`
+    const wordsLineH = doc.font(FB).fontSize(8).heightOfString(wordsText, { width: pw - 10 })
+    const wordsRowH = Math.max(24, 10 + wordsLineH + 6)
     const wordsY = y
-    const wordsRowH = 20
     doc.font(F).fontSize(6.5).text('Amount Chargeable (in words)', LM + 3, y + 2, { width: pw * 0.7, lineBreak: false })
     doc.font(F).fontSize(6.5).text('E. & O.E', LM + 3, y + 2, { width: pw - 6, align: 'right', lineBreak: false })
-    y += 9
-    doc.font(FB).fontSize(8).text(`INR ${numberToWords(total)} Only`, LM + 3, y, { width: pw - 6, lineBreak: false })
+    y += 10
+    doc.font(FB).fontSize(8).text(wordsText, LM + 3, y, { width: pw - 10 })
     y = wordsY + wordsRowH
     rect(doc, LM, wordsY, pw, wordsRowH)
 
@@ -512,10 +514,12 @@ export function generateQuotationPDF(
     rect(doc, LM, hsnY, pw, y - hsnY)
 
     const twY = y
+    const taxWordsText = `INR ${numberToWords(cgst + sgst)} Only`
+    const taxWordsH = Math.max(12, doc.font(FB).fontSize(7).heightOfString('Tax Amount (in words) : ' + taxWordsText, { width: pw - 6 }) + 4)
     doc.font(F).fontSize(7).text('Tax Amount (in words) : ', LM + 3, y + 2, { continued: true })
-    doc.font(FB).fontSize(7).text(`INR ${numberToWords(cgst + sgst)} Only`)
-    y += 12
-    rect(doc, LM, twY, pw, y - twY)
+    doc.font(FB).fontSize(7).text(taxWordsText)
+    y += taxWordsH
+    rect(doc, LM, twY, pw, taxWordsH)
 
     const botH  = 52
     const sigH  = 22
