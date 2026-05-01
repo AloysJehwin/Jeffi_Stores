@@ -109,7 +109,7 @@ function LabelPreview({ size, product, scale }: {
 }) {
   const w = Math.round(size.widthPt * scale)
   const h = Math.round(size.heightPt * scale)
-  const pad = Math.max(4, Math.round(3.5 * scale))
+  const pad = Math.max(3, Math.round(2.5 * scale))
 
   const name = product?.name || 'Product Name'
   const variantName = product?.variant_name || null
@@ -120,10 +120,10 @@ function LabelPreview({ size, product, scale }: {
   const hasMrp = !!(mrp && mrp > 0 && price && mrp !== price)
   const barcodeText = product?.gtin || product?.sku || '0000000000000'
 
-  const barH = Math.round(h * 0.24)
-  const nameFontSize = Math.max(7, Math.round(h * 0.115))
-  const smallFontSize = Math.max(6, Math.round(h * 0.085))
-  const priceFontSize = Math.max(8, Math.round(h * 0.13))
+  const barH = Math.round(h * 0.22)
+  const nameFontSize = Math.round(8 * scale)
+  const smallFontSize = Math.round(5.5 * scale)
+  const priceFontSize = Math.round(10 * scale)
 
   const base: React.CSSProperties = {
     width: w,
@@ -139,8 +139,8 @@ function LabelPreview({ size, product, scale }: {
   }
 
   if (size.size === '30x20') {
-    const nameFs = Math.max(6, Math.round(h * 0.12))
-    const varFs = Math.max(5, Math.round(h * 0.09))
+    const nameFs = Math.round(5 * scale)
+    const varFs = Math.round(4.5 * scale)
     return (
       <div style={base}>
         <div style={{ position: 'absolute', top: pad, left: pad, right: pad, bottom: barH + pad, overflow: 'hidden' }}>
@@ -157,8 +157,8 @@ function LabelPreview({ size, product, scale }: {
   }
 
   if (size.size === '80x20') {
-    const nameFs = Math.max(6, Math.round(h * 0.13))
-    const varFs = Math.max(5, Math.round(h * 0.095))
+    const nameFs = Math.round(6 * scale)
+    const varFs = Math.round(5 * scale)
     const nameColW = Math.round(w * 0.5)
     const priceColW = Math.round(w * 0.3)
     return (
@@ -170,14 +170,14 @@ function LabelPreview({ size, product, scale }: {
           )}
         </div>
         {price && price > 0 && (
-          <div style={{ position: 'absolute', top: pad, right: pad, width: priceColW, textAlign: 'right', fontSize: Math.round(nameFs * 1.05), fontWeight: 700, color: '#c0392b' }}>
+          <div style={{ position: 'absolute', top: pad, right: pad, width: priceColW, textAlign: 'right', fontSize: Math.round(7 * scale), fontWeight: 700, color: '#c0392b' }}>
             {fmtPrice(price)}
           </div>
         )}
         <div style={{ position: 'absolute', bottom: pad, left: pad }}>
           <BarcodePlaceholder width={Math.round(w * 0.52)} height={barH} text={barcodeText} />
         </div>
-        <div style={{ position: 'absolute', bottom: pad + Math.round(barH * 0.2), left: pad + Math.round(w * 0.54), fontSize: Math.max(5, Math.round(h * 0.09)), color: '#555' }}>
+        <div style={{ position: 'absolute', bottom: pad + Math.round(barH * 0.2), left: pad + Math.round(w * 0.54), fontSize: Math.round(4.5 * scale), color: '#555' }}>
           {sku}
         </div>
       </div>
@@ -645,11 +645,10 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           </p>
 
           {/* Preview box — ruler + label */}
-          <div className="bg-[#f0f0f0] dark:bg-zinc-800 rounded-lg py-7 flex items-center justify-center"
-            style={{ paddingLeft: RULER_LEFT + 8, paddingRight: 8 }}>
-            <div style={{ position: 'relative', width: previewW + RULER_LEFT, display: 'flex', alignItems: 'flex-start' }}>
+          <div className="bg-[#f0f0f0] dark:bg-zinc-800 rounded-lg py-6 flex items-center justify-center">
+            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
 
-              {/* Y-axis ruler — vertically centered alongside the label */}
+              {/* Y-axis ruler — same height as label, vertically centered text */}
               <div style={{
                 width: RULER_LEFT,
                 height: previewH,
@@ -658,7 +657,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 justifyContent: 'center',
                 flexShrink: 0,
               }}>
-                <div style={{
+                <span style={{
                   fontSize: 9,
                   color: '#999',
                   writingMode: 'vertical-rl' as any,
@@ -667,13 +666,12 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                   whiteSpace: 'nowrap',
                 }}>
                   {activeSize.heightMm} mm
-                </div>
+                </span>
               </div>
 
               {/* Label + X-axis ruler stacked */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 <LabelPreview size={activeSize} product={previewProduct} scale={previewScale} />
-                {/* X-axis ruler below label */}
                 <div style={{
                   width: previewW,
                   textAlign: 'center',
