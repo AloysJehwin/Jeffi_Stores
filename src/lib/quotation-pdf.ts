@@ -389,14 +389,14 @@ export function generateQuotationPDF(
     doc.font(FB).fontSize(7).text(fmt4(subtotal), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
     y += rowH
 
-    const labelAreaW = amtX - (LM + slW) - 4
+    const labelAreaW = amtX - (LM + slW) - 10  // extra right padding to clear the divider line
     hline(doc, LM, R, y)
-    doc.font(FBI).fontSize(8).text('CGST', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right' })
+    doc.font(FBI).fontSize(8).text('CGST', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right', lineBreak: false })
     doc.font(F).fontSize(7).text(fmt4(cgst), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
     y += rowH
 
     hline(doc, LM, R, y)
-    doc.font(FBI).fontSize(8).text('SGST', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right' })
+    doc.font(FBI).fontSize(8).text('SGST', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right', lineBreak: false })
     doc.font(F).fontSize(7).text(fmt4(sgst), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
     y += rowH
 
