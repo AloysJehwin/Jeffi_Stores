@@ -49,8 +49,10 @@ interface ProductResult {
   name: string
   variant_name: string | null
   sku: string
+  mrp: number
   base_price: number
   gst_percentage: number
+  hsn_code: string | null
 }
 
 type View = 'list' | 'editor'
@@ -380,11 +382,18 @@ export default function QuotationsClient() {
     updateItem(productModalRow, 'description', desc)
     setItems(prev => prev.map((item, i) => {
       if (i !== productModalRow) return item
+      const mrp = Number(p.mrp) || 0
+      const basePrice = Number(p.base_price) || 0
+      const discPct = mrp > 0 && basePrice < mrp
+        ? Math.round((1 - basePrice / mrp) * 100 * 100) / 100
+        : 0
       const updated = {
         ...item,
         description: desc,
+        hsn_code: p.hsn_code || '',
         gst_rate: p.gst_percentage || 18,
-        rate: Number(p.base_price) || 0,
+        rate: mrp > 0 ? mrp : basePrice,
+        discount_pct: discPct,
         product_id: p.product_id,
         variant_id: p.variant_id || null,
       }

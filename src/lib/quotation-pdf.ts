@@ -402,7 +402,7 @@ export function generateQuotationPDF(
 
     if (hasRound) {
       hline(doc, LM, R, y)
-      doc.font(FBI).fontSize(7).text('ROUND OFF', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right', lineBreak: false })
+      doc.font(FBI).fontSize(7).text('ROUND\nOFF', LM + slW + 2, y + 1, { width: labelAreaW, align: 'right', lineBreak: true })
       doc.font(F).fontSize(7).text(fmt4(roundOff), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
       y += rowH
     }
