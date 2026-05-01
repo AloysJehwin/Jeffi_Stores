@@ -155,13 +155,13 @@ export default function ScanClient() {
     setStage('looking_up')
     try {
       const res = await fetch(`/api/admin/products/by-sku?q=${encodeURIComponent(sku)}`)
-      if (res.status === 404) { setStage('not_found'); return }
-      if (!res.ok) throw new Error('Lookup failed')
       const data = await res.json()
+      if (res.status === 404) { setStage('not_found'); return }
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
       setProduct(data.item)
       setStage('found_product')
-    } catch {
-      setErrorMsg('Could not look up product. Check your connection.')
+    } catch (e: any) {
+      setErrorMsg(e.message || 'Could not look up product. Check your connection.')
       setStage('error')
     }
   }

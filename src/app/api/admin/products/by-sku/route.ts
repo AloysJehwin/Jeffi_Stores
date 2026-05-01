@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
          p.stock_quantity,
          p.is_active,
          p.has_variants,
-         (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.position ASC LIMIT 1) AS image_url
+         (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.is_primary DESC, pi.display_order ASC LIMIT 1) AS image_url
        FROM products p
        LEFT JOIN brands b ON b.id = p.brand_id
        LEFT JOIN categories c ON c.id = p.category_id
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
          pv.stock_quantity,
          pv.is_active,
          false AS has_variants,
-         (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.position ASC LIMIT 1) AS image_url
+         (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.is_primary DESC, pi.display_order ASC LIMIT 1) AS image_url
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
        LEFT JOIN brands b ON b.id = p.brand_id
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  } catch {
-    return NextResponse.json({ error: 'Failed' }, { status: 500 })
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 })
   }
 }
