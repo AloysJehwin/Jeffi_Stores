@@ -416,14 +416,13 @@ export function generateQuotationPDF(
 
     const wordsText = `INR ${numberToWords(total)} Only`
     const wordsLineH = doc.font(FB).fontSize(8).heightOfString(wordsText, { width: pw - 10 })
-    const wordsRowH = Math.max(24, 10 + wordsLineH + 6)
+    const wordsRowH = Math.max(26, 11 + wordsLineH + 6)
     const wordsY = y
-    doc.font(F).fontSize(6.5).text('Amount Chargeable (in words)', LM + 3, y + 2, { width: pw * 0.7, lineBreak: false })
-    doc.font(F).fontSize(6.5).text('E. & O.E', LM + 3, y + 2, { width: pw - 6, align: 'right', lineBreak: false })
-    y += 10
-    doc.font(FB).fontSize(8).text(wordsText, LM + 3, y, { width: pw - 10 })
-    y = wordsY + wordsRowH
     rect(doc, LM, wordsY, pw, wordsRowH)
+    doc.font(F).fontSize(6.5).text('Amount Chargeable (in words)', LM + 3, wordsY + 2, { width: pw * 0.7, lineBreak: false })
+    doc.font(F).fontSize(6.5).text('E. & O.E', LM + 3, wordsY + 2, { width: pw - 6, align: 'right', lineBreak: false })
+    doc.font(FB).fontSize(8).text(wordsText, LM + 3, wordsY + 11, { width: pw - 10 })
+    y = wordsY + wordsRowH
 
     if (y + 55 > pageBottom) { doc.addPage(); y = LM }
     const hsnY = y
@@ -452,7 +451,7 @@ export function generateQuotationPDF(
     const hc   = hDefs.map(c => ({ ...c, w: Math.round(c.w * hSc) }))
     hc[hc.length - 1].w += pw - hc.reduce((s, c) => s + c.w, 0)
 
-    const hh1 = 9, hh2 = 9
+    const hh1 = 11, hh2 = 11
     let cx = LM
     doc.font(FB).fontSize(6.5)
 
@@ -515,11 +514,12 @@ export function generateQuotationPDF(
 
     const twY = y
     const taxWordsText = `INR ${numberToWords(cgst + sgst)} Only`
-    const taxWordsH = Math.max(12, doc.font(FB).fontSize(7).heightOfString('Tax Amount (in words) : ' + taxWordsText, { width: pw - 6 }) + 4)
-    doc.font(F).fontSize(7).text('Tax Amount (in words) : ', LM + 3, y + 2, { continued: true })
-    doc.font(FB).fontSize(7).text(taxWordsText)
-    y += taxWordsH
+    const taxWordsFullText = 'Tax Amount (in words) : ' + taxWordsText
+    const taxWordsH = Math.max(14, doc.font(FB).fontSize(7).heightOfString(taxWordsFullText, { width: pw - 10 }) + 6)
     rect(doc, LM, twY, pw, taxWordsH)
+    doc.font(F).fontSize(7).text('Tax Amount (in words) : ', LM + 3, twY + 3, { continued: true })
+    doc.font(FB).fontSize(7).text(taxWordsText, { width: pw - 10 })
+    y = twY + taxWordsH
 
     const botH  = 52
     const sigH  = 22
