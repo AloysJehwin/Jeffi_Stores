@@ -93,7 +93,7 @@ function drawPrice(
       const mrpText = fmtShort(mrpIncGst)
       const mrpW = doc.widthOfString(mrpText)
       doc.text(mrpText, px, py, { lineBreak: false })
-      doc.moveTo(px, py + subSize * 0.6).lineTo(px + mrpW, py + subSize * 0.6).stroke('#aaaaaa')
+      doc.moveTo(px, py + subSize * 0.38).lineTo(px + mrpW, py + subSize * 0.38).lineWidth(0.5).stroke('#888888')
       py += subSize + 1.5
     }
   }
