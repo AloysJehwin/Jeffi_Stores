@@ -698,7 +698,6 @@ export default function QuotationsClient() {
                   </td>
                   <td className="py-1.5 pr-2">
                     <AdminSelect
-                      compact
                       value={item.unit}
                       options={UNITS.map(u => ({ value: u, label: u }))}
                       onChange={val => updateItem(idx, 'unit', val)}
