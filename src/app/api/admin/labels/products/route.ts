@@ -9,7 +9,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')?.trim() || ''
-    const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 100)
+    const categoryId = searchParams.get('category_id')?.trim() || ''
+    const limit = Math.min(parseInt(searchParams.get('limit') || '40'), 100)
 
     const rows = await queryMany(
       `SELECT
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
        WHERE p.is_active = true
          AND p.has_variants = false
          AND ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR p.sku ILIKE '%' || $1 || '%')
+         AND ($2 = '' OR p.category_id = $2::uuid)
 
        UNION ALL
 
@@ -52,10 +54,11 @@ export async function GET(request: NextRequest) {
        WHERE pv.is_active = true
          AND p.is_active = true
          AND ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR pv.variant_name ILIKE '%' || $1 || '%' OR pv.sku ILIKE '%' || $1 || '%')
+         AND ($2 = '' OR p.category_id = $2::uuid)
 
        ORDER BY name ASC, variant_name ASC NULLS FIRST
-       LIMIT $2`,
-      [q, limit]
+       LIMIT $3`,
+      [q, categoryId, limit]
     )
 
     return NextResponse.json({ products: rows || [] })

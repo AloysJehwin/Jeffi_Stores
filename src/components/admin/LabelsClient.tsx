@@ -3,6 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { LabelSpec, LabelSize } from '@/lib/label-pdf'
 
+interface Category {
+  id: string
+  name: string
+  parent_category_id: string | null
+}
+
 interface ProductResult {
   id: string
   product_id?: string
@@ -24,6 +30,7 @@ interface SelectedProduct extends ProductResult {
 
 interface Props {
   labelSizes: LabelSpec[]
+  categories: Category[]
 }
 
 function fmtPrice(p: number | null | undefined): string {
@@ -40,10 +47,10 @@ function BarcodePlaceholder({ width, height, text }: { width: number; height: nu
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
       {BARCODE_BARS.map((barW, i) => {
         const x = (curX / totalW) * width
-        const w = (barW / totalW) * width
+        const bw = (barW / totalW) * width
         curX += barW
         return i % 2 === 0
-          ? <rect key={i} x={x} y={0} width={Math.max(0.5, w - 0.5)} height={height * 0.8} fill="#1a1a1a"/>
+          ? <rect key={i} x={x} y={0} width={Math.max(0.5, bw - 0.5)} height={height * 0.8} fill="#1a1a1a"/>
           : null
       })}
       <text
@@ -82,7 +89,6 @@ function QRPlaceholder({ size }: { size: number }) {
     [1,1,1,1,1,1,1,0,1,0,0,0,0,1,0,0,0,1,0,0,1],
   ]
   const cols = cells[0].length
-  const rows = cells.length
   const cs = size / cols
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
@@ -111,13 +117,13 @@ function LabelPreview({ size, product, scale }: {
   const brand = product?.brand_name || null
   const price = product ? (product.sale_price ?? product.base_price) : null
   const mrp = product?.mrp ?? null
-  const hasMrp = mrp && mrp > 0 && mrp !== price
+  const hasMrp = !!(mrp && mrp > 0 && price && mrp !== price)
+  const barcodeText = product?.gtin || product?.sku || '0000000000000'
 
   const barH = Math.round(h * 0.24)
   const nameFontSize = Math.max(7, Math.round(h * 0.115))
   const smallFontSize = Math.max(6, Math.round(h * 0.085))
-  const priceFontSize = Math.max(8, Math.round(h * 0.135))
-  const barcodeText = product?.gtin || product?.sku || '0000000000000'
+  const priceFontSize = Math.max(8, Math.round(h * 0.13))
 
   const base: React.CSSProperties = {
     width: w,
@@ -129,6 +135,7 @@ function LabelPreview({ size, product, scale }: {
     borderRadius: 2,
     boxSizing: 'border-box',
     fontFamily: 'Helvetica, Arial, sans-serif',
+    flexShrink: 0,
   }
 
   if (size.size === '30x20') {
@@ -170,7 +177,7 @@ function LabelPreview({ size, product, scale }: {
         <div style={{ position: 'absolute', bottom: pad, left: pad }}>
           <BarcodePlaceholder width={Math.round(w * 0.52)} height={barH} text={barcodeText} />
         </div>
-        <div style={{ position: 'absolute', bottom: pad + Math.round(barH * 0.25), left: pad + Math.round(w * 0.54), fontSize: Math.max(5, Math.round(h * 0.09)), color: '#555' }}>
+        <div style={{ position: 'absolute', bottom: pad + Math.round(barH * 0.2), left: pad + Math.round(w * 0.54), fontSize: Math.max(5, Math.round(h * 0.09)), color: '#555' }}>
           {sku}
         </div>
       </div>
@@ -198,21 +205,20 @@ function LabelPreview({ size, product, scale }: {
 
   if (size.size === '40x60') {
     const qrSize = Math.round(Math.min(w, h) * 0.27)
-    const textRight = w - qrSize - pad * 2 - 2
     return (
       <div style={base}>
         <div style={{ position: 'absolute', top: pad, right: pad }}>
           <QRPlaceholder size={qrSize} />
         </div>
-        <div style={{ position: 'absolute', top: pad, left: pad, right: qrSize + pad * 2 + 2, overflow: 'hidden' }}>
-          <div style={{ fontSize: nameFontSize, fontWeight: 700, lineHeight: 1.25, color: '#111', maxHeight: variantName ? nameFontSize * 1.3 : nameFontSize * 2.7, overflow: 'hidden' }}>{name}</div>
+        <div style={{ position: 'absolute', top: pad, left: pad, right: qrSize + pad * 2 + 2, bottom: barH + pad, overflow: 'hidden' }}>
+          <div style={{ fontSize: nameFontSize, fontWeight: 700, lineHeight: 1.25, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: variantName ? 1 : 2, WebkitBoxOrient: 'vertical' as any }}>{name}</div>
           {variantName && (
             <div style={{ fontSize: smallFontSize, color: '#333', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
           )}
           <div style={{ fontSize: smallFontSize * 0.9, color: '#666', marginTop: 2 }}>SKU: {sku}</div>
-          <div style={{ marginTop: 3 }}>
+          <div style={{ marginTop: 3, display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 3 }}>
             {hasMrp && (
-              <span style={{ fontSize: smallFontSize * 0.85, color: '#aaa', textDecoration: 'line-through', marginRight: 3 }}>{fmtPrice(mrp)}</span>
+              <span style={{ fontSize: smallFontSize * 0.85, color: '#aaa', textDecoration: 'line-through' }}>{fmtPrice(mrp)}</span>
             )}
             {price && price > 0 && (
               <span style={{ fontSize: priceFontSize * 0.95, fontWeight: 700, color: '#c0392b' }}>{fmtPrice(price)}</span>
@@ -227,34 +233,42 @@ function LabelPreview({ size, product, scale }: {
   }
 
   if (size.size === '50x50') {
-    const qrSize = Math.round(w * 0.28)
-    const rightX = pad + qrSize + Math.round(pad * 0.8)
+    const qrSize = Math.round(w * 0.29)
+    const gapAfterQR = Math.round(pad * 0.7)
+    const rightX = pad + qrSize + gapAfterQR
     const rightW = w - rightX - pad
+    const contentH = h - barH - pad * 2 - 6
+    const skuRowH = Math.round(smallFontSize * 0.85) + 3
+    const infoH = contentH - skuRowH
     return (
       <div style={base}>
-        <div style={{ position: 'absolute', top: pad, left: pad }}>
+        {/* QR — top left, constrained to content area */}
+        <div style={{ position: 'absolute', top: pad, left: pad, width: qrSize, height: Math.min(qrSize, infoH), overflow: 'hidden' }}>
           <QRPlaceholder size={qrSize} />
         </div>
-        <div style={{ position: 'absolute', top: pad, left: rightX, right: pad, overflow: 'hidden' }}>
-          <div style={{ fontSize: nameFontSize, fontWeight: 700, lineHeight: 1.25, color: '#111', maxHeight: variantName ? nameFontSize * 1.4 : nameFontSize * 2.8, overflow: 'hidden' }}>{name}</div>
+        {/* Right column — name, variant, brand, price */}
+        <div style={{ position: 'absolute', top: pad, left: rightX, width: rightW, height: infoH, overflow: 'hidden' }}>
+          <div style={{ fontSize: nameFontSize, fontWeight: 700, lineHeight: 1.25, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: variantName ? 1 : 2, WebkitBoxOrient: 'vertical' as any }}>{name}</div>
           {variantName && (
             <div style={{ fontSize: smallFontSize, color: '#333', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
           )}
           {brand && (
-            <div style={{ fontSize: smallFontSize * 0.85, color: '#888', marginTop: 1 }}>{brand}</div>
+            <div style={{ fontSize: Math.round(smallFontSize * 0.85), color: '#888', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{brand}</div>
           )}
           <div style={{ marginTop: 3 }}>
             {hasMrp && (
-              <div style={{ fontSize: smallFontSize * 0.85, color: '#aaa', textDecoration: 'line-through' }}>{fmtPrice(mrp)}</div>
+              <div style={{ fontSize: Math.round(smallFontSize * 0.85), color: '#aaa', textDecoration: 'line-through', lineHeight: 1.2 }}>{fmtPrice(mrp)}</div>
             )}
             {price && price > 0 && (
-              <div style={{ fontSize: priceFontSize, fontWeight: 700, color: '#c0392b', marginTop: 1 }}>{fmtPrice(price)}</div>
+              <div style={{ fontSize: priceFontSize, fontWeight: 700, color: '#c0392b', lineHeight: 1.2 }}>{fmtPrice(price)}</div>
             )}
           </div>
         </div>
-        <div style={{ position: 'absolute', bottom: barH + pad + 2, left: pad, right: pad, fontSize: smallFontSize * 0.85, color: '#666' }}>
+        {/* SKU row above barcode */}
+        <div style={{ position: 'absolute', bottom: barH + pad + 1, left: pad, right: pad, fontSize: Math.round(smallFontSize * 0.85), color: '#666', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
           SKU: {sku}
         </div>
+        {/* Barcode */}
         <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
           <BarcodePlaceholder width={w - pad * 2} height={barH} text={barcodeText} />
         </div>
@@ -265,11 +279,13 @@ function LabelPreview({ size, product, scale }: {
   return null
 }
 
-export default function LabelsClient({ labelSizes }: Props) {
+export default function LabelsClient({ labelSizes, categories }: Props) {
   const [selectedSize, setSelectedSize] = useState<LabelSize>('40x60')
   const [outputMode, setOutputMode] = useState<'thermal' | 'sheet'>('thermal')
   const [copies, setCopies] = useState(1)
   const [query, setQuery] = useState('')
+  const [selectedMainCat, setSelectedMainCat] = useState('')
+  const [selectedSubCat, setSelectedSubCat] = useState('')
   const [searchResults, setSearchResults] = useState<ProductResult[]>([])
   const [searching, setSearching] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([])
@@ -278,19 +294,30 @@ export default function LabelsClient({ labelSizes }: Props) {
   const [error, setError] = useState('')
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
+  const mainCategories = categories.filter(c => !c.parent_category_id)
+  const subCategories = selectedMainCat
+    ? categories.filter(c => c.parent_category_id === selectedMainCat)
+    : []
+
+  const activeCategoryId = selectedSubCat || selectedMainCat
+
   const activeSize = labelSizes.find(s => s.size === selectedSize)!
 
-  const PREVIEW_MAX_W = 260
-  const PREVIEW_MAX_H = 300
+  const PREVIEW_MAX_W = 250
+  const PREVIEW_MAX_H = 290
   const previewScale = Math.min(
     PREVIEW_MAX_W / activeSize.widthPt,
     PREVIEW_MAX_H / activeSize.heightPt
   )
+  const previewW = Math.round(activeSize.widthPt * previewScale)
+  const previewH = Math.round(activeSize.heightPt * previewScale)
 
-  const search = useCallback(async (q: string) => {
+  const search = useCallback(async (q: string, catId: string) => {
     setSearching(true)
     try {
-      const res = await fetch(`/api/admin/labels/products?q=${encodeURIComponent(q)}&limit=30`)
+      const params = new URLSearchParams({ q, limit: '40' })
+      if (catId) params.set('category_id', catId)
+      const res = await fetch(`/api/admin/labels/products?${params}`)
       const data = await res.json()
       setSearchResults(data.products || [])
     } catch {
@@ -302,14 +329,17 @@ export default function LabelsClient({ labelSizes }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => search(query), 280)
-  }, [query, search])
+    debounceRef.current = setTimeout(() => search(query, activeCategoryId), 280)
+  }, [query, activeCategoryId, search])
 
-  useEffect(() => { search('') }, [search])
+  useEffect(() => { search('', '') }, [search])
 
-  useEffect(() => {
-    setPreviewIndex(0)
-  }, [selectedProducts.length])
+  useEffect(() => { setPreviewIndex(0) }, [selectedProducts.length])
+
+  function onMainCatChange(id: string) {
+    setSelectedMainCat(id)
+    setSelectedSubCat('')
+  }
 
   function toggleProduct(p: ProductResult) {
     setSelectedProducts(prev => {
@@ -320,7 +350,9 @@ export default function LabelsClient({ labelSizes }: Props) {
   }
 
   function updateProductCopies(id: string, c: number) {
-    setSelectedProducts(prev => prev.map(p => p.id === id ? { ...p, copies: Math.max(1, Math.min(100, c)) } : p))
+    setSelectedProducts(prev =>
+      prev.map(p => p.id === id ? { ...p, copies: Math.max(1, Math.min(100, c)) } : p)
+    )
   }
 
   async function handleDownload() {
@@ -358,7 +390,11 @@ export default function LabelsClient({ labelSizes }: Props) {
 
   const totalLabels = selectedProducts.reduce((sum, p) => sum + p.copies, 0) * copies
   const safePreviewIdx = Math.min(previewIndex, Math.max(0, selectedProducts.length - 1))
-  const previewProduct = selectedProducts.length > 0 ? selectedProducts[safePreviewIdx] : searchResults[0] || null
+  const previewProduct = selectedProducts.length > 0
+    ? selectedProducts[safePreviewIdx]
+    : searchResults[0] || null
+
+  const RULER_LEFT = 28 // px reserved for y-axis ruler
 
   return (
     <div className="flex flex-col xl:flex-row gap-6 items-start">
@@ -425,7 +461,7 @@ export default function LabelsClient({ labelSizes }: Props) {
                 ))}
               </div>
               <p className="text-xs text-foreground-muted mt-1.5">
-                {outputMode === 'thermal' ? 'One label per page — ideal for thermal/label printers' : 'Multiple labels per A4 page with cut lines — for desktop printers'}
+                {outputMode === 'thermal' ? 'One label per page — for thermal/label printers' : 'Multiple labels per A4 page with cut lines — for desktop printers'}
               </p>
             </div>
             <div className="sm:w-32">
@@ -439,9 +475,37 @@ export default function LabelsClient({ labelSizes }: Props) {
           </div>
         </div>
 
-        {/* Product / variant search */}
+        {/* Category filter + product search */}
         <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-foreground mb-3">Select Products & Variants</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">Select Products &amp; Variants</h2>
+
+          {/* Category filters */}
+          <div className="flex gap-2 mb-3">
+            <select
+              value={selectedMainCat}
+              onChange={e => onMainCatChange(e.target.value)}
+              className="flex-1 min-w-0 px-2.5 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-xs"
+            >
+              <option value="">All categories</option>
+              {mainCategories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {subCategories.length > 0 && (
+              <select
+                value={selectedSubCat}
+                onChange={e => setSelectedSubCat(e.target.value)}
+                className="flex-1 min-w-0 px-2.5 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-xs"
+              >
+                <option value="">All subcategories</option>
+                {subCategories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Search box */}
           <div className="relative mb-3">
             <input
               type="text"
@@ -455,6 +519,7 @@ export default function LabelsClient({ labelSizes }: Props) {
             </svg>
           </div>
 
+          {/* Results list */}
           <div className="space-y-0.5 max-h-72 overflow-y-auto">
             {searching && <div className="text-sm text-foreground-muted text-center py-6">Searching…</div>}
             {!searching && searchResults.length === 0 && (
@@ -508,9 +573,13 @@ export default function LabelsClient({ labelSizes }: Props) {
             </div>
             <div className="space-y-1.5">
               {selectedProducts.map((p, idx) => (
-                <div key={p.id} className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors cursor-pointer ${
-                  idx === safePreviewIdx ? 'bg-orange-50 dark:bg-orange-900/20 ring-1 ring-orange-200 dark:ring-orange-800' : 'bg-surface-secondary'
-                }`}
+                <div
+                  key={p.id}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors cursor-pointer ${
+                    idx === safePreviewIdx
+                      ? 'bg-orange-50 dark:bg-orange-900/20 ring-1 ring-orange-200 dark:ring-orange-800'
+                      : 'bg-surface-secondary'
+                  }`}
                   onClick={() => setPreviewIndex(idx)}
                 >
                   <div className="flex-1 min-w-0">
@@ -575,30 +644,46 @@ export default function LabelsClient({ labelSizes }: Props) {
             {activeSize.widthMm} × {activeSize.heightMm} mm
           </p>
 
-          {/* Preview box */}
-          <div className="bg-[#f0f0f0] dark:bg-zinc-800 rounded-lg flex items-center justify-center py-8 px-4 min-h-44 relative">
-            {/* ruler top */}
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[9px] text-foreground-muted select-none">
-              ←── {activeSize.widthMm} mm ──→
-            </div>
-            <div style={{ position: 'relative' }}>
-              {/* ruler left */}
+          {/* Preview box — ruler + label */}
+          <div className="bg-[#f0f0f0] dark:bg-zinc-800 rounded-lg py-7 flex items-center justify-center"
+            style={{ paddingLeft: RULER_LEFT + 8, paddingRight: 8 }}>
+            <div style={{ position: 'relative', width: previewW + RULER_LEFT, display: 'flex', alignItems: 'flex-start' }}>
+
+              {/* Y-axis ruler — vertically centered alongside the label */}
               <div style={{
-                position: 'absolute',
-                left: -22,
-                top: 0,
-                height: activeSize.heightPt * previewScale,
+                width: RULER_LEFT,
+                height: previewH,
                 display: 'flex',
                 alignItems: 'center',
-                fontSize: 9,
-                color: '#999',
-                writingMode: 'vertical-rl',
-                transform: 'rotate(180deg)',
-                userSelect: 'none',
+                justifyContent: 'center',
+                flexShrink: 0,
               }}>
-                {activeSize.heightMm} mm
+                <div style={{
+                  fontSize: 9,
+                  color: '#999',
+                  writingMode: 'vertical-rl' as any,
+                  transform: 'rotate(180deg)',
+                  userSelect: 'none',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {activeSize.heightMm} mm
+                </div>
               </div>
-              <LabelPreview size={activeSize} product={previewProduct} scale={previewScale} />
+
+              {/* Label + X-axis ruler stacked */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <LabelPreview size={activeSize} product={previewProduct} scale={previewScale} />
+                {/* X-axis ruler below label */}
+                <div style={{
+                  width: previewW,
+                  textAlign: 'center',
+                  fontSize: 9,
+                  color: '#999',
+                  userSelect: 'none',
+                }}>
+                  ←── {activeSize.widthMm} mm ──→
+                </div>
+              </div>
             </div>
           </div>
 
@@ -630,18 +715,16 @@ export default function LabelsClient({ labelSizes }: Props) {
               {previewProduct.name}{previewProduct.variant_name ? ` — ${previewProduct.variant_name}` : ''}
             </p>
           ) : (
-            <p className="text-xs text-foreground-muted text-center mt-2">
-              Select a product to preview
-            </p>
+            <p className="text-xs text-foreground-muted text-center mt-2">Select a product to preview</p>
           )}
 
-          {/* Summary */}
+          {/* Summary grid */}
           <div className="mt-4 pt-3 border-t border-border-default grid grid-cols-2 gap-y-1.5">
             {[
               ['Size', activeSize.label],
               ['Format', outputMode === 'thermal' ? 'Thermal' : 'A4 sheet'],
-              ['Items', selectedProducts.length],
-              ['Total labels', totalLabels || '—'],
+              ['Items', String(selectedProducts.length)],
+              ['Total labels', totalLabels ? String(totalLabels) : '—'],
             ].map(([label, val]) => (
               <div key={label} className="contents">
                 <span className="text-xs text-foreground-muted">{label}</span>
