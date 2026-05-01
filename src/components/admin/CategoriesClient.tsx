@@ -38,12 +38,14 @@ function SortableRow({
   collapsed,
   onToggleCollapse,
   subCount,
+  onDeleted,
 }: {
   category: Category
   isSubcat: boolean
   collapsed?: boolean
   onToggleCollapse?: () => void
   subCount?: number
+  onDeleted?: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
@@ -118,7 +120,7 @@ function SortableRow({
         <Link href={`/admin/categories/edit/${category.id}`} className="text-accent-500 hover:text-accent-600 mr-4">
           Edit
         </Link>
-        <DeleteCategoryButton categoryId={category.id} categoryName={category.name} />
+        <DeleteCategoryButton categoryId={category.id} categoryName={category.name} onDeleted={onDeleted} />
       </td>
     </tr>
   )
@@ -208,6 +210,10 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     }
   }
 
+  const handleCategoryDeleted = (id: string) => {
+    setCategories(prev => prev.filter(c => c.id !== id && c.parent_category_id !== id))
+  }
+
   const activeCategory = categories.find(c => c.id === activeId)
 
   return (
@@ -253,12 +259,14 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                         collapsed={isCollapsed}
                         onToggleCollapse={() => toggleCollapse(cat.id)}
                         subCount={subcats.length}
+                        onDeleted={() => handleCategoryDeleted(cat.id)}
                       />
                       {!isCollapsed && subcats.map(sub => (
                         <SortableRow
                           key={sub.id}
                           category={sub}
                           isSubcat={true}
+                          onDeleted={() => handleCategoryDeleted(sub.id)}
                         />
                       ))}
                     </>
@@ -315,7 +323,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                 </div>
                 <div className="flex items-center justify-end gap-3 text-sm">
                   <Link href={`/admin/categories/edit/${cat.id}`} className="text-accent-500 font-medium">Edit</Link>
-                  <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} />
+                  <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} onDeleted={() => handleCategoryDeleted(cat.id)} />
                 </div>
               </div>
 
@@ -335,7 +343,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                   </div>
                   <div className="flex items-center justify-end gap-3 text-sm">
                     <Link href={`/admin/categories/edit/${sub.id}`} className="text-accent-500 font-medium">Edit</Link>
-                    <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} />
+                    <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                   </div>
                 </div>
               ))}

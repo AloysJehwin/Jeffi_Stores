@@ -7,9 +7,10 @@ import { useToast } from '@/contexts/ToastContext'
 interface DeleteCategoryButtonProps {
   categoryId: string
   categoryName: string
+  onDeleted?: () => void
 }
 
-export default function DeleteCategoryButton({ categoryId, categoryName }: DeleteCategoryButtonProps) {
+export default function DeleteCategoryButton({ categoryId, categoryName, onDeleted }: DeleteCategoryButtonProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const { showToast } = useToast()
@@ -28,6 +29,8 @@ export default function DeleteCategoryButton({ categoryId, categoryName }: Delet
         throw new Error(data.error || 'Failed to delete category')
       }
 
+      showToast(`"${categoryName}" deleted successfully.`, 'success')
+      onDeleted?.()
       router.refresh()
       setShowConfirm(false)
     } catch (error: any) {
