@@ -316,7 +316,7 @@ export function generateQuotationPDF(
     const roundOff = total - rawTotal
     const hasRound = Math.abs(roundOff) >= 0.005
 
-    const summaryH = rowH + rowH + rowH + (hasRound ? rowH : 0) + 20
+    const summaryH = rowH + rowH + rowH + rowH + (hasRound ? rowH : 0) + 20  // +1 blank row
 
     let tableTop = y
 
@@ -384,6 +384,7 @@ export function generateQuotationPDF(
     }
 
     pageBreak(summaryH)
+    y += rowH  // blank row between last item and subtotal
     hline(doc, LM, R, y)
     doc.font(FB).fontSize(7).text(fmt4(subtotal), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
     y += rowH
