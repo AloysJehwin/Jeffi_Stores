@@ -103,7 +103,10 @@ export default function QuotationsClient() {
   const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'pending' | 'saving' | 'saved'>('idle')
+  const [isFinal, setIsFinal] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [quoteNumber, setQuoteNumber] = useState('')
   const [quoteDate, setQuoteDate] = useState(todayISO())
@@ -130,6 +133,8 @@ export default function QuotationsClient() {
   const [custResults, setCustResults] = useState<any[]>([])
   const [showCustDrop, setShowCustDrop] = useState(false)
   const custTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const isEditorMounted = useRef(false)
 
   const [productModalOpen, setProductModalOpen] = useState(false)
   const [productModalRow, setProductModalRow] = useState<number | null>(null)
@@ -178,6 +183,9 @@ export default function QuotationsClient() {
     setBName(''); setBAddr1(''); setBAddr2(''); setBCity(''); setBState('Chhattisgarh'); setBGstin('')
     setItems([emptyItem()])
     setSaveError('')
+    setIsFinal(false)
+    setAutoSaveStatus('idle')
+    isEditorMounted.current = false
     setView('editor')
   }
 
@@ -210,6 +218,9 @@ export default function QuotationsClient() {
         variant_id: i.variant_id,
       }))
       setItems(loadedItems.length ? loadedItems : [emptyItem()])
+      setIsFinal(q.status === 'final')
+      setAutoSaveStatus('idle')
+      isEditorMounted.current = false
       setView('editor')
     } catch {
       setError('Failed to load quotation')
@@ -219,6 +230,7 @@ export default function QuotationsClient() {
   async function save(newStatus?: string) {
     setSaving(true)
     setSaveError('')
+    setAutoSaveStatus('saving')
     try {
       const body = {
         quote_date: quoteDate,
@@ -259,15 +271,33 @@ export default function QuotationsClient() {
       if (!res.ok) throw new Error(data.error || 'Save failed')
       if (!editId) setEditId(data.quotation.id)
       setQuoteNumber(data.quotation.quote_number)
+      setAutoSaveStatus('saved')
+      setTimeout(() => setAutoSaveStatus('idle'), 2000)
       if (newStatus === 'final') {
+        setIsFinal(true)
         setView('list')
       }
     } catch (e: any) {
       setSaveError(e.message || 'Save failed')
+      setAutoSaveStatus('idle')
     } finally {
       setSaving(false)
     }
   }
+
+  function scheduleAutoSave() {
+    if (isFinal) return
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    setAutoSaveStatus('pending')
+    autoSaveTimer.current = setTimeout(() => { save() }, 1500)
+  }
+
+  useEffect(() => {
+    if (view !== 'editor') return
+    if (!isEditorMounted.current) { isEditorMounted.current = true; return }
+    scheduleAutoSave()
+  }, [quoteDate, notes, cName, cAddr1, cAddr2, cCity, cState, cGstin,
+      buyerSame, bName, bAddr1, bAddr2, bCity, bState, bGstin, items])
 
   async function downloadPDF() {
     if (!editId) { await save(); }
@@ -374,7 +404,7 @@ export default function QuotationsClient() {
         const params = new URLSearchParams({ limit: '40' })
         if (q.trim()) params.set('q', q.trim())
         if (catId) params.set('category_id', catId)
-        const res = await fetch(`/api/admin/labels/products?${params}`)
+        const res = await fetch(`/api/admin/quotations/products?${params}`)
         const data = await res.json()
         setProdResults(data.products || [])
       } finally {
@@ -813,15 +843,22 @@ export default function QuotationsClient() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 justify-end">
-        <button onClick={() => save()} disabled={saving}
-          className="px-5 py-2.5 border border-border-default text-foreground hover:bg-surface-secondary rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-          {saving ? 'Saving…' : 'Save Draft'}
-        </button>
-        <button onClick={() => save('final')} disabled={saving}
-          className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-          {saving ? 'Saving…' : 'Finalise & Save'}
-        </button>
+      <div className="flex flex-wrap gap-3 justify-end items-center">
+        {autoSaveStatus === 'pending' && (
+          <span className="text-xs text-foreground-secondary">Unsaved changes…</span>
+        )}
+        {autoSaveStatus === 'saving' && (
+          <span className="text-xs text-foreground-secondary animate-pulse">Saving…</span>
+        )}
+        {autoSaveStatus === 'saved' && (
+          <span className="text-xs text-green-600 dark:text-green-400">✓ Saved</span>
+        )}
+        {!isFinal && (
+          <button onClick={() => save('final')} disabled={saving}
+            className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+            {saving ? 'Saving…' : 'Finalise & Save'}
+          </button>
+        )}
         <button onClick={downloadPDF} disabled={downloading || saving}
           className="px-5 py-2.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
           {downloading ? 'Generating…' : 'Download PDF'}
@@ -892,7 +929,7 @@ export default function QuotationsClient() {
                 ))
               })()}
             </div>
-            {prodSearch.trim() && !prodLoading && (
+            {prodSearch.trim() && productModalRow !== null && !items[productModalRow]?.product_id && (
               <div className="p-3 border-t border-border-default bg-surface-secondary">
                 <button
                   type="button"
