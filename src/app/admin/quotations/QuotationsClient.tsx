@@ -135,6 +135,7 @@ export default function QuotationsClient() {
   const [prodSearch, setProdSearch] = useState('')
   const [prodResults, setProdResults] = useState<ProductResult[]>([])
   const [prodLoading, setProdLoading] = useState(false)
+  const [creatingDraft, setCreatingDraft] = useState(false)
   const prodTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [prodCategory, setProdCategory] = useState('')
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
@@ -412,6 +413,34 @@ export default function QuotationsClient() {
     }))
     setProductModalOpen(false)
     setProductModalRow(null)
+  }
+
+  async function createDraftProduct() {
+    const name = prodSearch.trim()
+    if (!name || productModalRow === null) return
+    setCreatingDraft(true)
+    try {
+      const res = await fetch('/api/admin/products/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setItems(prev => prev.map((item, i) => {
+        if (i !== productModalRow) return item
+        const updated = { ...item, description: data.name, product_id: data.id }
+        updated.amount = calcItemAmount(updated)
+        return updated
+      }))
+      setProductModalOpen(false)
+      setProductModalRow(null)
+      window.open(`/admin/products/edit/${data.id}`, '_blank')
+    } catch (e: any) {
+      alert(e.message || 'Failed to create draft product')
+    } finally {
+      setCreatingDraft(false)
+    }
   }
 
   const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500'
@@ -847,6 +876,21 @@ export default function QuotationsClient() {
                 ))
               })()}
             </div>
+            {prodSearch.trim() && !prodLoading && (
+              <div className="p-3 border-t border-border-default bg-surface-secondary">
+                <button
+                  type="button"
+                  onClick={createDraftProduct}
+                  disabled={creatingDraft}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border-default hover:border-accent-500 hover:bg-accent-50 dark:hover:bg-accent-900/20 text-sm text-foreground-secondary hover:text-accent-600 transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span>{creatingDraft ? 'Creating…' : <>Create draft product <span className="font-medium text-foreground">"{prodSearch.trim()}"</span></>}</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
