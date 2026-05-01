@@ -303,8 +303,8 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
 
   const activeSize = labelSizes.find(s => s.size === selectedSize)!
 
-  const PREVIEW_MAX_W = 250
-  const PREVIEW_MAX_H = 290
+  const PREVIEW_MAX_W = 200
+  const PREVIEW_MAX_H = 240
   const previewScale = Math.min(
     PREVIEW_MAX_W / activeSize.widthPt,
     PREVIEW_MAX_H / activeSize.heightPt
@@ -645,8 +645,8 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           </p>
 
           {/* Preview box — ruler + label */}
-          <div className="bg-[#f0f0f0] dark:bg-zinc-800 rounded-lg py-6 flex items-center justify-center">
-            <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+          <div className="bg-[#f0f0f0] dark:bg-zinc-800 rounded-lg py-6 flex items-center justify-center overflow-hidden">
+            <div style={{ display: 'inline-flex', alignItems: 'flex-start' }}>
 
               {/* Y-axis ruler — same height as label, vertically centered text */}
               <div style={{
