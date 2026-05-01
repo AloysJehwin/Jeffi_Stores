@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 interface QuoteItem {
   id?: string
@@ -414,7 +415,6 @@ export default function QuotationsClient() {
   }
 
   const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500'
-  const selectCls = inputCls + ' appearance-none cursor-pointer'
   const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
   if (view === 'list') {
@@ -697,10 +697,12 @@ export default function QuotationsClient() {
                       className={inputCls} />
                   </td>
                   <td className="py-1.5 pr-2">
-                    <select value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)}
-                      className={selectCls}>
-                      {UNITS.map(u => <option key={u}>{u}</option>)}
-                    </select>
+                    <AdminSelect
+                      compact
+                      value={item.unit}
+                      options={UNITS.map(u => ({ value: u, label: u }))}
+                      onChange={val => updateItem(idx, 'unit', val)}
+                    />
                   </td>
                   <td className="py-1.5 pr-2">
                     <input type="number" value={item.rate} min={0} step="any"
@@ -786,14 +788,12 @@ export default function QuotationsClient() {
             </div>
             <div className="p-4 border-b border-border-default space-y-2">
               {categories.length > 0 && (
-                <select
+                <AdminSelect
                   value={prodCategory}
-                  onChange={e => { setProdCategory(e.target.value); loadProducts(prodSearch, e.target.value) }}
-                  className={selectCls}
-                >
-                  <option value="">All Categories</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                  placeholder="All Categories"
+                  options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
+                  onChange={val => { setProdCategory(val); loadProducts(prodSearch, val) }}
+                />
               )}
               <input
                 autoFocus type="text" value={prodSearch}
