@@ -49,17 +49,17 @@ function PriceBlock({ exGst, mrp, gstPct, mainSize, subSize, gap }: {
 }) {
   if (!exGst || exGst === 0) return null
   const gstFactor = 1 + (gstPct || 0) / 100
-  const incGst = Math.round(exGst * gstFactor)
-  const mrpIncGst = mrp && mrp > 0 ? Math.round(mrp * gstFactor) : null
+  const incGst = Number((exGst * gstFactor).toFixed(2))
+  const mrpIncGst = mrp && mrp > 0 ? Number((mrp * gstFactor).toFixed(2)) : null
   const showExGst = gstPct > 0
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap }}>
       {mrpIncGst && mrpIncGst !== incGst && (
-        <span style={{ fontSize: subSize, color: '#aaa', textDecoration: 'line-through', lineHeight: 1 }}>Rs. {mrpIncGst}</span>
+        <span style={{ fontSize: subSize, color: '#aaa', textDecoration: 'line-through', lineHeight: 1 }}>Rs. {mrpIncGst.toFixed(2)}</span>
       )}
-      <span style={{ fontSize: mainSize, fontWeight: 700, color: '#c0392b', lineHeight: 1 }}>Rs. {incGst}</span>
+      <span style={{ fontSize: mainSize, fontWeight: 700, color: '#c0392b', lineHeight: 1 }}>Rs. {incGst.toFixed(2)}</span>
       {showExGst && (
-        <span style={{ fontSize: subSize - 1, color: '#888', lineHeight: 1 }}>ex. GST Rs. {Math.round(exGst)}</span>
+        <span style={{ fontSize: subSize - 1, color: '#888', lineHeight: 1 }}>ex. GST Rs. {Number(exGst).toFixed(2)}</span>
       )}
     </div>
   )
@@ -202,12 +202,12 @@ function LabelPreview({ size, product, scale }: {
           )}
           {exGst && exGst > 0 && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: Math.round(3 * scale), flexWrap: 'wrap' }}>
-              {mrp && mrp > 0 && Math.round(mrp * (1 + gstPct / 100)) !== Math.round(exGst * (1 + gstPct / 100)) && (
-                <span style={{ fontSize: exGstFs, color: '#aaa', textDecoration: 'line-through' }}>Rs. {Math.round(mrp * (1 + gstPct / 100))}</span>
+              {mrp && mrp > 0 && (mrp * (1 + gstPct / 100)).toFixed(2) !== (exGst * (1 + gstPct / 100)).toFixed(2) && (
+                <span style={{ fontSize: exGstFs, color: '#aaa', textDecoration: 'line-through' }}>Rs. {(mrp * (1 + gstPct / 100)).toFixed(2)}</span>
               )}
-              <span style={{ fontSize: priceFs, fontWeight: 700, color: '#c0392b' }}>Rs. {Math.round(exGst * (1 + gstPct / 100))}</span>
+              <span style={{ fontSize: priceFs, fontWeight: 700, color: '#c0392b' }}>Rs. {(exGst * (1 + gstPct / 100)).toFixed(2)}</span>
               {gstPct > 0 && (
-                <span style={{ fontSize: exGstFs, color: '#888' }}>ex.GST Rs. {Math.round(exGst)}</span>
+                <span style={{ fontSize: exGstFs, color: '#888' }}>ex.GST Rs. {Number(exGst).toFixed(2)}</span>
               )}
             </div>
           )}

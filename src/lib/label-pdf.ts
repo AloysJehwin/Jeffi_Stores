@@ -83,14 +83,14 @@ function drawPrice(
   if (!exGst || exGst === 0) return py
 
   const gstFactor = 1 + (p.gst_percentage || 0) / 100
-  const incGst = Math.round(exGst * gstFactor)
+  const incGst = Number((exGst * gstFactor).toFixed(2))
   const showExGst = p.gst_percentage > 0
 
   if (p.mrp && p.mrp > 0) {
-    const mrpIncGst = Math.round(p.mrp * gstFactor)
+    const mrpIncGst = Number((p.mrp * gstFactor).toFixed(2))
     if (mrpIncGst !== incGst) {
       doc.font('Helvetica').fontSize(subSize).fillColor('#888888')
-      const mrpText = fmtShort(mrpIncGst)
+      const mrpText = `Rs. ${mrpIncGst.toFixed(2)}`
       const mrpW = doc.widthOfString(mrpText)
       doc.text(mrpText, px, py, { lineBreak: false })
       doc.moveTo(px, py + subSize * 0.38).lineTo(px + mrpW, py + subSize * 0.38).lineWidth(0.5).stroke('#888888')
@@ -99,12 +99,12 @@ function drawPrice(
   }
 
   doc.font('Helvetica-Bold').fontSize(mainSize).fillColor('#c0392b')
-  doc.text(`Rs. ${incGst}`, px, py, { width: availW, lineBreak: false })
+  doc.text(`Rs. ${incGst.toFixed(2)}`, px, py, { width: availW, lineBreak: false })
   py += mainSize + 1.5
 
   if (showExGst) {
     doc.font('Helvetica').fontSize(subSize - 0.5).fillColor('#777777')
-    doc.text(`ex. GST Rs. ${Math.round(exGst)}`, px, py, { width: availW, lineBreak: false })
+    doc.text(`ex. GST Rs. ${Number(exGst).toFixed(2)}`, px, py, { width: availW, lineBreak: false })
     py += subSize + 1
   }
 
