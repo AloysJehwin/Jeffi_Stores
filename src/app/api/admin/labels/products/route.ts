@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
          p.sale_price,
          p.base_price,
          COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
+         p.hsn_code,
          b.name AS brand_name,
          p.gtin
        FROM products p
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
          pv.sale_price,
          COALESCE(pv.price, p.base_price) AS base_price,
          COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
+         p.hsn_code,
          b.name AS brand_name,
          COALESCE(pv.gtin, p.gtin) AS gtin
        FROM product_variants pv
