@@ -331,23 +331,23 @@ export function generateQuotationPDF(
         cx += col.w
       }
       y += hdrH
+      tableTop = y
     }
 
-    function closeTable() {
-      rect(doc, LM, tableTop, pw, y - tableTop)
+    function closePageTable(endY: number) {
+      rect(doc, LM, tableTop, pw, endY - tableTop)
       let cx = LM
       for (let i = 0; i < cols.length - 1; i++) {
         cx += cols[i].w
-        vline(doc, cx, tableTop, y)
+        vline(doc, cx, tableTop, endY)
       }
     }
 
     function pageBreak(need: number) {
       if (y + need > pageBottom) {
-        closeTable()
+        closePageTable(y)
         doc.addPage()
         y = LM
-        tableTop = y
         drawHeader()
       }
     }
@@ -360,7 +360,7 @@ export function generateQuotationPDF(
       const descCol = cols[1]
       const descH = Math.max(rowH, doc.font(FB).fontSize(7).heightOfString(item.description, { width: descCol.w - 4 }) + 6)
 
-      pageBreak(i === items.length - 1 ? descH + summaryH : descH)
+      pageBreak(descH)
 
       let cx = LM
       const row = [
@@ -383,45 +383,41 @@ export function generateQuotationPDF(
       y += descH
     }
 
-    pageBreak(rowH)
+    pageBreak(summaryH)
     hline(doc, LM, R, y)
     doc.font(FB).fontSize(7).text(fmt4(subtotal), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
     y += rowH
 
     const labelAreaW = amtX - (LM + slW) - 4
-    pageBreak(rowH)
     hline(doc, LM, R, y)
     doc.font(FBI).fontSize(8).text('CGST', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right' })
     doc.font(F).fontSize(7).text(fmt4(cgst), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
     y += rowH
 
-    pageBreak(rowH)
     hline(doc, LM, R, y)
     doc.font(FBI).fontSize(8).text('SGST', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right' })
     doc.font(F).fontSize(7).text(fmt4(sgst), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
     y += rowH
 
     if (hasRound) {
-      pageBreak(rowH)
       hline(doc, LM, R, y)
       doc.font(FBI).fontSize(8).text('ROUND OFF', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right' })
       doc.font(F).fontSize(7).text(fmt4(roundOff), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
       y += rowH
     }
 
-    pageBreak(20)
     hline(doc, LM, R, y)
     doc.font(FB).fontSize(8).text('Total', LM + slW + 2, y + 5, { width: labelAreaW, align: 'right', lineBreak: false })
     doc.font(FB).fontSize(8).text(`₹ ${fmt4(total)}`, amtX + 2, y + 5, { width: amtW - 4, align: 'right', lineBreak: false })
     y += 20
 
-    closeTable()
+    closePageTable(y)
 
     const wordsY = y
-    const wordsRowH = 26
-    doc.font(F).fontSize(6.5).text('Amount Chargeable (in words)', LM + 3, y + 3, { width: pw * 0.7, lineBreak: false })
-    doc.font(F).fontSize(6.5).text('E. & O.E', LM + 3, y + 3, { width: pw - 6, align: 'right', lineBreak: false })
-    y += 11
+    const wordsRowH = 20
+    doc.font(F).fontSize(6.5).text('Amount Chargeable (in words)', LM + 3, y + 2, { width: pw * 0.7, lineBreak: false })
+    doc.font(F).fontSize(6.5).text('E. & O.E', LM + 3, y + 2, { width: pw - 6, align: 'right', lineBreak: false })
+    y += 9
     doc.font(FB).fontSize(8).text(`INR ${numberToWords(total)} Only`, LM + 3, y, { width: pw - 6, lineBreak: false })
     y = wordsY + wordsRowH
     rect(doc, LM, wordsY, pw, wordsRowH)
@@ -453,7 +449,7 @@ export function generateQuotationPDF(
     const hc   = hDefs.map(c => ({ ...c, w: Math.round(c.w * hSc) }))
     hc[hc.length - 1].w += pw - hc.reduce((s, c) => s + c.w, 0)
 
-    const hh1 = 11, hh2 = 11
+    const hh1 = 9, hh2 = 9
     let cx = LM
     doc.font(FB).fontSize(6.5)
 
@@ -515,27 +511,29 @@ export function generateQuotationPDF(
     rect(doc, LM, hsnY, pw, y - hsnY)
 
     const twY = y
-    doc.font(F).fontSize(7).text('Tax Amount (in words) : ', LM + 3, y + 3, { continued: true })
+    doc.font(F).fontSize(7).text('Tax Amount (in words) : ', LM + 3, y + 2, { continued: true })
     doc.font(FB).fontSize(7).text(`INR ${numberToWords(cgst + sgst)} Only`)
-    y += 14
+    y += 12
     rect(doc, LM, twY, pw, y - twY)
 
-    if (y + 115 > pageBottom) { doc.addPage(); y = LM }
+    const botH  = 52
+    const sigH  = 22
+    const footerH = botH + sigH + 6 + 9 + 9  // 98
+    if (y + footerH > pageBottom) { doc.addPage(); y = LM }
     const botY  = y
-    const botH  = 70
     const declW = Math.round(pw * 0.50)
     const bankX = LM + declW
     const bankW = pw - declW
 
     doc.font(FB).fontSize(7).text('Declaration', LM + 3, y + 3)
-    y += 11
+    y += 10
     doc.font(F).fontSize(6.5).text(
       'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
       LM + 3, y, { width: declW - 6 }
     )
 
     let by = botY + 3
-    doc.font(F).fontSize(7).text("Company's Bank Details", bankX + 3, by, { width: bankW - 6 }); by += 11
+    doc.font(F).fontSize(7).text("Company's Bank Details", bankX + 3, by, { width: bankW - 6 }); by += 10
     const lblW = 82, valX = bankX + lblW + 4, valW = bankW - lblW - 10
     for (const bd of [
       { l: 'Bank Name',          v: business.bankName },
@@ -544,21 +542,20 @@ export function generateQuotationPDF(
     ]) {
       doc.font(F).fontSize(6.5).text(`${bd.l}  :`, bankX + 3, by, { width: lblW })
       doc.font(FB).fontSize(6.5).text(bd.v, valX, by, { width: valW })
-      by += 10
+      by += 9
     }
 
     y = botY + botH
     rect(doc, LM,    botY, declW, botH)
     rect(doc, bankX, botY, bankW, botH)
 
-    const sigH = 30
     rect(doc, LM,    y, declW, sigH)
     rect(doc, bankX, y, bankW, sigH)
-    doc.font(FB).fontSize(7).text(`for ${business.tradeName.toUpperCase()}`, bankX + 2, y + 4, { width: bankW - 4, align: 'right' })
-    doc.font(F).fontSize(7).text('Authorised Signatory', bankX + 2, y + sigH - 12, { width: bankW - 4, align: 'right' })
-    y += sigH + 8
+    doc.font(FB).fontSize(7).text(`for ${business.tradeName.toUpperCase()}`, bankX + 2, y + 3, { width: bankW - 4, align: 'right' })
+    doc.font(F).fontSize(7).text('Authorised Signatory', bankX + 2, y + sigH - 10, { width: bankW - 4, align: 'right' })
+    y += sigH + 6
 
-    doc.font(F).fontSize(7).text('SUBJECT TO RAIPUR JURISDICTION', LM, y, { width: pw, align: 'center' }); y += 10
+    doc.font(F).fontSize(7).text('SUBJECT TO RAIPUR JURISDICTION', LM, y, { width: pw, align: 'center' }); y += 9
     doc.font(F).fontSize(6.5).text('This is a Computer Generated Invoice', LM, y, { width: pw, align: 'center' })
 
     doc.end()
