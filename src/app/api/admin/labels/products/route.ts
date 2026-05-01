@@ -9,16 +9,51 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')?.trim() || ''
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50)
+    const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 100)
 
     const rows = await queryMany(
-      `SELECT p.id, p.name, p.sku, p.slug, p.mrp, p.sale_price, p.base_price, p.gtin,
-              b.name AS brand_name
+      `SELECT
+         'product:' || p.id AS id,
+         p.id AS product_id,
+         NULL::uuid AS variant_id,
+         p.name,
+         NULL AS variant_name,
+         p.sku,
+         p.slug,
+         COALESCE(p.mrp, 0)::numeric AS mrp,
+         p.sale_price,
+         p.base_price,
+         b.name AS brand_name,
+         p.gtin
        FROM products p
        LEFT JOIN brands b ON b.id = p.brand_id
        WHERE p.is_active = true
+         AND p.has_variants = false
          AND ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR p.sku ILIKE '%' || $1 || '%')
-       ORDER BY p.name ASC
+
+       UNION ALL
+
+       SELECT
+         'variant:' || pv.id AS id,
+         p.id AS product_id,
+         pv.id AS variant_id,
+         p.name,
+         pv.variant_name,
+         pv.sku,
+         p.slug,
+         COALESCE(pv.mrp, 0)::numeric AS mrp,
+         pv.sale_price,
+         COALESCE(pv.price, p.base_price) AS base_price,
+         b.name AS brand_name,
+         COALESCE(pv.gtin, p.gtin) AS gtin
+       FROM product_variants pv
+       JOIN products p ON p.id = pv.product_id
+       LEFT JOIN brands b ON b.id = p.brand_id
+       WHERE pv.is_active = true
+         AND p.is_active = true
+         AND ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR pv.variant_name ILIKE '%' || $1 || '%' OR pv.sku ILIKE '%' || $1 || '%')
+
+       ORDER BY name ASC, variant_name ASC NULLS FIRST
        LIMIT $2`,
       [q, limit]
     )

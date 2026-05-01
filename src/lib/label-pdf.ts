@@ -4,7 +4,10 @@ const bwipjs = eval('require')('bwip-js')
 
 export interface LabelProduct {
   id: string
+  product_id?: string
+  variant_id?: string | null
   name: string
+  variant_name?: string | null
   sku: string
   slug: string
   mrp: number | null
@@ -41,9 +44,10 @@ async function makeQRBuffer(text: string, size: number): Promise<Buffer> {
 
 async function makeBarcodeBuffer(text: string, heightMm: number): Promise<Buffer | null> {
   try {
+    const safeText = text.replace(/[^\x20-\x7E]/g, '').slice(0, 48) || 'LABEL'
     return await bwipjs.toBuffer({
       bcid: 'code128',
-      text,
+      text: safeText,
       scale: 2,
       height: heightMm,
       includetext: true,
@@ -56,132 +60,189 @@ async function makeBarcodeBuffer(text: string, heightMm: number): Promise<Buffer
 }
 
 function fmt(price: number | null): string {
-  if (price == null) return ''
+  if (price == null || price === 0) return ''
   return `Rs. ${Number(price).toFixed(2)}`
+}
+
+function displayName(p: LabelProduct): string {
+  return p.variant_name ? `${p.name} — ${p.variant_name}` : p.name
 }
 
 function clip(text: string, maxPt: number, doc: any, font: string, size: number): string {
   doc.font(font).fontSize(size)
-  while (text.length > 3 && doc.widthOfString(text) > maxPt) {
+  while (text.length > 4 && doc.widthOfString(text) > maxPt) {
     text = text.slice(0, -2) + '…'
   }
   return text
 }
 
 async function render30x20(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
-  const pad = 3
+  const pad = 2.5
   const barcodeText = p.gtin || p.sku
-  const barcodePt = 8 * MM
-  const nameH = h - pad * 2 - barcodePt - 2
+  const barH = 7 * MM
+  const topH = h - pad * 2 - barH - 1.5
 
-  doc.font('Helvetica-Bold').fontSize(5.5)
-  const name = clip(p.name, w - pad * 2, doc, 'Helvetica-Bold', 5.5)
-  doc.text(name, x + pad, y + pad, { width: w - pad * 2, lineBreak: false, ellipsis: true })
+  doc.font('Helvetica-Bold').fontSize(5)
+  const line1 = clip(p.name, w - pad * 2, doc, 'Helvetica-Bold', 5)
+  doc.text(line1, x + pad, y + pad, { width: w - pad * 2, lineBreak: false })
+
+  if (p.variant_name) {
+    doc.font('Helvetica').fontSize(4.5).fillColor('#444444')
+    const vline = clip(p.variant_name, w - pad * 2, doc, 'Helvetica', 4.5)
+    doc.text(vline, x + pad, y + pad + 7, { width: w - pad * 2, lineBreak: false })
+    doc.fillColor('#000000')
+  }
 
   const barBuf = await makeBarcodeBuffer(barcodeText, 3)
   if (barBuf) {
-    const barW = w - pad * 2
-    doc.image(barBuf, x + pad, y + pad + nameH, { width: barW, height: barcodePt })
+    doc.image(barBuf, x + pad, y + h - pad - barH, { width: w - pad * 2, height: barH })
   }
 }
 
 async function render30x50(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
-  const pad = 4
+  const pad = 3.5
   const barcodeH = 10 * MM
-  const barBuf = await makeBarcodeBuffer(p.gtin || p.sku, 4)
+  const barcodeText = p.gtin || p.sku
 
   doc.font('Helvetica-Bold').fontSize(7)
-  doc.text(p.name, x + pad, y + pad, { width: w - pad * 2, lineBreak: true, height: h - pad * 2 - barcodeH - 6 })
+  const nameAreaH = h - pad * 2 - barcodeH - 10
+  doc.text(p.name, x + pad, y + pad, { width: w - pad * 2, lineBreak: true, height: p.variant_name ? nameAreaH * 0.55 : nameAreaH * 0.75 })
 
-  doc.font('Helvetica').fontSize(6).fillColor('#555555')
-  doc.text(p.sku, x + pad, y + h - pad - barcodeH - 8, { width: w - pad * 2, lineBreak: false })
+  let cursor = y + pad
+  doc.font('Helvetica-Bold').fontSize(7)
+  const nameH = Math.min(doc.heightOfString(p.name, { width: w - pad * 2 }), nameAreaH * 0.75)
+  cursor += nameH + 2
+
+  if (p.variant_name) {
+    doc.font('Helvetica').fontSize(6).fillColor('#333333')
+    doc.text(p.variant_name, x + pad, cursor, { width: w - pad * 2, lineBreak: false })
+    cursor += 9
+    doc.fillColor('#000000')
+  }
+
+  doc.font('Helvetica').fontSize(5.5).fillColor('#666666')
+  doc.text(p.sku, x + pad, y + h - pad - barcodeH - 9, { width: w - pad * 2, lineBreak: false })
   doc.fillColor('#000000')
 
+  const barBuf = await makeBarcodeBuffer(barcodeText, 4)
   if (barBuf) {
     doc.image(barBuf, x + pad, y + h - pad - barcodeH, { width: w - pad * 2, height: barcodeH })
   }
 }
 
 async function render40x60(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
-  const pad = 4
-  const barcodeH = 10 * MM
-  const qrSize = Math.round(13 * MM)
+  const pad = 3.5
+  const barcodeH = 9 * MM
+  const qrSize = 12 * MM
+  const barcodeText = p.gtin || p.sku
+
   const qrBuf = await makeQRBuffer(
     `${process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'}/products/${p.slug}`,
-    qrSize * 2
+    Math.round(qrSize * 3)
   )
-  const barBuf = await makeBarcodeBuffer(p.gtin || p.sku, 4)
+  const barBuf = await makeBarcodeBuffer(barcodeText, 3.5)
 
-  const nameH = 20
-  doc.font('Helvetica-Bold').fontSize(8)
-  doc.text(p.name, x + pad, y + pad, { width: w - pad * 2, height: nameH, lineBreak: true })
+  const rightX = x + w - pad - qrSize
+  const textW = rightX - x - pad - 2
 
-  const midY = y + pad + nameH + 3
-  doc.font('Helvetica').fontSize(6).fillColor('#444444')
-  doc.text(`SKU: ${p.sku}`, x + pad, midY, { width: w - qrSize - pad * 2 - 4, lineBreak: false })
+  doc.font('Helvetica-Bold').fontSize(7.5)
+  doc.text(p.name, x + pad, y + pad, { width: textW, lineBreak: true, height: p.variant_name ? 14 : 18 })
+
+  let midY = y + pad + (p.variant_name ? 14 : 18) + 1
+
+  if (p.variant_name) {
+    doc.font('Helvetica').fontSize(6).fillColor('#333333')
+    doc.text(p.variant_name, x + pad, midY, { width: textW, lineBreak: false })
+    midY += 9
+    doc.fillColor('#000000')
+  }
+
+  doc.font('Helvetica').fontSize(5.5).fillColor('#555555')
+  doc.text(`SKU: ${p.sku}`, x + pad, midY, { width: textW, lineBreak: false })
+  midY += 8
 
   const price = p.sale_price ?? p.base_price
-  if (p.mrp && p.mrp !== price) {
-    doc.fontSize(6).fillColor('#888888')
+  if (p.mrp && p.mrp > 0 && p.mrp !== price) {
+    doc.fontSize(5.5).fillColor('#888888')
     const mrpText = fmt(p.mrp)
     const mrpW = doc.widthOfString(mrpText)
-    doc.text(mrpText, x + pad, midY + 9, { lineBreak: false })
-    doc.moveTo(x + pad, midY + 12).lineTo(x + pad + mrpW, midY + 12).stroke('#888888')
-    doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
-    doc.text(fmt(price), x + pad, midY + 16, { lineBreak: false })
-  } else if (price) {
-    doc.fillColor('#000000').fontSize(8).font('Helvetica-Bold')
-    doc.text(fmt(price), x + pad, midY + 9, { lineBreak: false })
+    doc.text(mrpText, x + pad, midY, { lineBreak: false })
+    doc.moveTo(x + pad, midY + 3.5).lineTo(x + pad + mrpW, midY + 3.5).stroke('#aaaaaa')
+    midY += 8
+    doc.fillColor('#c0392b').fontSize(8).font('Helvetica-Bold')
+    doc.text(fmt(price), x + pad, midY, { lineBreak: false })
+  } else if (price && price > 0) {
+    doc.fillColor('#c0392b').fontSize(8).font('Helvetica-Bold')
+    doc.text(fmt(price), x + pad, midY, { lineBreak: false })
   }
 
   if (qrBuf) {
-    doc.image(qrBuf, x + w - pad - qrSize, y + pad, { width: qrSize, height: qrSize })
+    doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
   }
 
+  doc.fillColor('#000000')
   if (barBuf) {
-    doc.fillColor('#000000')
     doc.image(barBuf, x + pad, y + h - pad - barcodeH, { width: w - pad * 2, height: barcodeH })
   }
 }
 
 async function render50x50(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
-  const pad = 4
+  const pad = 3.5
   const barcodeH = 10 * MM
-  const qrSize = Math.round(15 * MM)
+  const qrSize = 14 * MM
+  const barcodeText = p.gtin || p.sku
+
   const qrBuf = await makeQRBuffer(
     `${process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'}/products/${p.slug}`,
-    qrSize * 2
+    Math.round(qrSize * 3)
   )
-  const barBuf = await makeBarcodeBuffer(p.gtin || p.sku, 4)
+  const barBuf = await makeBarcodeBuffer(barcodeText, 4)
 
-  doc.font('Helvetica-Bold').fontSize(9)
-  doc.text(p.name, x + qrSize + pad + 3, y + pad, { width: w - qrSize - pad * 2 - 3, height: 22, lineBreak: true })
-
-  if (p.brand_name) {
-    doc.font('Helvetica').fontSize(6.5).fillColor('#666666')
-    doc.text(p.brand_name, x + qrSize + pad + 3, y + pad + 22, { width: w - qrSize - pad * 2 - 3, lineBreak: false })
-  }
-
-  const price = p.sale_price ?? p.base_price
-  if (p.mrp && p.mrp !== price) {
-    doc.fontSize(6).fillColor('#888888')
-    const mrpText = fmt(p.mrp)
-    const mrpW = doc.widthOfString(mrpText)
-    doc.text(mrpText, x + qrSize + pad + 3, y + pad + 31, { lineBreak: false })
-    doc.moveTo(x + qrSize + pad + 3, y + pad + 34).lineTo(x + qrSize + pad + 3 + mrpW, y + pad + 34).stroke('#888888')
-    doc.fillColor('#e65100').fontSize(10).font('Helvetica-Bold')
-    doc.text(fmt(price), x + qrSize + pad + 3, y + pad + 38, { lineBreak: false })
-  } else if (price) {
-    doc.fillColor('#e65100').fontSize(10).font('Helvetica-Bold')
-    doc.text(fmt(price), x + qrSize + pad + 3, y + pad + 31, { lineBreak: false })
-  }
-
-  doc.fillColor('#000000').font('Helvetica').fontSize(6)
-  doc.text(`SKU: ${p.sku}`, x + pad, y + h - pad - barcodeH - 10, { width: w - pad * 2, lineBreak: false })
+  const contentH = h - pad * 2 - barcodeH - 7
+  const leftColW = qrSize + 3
+  const rightX = x + pad + leftColW
+  const rightW = w - pad * 2 - leftColW
 
   if (qrBuf) {
     doc.image(qrBuf, x + pad, y + pad, { width: qrSize, height: qrSize })
   }
+
+  doc.font('Helvetica-Bold').fontSize(8)
+  doc.text(p.name, rightX, y + pad, { width: rightW, lineBreak: true, height: p.variant_name ? 16 : 22 })
+
+  let cur = y + pad + (p.variant_name ? 16 : 22) + 1
+
+  if (p.variant_name) {
+    doc.font('Helvetica').fontSize(6.5).fillColor('#333333')
+    doc.text(p.variant_name, rightX, cur, { width: rightW, lineBreak: false })
+    cur += 9
+    doc.fillColor('#000000')
+  }
+
+  if (p.brand_name) {
+    doc.font('Helvetica').fontSize(6).fillColor('#777777')
+    doc.text(p.brand_name, rightX, cur, { width: rightW, lineBreak: false })
+    cur += 8
+    doc.fillColor('#000000')
+  }
+
+  const price = p.sale_price ?? p.base_price
+  if (p.mrp && p.mrp > 0 && p.mrp !== price) {
+    doc.fontSize(5.5).fillColor('#888888')
+    const mrpText = fmt(p.mrp)
+    const mrpW = doc.widthOfString(mrpText)
+    doc.text(mrpText, rightX, cur, { lineBreak: false })
+    doc.moveTo(rightX, cur + 3.5).lineTo(rightX + mrpW, cur + 3.5).stroke('#aaaaaa')
+    cur += 8
+    doc.fillColor('#c0392b').fontSize(10).font('Helvetica-Bold')
+    doc.text(fmt(price), rightX, cur, { lineBreak: false })
+  } else if (price && price > 0) {
+    doc.fillColor('#c0392b').fontSize(10).font('Helvetica-Bold')
+    doc.text(fmt(price), rightX, cur, { lineBreak: false })
+  }
+
+  doc.fillColor('#000000').font('Helvetica').fontSize(5.5)
+  doc.text(`SKU: ${p.sku}`, x + pad, y + h - pad - barcodeH - 8, { width: w - pad * 2, lineBreak: false })
 
   if (barBuf) {
     doc.image(barBuf, x + pad, y + h - pad - barcodeH, { width: w - pad * 2, height: barcodeH })
@@ -189,30 +250,38 @@ async function render50x50(doc: any, p: LabelProduct, x: number, y: number, w: n
 }
 
 async function render80x20(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
-  const pad = 3
+  const pad = 2.5
   const barH = 7 * MM
-  const nameW = w * 0.55
-  const priceW = w * 0.35
+  const barcodeText = p.gtin || p.sku
+  const nameColW = w * 0.5
+  const priceColW = w * 0.32
+  const priceX = x + nameColW + 2
 
-  doc.font('Helvetica-Bold').fontSize(6.5)
-  doc.text(clip(p.name, nameW - pad * 2, doc, 'Helvetica-Bold', 6.5), x + pad, y + pad + 1, {
-    width: nameW - pad * 2, lineBreak: false,
-  })
+  doc.font('Helvetica-Bold').fontSize(6)
+  const nameLine = clip(p.name, nameColW - pad * 2, doc, 'Helvetica-Bold', 6)
+  doc.text(nameLine, x + pad, y + pad, { width: nameColW - pad * 2, lineBreak: false })
+
+  if (p.variant_name) {
+    doc.font('Helvetica').fontSize(5).fillColor('#444444')
+    const vline = clip(p.variant_name, nameColW - pad * 2, doc, 'Helvetica', 5)
+    doc.text(vline, x + pad, y + pad + 8, { width: nameColW - pad * 2, lineBreak: false })
+    doc.fillColor('#000000')
+  }
 
   const price = p.sale_price ?? p.base_price
-  if (price) {
-    doc.font('Helvetica-Bold').fontSize(7).fillColor('#e65100')
-    doc.text(fmt(price), x + nameW, y + pad + 1, { width: priceW, lineBreak: false, align: 'right' })
-  }
-
-  const barBuf = await makeBarcodeBuffer(p.gtin || p.sku, 3)
-  if (barBuf) {
+  if (price && price > 0) {
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#c0392b')
+    doc.text(fmt(price), priceX, y + pad, { width: priceColW, lineBreak: false, align: 'right' })
     doc.fillColor('#000000')
-    doc.image(barBuf, x + pad, y + h - pad - barH, { width: w * 0.6, height: barH })
   }
 
-  doc.fillColor('#000000').font('Helvetica').fontSize(5)
-  doc.text(p.sku, x + w * 0.62, y + h - pad - barH + 2, { width: w * 0.35, lineBreak: false })
+  const barBuf = await makeBarcodeBuffer(barcodeText, 3)
+  if (barBuf) {
+    doc.image(barBuf, x + pad, y + h - pad - barH, { width: w * 0.55, height: barH })
+  }
+
+  doc.fillColor('#000000').font('Helvetica').fontSize(4.5)
+  doc.text(p.sku, x + w * 0.57, y + h - pad - barH + 1, { width: w * 0.4, lineBreak: false })
 }
 
 type RenderFn = (doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) => Promise<void>
@@ -270,11 +339,10 @@ export async function generateLabelSheetPDF(
   const PAGE_W = 595.28
   const PAGE_H = 841.89
   const MARGIN = 18
-  const GAP = 4
+  const GAP = 5
 
-  const cols = Math.floor((PAGE_W - MARGIN * 2 + GAP) / (spec.widthPt + GAP))
-  const rows = Math.floor((PAGE_H - MARGIN * 2 + GAP) / (spec.heightPt + GAP))
-  const perPage = cols * rows
+  const cols = Math.max(1, Math.floor((PAGE_W - MARGIN * 2 + GAP) / (spec.widthPt + GAP)))
+  const rows = Math.max(1, Math.floor((PAGE_H - MARGIN * 2 + GAP) / (spec.heightPt + GAP)))
 
   const allLabels: LabelProduct[] = []
   for (const p of products) {
@@ -296,7 +364,7 @@ export async function generateLabelSheetPDF(
           for (let c = 0; c < cols && idx < allLabels.length; c++) {
             const x = MARGIN + c * (spec.widthPt + GAP)
             const y = MARGIN + r * (spec.heightPt + GAP)
-            doc.rect(x, y, spec.widthPt, spec.heightPt).dash(2, { space: 2 }).stroke('#cccccc').undash()
+            doc.rect(x, y, spec.widthPt, spec.heightPt).dash(2, { space: 2 }).stroke('#bbbbbb').undash()
             await renderFn(doc, allLabels[idx], x, y, spec.widthPt, spec.heightPt)
             idx++
           }

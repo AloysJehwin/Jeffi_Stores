@@ -14,27 +14,66 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'product_ids required' }, { status: 400 })
     }
     if (product_ids.length > 200) {
-      return NextResponse.json({ error: 'Maximum 200 products per download' }, { status: 400 })
+      return NextResponse.json({ error: 'Maximum 200 items per download' }, { status: 400 })
     }
     if (!LABEL_SIZES.find(s => s.size === size)) {
       return NextResponse.json({ error: 'Invalid size' }, { status: 400 })
     }
     const copiesNum = Math.min(Math.max(parseInt(copies) || 1, 1), 100)
 
-    const rows = await queryMany<LabelProduct>(
-      `SELECT p.id, p.name, p.sku, p.slug, p.mrp, p.sale_price, p.base_price, p.gtin,
-              b.name AS brand_name
-       FROM products p
-       LEFT JOIN brands b ON b.id = p.brand_id
-       WHERE p.id = ANY($1::uuid[])`,
-      [product_ids]
-    )
+    const productIds: string[] = []
+    const variantIds: string[] = []
+    for (const id of product_ids as string[]) {
+      if (id.startsWith('variant:')) variantIds.push(id.slice(8))
+      else if (id.startsWith('product:')) productIds.push(id.slice(8))
+      else productIds.push(id)
+    }
 
-    if (!rows || rows.length === 0) {
+    const results: LabelProduct[] = []
+
+    if (productIds.length > 0) {
+      const rows = await queryMany<LabelProduct>(
+        `SELECT p.id, p.id AS product_id, NULL AS variant_id,
+                p.name, NULL AS variant_name,
+                p.sku, p.slug, p.mrp, p.sale_price, p.base_price, p.gtin,
+                b.name AS brand_name
+         FROM products p
+         LEFT JOIN brands b ON b.id = p.brand_id
+         WHERE p.id = ANY($1::uuid[])`,
+        [productIds]
+      )
+      for (const r of (rows || [])) {
+        results.push({ ...r, id: `product:${r.id}` })
+      }
+    }
+
+    if (variantIds.length > 0) {
+      const rows = await queryMany<LabelProduct>(
+        `SELECT 'variant:' || pv.id AS id,
+                p.id AS product_id, pv.id AS variant_id,
+                p.name, pv.variant_name,
+                pv.sku, p.slug,
+                COALESCE(pv.mrp, 0) AS mrp,
+                pv.sale_price,
+                COALESCE(pv.price, p.base_price) AS base_price,
+                COALESCE(pv.gtin, p.gtin) AS gtin,
+                b.name AS brand_name
+         FROM product_variants pv
+         JOIN products p ON p.id = pv.product_id
+         LEFT JOIN brands b ON b.id = p.brand_id
+         WHERE pv.id = ANY($1::uuid[])`,
+        [variantIds]
+      )
+      for (const r of (rows || [])) results.push(r)
+    }
+
+    if (results.length === 0) {
       return NextResponse.json({ error: 'No products found' }, { status: 404 })
     }
 
-    const ordered = product_ids.map(id => rows.find(r => r.id === id)).filter(Boolean) as LabelProduct[]
+    const ordered = product_ids
+      .map(id => results.find(r => r.id === id))
+      .filter(Boolean) as LabelProduct[]
 
     const pdfBuffer = sheet
       ? await generateLabelSheetPDF(ordered, size as LabelSize, copiesNum)
