@@ -54,6 +54,7 @@ export default async function AdminLayout({
     { href: '/admin/orders', label: 'Orders', scope: 'orders' },
     { href: '/admin/packing-slips', label: 'Packing Slips', scope: 'orders' },
     { href: '/admin/labels', label: 'Labels', scope: 'labels' },
+    { href: '/admin/quotations', label: 'Quotations', scope: 'quotations' },
     { href: '/admin/scan', label: 'QuickScan', scope: 'orders', mobileOnly: true },
     { href: '/admin/customers', label: 'Customers', scope: 'customers' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews' },

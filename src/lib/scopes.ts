@@ -67,6 +67,12 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/scan'],
   },
   {
+    key: 'quotations',
+    label: 'Quotations',
+    description: 'Create and download B2B quotations',
+    routes: ['/admin/quotations'],
+  },
+  {
     key: 'inflation',
     label: 'Inflation / Pricing',
     description: 'Bulk price adjustments via inflation tool',
@@ -95,6 +101,7 @@ export function getScopeForPath(pathname: string): string | null {
   }
 
   if (pathname.startsWith('/api/admin/labels')) return 'labels'
+  if (pathname.startsWith('/api/admin/quotations')) return 'quotations'
   if (pathname.startsWith('/api/admin/users')) return 'settings'
   if (pathname.startsWith('/api/admin/certificates')) return 'settings'
   if (pathname.startsWith('/api/admin/reviews')) return 'reviews'
