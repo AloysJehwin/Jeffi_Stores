@@ -618,14 +618,17 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                     {p.variant_name && <div className="text-xs text-foreground-secondary">{p.variant_name}</div>}
                     <div className="text-xs text-foreground-muted">{p.sku}</div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-xs text-foreground-muted">qty</span>
-                    <input
-                      type="number" min={1} max={100} value={p.copies}
-                      onChange={e => updateProductCopies(p.id, parseInt(e.target.value) || 1)}
-                      onClick={e => e.stopPropagation()}
-                      className="w-12 px-1.5 py-1 rounded border border-border-default bg-surface-primary text-foreground text-xs text-center"
-                    />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs text-foreground-muted mr-0.5">qty</span>
+                    <button
+                      onClick={e => { e.stopPropagation(); updateProductCopies(p.id, p.copies - 1) }}
+                      className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface-primary text-foreground-secondary hover:bg-surface-secondary transition-colors text-sm font-medium"
+                    >−</button>
+                    <span className="w-7 text-center text-sm font-medium text-foreground tabular-nums">{p.copies}</span>
+                    <button
+                      onClick={e => { e.stopPropagation(); updateProductCopies(p.id, p.copies + 1) }}
+                      className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface-primary text-foreground-secondary hover:bg-surface-secondary transition-colors text-sm font-medium"
+                    >+</button>
                   </div>
                   <button
                     onClick={e => { e.stopPropagation(); toggleProduct(p) }}
