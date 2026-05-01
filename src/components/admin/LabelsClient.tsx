@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { LabelSpec, LabelSize } from '@/lib/label-pdf'
+import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 
 interface Category {
   id: string
@@ -509,27 +510,31 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
 
           {/* Category filters */}
           <div className="flex gap-2 mb-3">
-            <select
-              value={selectedMainCat}
-              onChange={e => onMainCatChange(e.target.value)}
-              className="flex-1 min-w-0 px-2.5 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-xs"
-            >
-              <option value="">All categories</option>
-              {mainCategories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <div className="flex-1 min-w-0">
+              <AdminSelect
+                compact
+                value={selectedMainCat}
+                placeholder="All categories"
+                options={[
+                  { value: '', label: 'All categories' },
+                  ...mainCategories.map(c => ({ value: c.id, label: c.name })),
+                ] as SelectOption[]}
+                onChange={v => onMainCatChange(v)}
+              />
+            </div>
             {subCategories.length > 0 && (
-              <select
-                value={selectedSubCat}
-                onChange={e => setSelectedSubCat(e.target.value)}
-                className="flex-1 min-w-0 px-2.5 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-xs"
-              >
-                <option value="">All subcategories</option>
-                {subCategories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <div className="flex-1 min-w-0">
+                <AdminSelect
+                  compact
+                  value={selectedSubCat}
+                  placeholder="All subcategories"
+                  options={[
+                    { value: '', label: 'All subcategories' },
+                    ...subCategories.map(c => ({ value: c.id, label: c.name })),
+                  ] as SelectOption[]}
+                  onChange={v => setSelectedSubCat(v)}
+                />
+              </div>
             )}
           </div>
 
