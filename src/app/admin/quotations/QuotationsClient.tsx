@@ -697,11 +697,21 @@ export default function QuotationsClient() {
                       className={inputCls} />
                   </td>
                   <td className="py-1.5 pr-2">
-                    <AdminSelect
-                      value={item.unit}
-                      options={UNITS.map(u => ({ value: u, label: u }))}
-                      onChange={val => updateItem(idx, 'unit', val)}
-                    />
+                    <div className="flex items-center gap-0.5">
+                      <button type="button" onClick={() => {
+                        const i = UNITS.indexOf(item.unit)
+                        updateItem(idx, 'unit', UNITS[(i - 1 + UNITS.length) % UNITS.length])
+                      }} className="px-1 py-1 text-foreground-secondary hover:text-foreground transition-colors">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                      </button>
+                      <span className="text-xs font-medium text-foreground w-8 text-center tabular-nums">{item.unit}</span>
+                      <button type="button" onClick={() => {
+                        const i = UNITS.indexOf(item.unit)
+                        updateItem(idx, 'unit', UNITS[(i + 1) % UNITS.length])
+                      }} className="px-1 py-1 text-foreground-secondary hover:text-foreground transition-colors">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                      </button>
+                    </div>
                   </td>
                   <td className="py-1.5 pr-2">
                     <input type="number" value={item.rate} min={0} step="any"
