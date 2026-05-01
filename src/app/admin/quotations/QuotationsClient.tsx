@@ -90,7 +90,7 @@ function todayISO() {
 }
 
 export default function QuotationsClient() {
-  const { showConfirm } = useToast()
+  const { showToast, showConfirm } = useToast()
   const [view, setView] = useState<View>('list')
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
@@ -437,9 +437,10 @@ export default function QuotationsClient() {
       }))
       setProductModalOpen(false)
       setProductModalRow(null)
+      showToast(`Draft product "${data.name}" created — edit it in the new tab (SKU: ${data.sku})`, 'warning')
       window.open(`/admin/products/edit/${data.id}`, '_blank')
     } catch (e: any) {
-      alert(e.message || 'Failed to create draft product')
+      showToast(e.message || 'Failed to create draft product', 'error')
     } finally {
       setCreatingDraft(false)
     }
@@ -705,12 +706,18 @@ export default function QuotationsClient() {
                     <div className="flex gap-1 items-center">
                       <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)}
                         placeholder="Description of goods" className={inputCls + ' min-w-[160px]'} />
-                      {item.product_id && (
-                        <span
-                          title={item.is_draft_product ? 'Draft product — click to edit' : 'Linked to product'}
-                          onClick={() => item.is_draft_product && window.open(`/admin/products/edit/${item.product_id}`, '_blank')}
-                          className={`shrink-0 w-2.5 h-2.5 rounded-full ${item.is_draft_product ? 'bg-yellow-400 cursor-pointer' : 'bg-green-500'}`}
-                        />
+                      {item.product_id && item.is_draft_product && (
+                        <button
+                          type="button"
+                          title="Draft product — click to edit in new tab"
+                          onClick={() => window.open(`/admin/products/edit/${item.product_id}`, '_blank')}
+                          className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700 hover:bg-yellow-200 transition-colors whitespace-nowrap"
+                        >
+                          Draft ↗
+                        </button>
+                      )}
+                      {item.product_id && !item.is_draft_product && (
+                        <span title="Linked to product" className="shrink-0 w-2 h-2 rounded-full bg-green-500" />
                       )}
                       <button onClick={() => openProductModal(idx)} title="Pick from products"
                         className="shrink-0 p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors border border-border-default rounded">
