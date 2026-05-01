@@ -815,17 +815,37 @@ export default function QuotationsClient() {
               {!prodLoading && prodResults.length === 0 && (
                 <p className="p-4 text-center text-foreground-secondary text-sm">No products found</p>
               )}
-              {prodResults.map(p => (
-                <button key={p.id} onClick={() => selectProduct(p)}
-                  className="w-full text-left px-4 py-3 hover:bg-surface-secondary transition-colors border-b border-border-default/50 last:border-0">
-                  <p className="text-sm font-medium text-foreground">{p.name}{p.variant_name ? ` — ${p.variant_name}` : ''}</p>
-                  <div className="flex gap-3 mt-0.5">
-                    <span className="text-xs text-foreground-secondary font-mono">{p.sku}</span>
-                    <span className="text-xs text-secondary-500 font-semibold">₹{fmt2(Number(p.base_price))}</span>
-                    <span className="text-xs text-foreground-secondary">GST {p.gst_percentage}%</span>
+              {!prodLoading && (() => {
+                const groups: { productId: string; name: string; items: ProductResult[] }[] = []
+                for (const p of prodResults) {
+                  const g = groups.find(g => g.productId === p.product_id)
+                  if (g) g.items.push(p)
+                  else groups.push({ productId: p.product_id, name: p.name, items: [p] })
+                }
+                return groups.map(g => (
+                  <div key={g.productId} className="border-b border-border-default last:border-0">
+                    {g.items.length > 1 && (
+                      <p className="px-4 pt-2.5 pb-1 text-xs font-semibold text-foreground-muted uppercase tracking-wider bg-surface-secondary">{g.name}</p>
+                    )}
+                    {g.items.map(p => (
+                      <button key={p.id} onClick={() => selectProduct(p)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-surface-secondary transition-colors border-b border-border-default/30 last:border-0">
+                        <p className="text-sm font-medium text-foreground">
+                          {g.items.length > 1
+                            ? (p.variant_name || p.name)
+                            : p.name}
+                        </p>
+                        <div className="flex gap-3 mt-0.5">
+                          <span className="text-xs text-foreground-secondary font-mono">{p.sku}</span>
+                          <span className="text-xs text-secondary-500 font-semibold">₹{fmt2(Number(p.mrp || p.base_price))}</span>
+                          <span className="text-xs text-foreground-secondary">GST {p.gst_percentage}%</span>
+                          {p.hsn_code && <span className="text-xs text-foreground-muted">HSN {p.hsn_code}</span>}
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </button>
-              ))}
+                ))
+              })()}
             </div>
           </div>
         </div>
