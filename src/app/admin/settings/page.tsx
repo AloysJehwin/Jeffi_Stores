@@ -68,7 +68,7 @@ export default async function SettingsPage() {
                         <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">All Access</span>
                       ) : (
                         (adminInfo.scopes || []).map((scope: string) => (
-                          <span key={scope} className="px-2 py-0.5 bg-accent-100 text-accent-700 dark:text-accent-400 rounded-full text-xs font-medium">
+                          <span key={scope} className="px-2 py-0.5 bg-surface-secondary border border-border-default text-foreground rounded-md text-xs font-medium">
                             {scopeLabels[scope] || scope}
                           </span>
                         ))
@@ -338,14 +338,15 @@ export default async function SettingsPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               <div className="px-6 py-4 border-b border-border-default">
                 <h2 className="text-lg font-semibold text-foreground">Available Scopes</h2>
+                <p className="text-xs text-foreground-muted mt-1">{ADMIN_SCOPES.length} scopes</p>
               </div>
-              <div className="p-4 sm:p-6 space-y-2">
+              <div className="p-4 divide-y divide-border-default">
                 {ADMIN_SCOPES.map(scope => (
-                  <div key={scope.key} className="flex items-start gap-2">
-                    <span className="px-2 py-0.5 bg-accent-100 text-accent-700 dark:text-accent-400 rounded text-xs font-mono mt-0.5">
-                      {scope.key}
+                  <div key={scope.key} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
+                    <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-secondary border border-border-default text-foreground font-mono">
+                      {scope.label}
                     </span>
-                    <span className="text-xs text-foreground-muted">{scope.description}</span>
+                    <span className="text-xs text-foreground-secondary leading-relaxed">{scope.description}</span>
                   </div>
                 ))}
               </div>

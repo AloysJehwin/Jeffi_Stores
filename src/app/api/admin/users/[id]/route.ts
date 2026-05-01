@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { query, queryOne } from '@/lib/db'
 import { NextRequest } from 'next/server'
+import { ALL_SCOPE_KEYS } from '@/lib/scopes'
 
 export async function PATCH(
   request: NextRequest,
@@ -22,8 +23,7 @@ export async function PATCH(
     let i = 1
 
     if (scopes !== undefined) {
-      const validScopes = ['dashboard', 'products', 'categories', 'orders', 'reviews', 'brands', 'customers', 'settings']
-      if (!Array.isArray(scopes) || scopes.some((s: string) => !validScopes.includes(s))) {
+      if (!Array.isArray(scopes) || scopes.some((s: string) => !ALL_SCOPE_KEYS.includes(s))) {
         return NextResponse.json({ error: 'Invalid scopes' }, { status: 400 })
       }
       updates.push(`scopes = $${i++}`)
