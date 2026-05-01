@@ -145,7 +145,7 @@ function LabelPreview({ size, product, scale }: {
   const exGst = product ? (product.sale_price ?? product.base_price) : null
   const mrp = product?.mrp ?? null
   const gstPct = product?.gst_percentage ?? 0
-  const barcodeText = product?.gtin || product?.sku || '0000000000000'
+  const barcodeText = product?.sku || 'SKU-001'
 
   const barH = Math.round(h * 0.22)
   const nameFontSize = Math.round(8 * scale)

@@ -122,7 +122,7 @@ function clip(text: string, maxPt: number, doc: any, font: string, size: number)
 
 async function render30x20(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
   const pad = 2.5
-  const barcodeText = p.gtin || p.sku
+  const barcodeText = p.sku
   const barH = 7 * MM
 
   doc.font('Helvetica-Bold').fontSize(5)
@@ -149,7 +149,7 @@ async function render30x20(doc: any, p: LabelProduct, x: number, y: number, w: n
 async function render30x50(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
   const pad = 3.5
   const barcodeH = 10 * MM
-  const barcodeText = p.gtin || p.sku
+  const barcodeText = p.sku
 
   doc.font('Helvetica-Bold').fontSize(7)
   const nameAreaH = h - pad * 2 - barcodeH - 10
@@ -183,12 +183,9 @@ async function render40x60(doc: any, p: LabelProduct, x: number, y: number, w: n
   const pad = 3.5
   const barcodeH = 9 * MM
   const qrSize = 12 * MM
-  const barcodeText = p.gtin || p.sku
+  const barcodeText = p.sku
 
-  const qrBuf = await makeQRBuffer(
-    `${process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'}/products/${p.slug}`,
-    Math.round(qrSize * 3)
-  )
+  const qrBuf = await makeQRBuffer(p.sku, Math.round(qrSize * 3))
   const barBuf = await makeBarcodeBuffer(barcodeText, 3.5)
 
   const rightX = x + w - pad - qrSize
@@ -226,12 +223,9 @@ async function render50x50(doc: any, p: LabelProduct, x: number, y: number, w: n
   const pad = 3.5
   const barcodeH = 10 * MM
   const qrSize = 14 * MM
-  const barcodeText = p.gtin || p.sku
+  const barcodeText = p.sku
 
-  const qrBuf = await makeQRBuffer(
-    `${process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'}/products/${p.slug}`,
-    Math.round(qrSize * 3)
-  )
+  const qrBuf = await makeQRBuffer(p.sku, Math.round(qrSize * 3))
   const barBuf = await makeBarcodeBuffer(barcodeText, 4)
 
   const contentH = h - pad * 2 - barcodeH - 7
@@ -275,7 +269,7 @@ async function render50x50(doc: any, p: LabelProduct, x: number, y: number, w: n
 async function render80x20(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
   const pad = 2.5
   const barH = 7 * MM
-  const barcodeText = p.gtin || p.sku
+  const barcodeText = p.sku
   const topH = h - pad - barH - pad
 
   const nameColW = w * 0.62
