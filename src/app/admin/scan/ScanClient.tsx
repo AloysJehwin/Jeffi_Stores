@@ -11,11 +11,33 @@ interface OrderInfo {
   customer_name: string
 }
 
+interface ProductInfo {
+  id: string
+  product_id: string
+  variant_id: string | null
+  name: string
+  variant_name: string | null
+  sku: string
+  slug: string
+  mrp: number
+  sale_price: number | null
+  base_price: number
+  gst_percentage: number
+  brand_name: string | null
+  category_name: string | null
+  gtin: string | null
+  stock_quantity: number
+  is_active: boolean
+  has_variants: boolean
+  image_url: string | null
+}
+
 type Stage =
   | 'idle'
   | 'scanning'
   | 'looking_up'
-  | 'found'
+  | 'found_order'
+  | 'found_product'
   | 'not_found'
   | 'shipping'
   | 'updating'
@@ -51,9 +73,15 @@ function statusLabel(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
+function fmt2(n: number | null) {
+  if (!n) return ''
+  return `Rs. ${Number(n).toFixed(2)}`
+}
+
 export default function ScanClient() {
   const [stage, setStage] = useState<Stage>('idle')
   const [order, setOrder] = useState<OrderInfo | null>(null)
+  const [product, setProduct] = useState<ProductInfo | null>(null)
   const [selectedStatus, setSelectedStatus] = useState('')
   const [trackingUrl, setTrackingUrl] = useState('')
   const [manualInput, setManualInput] = useState('')
@@ -87,7 +115,7 @@ export default function ScanClient() {
           ctrl.stop()
           controlsRef.current = null
           scanningRef.current = false
-          await lookupOrder(result.getText())
+          await handleScanResult(result.getText())
         }
       }
     ).then(controls => {
@@ -99,26 +127,48 @@ export default function ScanClient() {
     })
   }, [stage])
 
+  async function handleScanResult(text: string) {
+    const trimmed = text.trim()
+    if (trimmed.startsWith('ORD-')) {
+      await lookupOrder(trimmed)
+    } else {
+      await lookupProduct(trimmed)
+    }
+  }
+
   async function lookupOrder(orderNumber: string) {
     setStage('looking_up')
     try {
       const res = await fetch(`/api/admin/orders/by-number?q=${encodeURIComponent(orderNumber.trim())}`)
-      if (res.status === 404) {
-        setStage('not_found')
-        return
-      }
+      if (res.status === 404) { setStage('not_found'); return }
       if (!res.ok) throw new Error('Lookup failed')
       const data = await res.json()
       setOrder(data.order)
-      setStage('found')
+      setStage('found_order')
     } catch {
       setErrorMsg('Could not look up order. Check your connection.')
       setStage('error')
     }
   }
 
+  async function lookupProduct(sku: string) {
+    setStage('looking_up')
+    try {
+      const res = await fetch(`/api/admin/products/by-sku?q=${encodeURIComponent(sku)}`)
+      if (res.status === 404) { setStage('not_found'); return }
+      if (!res.ok) throw new Error('Lookup failed')
+      const data = await res.json()
+      setProduct(data.item)
+      setStage('found_product')
+    } catch {
+      setErrorMsg('Could not look up product. Check your connection.')
+      setStage('error')
+    }
+  }
+
   function startCamera() {
     setOrder(null)
+    setProduct(null)
     setSelectedStatus('')
     setTrackingUrl('')
     setErrorMsg('')
@@ -134,10 +184,7 @@ export default function ScanClient() {
     }
     setStage('updating')
     try {
-      const body: Record<string, string> = {
-        status: s,
-        payment_status: order!.payment_status,
-      }
+      const body: Record<string, string> = { status: s, payment_status: order!.payment_status }
       const res = await fetch(`/api/orders/${order!.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -185,6 +232,7 @@ export default function ScanClient() {
     stopCamera()
     setStage('idle')
     setOrder(null)
+    setProduct(null)
     setSelectedStatus('')
     setTrackingUrl('')
     setManualInput('')
@@ -193,6 +241,13 @@ export default function ScanClient() {
   }
 
   const nextStatuses = order ? (VALID_TRANSITIONS[order.status] ?? []) : []
+
+  const incGst = product
+    ? Number((((product.sale_price ?? product.base_price) || 0) * (1 + (product.gst_percentage || 0) / 100)).toFixed(2))
+    : 0
+  const mrpIncGst = product && product.mrp > 0
+    ? Number((product.mrp * (1 + (product.gst_percentage || 0) / 100)).toFixed(2))
+    : null
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
@@ -206,7 +261,7 @@ export default function ScanClient() {
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white">QuickScan</h1>
-            <p className="text-gray-400 mt-1 text-sm">Scan a packing slip QR code to update order status</p>
+            <p className="text-gray-400 mt-1 text-sm">Scan a packing slip QR to update orders, or a product label QR to view product details</p>
           </div>
           <button
             onClick={startCamera}
@@ -234,16 +289,14 @@ export default function ScanClient() {
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <div
               className="relative w-60 h-60 rounded-2xl"
-              style={{
-                boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)',
-              }}
+              style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)' }}
             >
               <span className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-2xl" />
               <span className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-2xl" />
               <span className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-2xl" />
               <span className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-2xl" />
             </div>
-            <p className="mt-6 text-white/70 text-sm">Point at the QR code on the packing slip</p>
+            <p className="mt-6 text-white/70 text-sm">Point at any QR code</p>
           </div>
           <button
             onClick={reset}
@@ -259,7 +312,7 @@ export default function ScanClient() {
       {stage === 'looking_up' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-4 p-8">
           <div className="w-12 h-12 border-4 border-secondary-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400">Looking up order…</p>
+          <p className="text-gray-400">Looking up…</p>
         </div>
       )}
 
@@ -301,8 +354,8 @@ export default function ScanClient() {
             </svg>
           </div>
           <div>
-            <p className="text-lg font-semibold text-white">Order not found</p>
-            <p className="text-gray-400 text-sm mt-1">This QR code does not match any order.</p>
+            <p className="text-lg font-semibold text-white">Not found</p>
+            <p className="text-gray-400 text-sm mt-1">This QR code does not match any order or product.</p>
           </div>
           <button onClick={reset} className="w-full max-w-xs py-3.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors">
             Try Again
@@ -310,7 +363,7 @@ export default function ScanClient() {
         </div>
       )}
 
-      {stage === 'found' && order && (
+      {stage === 'found_order' && order && (
         <div className="flex flex-col flex-1 p-6 gap-5 overflow-y-auto">
           <div className="flex items-center gap-3">
             <button onClick={reset} className="p-2 text-gray-400 hover:text-white">
@@ -362,6 +415,108 @@ export default function ScanClient() {
         </div>
       )}
 
+      {stage === 'found_product' && product && (
+        <div className="flex flex-col flex-1 p-6 gap-5 overflow-y-auto">
+          <div className="flex items-center gap-3">
+            <button onClick={reset} className="p-2 text-gray-400 hover:text-white">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h2 className="text-lg font-semibold">Product Details</h2>
+          </div>
+
+          <div className="bg-gray-800 rounded-2xl overflow-hidden">
+            {product.image_url && (
+              <div className="w-full h-48 bg-gray-900 flex items-center justify-center overflow-hidden">
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            )}
+            <div className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-white text-base leading-snug">{product.name}</p>
+                  {product.variant_name && (
+                    <p className="text-gray-400 text-sm mt-0.5">{product.variant_name}</p>
+                  )}
+                </div>
+                <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${product.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  {product.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-700/60 rounded-xl p-3">
+                  <p className="text-xs text-gray-400 mb-0.5">SKU</p>
+                  <p className="font-mono text-sm text-white break-all">{product.sku}</p>
+                </div>
+                <div className="bg-gray-700/60 rounded-xl p-3">
+                  <p className="text-xs text-gray-400 mb-0.5">Stock</p>
+                  <p className={`text-sm font-semibold ${product.stock_quantity === 0 ? 'text-red-400' : product.stock_quantity <= 5 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    {product.stock_quantity} units
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-700/60 rounded-xl p-3 space-y-1.5">
+                <p className="text-xs text-gray-400 mb-1">Pricing (inc. GST)</p>
+                {mrpIncGst && mrpIncGst !== incGst && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400">MRP</span>
+                    <span className="text-sm text-gray-400 line-through">{fmt2(mrpIncGst)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-400">Sale Price</span>
+                  <span className="text-base font-bold text-secondary-400">{fmt2(incGst)}</span>
+                </div>
+                {product.gst_percentage > 0 && (
+                  <div className="flex justify-between items-center border-t border-gray-600 pt-1.5">
+                    <span className="text-xs text-gray-500">ex. GST ({product.gst_percentage}%)</span>
+                    <span className="text-xs text-gray-400">{fmt2(product.sale_price ?? product.base_price)}</span>
+                  </div>
+                )}
+              </div>
+
+              {(product.brand_name || product.category_name) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {product.brand_name && (
+                    <div className="bg-gray-700/60 rounded-xl p-3">
+                      <p className="text-xs text-gray-400 mb-0.5">Brand</p>
+                      <p className="text-sm text-white">{product.brand_name}</p>
+                    </div>
+                  )}
+                  {product.category_name && (
+                    <div className="bg-gray-700/60 rounded-xl p-3">
+                      <p className="text-xs text-gray-400 mb-0.5">Category</p>
+                      <p className="text-sm text-white">{product.category_name}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {product.gtin && (
+                <div className="bg-gray-700/60 rounded-xl p-3">
+                  <p className="text-xs text-gray-400 mb-0.5">GTIN / Barcode</p>
+                  <p className="font-mono text-sm text-white">{product.gtin}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={startCamera}
+            className="w-full py-4 bg-secondary-500 hover:bg-secondary-600 active:bg-secondary-700 text-white font-semibold rounded-2xl text-base transition-colors"
+          >
+            Scan Next
+          </button>
+        </div>
+      )}
+
       {stage === 'shipping' && order && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60">
           <div className="bg-gray-900 rounded-t-3xl p-6 flex flex-col gap-4">
@@ -387,7 +542,7 @@ export default function ScanClient() {
               Confirm Shipped
             </button>
             <button
-              onClick={() => setStage('found')}
+              onClick={() => setStage('found_order')}
               className="w-full py-3 text-gray-400 text-sm"
             >
               Cancel
