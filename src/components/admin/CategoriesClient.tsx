@@ -13,7 +13,6 @@ import {
   useSensors,
   DragStartEvent,
   DragEndEvent,
-  DragOverEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -55,14 +54,12 @@ function SortableRow({
   collapsed,
   onToggleCollapse,
   subCount,
-  isDraggingOver,
 }: {
   category: Category
   isSubcat: boolean
   collapsed?: boolean
   onToggleCollapse?: () => void
   subCount?: number
-  isDraggingOver?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
@@ -78,9 +75,7 @@ function SortableRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className={`${isSubcat ? 'bg-surface' : 'bg-surface-elevated'} ${
-        isDraggingOver ? 'outline outline-2 outline-accent-400' : ''
-      } hover:bg-surface-secondary`}
+      className={`${isSubcat ? 'bg-surface' : 'bg-surface-elevated'} hover:bg-surface-secondary`}
     >
       <td className="px-4 py-3 whitespace-nowrap">
         <div className={`flex items-center gap-2 ${isSubcat ? 'ml-8' : ''}`}>
@@ -203,7 +198,6 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [dragOverParent, setDragOverParent] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
 
@@ -247,28 +241,11 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
 
   const handleDragStart = (e: DragStartEvent) => {
     setActiveId(e.active.id as string)
-    setDragOverParent(null)
-  }
-
-  const handleDragOver = (e: DragOverEvent) => {
-    const overId = e.over?.id as string | undefined
-    if (!overId || !activeId) return
-    const overCat = categories.find(c => c.id === overId)
-    if (!overCat) return
-    const activeCat = categories.find(c => c.id === activeId)
-    if (!activeCat) return
-
-    if (!activeCat.parent_category_id && overCat.parent_category_id) {
-      setDragOverParent(overCat.parent_category_id)
-    } else {
-      setDragOverParent(null)
-    }
   }
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e
     setActiveId(null)
-    setDragOverParent(null)
     if (!over || active.id === over.id) return
 
     const activeId = active.id as string
@@ -276,34 +253,16 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
     const activeCat = categories.find(c => c.id === activeId)!
     const overCat = categories.find(c => c.id === overId)!
 
-    let updated = [...categories]
-
     const isMainDragged = !activeCat.parent_category_id
-    const overIsSubcat = !!overCat.parent_category_id
     const overIsMain = !overCat.parent_category_id
+    const sameParent = activeCat.parent_category_id === overCat.parent_category_id
 
-    if (isMainDragged && overIsSubcat) {
-      const newParent = overCat.parent_category_id!
-      const siblings = updated
-        .filter(c => c.parent_category_id === newParent)
-        .sort((a, b) => a.display_order - b.display_order)
-      const overIdx = siblings.findIndex(c => c.id === overId)
-      updated = updated.map(c => {
-        if (c.id === activeId) return { ...c, parent_category_id: newParent, display_order: overIdx + 1 }
-        return c
-      })
-      const newSiblings = updated
-        .filter(c => c.parent_category_id === newParent)
-        .sort((a, b) => (a.id === activeId ? overIdx : a.display_order) - (b.id === activeId ? overIdx : b.display_order))
-      newSiblings.forEach((c, i) => {
-        const idx = updated.findIndex(u => u.id === c.id)
-        updated[idx] = { ...updated[idx], display_order: i + 1 }
-      })
-    } else if (!isMainDragged && overIsMain) {
-      updated = updated.map(c => {
-        if (c.id === activeId) return { ...c, parent_category_id: null }
-        return c
-      })
+    if (isMainDragged && !overIsMain) return
+    if (!isMainDragged && (!sameParent)) return
+
+    const updated = [...categories]
+
+    if (isMainDragged) {
       const mains = updated.filter(c => !c.parent_category_id).sort((a, b) => a.display_order - b.display_order)
       const fromIdx = mains.findIndex(c => c.id === activeId)
       const toIdx = mains.findIndex(c => c.id === overId)
@@ -312,41 +271,15 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
         const idx = updated.findIndex(u => u.id === c.id)
         updated[idx] = { ...updated[idx], display_order: i + 1 }
       })
-    } else if (isMainDragged && overIsMain) {
-      const mains = updated.filter(c => !c.parent_category_id).sort((a, b) => a.display_order - b.display_order)
-      const fromIdx = mains.findIndex(c => c.id === activeId)
-      const toIdx = mains.findIndex(c => c.id === overId)
-      const reordered = arrayMove(mains, fromIdx, toIdx)
+    } else {
+      const siblings = updated.filter(c => c.parent_category_id === activeCat.parent_category_id).sort((a, b) => a.display_order - b.display_order)
+      const fromIdx = siblings.findIndex(c => c.id === activeId)
+      const toIdx = siblings.findIndex(c => c.id === overId)
+      const reordered = arrayMove(siblings, fromIdx, toIdx)
       reordered.forEach((c, i) => {
         const idx = updated.findIndex(u => u.id === c.id)
         updated[idx] = { ...updated[idx], display_order: i + 1 }
       })
-    } else if (!isMainDragged && overIsSubcat) {
-      const sameParent = activeCat.parent_category_id === overCat.parent_category_id
-      if (sameParent) {
-        const siblings = updated.filter(c => c.parent_category_id === activeCat.parent_category_id).sort((a, b) => a.display_order - b.display_order)
-        const fromIdx = siblings.findIndex(c => c.id === activeId)
-        const toIdx = siblings.findIndex(c => c.id === overId)
-        const reordered = arrayMove(siblings, fromIdx, toIdx)
-        reordered.forEach((c, i) => {
-          const idx = updated.findIndex(u => u.id === c.id)
-          updated[idx] = { ...updated[idx], display_order: i + 1 }
-        })
-      } else {
-        const newParent = overCat.parent_category_id!
-        const newSiblings = updated.filter(c => c.parent_category_id === newParent && c.id !== activeId).sort((a, b) => a.display_order - b.display_order)
-        const overIdx = newSiblings.findIndex(c => c.id === overId)
-        newSiblings.splice(overIdx + 1, 0, { ...activeCat, parent_category_id: newParent })
-        newSiblings.forEach((c, i) => {
-          const idx = updated.findIndex(u => u.id === c.id)
-          updated[idx] = { ...updated[idx], parent_category_id: newParent, display_order: i + 1 }
-        })
-        const oldSiblings = updated.filter(c => c.parent_category_id === activeCat.parent_category_id && c.id !== activeId).sort((a, b) => a.display_order - b.display_order)
-        oldSiblings.forEach((c, i) => {
-          const idx = updated.findIndex(u => u.id === c.id)
-          updated[idx] = { ...updated[idx], display_order: i + 1 }
-        })
-      }
     }
 
     setCategories(updated)
@@ -371,7 +304,6 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={flatOrder.map(c => c.id)} strategy={verticalListSortingStrategy}>
@@ -401,7 +333,6 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                         collapsed={isCollapsed}
                         onToggleCollapse={() => toggleCollapse(cat.id)}
                         subCount={subcats.length}
-                        isDraggingOver={dragOverParent === cat.id}
                       />
                       {!isCollapsed && subcats.map(sub => (
                         <SortableRow
