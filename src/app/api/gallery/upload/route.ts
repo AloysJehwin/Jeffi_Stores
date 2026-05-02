@@ -3,19 +3,9 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { uploadGalleryImage } from '@/lib/s3'
 import { queryOne } from '@/lib/db'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-}
-
-export async function OPTIONS() {
-  return NextResponse.json(null, { headers: corsHeaders })
-}
-
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
-  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: corsHeaders })
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     let imageBuffer: Buffer
@@ -28,18 +18,18 @@ export async function POST(request: NextRequest) {
 
     if (contentType.includes('application/json')) {
       const body = await request.json()
-      if (!body.imageUrl) return NextResponse.json({ error: 'imageUrl is required' }, { status: 400, headers: corsHeaders })
+      if (!body.imageUrl) return NextResponse.json({ error: 'imageUrl is required' }, { status: 400 })
       sourceUrl = body.imageUrl
       customName = body.customName || null
       categoryId = body.categoryId || null
       fileName = body.fileName || new URL(body.imageUrl).pathname.split('/').pop() || 'image'
       const res = await fetch(body.imageUrl)
-      if (!res.ok) return NextResponse.json({ error: 'Failed to fetch image' }, { status: 400, headers: corsHeaders })
+      if (!res.ok) return NextResponse.json({ error: 'Failed to fetch image' }, { status: 400 })
       imageBuffer = Buffer.from(await res.arrayBuffer())
     } else {
       const formData = await request.formData()
       const file = formData.get('file') as File | null
-      if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400, headers: corsHeaders })
+      if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
       fileName = file.name
       customName = (formData.get('customName') as string | null) || null
       categoryId = (formData.get('categoryId') as string | null) || null
@@ -56,8 +46,8 @@ export async function POST(request: NextRequest) {
        result.fileName, result.fileSize, 'image/png', result.width, result.height, sourceUrl, customName, categoryId]
     )
 
-    return NextResponse.json(record, { headers: corsHeaders })
+    return NextResponse.json(record)
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Upload failed' }, { status: 500, headers: corsHeaders })
+    return NextResponse.json({ error: err.message || 'Upload failed' }, { status: 500 })
   }
 }
