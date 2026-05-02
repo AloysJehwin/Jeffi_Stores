@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, queryOne } from '@/lib/db'
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 21
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get('sort') || ''
     const order = searchParams.get('order') === 'asc' ? 'ASC' : 'DESC'
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
-    const offset = (page - 1) * PAGE_SIZE
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || String(PAGE_SIZE), 10)))
+    const offset = (page - 1) * limit
 
     const conditions: string[] = ['p.is_active = true']
     const params: unknown[] = []
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
        LEFT JOIN brands b ON p.brand_id = b.id
        WHERE ${whereClause}
        ORDER BY ${orderBy}
-       LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
+       LIMIT ${limit} OFFSET ${offset}`,
       params
     )
 
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
       products: products || [],
       total,
       page,
-      totalPages: Math.ceil(total / PAGE_SIZE),
+      totalPages: Math.ceil(total / limit),
     })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
