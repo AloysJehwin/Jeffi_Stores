@@ -3,6 +3,10 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { uploadGalleryImage } from '@/lib/s3'
 import { queryOne } from '@/lib/db'
 
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204 })
+}
+
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
