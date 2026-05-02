@@ -18,6 +18,8 @@ export async function generateProductSku(categoryId: string | null): Promise<str
       }
     }
 
+    prefix = prefix.toUpperCase()
+
     const maxResult = await client.query(
       `SELECT MAX(
         CAST(NULLIF(SUBSTRING(sku FROM length($1) + 2), '') AS INTEGER)
