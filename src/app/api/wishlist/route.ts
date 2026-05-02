@@ -1,25 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { query, queryMany } from '@/lib/db'
+import { authenticateUser } from '@/lib/jwt'
 import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
 import { getUserIdForSession } from '@/lib/guest-user'
 
-// Get wishlist items for a user
+async function resolveUserId(request: NextRequest): Promise<string> {
+  const auth = await authenticateUser(request)
+  if (auth?.userId) return auth.userId
+  const cookieStore = await cookies()
+  const sessionId = cookieStore.get('session_id')?.value
+  return getUserIdForSession(sessionId, undefined)
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const sessionId = cookieStore.get('session_id')?.value
-    const token = cookieStore.get('token')?.value
-
-    // Verify JWT token if exists
-    let authUserId: string | undefined
-    if (token) {
-      const payload = await verifyToken(token)
-      authUserId = payload?.userId
-    }
-
-    // Get user ID (either authenticated or guest)
-    const userId = await getUserIdForSession(sessionId, authUserId)
+    const userId = await resolveUserId(request)
 
     const wishlistItems = await queryMany(`
       SELECT
@@ -44,42 +39,25 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items: wishlistItems || [] })
   } catch (error) {
-    console.error('Wishlist GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch wishlist' }, { status: 500 })
   }
 }
 
-// Add item to wishlist
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { productId } = body
+    const productId = body.product_id || body.productId
 
-    const cookieStore = await cookies()
-    const sessionId = cookieStore.get('session_id')?.value
-    const token = cookieStore.get('token')?.value
+    const userId = await resolveUserId(request)
 
-    // Verify JWT token if exists
-    let authUserId: string | undefined
-    if (token) {
-      const payload = await verifyToken(token)
-      authUserId = payload?.userId
-    }
-
-    // Get user ID (either authenticated or guest)
-    const userId = await getUserIdForSession(sessionId, authUserId)
-
-    // Check if item already exists in wishlist
-    const existingItem = await queryOne(
-      'SELECT * FROM wishlist_items WHERE user_id = $1 AND product_id = $2',
+    const existing = await query(
+      'SELECT id FROM wishlist_items WHERE user_id = $1 AND product_id = $2',
       [userId, productId]
     )
-
-    if (existingItem) {
+    if ((existing as any).rows?.length > 0) {
       return NextResponse.json({ message: 'Item already in wishlist' })
     }
 
-    // Insert new item
     await query(
       'INSERT INTO wishlist_items (user_id, product_id) VALUES ($1, $2)',
       [userId, productId]
@@ -87,30 +65,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: 'Item added to wishlist' })
   } catch (error) {
-    console.error('Wishlist POST error:', error)
     return NextResponse.json({ error: 'Failed to add to wishlist' }, { status: 500 })
   }
 }
 
-// Remove item from wishlist
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const productId = searchParams.get('productId')
+    const productId = searchParams.get('productId') || searchParams.get('product_id')
 
-    const cookieStore = await cookies()
-    const sessionId = cookieStore.get('session_id')?.value
-    const token = cookieStore.get('token')?.value
-
-    // Verify JWT token if exists
-    let authUserId: string | undefined
-    if (token) {
-      const payload = await verifyToken(token)
-      authUserId = payload?.userId
-    }
-
-    // Get user ID (either authenticated or guest)
-    const userId = await getUserIdForSession(sessionId, authUserId)
+    const userId = await resolveUserId(request)
 
     await query(
       'DELETE FROM wishlist_items WHERE product_id = $1 AND user_id = $2',
@@ -119,7 +83,6 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Item removed from wishlist' })
   } catch (error) {
-    console.error('Wishlist DELETE error:', error)
     return NextResponse.json({ error: 'Failed to remove from wishlist' }, { status: 500 })
   }
 }
