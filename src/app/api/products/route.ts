@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, queryOne } from '@/lib/db'
 
-const PAGE_SIZE = 21
+const PAGE_SIZE = 20
 
 export async function GET(request: NextRequest) {
   try {
