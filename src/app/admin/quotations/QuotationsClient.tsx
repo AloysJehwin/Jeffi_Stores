@@ -476,7 +476,7 @@ export default function QuotationsClient() {
     }
   }
 
-  const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500'
+  const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 disabled:opacity-60 disabled:cursor-not-allowed'
   const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
   if (view === 'list') {
@@ -566,12 +566,14 @@ export default function QuotationsClient() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => openEdit(q.id)} title="Edit"
-                          className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
+                        {q.status === 'draft' && (
+                          <button onClick={() => openEdit(q.id)} title="Edit"
+                            className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                        )}
                         <a href={`/api/admin/quotations/${q.id}/pdf`} target="_blank" rel="noopener noreferrer" title="Download PDF"
                           className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -609,13 +611,22 @@ export default function QuotationsClient() {
         </button>
         <div>
           <h1 className="text-xl font-bold text-foreground">
-            {editId ? `Edit ${quoteNumber}` : 'New Quotation'}
+            {editId ? quoteNumber : 'New Quotation'}
           </h1>
           <p className="text-foreground-secondary text-xs mt-0.5">
-            {editId ? 'Update and finalise the quotation' : 'Fill in details and add line items'}
+            {isFinal ? 'This quotation is finalised and cannot be edited' : (editId ? 'Update and finalise the quotation' : 'Fill in details and add line items')}
           </p>
         </div>
       </div>
+
+      {isFinal && (
+        <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-center gap-2">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          This quotation has been finalised. Download the PDF below.
+        </div>
+      )}
 
       {saveError && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">
@@ -634,11 +645,11 @@ export default function QuotationsClient() {
             </div>
             <div>
               <label className={labelCls}>Date</label>
-              <input type="date" value={quoteDate} onChange={e => setQuoteDate(e.target.value)} className={inputCls} />
+              <input type="date" value={quoteDate} onChange={e => setQuoteDate(e.target.value)} disabled={isFinal} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Notes (optional)</label>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} disabled={isFinal}
                 className={inputCls + ' resize-none'} placeholder="Any special terms or references..." />
             </div>
           </div>
@@ -651,7 +662,7 @@ export default function QuotationsClient() {
           <div className="relative mb-2">
             <input
               type="text" value={custSearch} onChange={e => searchCustomers(e.target.value)}
-              placeholder="Search existing customer…" className={inputCls}
+              placeholder="Search existing customer…" disabled={isFinal} className={inputCls}
             />
             {showCustDrop && custResults.length > 0 && (
               <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -666,14 +677,14 @@ export default function QuotationsClient() {
             )}
           </div>
           <div className="space-y-2">
-            <input value={cName} onChange={e => setCName(e.target.value)} placeholder="Name / Company" className={inputCls} />
-            <input value={cAddr1} onChange={e => setCAddr1(e.target.value)} placeholder="Address line 1" className={inputCls} />
-            <input value={cAddr2} onChange={e => setCAddr2(e.target.value)} placeholder="Address line 2 (optional)" className={inputCls} />
+            <input value={cName} onChange={e => setCName(e.target.value)} placeholder="Name / Company" disabled={isFinal} className={inputCls} />
+            <input value={cAddr1} onChange={e => setCAddr1(e.target.value)} placeholder="Address line 1" disabled={isFinal} className={inputCls} />
+            <input value={cAddr2} onChange={e => setCAddr2(e.target.value)} placeholder="Address line 2 (optional)" disabled={isFinal} className={inputCls} />
             <div className="flex gap-2">
-              <input value={cCity} onChange={e => setCCity(e.target.value)} placeholder="City" className={inputCls} />
-              <input value={cState} onChange={e => setCState(e.target.value)} placeholder="State" className={inputCls} />
+              <input value={cCity} onChange={e => setCCity(e.target.value)} placeholder="City" disabled={isFinal} className={inputCls} />
+              <input value={cState} onChange={e => setCState(e.target.value)} placeholder="State" disabled={isFinal} className={inputCls} />
             </div>
-            <input value={cGstin} onChange={e => setCGstin(e.target.value)} placeholder="GSTIN (optional)" className={inputCls + ' font-mono'} />
+            <input value={cGstin} onChange={e => setCGstin(e.target.value)} placeholder="GSTIN (optional)" disabled={isFinal} className={inputCls + ' font-mono'} />
           </div>
         </div>
 
@@ -682,7 +693,7 @@ export default function QuotationsClient() {
             <h2 className="text-sm font-semibold text-foreground">Buyer (Bill to)</h2>
             <label className="flex items-center gap-2 text-xs text-foreground-secondary cursor-pointer select-none">
               <input type="checkbox" checked={buyerSame} onChange={e => setBuyerSame(e.target.checked)}
-                className="w-3.5 h-3.5 accent-secondary-500" />
+                disabled={isFinal} className="w-3.5 h-3.5 accent-secondary-500" />
               Same as consignee
             </label>
           </div>
@@ -690,14 +701,14 @@ export default function QuotationsClient() {
             <p className="text-foreground-secondary text-xs py-4 text-center">Using same address as consignee</p>
           ) : (
             <div className="space-y-2">
-              <input value={bName} onChange={e => setBName(e.target.value)} placeholder="Name / Company" className={inputCls} />
-              <input value={bAddr1} onChange={e => setBAddr1(e.target.value)} placeholder="Address line 1" className={inputCls} />
-              <input value={bAddr2} onChange={e => setBAddr2(e.target.value)} placeholder="Address line 2 (optional)" className={inputCls} />
+              <input value={bName} onChange={e => setBName(e.target.value)} placeholder="Name / Company" disabled={isFinal} className={inputCls} />
+              <input value={bAddr1} onChange={e => setBAddr1(e.target.value)} placeholder="Address line 1" disabled={isFinal} className={inputCls} />
+              <input value={bAddr2} onChange={e => setBAddr2(e.target.value)} placeholder="Address line 2 (optional)" disabled={isFinal} className={inputCls} />
               <div className="flex gap-2">
-                <input value={bCity} onChange={e => setBCity(e.target.value)} placeholder="City" className={inputCls} />
-                <input value={bState} onChange={e => setBState(e.target.value)} placeholder="State" className={inputCls} />
+                <input value={bCity} onChange={e => setBCity(e.target.value)} placeholder="City" disabled={isFinal} className={inputCls} />
+                <input value={bState} onChange={e => setBState(e.target.value)} placeholder="State" disabled={isFinal} className={inputCls} />
               </div>
-              <input value={bGstin} onChange={e => setBGstin(e.target.value)} placeholder="GSTIN (optional)" className={inputCls + ' font-mono'} />
+              <input value={bGstin} onChange={e => setBGstin(e.target.value)} placeholder="GSTIN (optional)" disabled={isFinal} className={inputCls + ' font-mono'} />
             </div>
           )}
         </div>
@@ -706,10 +717,12 @@ export default function QuotationsClient() {
       <div className="bg-surface-elevated border border-border-default rounded-xl p-4 mb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-foreground">Line Items</h2>
-          <button onClick={addItem}
-            className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-medium transition-colors">
-            + Add Row
-          </button>
+          {!isFinal && (
+            <button onClick={addItem}
+              className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-medium transition-colors">
+              + Add Row
+            </button>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -735,7 +748,7 @@ export default function QuotationsClient() {
                   <td className="py-1.5 pr-2">
                     <div className="flex gap-1 items-center">
                       <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)}
-                        placeholder="Description of goods" className={inputCls + ' min-w-[160px]'} />
+                        placeholder="Description of goods" disabled={isFinal} className={inputCls + ' min-w-[160px]'} />
                       {item.product_id && item.is_draft_product && (
                         <button
                           type="button"
@@ -749,41 +762,43 @@ export default function QuotationsClient() {
                       {item.product_id && !item.is_draft_product && (
                         <span title="Linked to product" className="shrink-0 w-2 h-2 rounded-full bg-green-500" />
                       )}
-                      <button onClick={() => openProductModal(idx)} title="Pick from products"
-                        className="shrink-0 p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors border border-border-default rounded">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </button>
+                      {!isFinal && (
+                        <button onClick={() => openProductModal(idx)} title="Pick from products"
+                          className="shrink-0 p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors border border-border-default rounded">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </td>
                   <td className="py-1.5 pr-2">
                     <input value={item.hsn_code} onChange={e => updateItem(idx, 'hsn_code', e.target.value)}
-                      placeholder="7318" className={inputCls + ' font-mono'} />
+                      placeholder="7318" disabled={isFinal} className={inputCls + ' font-mono'} />
                   </td>
                   <td className="py-1.5 pr-2">
                     <input type="number" value={item.gst_rate} min={0} max={28} step={0.5}
                       onChange={e => updateItem(idx, 'gst_rate', parseFloat(e.target.value) || 0)}
-                      className={inputCls} />
+                      disabled={isFinal} className={inputCls} />
                   </td>
                   <td className="py-1.5 pr-2">
                     <input type="number" value={item.quantity} min={0} step="any"
                       onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
-                      className={inputCls} />
+                      disabled={isFinal} className={inputCls} />
                   </td>
                   <td className="py-1.5 pr-2">
                     <div className="flex items-center gap-0.5">
-                      <button type="button" onClick={() => {
+                      <button type="button" disabled={isFinal} onClick={() => {
                         const i = UNITS.indexOf(item.unit)
                         updateItem(idx, 'unit', UNITS[(i - 1 + UNITS.length) % UNITS.length])
-                      }} className="px-1 py-1 text-foreground-secondary hover:text-foreground transition-colors">
+                      }} className="px-1 py-1 text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-40">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                       </button>
                       <span className="text-xs font-medium text-foreground w-8 text-center tabular-nums">{item.unit}</span>
-                      <button type="button" onClick={() => {
+                      <button type="button" disabled={isFinal} onClick={() => {
                         const i = UNITS.indexOf(item.unit)
                         updateItem(idx, 'unit', UNITS[(i + 1) % UNITS.length])
-                      }} className="px-1 py-1 text-foreground-secondary hover:text-foreground transition-colors">
+                      }} className="px-1 py-1 text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-40">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                       </button>
                     </div>
@@ -791,18 +806,18 @@ export default function QuotationsClient() {
                   <td className="py-1.5 pr-2">
                     <input type="number" value={item.rate} min={0} step="any"
                       onChange={e => updateItem(idx, 'rate', parseFloat(e.target.value) || 0)}
-                      className={inputCls} />
+                      disabled={isFinal} className={inputCls} />
                   </td>
                   <td className="py-1.5 pr-2">
                     <input type="number" value={item.discount_pct} min={0} max={100} step="any"
                       onChange={e => updateItem(idx, 'discount_pct', parseFloat(e.target.value) || 0)}
-                      className={inputCls} />
+                      disabled={isFinal} className={inputCls} />
                   </td>
                   <td className="py-1.5 pr-2 text-right font-semibold text-foreground tabular-nums">
                     ₹{fmt2(item.amount)}
                   </td>
                   <td className="py-1.5">
-                    <button onClick={() => removeItem(idx)} disabled={items.length === 1}
+                    <button onClick={() => removeItem(idx)} disabled={items.length === 1 || isFinal}
                       className="p-1 text-foreground-secondary hover:text-red-500 disabled:opacity-30 transition-colors">
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
