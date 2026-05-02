@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+export async function OPTIONS() {
+  return NextResponse.json(null, { headers: corsHeaders })
+}
+
 export async function GET(_request: NextRequest) {
 
   const categories = await queryMany(
@@ -8,5 +18,5 @@ export async function GET(_request: NextRequest) {
     []
   )
 
-  return NextResponse.json({ categories: categories || [] })
+  return NextResponse.json({ categories: categories || [] }, { headers: corsHeaders })
 }
