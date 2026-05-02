@@ -12,20 +12,15 @@ const JWT_SECRET = new TextEncoder().encode(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, otp, firstName, lastName, phone } = body
+    const { email, firstName, lastName, phone } = body
 
-    console.log('Signup request:', { email, otp: otp ? '***' : undefined, firstName, lastName, phone })
-
-    // Validate required fields
-    if (!email || !otp || !firstName) {
-      console.log('Validation failed:', { email: !!email, otp: !!otp, firstName: !!firstName })
+    if (!email || !firstName) {
       return NextResponse.json(
-        { error: 'Email, OTP, and first name are required' },
+        { error: 'Email and first name are required' },
         { status: 400 }
       )
     }
 
-    // Check if OTP was verified (should have been verified in previous step)
     const otpValid = await isOTPVerified(email)
     if (!otpValid) {
       return NextResponse.json(
@@ -34,7 +29,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate phone if provided
     let normalizedPhone = null
     if (phone) {
       const digits = phone.replace(/\D/g, '')
@@ -45,19 +39,16 @@ export async function POST(request: NextRequest) {
       normalizedPhone = `+91${cleaned}`
     }
 
-    // Check if email already exists
     const existingUser = await queryOne(
       'SELECT id FROM users WHERE email = $1',
       [email.toLowerCase()]
     )
 
     if (existingUser) {
-      // Clean up OTP
       await deleteOTP(email)
       return NextResponse.json({ error: 'Email already registered' }, { status: 400 })
     }
 
-    // Create user
     const newUser = await queryOne(
       `INSERT INTO users (email, first_name, last_name, phone, is_active, last_login)
        VALUES ($1, $2, $3, $4, $5, NOW())
@@ -66,16 +57,11 @@ export async function POST(request: NextRequest) {
     )
 
     if (!newUser) {
-      console.error('User creation failed')
       return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
     }
 
-    // Send welcome email (don't wait for it)
-    sendWelcomeEmail(email, firstName).catch(err =>
-      console.error('Welcome email failed:', err)
-    )
+    sendWelcomeEmail(email, firstName).catch(() => {})
 
-    // Create JWT token
     const token = await new SignJWT({
       userId: newUser.id,
       email: newUser.email
@@ -84,27 +70,25 @@ export async function POST(request: NextRequest) {
       .setExpirationTime('30d')
       .sign(JWT_SECRET)
 
-    // Set cookie
     const cookieStore = await cookies()
     cookieStore.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: 30 * 24 * 60 * 60,
       path: '/',
     })
 
-    // Also set session_id to user's UUID for cart/wishlist
     cookieStore.set('session_id', newUser.id, {
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
     })
 
-    // Clean up OTP after successful signup
     await deleteOTP(email)
 
     return NextResponse.json({
       message: 'Account created successfully',
+      token,
       user: {
         id: newUser.id,
         email: newUser.email,
@@ -113,8 +97,7 @@ export async function POST(request: NextRequest) {
         phone: newUser.phone,
       },
     })
-  } catch (error) {
-    console.error('Signup error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
   }
 }
