@@ -4,13 +4,11 @@ import { authenticateAdmin } from '@/lib/jwt'
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const brands = await queryMany('SELECT * FROM brands ORDER BY name ASC')
-    return NextResponse.json({ brands })
+    const brands = await queryMany(
+      'SELECT id, name, slug FROM brands WHERE is_active = true ORDER BY name ASC',
+      []
+    )
+    return NextResponse.json({ brands: brands || [] })
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to fetch brands' }, { status: 500 })
   }
