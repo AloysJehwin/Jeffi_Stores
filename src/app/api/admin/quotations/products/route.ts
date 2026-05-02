@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
          COALESCE(p.mrp, 0)::numeric AS mrp,
          p.base_price,
          COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
-         p.hsn_code
+         p.hsn_code,
+         p.is_active
        FROM products p
-       WHERE p.is_active = true
-         AND p.has_variants = false
+       WHERE p.has_variants = false
          AND ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR p.sku ILIKE '%' || $1 || '%')
          AND ($2 = '' OR p.category_id = $2::uuid)
 
@@ -42,12 +42,11 @@ export async function GET(request: NextRequest) {
          COALESCE(pv.mrp, 0)::numeric AS mrp,
          COALESCE(pv.price, p.base_price) AS base_price,
          COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
-         p.hsn_code
+         p.hsn_code,
+         p.is_active AND pv.is_active AS is_active
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
-       WHERE pv.is_active = true
-         AND p.is_active = true
-         AND ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR pv.variant_name ILIKE '%' || $1 || '%' OR pv.sku ILIKE '%' || $1 || '%')
+       WHERE ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR pv.variant_name ILIKE '%' || $1 || '%' OR pv.sku ILIKE '%' || $1 || '%')
          AND ($2 = '' OR p.category_id = $2::uuid)
 
        ORDER BY name ASC, variant_name ASC NULLS FIRST

@@ -17,6 +17,7 @@ interface QuoteItem {
   product_id?: string | null
   variant_id?: string | null
   is_draft_product?: boolean
+  is_active_product?: boolean
 }
 
 interface Quotation {
@@ -56,6 +57,7 @@ interface ProductResult {
   base_price: number
   gst_percentage: number
   hsn_code: string | null
+  is_active: boolean
 }
 
 type View = 'list' | 'editor'
@@ -439,6 +441,7 @@ export default function QuotationsClient() {
         product_id: p.product_id,
         variant_id: p.variant_id || null,
         is_draft_product: false,
+        is_active_product: p.is_active,
       }
       updated.amount = calcItemAmount(updated)
       return updated
@@ -759,7 +762,10 @@ export default function QuotationsClient() {
                           Draft ↗
                         </button>
                       )}
-                      {item.product_id && !item.is_draft_product && (
+                      {item.product_id && !item.is_draft_product && item.is_active_product === false && (
+                        <span title="Inactive product" className="shrink-0 w-2 h-2 rounded-full bg-yellow-400" />
+                      )}
+                      {item.product_id && !item.is_draft_product && item.is_active_product !== false && (
                         <span title="Linked to product" className="shrink-0 w-2 h-2 rounded-full bg-green-500" />
                       )}
                       {!isFinal && (
@@ -927,12 +933,14 @@ export default function QuotationsClient() {
                     {g.items.map(p => (
                       <button key={p.id} onClick={() => selectProduct(p)}
                         className="w-full text-left px-4 py-2.5 hover:bg-surface-secondary transition-colors border-b border-border-default/30 last:border-0">
-                        <p className="text-sm font-medium text-foreground">
-                          {g.items.length > 1
-                            ? (p.variant_name || p.name)
-                            : p.name}
-                        </p>
-                        <div className="flex gap-3 mt-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${p.is_active ? 'bg-green-500' : 'bg-yellow-400'}`} />
+                          <p className={`text-sm font-medium ${p.is_active ? 'text-foreground' : 'text-foreground-secondary'}`}>
+                            {g.items.length > 1 ? (p.variant_name || p.name) : p.name}
+                            {!p.is_active && <span className="ml-1.5 text-[10px] font-normal text-yellow-600 dark:text-yellow-400">(inactive)</span>}
+                          </p>
+                        </div>
+                        <div className="flex gap-3 mt-0.5 pl-3">
                           <span className="text-xs text-foreground-secondary font-mono">{p.sku}</span>
                           <span className="text-xs text-secondary-500 font-semibold">₹{fmt2(Number(p.mrp || p.base_price))}</span>
                           <span className="text-xs text-foreground-secondary">GST {p.gst_percentage}%</span>
