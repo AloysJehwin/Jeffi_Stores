@@ -132,7 +132,7 @@ function CheckoutReviewPage() {
                       key={address.id}
                       className={`flex items-start gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${
                         selectedAddress?.id === address.id
-                          ? 'border-accent-500 bg-accent-50'
+                          ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30'
                           : 'border-border-default hover:border-border-secondary'
                       }`}
                     >

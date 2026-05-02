@@ -380,7 +380,7 @@ function CheckoutPage() {
                   <label
                     className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${
                       paymentMethod === 'razorpay'
-                        ? 'border-accent-500 bg-accent-50'
+                        ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30'
                         : 'border-border-default hover:border-border-secondary'
                     }`}
                   >
@@ -404,7 +404,7 @@ function CheckoutPage() {
                 <label
                   className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     paymentMethod === 'manual'
-                      ? 'border-accent-500 bg-accent-50'
+                      ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30'
                       : 'border-border-default hover:border-border-secondary'
                   }`}
                 >
