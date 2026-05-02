@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
           )
         ) AS products
       FROM wishlist_items wi
-      LEFT JOIN products p ON wi.product_id = p.id
+      INNER JOIN products p ON wi.product_id = p.id AND p.is_active = true
       WHERE wi.user_id = $1
     `, [userId])
 
