@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     const sortCol = allowedSort[sort] || null
     const orderBy = sortCol
       ? `${sortCol} ${order}`
-      : `p.is_featured DESC, p.created_at DESC`
+      : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
 
     const whereClause = conditions.join(' AND ')
 
@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
         (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
+       LEFT JOIN categories pc ON c.parent_category_id = pc.id
        LEFT JOIN brands b ON p.brand_id = b.id
        WHERE ${whereClause}
        ORDER BY ${orderBy}
