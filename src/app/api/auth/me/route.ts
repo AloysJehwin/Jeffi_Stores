@@ -1,32 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { jwtVerify } from 'jose'
 import { queryOne } from '@/lib/db'
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-)
+import { authenticateUser } from '@/lib/jwt'
 
 export async function GET(request: NextRequest) {
   try {
-    const token = cookies().get('auth_token')?.value
+    const userPayload = await authenticateUser(request)
 
-    if (!token) {
+    if (!userPayload) {
       return NextResponse.json({ user: null })
     }
 
-    // Verify JWT
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-
-    // Get user from database
     const user = await queryOne(
       'SELECT id, email, first_name, last_name, phone, created_at FROM users WHERE id = $1',
-      [payload.userId as string]
+      [userPayload.userId]
     )
 
     if (!user) {
-      // Invalid token or user not found
-      cookies().delete('auth_token')
       return NextResponse.json({ user: null })
     }
 
@@ -40,9 +29,7 @@ export async function GET(request: NextRequest) {
         createdAt: user.created_at,
       },
     })
-  } catch (error) {
-    console.error('Auth verification error:', error)
-    cookies().delete('auth_token')
+  } catch {
     return NextResponse.json({ user: null })
   }
 }
