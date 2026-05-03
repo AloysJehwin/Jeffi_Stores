@@ -48,20 +48,21 @@ export default async function AdminLayout({
 
   const navLinks = [
     { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard' },
-    { href: '/admin/products', label: 'Products', scope: 'products' },
-    { href: '/admin/categories', label: 'Categories', scope: 'categories' },
-    { href: '/admin/brands', label: 'Brands', scope: 'brands' },
-    { href: '/admin/orders', label: 'Orders', scope: 'orders' },
-    { href: '/admin/packing-slips', label: 'Packing Slips', scope: 'orders' },
-    { href: '/admin/labels', label: 'Labels', scope: 'labels' },
-    { href: '/admin/quotations', label: 'Quotations', scope: 'quotations' },
-    { href: '/admin/scan', label: 'QuickScan', scope: 'orders', mobileOnly: true },
     { href: '/admin/customers', label: 'Customers', scope: 'customers' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews' },
+    { href: '/admin/products', label: 'Products', scope: 'products', group: 'Catalogue' },
+    { href: '/admin/categories', label: 'Categories', scope: 'categories', group: 'Catalogue' },
+    { href: '/admin/brands', label: 'Brands', scope: 'brands', group: 'Catalogue' },
+    { href: '/admin/orders', label: 'Orders', scope: 'orders', group: 'Operations' },
+    { href: '/admin/packing-slips', label: 'Packing Slips', scope: 'packing_slips', group: 'Operations' },
+    { href: '/admin/labels', label: 'Labels', scope: 'labels', group: 'Operations' },
+    { href: '/admin/quotations', label: 'Quotations', scope: 'quotations', group: 'Operations' },
+    { href: '/admin/scan', label: 'QuickScan', scope: 'quick_scan', group: 'Operations', mobileOnly: true },
     { href: '/admin/coupons', label: 'Coupons', scope: 'coupons', group: 'Marketing' },
     { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms', group: 'Marketing' },
-    { href: '/admin/inflation', label: 'Inflation', scope: 'settings' },
-    { href: '/admin/settings', label: 'Settings', scope: 'settings' },
+    { href: '/admin/mailer', label: 'Mailer', scope: 'mailer', group: 'Marketing' },
+    { href: '/admin/inflation', label: 'Inflation', scope: 'inflation', group: 'Settings' },
+    { href: '/admin/settings', label: 'Settings', scope: 'settings', group: 'Settings' },
   ]
 
   const filteredNavLinks = navLinks.filter(link => hasScope(role, scopes, link.scope))
