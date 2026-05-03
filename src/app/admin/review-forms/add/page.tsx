@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { query, queryMany } from '@/lib/db'
 import Link from 'next/link'
+import ReviewFormForm from '../ReviewFormForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,57 +45,7 @@ export default async function AddReviewFormPage() {
         </div>
       </div>
 
-      <form action={createReviewForm} className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Form Title *</label>
-          <input name="title" required className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. Leave Us a Google Review" />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-            Slug * <span className="text-foreground-muted font-normal">— forms.jeffistores.in/<strong>this-slug</strong></span>
-          </label>
-          <input name="slug" required className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent font-mono" placeholder="e.g. google-review" pattern="[a-z0-9-]+" title="Lowercase letters, numbers, hyphens only" />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Google Review URL *</label>
-          <input name="google_review_url" type="url" required className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="https://g.page/r/..." />
-          <p className="mt-1 text-xs text-foreground-muted">Paste your Google Maps review link — customers will be sent here first</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Reward Coupon</label>
-          <select name="coupon_id" className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent">
-            <option value="">— No coupon —</option>
-            {coupons.map(c => (
-              <option key={c.id} value={c.id}>{c.code}{c.description ? ` — ${c.description}` : ''}</option>
-            ))}
-          </select>
-          {coupons.length === 0 && (
-            <p className="mt-1 text-xs text-amber-600">No active coupons found. <Link href="/admin/coupons/add" className="underline">Create one first.</Link></p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Description</label>
-          <textarea name="description" rows={2} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Optional — shown to customer on the form page" />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input type="checkbox" name="is_active" id="is_active" defaultChecked className="w-4 h-4 text-accent-600 rounded border-border-secondary" />
-          <label htmlFor="is_active" className="text-sm text-foreground-secondary">Active (form accepts submissions)</label>
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <Link href="/admin/review-forms" className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
-            Cancel
-          </Link>
-          <button type="submit" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">
-            Create Form
-          </button>
-        </div>
-      </form>
+      <ReviewFormForm action={createReviewForm} submitLabel="Create Form" coupons={coupons} />
     </div>
   )
 }

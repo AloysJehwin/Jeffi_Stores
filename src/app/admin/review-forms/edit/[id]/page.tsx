@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { query, queryOne, queryMany } from '@/lib/db'
 import Link from 'next/link'
+import ReviewFormForm from '../../ReviewFormForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,41 +50,19 @@ export default async function EditReviewFormPage({ params }: { params: { id: str
         <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">Edit Review Form</h1>
       </div>
 
-      <form action={updateForm} className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Form Title *</label>
-          <input name="title" required defaultValue={form.title} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Slug *</label>
-          <input name="slug" required defaultValue={form.slug} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent font-mono" pattern="[a-z0-9-]+" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Google Review URL *</label>
-          <input name="google_review_url" type="url" required defaultValue={form.google_review_url} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Reward Coupon</label>
-          <select name="coupon_id" defaultValue={form.coupon_id || ''} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent">
-            <option value="">— No coupon —</option>
-            {coupons.map(c => (
-              <option key={c.id} value={c.id}>{c.code}{c.description ? ` — ${c.description}` : ''}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Description</label>
-          <textarea name="description" rows={2} defaultValue={form.description || ''} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-        </div>
-        <div className="flex items-center gap-2">
-          <input type="checkbox" name="is_active" id="is_active" defaultChecked={form.is_active} className="w-4 h-4 text-accent-600 rounded border-border-secondary" />
-          <label htmlFor="is_active" className="text-sm text-foreground-secondary">Active</label>
-        </div>
-        <div className="flex gap-3 pt-2">
-          <Link href="/admin/review-forms" className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">Cancel</Link>
-          <button type="submit" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">Save Changes</button>
-        </div>
-      </form>
+      <ReviewFormForm
+        action={updateForm}
+        submitLabel="Save Changes"
+        coupons={coupons}
+        defaultValues={{
+          title: form.title,
+          slug: form.slug,
+          google_review_url: form.google_review_url,
+          coupon_id: form.coupon_id,
+          description: form.description,
+          is_active: form.is_active,
+        }}
+      />
     </div>
   )
 }
