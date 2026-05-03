@@ -17,10 +17,10 @@ function shouldShowFooter(pathname: string | null): boolean {
   )
 }
 
-export default function ConditionalLayout({ children }: { children: React.ReactNode }) {
+export default function ConditionalLayout({ children, isFormsSubdomain }: { children: React.ReactNode; isFormsSubdomain?: boolean }) {
   const pathname = usePathname()
   const isAdminPage = pathname?.startsWith('/admin')
-  const isFormsPage = pathname?.startsWith('/forms')
+  const isFormsPage = isFormsSubdomain || pathname?.startsWith('/forms')
 
   if (isAdminPage || isFormsPage) {
     return (

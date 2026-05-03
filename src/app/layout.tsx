@@ -1,4 +1,5 @@
 import './globals.css'
+import { headers } from 'next/headers'
 import ConditionalLayout from '@/components/ConditionalLayout'
 import Script from 'next/script'
 
@@ -17,7 +18,9 @@ export const viewport = {
   viewportFit: 'cover',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const host = headers().get('host') || ''
+  const isFormsSubdomain = host.startsWith('forms.')
   return (
     <html lang="en" className="bg-surface" suppressHydrationWarning>
       <head>
@@ -34,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');`,
           }}
         />
-        <ConditionalLayout>{children}</ConditionalLayout>
+        <ConditionalLayout isFormsSubdomain={isFormsSubdomain}>{children}</ConditionalLayout>
       </body>
     </html>
   )
