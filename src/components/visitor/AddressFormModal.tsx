@@ -1,8 +1,30 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import CustomSelect from './CustomSelect'
+
+declare global {
+  interface Window {
+    google: typeof google
+    initGoogleMapsAutocomplete?: () => void
+  }
+}
+
+function loadGoogleMapsScript(apiKey: string, onLoad: () => void) {
+  if (window.google?.maps?.places) { onLoad(); return }
+  if (document.getElementById('google-maps-script')) {
+    window.initGoogleMapsAutocomplete = onLoad
+    return
+  }
+  window.initGoogleMapsAutocomplete = onLoad
+  const script = document.createElement('script')
+  script.id = 'google-maps-script'
+  script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMapsAutocomplete`
+  script.async = true
+  script.defer = true
+  document.head.appendChild(script)
+}
 
 interface Address {
   id: string
@@ -32,6 +54,53 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
   const [pinLookupState, setPinLookupState] = useState<'idle' | 'loading' | 'found' | 'error'>('idle')
   const [localities, setLocalities] = useState<string[]>([])
   const pinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const address1Ref = useRef<HTMLInputElement>(null)
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+
+  const initAutocomplete = useCallback(() => {
+    if (!address1Ref.current || autocompleteRef.current) return
+    const ac = new window.google.maps.places.Autocomplete(address1Ref.current, {
+      componentRestrictions: { country: 'in' },
+      fields: ['address_components', 'formatted_address'],
+      types: ['address'],
+    })
+    autocompleteRef.current = ac
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace()
+      if (!place.address_components) return
+      let streetNumber = '', route = '', locality = '', city = '', state = '', postal = ''
+      for (const comp of place.address_components) {
+        const type = comp.types[0]
+        if (type === 'street_number') streetNumber = comp.long_name
+        else if (type === 'route') route = comp.long_name
+        else if (type === 'sublocality_level_1' || type === 'sublocality') locality = comp.long_name
+        else if (type === 'locality') city = comp.long_name
+        else if (type === 'administrative_area_level_1') state = comp.long_name
+        else if (type === 'postal_code') postal = comp.long_name
+      }
+      const line1 = [streetNumber, route].filter(Boolean).join(' ') || place.formatted_address || ''
+      setFormData(prev => ({
+        ...prev,
+        address_line1: line1,
+        address_line2: locality || prev.address_line2,
+        city: city || prev.city,
+        state: state || prev.state,
+        postal_code: postal || prev.postal_code,
+      }))
+      if (postal?.length === 6) setPinLookupState('found')
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    if (!apiKey) return
+    loadGoogleMapsScript(apiKey, initAutocomplete)
+  }, [isOpen, initAutocomplete])
+
+  useEffect(() => {
+    autocompleteRef.current = null
+  }, [isOpen])
 
   const [formData, setFormData] = useState({
     address_type: 'shipping',
@@ -225,11 +294,12 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
               </label>
               <input
                 id="modal_address_line1"
+                ref={address1Ref}
                 type="text"
                 value={formData.address_line1}
                 onChange={(e) => setFormData({ ...formData, address_line1: e.target.value })}
                 className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                placeholder="House/Flat No., Street, Area"
+                placeholder="Start typing your street address…"
                 required
               />
             </div>

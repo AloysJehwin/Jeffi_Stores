@@ -6,6 +6,12 @@ import { getScopeForPath, hasScope } from './lib/scopes'
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const pathname = request.nextUrl.pathname
+
+  if (hostname.startsWith('forms.')) {
+    const slug = pathname === '/' ? '' : pathname
+    return NextResponse.rewrite(new URL(`/forms${slug}`, request.url))
+  }
+
   const isAdminSubdomain = hostname.startsWith('admin.')
   const isAdminPath = pathname.startsWith('/admin')
   const isAdminApiPath = pathname.startsWith('/api/admin')
