@@ -1,5 +1,6 @@
 import './globals.css'
 import ConditionalLayout from '@/components/ConditionalLayout'
+import Script from 'next/script'
 
 export const metadata = {
   title: 'Jeffi Stores - Industrial Hardware & Tools',
@@ -27,6 +28,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="antialiased bg-surface text-foreground m-0 p-0">
+        <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
+        <Script id="gtag-init" strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');`,
+          }}
+        />
         <ConditionalLayout>{children}</ConditionalLayout>
       </body>
     </html>
