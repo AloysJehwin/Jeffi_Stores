@@ -14,7 +14,7 @@ const nextConfig = {
       {
         source: '/api/gallery/:path*',
         headers: [
-          { key: 'Access-Control-Allow-Origin', value: 'chrome-extension://*' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
           { key: 'Access-Control-Allow-Methods', value: 'GET,POST,DELETE,OPTIONS' },
           { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization' },
         ],
@@ -22,7 +22,7 @@ const nextConfig = {
       {
         source: '/api/categories',
         headers: [
-          { key: 'Access-Control-Allow-Origin', value: 'chrome-extension://*' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
           { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS' },
           { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization' },
         ],
