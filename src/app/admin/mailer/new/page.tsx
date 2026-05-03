@@ -15,14 +15,7 @@ const TEMPLATES = [
 
 const AUDIENCE_OPTIONS = [
   { value: 'all', label: 'All customers' },
-  { value: 'customer_type', label: 'By customer type' },
   { value: 'order_history', label: 'By recent order history' },
-]
-
-const CUSTOMER_TYPE_OPTIONS = [
-  { value: 'retail', label: 'Retail' },
-  { value: 'wholesale', label: 'Wholesale' },
-  { value: 'industrial', label: 'Industrial' },
 ]
 
 const inputClass = 'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
@@ -46,7 +39,6 @@ export default function NewCampaignPage() {
   const [subject, setSubject] = useState('')
   const [title, setTitle] = useState('')
   const [audienceType, setAudienceType] = useState('all')
-  const [customerTypes, setCustomerTypes] = useState<string[]>(['retail'])
   const [daysSinceOrder, setDaysSinceOrder] = useState('30')
   const [scheduledAt, setScheduledAt] = useState('')
   const [previewHtml, setPreviewHtml] = useState('')
@@ -85,9 +77,7 @@ export default function NewCampaignPage() {
     setSubmitting(true)
     setError('')
     try {
-      const audienceFilter = audienceType === 'customer_type'
-        ? { customerTypes }
-        : audienceType === 'order_history'
+      const audienceFilter = audienceType === 'order_history'
         ? { daysSinceOrder: parseInt(daysSinceOrder, 10) }
         : {}
 
@@ -276,25 +266,6 @@ export default function NewCampaignPage() {
             value={audienceType}
             onChange={setAudienceType}
           />
-
-          {audienceType === 'customer_type' && (
-            <div>
-              <p className={labelClass}>Customer Types</p>
-              <div className="flex flex-wrap gap-3">
-                {CUSTOMER_TYPE_OPTIONS.map(opt => (
-                  <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={customerTypes.includes(opt.value)}
-                      onChange={e => setCustomerTypes(prev => e.target.checked ? [...prev, opt.value] : prev.filter(t => t !== opt.value))}
-                      className="w-4 h-4 text-accent-500 rounded border-border-secondary"
-                    />
-                    <span className="text-sm text-foreground">{opt.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
 
           {audienceType === 'order_history' && (
             <div>
