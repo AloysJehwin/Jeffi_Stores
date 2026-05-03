@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { title, slug, description, google_review_url, coupon_id, is_active } = body
+  const { title, slug, description, google_review_url, coupon_id, is_active, custom_fields } = body
 
   if (!title || !slug || !google_review_url) {
     return NextResponse.json({ error: 'title, slug and google_review_url are required' }, { status: 400 })
@@ -48,9 +48,9 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await queryMany(
-      `INSERT INTO review_forms (title, slug, description, google_review_url, coupon_id, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [title, slug.toLowerCase().trim(), description || null, google_review_url, coupon_id || null, is_active ?? true]
+      `INSERT INTO review_forms (title, slug, description, google_review_url, coupon_id, is_active, custom_fields)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [title, slug.toLowerCase().trim(), description || null, google_review_url, coupon_id || null, is_active ?? true, JSON.stringify(custom_fields || [])]
     )
     return NextResponse.json({ form: result[0] }, { status: 201 })
   } catch (err: unknown) {

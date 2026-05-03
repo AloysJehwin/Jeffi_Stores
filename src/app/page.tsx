@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { queryMany } from '@/lib/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
+import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 
 export const dynamic = 'force-dynamic'
 
@@ -355,6 +356,7 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <ReviewCouponPopup />
     </div>
   )
 }

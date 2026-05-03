@@ -4,38 +4,69 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 
+interface CustomField {
+  id: string
+  label: string
+  type: 'text' | 'textarea' | 'image' | 'rating'
+  required: boolean
+}
+
 interface Submission {
   id: string
-  phone: string
+  email: string
   screenshot_url: string
   coupon_code: string | null
   status: 'pending' | 'approved' | 'rejected'
   submitted_at: string
+  extra_fields: Record<string, string>
+}
+
+interface FormMeta {
+  title: string
+  custom_fields: CustomField[]
+}
+
+function StarDisplay({ value }: { value: number }) {
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map(s => (
+        <span key={s} className={`text-sm ${s <= value ? 'text-yellow-400' : 'text-gray-300'}`}>★</span>
+      ))}
+    </div>
+  )
 }
 
 export default function SubmissionsPage({ params }: { params: { id: string } }) {
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [formMeta, setFormMeta] = useState<FormMeta | null>(null)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [updating, setUpdating] = useState<string | null>(null)
 
-  const fetchSubmissions = async () => {
+  const fetchData = async () => {
     setLoading(true)
     try {
       const qs = statusFilter ? `?status=${statusFilter}` : ''
-      const res = await fetch(`/api/admin/review-forms/${params.id}/submissions${qs}`)
-      if (res.ok) {
-        const data = await res.json()
+      const [subsRes, formRes] = await Promise.all([
+        fetch(`/api/admin/review-forms/${params.id}/submissions${qs}`),
+        fetch(`/api/admin/review-forms/${params.id}`),
+      ])
+      if (subsRes.ok) {
+        const data = await subsRes.json()
         setSubmissions(data.submissions)
         setTotal(data.total)
+      }
+      if (formRes.ok) {
+        const data = await formRes.json()
+        setFormMeta({ title: data.form.title, custom_fields: data.form.custom_fields || [] })
       }
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { fetchSubmissions() }, [statusFilter])
+  useEffect(() => { fetchData() }, [statusFilter])
 
   const updateStatus = async (submissionId: string, status: string) => {
     setUpdating(submissionId)
@@ -60,7 +91,9 @@ export default function SubmissionsPage({ params }: { params: { id: string } }) 
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">Submissions</h1>
+          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">
+            {formMeta?.title ? `${formMeta.title} — Submissions` : 'Submissions'}
+          </h1>
           <p className="text-sm text-foreground-secondary mt-0.5">{total} total</p>
         </div>
       </div>
@@ -93,12 +126,40 @@ export default function SubmissionsPage({ params }: { params: { id: string } }) 
                 <Image src={s.screenshot_url} alt="Review screenshot" fill className="object-cover" unoptimized />
               </a>
               <div className="p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm">+91 {s.phone}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(s.status)}`}>{s.status}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-sm truncate">{s.email}</span>
+                  <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(s.status)}`}>{s.status}</span>
                 </div>
-                {s.coupon_code && <p className="text-xs text-foreground-secondary">Coupon: <span className="font-mono font-bold text-accent-500">{s.coupon_code}</span></p>}
+
+                {s.coupon_code && (
+                  <p className="text-xs text-foreground-secondary">Coupon: <span className="font-mono font-bold text-accent-500">{s.coupon_code}</span></p>
+                )}
+
+                {formMeta?.custom_fields && formMeta.custom_fields.length > 0 && s.extra_fields && Object.keys(s.extra_fields).length > 0 && (
+                  <div className="space-y-1.5 pt-1 border-t border-border-default">
+                    {formMeta.custom_fields.map(field => {
+                      const val = s.extra_fields[field.id]
+                      if (!val) return null
+                      return (
+                        <div key={field.id}>
+                          <p className="text-xs text-foreground-muted">{field.label}</p>
+                          {field.type === 'rating' ? (
+                            <StarDisplay value={parseInt(val, 10)} />
+                          ) : field.type === 'image' ? (
+                            <a href={val} target="_blank" rel="noopener noreferrer">
+                              <Image src={val} alt={field.label} width={200} height={100} className="rounded-lg max-h-24 object-contain" unoptimized />
+                            </a>
+                          ) : (
+                            <p className="text-xs text-foreground">{val}</p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
                 <p className="text-xs text-foreground-muted">{new Date(s.submitted_at).toLocaleString('en-IN')}</p>
+
                 {s.status === 'pending' && (
                   <div className="flex gap-2 pt-1">
                     <button

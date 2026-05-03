@@ -2,12 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne, queryMany } from '@/lib/db'
 
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const form = await queryOne('SELECT * FROM review_forms WHERE id = $1', [params.id])
+  if (!form) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json({ form })
+}
+
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const fields = ['title', 'slug', 'description', 'google_review_url', 'coupon_id', 'is_active']
+  const fields = ['title', 'slug', 'description', 'google_review_url', 'coupon_id', 'is_active', 'custom_fields']
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
@@ -15,7 +24,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   for (const field of fields) {
     if (field in body) {
       updates.push(`${field} = $${i++}`)
-      values.push(field === 'slug' ? (body[field] as string).toLowerCase().trim() : body[field])
+      if (field === 'slug') values.push((body[field] as string).toLowerCase().trim())
+      else if (field === 'custom_fields') values.push(JSON.stringify(body[field]))
+      else values.push(body[field])
     }
   }
 
