@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { query, queryOne } from '@/lib/db'
 import Link from 'next/link'
+import CouponForm from '../../CouponForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,73 +69,23 @@ export default async function EditCouponPage({ params }: { params: { id: string 
         </div>
       </div>
 
-      <form action={updateCoupon} className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Coupon Code *</label>
-            <input name="code" required defaultValue={coupon.code} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" style={{ textTransform: 'uppercase' }} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Discount Type *</label>
-            <select name="discount_type" required defaultValue={coupon.discount_type} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent">
-              <option value="percentage">Percentage (%)</option>
-              <option value="fixed">Fixed Amount (₹)</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Discount Value *</label>
-            <input name="discount_value" type="number" step="0.01" min="0" required defaultValue={coupon.discount_value} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Min Purchase Amount (₹)</label>
-            <input name="min_purchase_amount" type="number" step="0.01" min="0" defaultValue={coupon.min_purchase_amount ?? ''} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Max Discount (₹)</label>
-            <input name="max_discount_amount" type="number" step="0.01" min="0" defaultValue={coupon.max_discount_amount ?? ''} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Total Usage Limit</label>
-            <input name="usage_limit" type="number" min="1" defaultValue={coupon.usage_limit ?? ''} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Valid From</label>
-            <input name="valid_from" type="datetime-local" defaultValue={toDatetimeLocal(coupon.valid_from)} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Valid Until</label>
-            <input name="valid_until" type="datetime-local" defaultValue={toDatetimeLocal(coupon.valid_until)} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Description</label>
-          <textarea name="description" rows={2} defaultValue={coupon.description ?? ''} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input type="checkbox" name="is_active" id="is_active" defaultChecked={coupon.is_active} className="w-4 h-4 text-accent-600 rounded border-border-secondary" />
-          <label htmlFor="is_active" className="text-sm text-foreground-secondary">Active</label>
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <Link href="/admin/coupons" className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
-            Cancel
-          </Link>
-          <button type="submit" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">
-            Save Changes
-          </button>
-        </div>
-      </form>
+      <CouponForm
+        action={updateCoupon}
+        submitLabel="Save Changes"
+        defaultValues={{
+          code: coupon.code,
+          discount_type: coupon.discount_type,
+          discount_value: coupon.discount_value,
+          min_purchase_amount: coupon.min_purchase_amount,
+          max_discount_amount: coupon.max_discount_amount,
+          usage_limit: coupon.usage_limit,
+          usage_limit_per_user: coupon.usage_limit_per_user,
+          valid_from: toDatetimeLocal(coupon.valid_from),
+          valid_until: toDatetimeLocal(coupon.valid_until),
+          description: coupon.description,
+          is_active: coupon.is_active,
+        }}
+      />
     </div>
   )
 }
