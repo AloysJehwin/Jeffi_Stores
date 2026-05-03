@@ -123,17 +123,6 @@ export default function FormClient({ form }: { form: ReviewForm }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-4 py-4">
-        <div className="max-w-lg mx-auto flex items-center gap-3">
-          <div className="w-9 h-9 bg-accent-500 rounded-lg flex items-center justify-center text-white font-black text-sm shrink-0">J</div>
-          <div>
-            <p className="font-bold text-gray-800 leading-none text-sm">Jeffi Stores</p>
-            <p className="text-xs text-gray-400">jeffistores.in</p>
-          </div>
-        </div>
-      </div>
-
       <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
         {/* Intro */}
         <div className="text-center space-y-2">

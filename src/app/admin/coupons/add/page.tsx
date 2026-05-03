@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/db'
 import Link from 'next/link'
+import CouponForm from '../CouponForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,73 +47,7 @@ export default function AddCouponPage() {
         </div>
       </div>
 
-      <form action={createCoupon} className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Coupon Code *</label>
-            <input name="code" required className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. REVIEW10" style={{ textTransform: 'uppercase' }} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Discount Type *</label>
-            <select name="discount_type" required className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent">
-              <option value="percentage">Percentage (%)</option>
-              <option value="fixed">Fixed Amount (₹)</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Discount Value *</label>
-            <input name="discount_value" type="number" step="0.01" min="0" required className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 10" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Min Purchase Amount (₹)</label>
-            <input name="min_purchase_amount" type="number" step="0.01" min="0" className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Optional" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Max Discount (₹)</label>
-            <input name="max_discount_amount" type="number" step="0.01" min="0" className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Optional cap" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Total Usage Limit</label>
-            <input name="usage_limit" type="number" min="1" className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Unlimited if blank" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Valid From</label>
-            <input name="valid_from" type="datetime-local" className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Valid Until</label>
-            <input name="valid_until" type="datetime-local" className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Description</label>
-          <textarea name="description" rows={2} className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 10% off for Google review submission" />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <input type="checkbox" name="is_active" id="is_active" defaultChecked className="w-4 h-4 text-accent-600 rounded border-border-secondary" />
-          <label htmlFor="is_active" className="text-sm text-foreground-secondary">Active</label>
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <Link href="/admin/coupons" className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
-            Cancel
-          </Link>
-          <button type="submit" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">
-            Create Coupon
-          </button>
-        </div>
-      </form>
+      <CouponForm action={createCoupon} submitLabel="Create Coupon" />
     </div>
   )
 }

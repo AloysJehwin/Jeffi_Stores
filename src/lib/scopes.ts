@@ -3,6 +3,7 @@ export interface ScopeDefinition {
   label: string
   description: string
   routes: string[]
+  group?: string
 }
 
 export const ADMIN_SCOPES: ScopeDefinition[] = [
@@ -17,18 +18,56 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     label: 'Products',
     description: 'Manage products, add/edit/delete',
     routes: ['/admin/products'],
+    group: 'Catalogue',
   },
   {
     key: 'categories',
     label: 'Categories',
     description: 'Manage categories, add/edit/delete',
     routes: ['/admin/categories'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'brands',
+    label: 'Brands',
+    description: 'Manage product brands',
+    routes: ['/admin/brands'],
+    group: 'Catalogue',
   },
   {
     key: 'orders',
     label: 'Orders',
     description: 'View and manage orders',
     routes: ['/admin/orders'],
+    group: 'Operations',
+  },
+  {
+    key: 'packing_slips',
+    label: 'Packing Slips',
+    description: 'Download and print packing slips',
+    routes: ['/admin/packing-slips'],
+    group: 'Operations',
+  },
+  {
+    key: 'labels',
+    label: 'Label Generator',
+    description: 'Generate and download product labels with QR codes and barcodes',
+    routes: ['/admin/labels'],
+    group: 'Operations',
+  },
+  {
+    key: 'quick_scan',
+    label: 'QuickScan',
+    description: 'Scan and update order shipping status',
+    routes: ['/admin/scan'],
+    group: 'Operations',
+  },
+  {
+    key: 'quotations',
+    label: 'Quotations',
+    description: 'Create and download B2B quotations',
+    routes: ['/admin/quotations'],
+    group: 'Operations',
   },
   {
     key: 'reviews',
@@ -37,64 +76,45 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/reviews'],
   },
   {
-    key: 'brands',
-    label: 'Brands',
-    description: 'Manage product brands',
-    routes: ['/admin/brands'],
-  },
-  {
     key: 'customers',
     label: 'Customers',
     description: 'View and manage customer accounts',
     routes: ['/admin/customers'],
   },
   {
-    key: 'packing_slips',
-    label: 'Packing Slips',
-    description: 'Download and print packing slips',
-    routes: ['/admin/packing-slips'],
-  },
-  {
-    key: 'labels',
-    label: 'Label Generator',
-    description: 'Generate and download product labels with QR codes and barcodes',
-    routes: ['/admin/labels'],
-  },
-  {
-    key: 'quick_scan',
-    label: 'QuickScan',
-    description: 'Scan and update order shipping status',
-    routes: ['/admin/scan'],
-  },
-  {
-    key: 'quotations',
-    label: 'Quotations',
-    description: 'Create and download B2B quotations',
-    routes: ['/admin/quotations'],
-  },
-  {
-    key: 'inflation',
-    label: 'Inflation / Pricing',
-    description: 'Bulk price adjustments via inflation tool',
-    routes: ['/admin/inflation'],
-  },
-  {
-    key: 'settings',
-    label: 'Settings',
-    description: 'System settings and admin management',
-    routes: ['/admin/settings'],
-  },
-  {
     key: 'coupons',
     label: 'Coupons',
     description: 'Create and manage discount coupons',
     routes: ['/admin/coupons'],
+    group: 'Marketing',
   },
   {
     key: 'review_forms',
     label: 'Review Forms',
     description: 'Manage Google review incentive forms',
     routes: ['/admin/review-forms'],
+    group: 'Marketing',
+  },
+  {
+    key: 'mailer',
+    label: 'Mailer',
+    description: 'Send and schedule email campaigns to customers',
+    routes: ['/admin/mailer'],
+    group: 'Marketing',
+  },
+  {
+    key: 'inflation',
+    label: 'Inflation / Pricing',
+    description: 'Bulk price adjustments via inflation tool',
+    routes: ['/admin/inflation'],
+    group: 'Settings',
+  },
+  {
+    key: 'settings',
+    label: 'Settings',
+    description: 'System settings and admin management',
+    routes: ['/admin/settings'],
+    group: 'Settings',
   },
 ]
 
@@ -119,6 +139,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/reviews')) return 'reviews'
   if (pathname.startsWith('/api/admin/coupons')) return 'coupons'
   if (pathname.startsWith('/api/admin/review-forms')) return 'review_forms'
+  if (pathname.startsWith('/api/admin/mailer')) return 'mailer'
   if (pathname.startsWith('/api/brands')) return 'brands'
   if (pathname.startsWith('/api/customers')) return 'customers'
 
