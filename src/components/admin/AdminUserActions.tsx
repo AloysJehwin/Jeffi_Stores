@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ADMIN_SCOPES } from '@/lib/scopes'
+import ScopeGrid from '@/components/admin/ScopeGrid'
 
 interface AdminUser {
   id: string
@@ -170,39 +171,7 @@ export default function AdminUserActions({
                     {allSelected ? 'Deselect all' : 'Select all'}
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {ADMIN_SCOPES.map(scope => {
-                    const active = scopes.includes(scope.key)
-                    return (
-                      <button
-                        key={scope.key}
-                        type="button"
-                        onClick={() => toggleScope(scope.key)}
-                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-colors ${
-                          active
-                            ? 'border-accent-500 bg-accent-500/10 dark:bg-accent-500/15'
-                            : 'border-border-default bg-surface hover:border-border-secondary hover:bg-surface-secondary'
-                        }`}
-                      >
-                        <span className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded flex items-center justify-center border ${
-                          active ? 'bg-accent-500 border-accent-500' : 'border-border-secondary bg-surface'
-                        }`}>
-                          {active && (
-                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </span>
-                        <span>
-                          <span className={`block text-xs font-semibold ${active ? 'text-accent-600 dark:text-accent-400' : 'text-foreground'}`}>
-                            {scope.label}
-                          </span>
-                          <span className="block text-xs text-foreground-muted leading-relaxed mt-0.5">{scope.description}</span>
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
+                <ScopeGrid selected={scopes} onToggle={toggleScope} variant="button" />
               </div>
 
               {error && (

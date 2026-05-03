@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ADMIN_SCOPES } from '@/lib/scopes'
+import ScopeGrid from '@/components/admin/ScopeGrid'
 
 export default function CreateAdminForm({ onCreated }: { onCreated?: () => void }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -63,7 +64,6 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
         return
       }
 
-      // Download the p12 certificate file
       if (data.certificate?.p12Base64) {
         const binary = atob(data.certificate.p12Base64)
         const bytes = new Uint8Array(binary.length)
@@ -81,7 +81,6 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
         URL.revokeObjectURL(url)
       }
 
-      // Show certificate password
       setCertInfo({
         p12Password: data.certificate.p12Password,
         username: form.username,
@@ -89,7 +88,6 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
         expiresAt: data.certificate.expiresAt,
       })
 
-      // Reset form
       setForm({
         username: '',
         password: '',
@@ -255,29 +253,7 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {ADMIN_SCOPES.map(scope => (
-            <label
-              key={scope.key}
-              className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                form.scopes.includes(scope.key)
-                  ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                  : 'border-border-default hover:border-border-secondary'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={form.scopes.includes(scope.key)}
-                onChange={() => toggleScope(scope.key)}
-                className="mt-0.5 accent-accent-500"
-              />
-              <div>
-                <p className="text-sm font-medium text-foreground">{scope.label}</p>
-                <p className="text-xs text-foreground-muted">{scope.description}</p>
-              </div>
-            </label>
-          ))}
-        </div>
+        <ScopeGrid selected={form.scopes} onToggle={toggleScope} variant="card" />
       </div>
 
       <div className="flex gap-3 pt-2">
