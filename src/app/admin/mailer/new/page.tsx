@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -31,6 +31,13 @@ const textareaClass = `${inputClass} resize-none`
 
 type TemplateData = Record<string, string>
 
+interface ReviewFormOption {
+  id: string
+  title: string
+  slug: string
+  coupon_code: string | null
+}
+
 export default function NewCampaignPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
@@ -46,6 +53,14 @@ export default function NewCampaignPage() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [reviewForms, setReviewForms] = useState<ReviewFormOption[]>([])
+
+  useEffect(() => {
+    fetch('/api/admin/review-forms?page=1')
+      .then(r => r.json())
+      .then(data => setReviewForms(data.forms || []))
+      .catch(() => {})
+  }, [])
 
   function setField(key: string, value: string) {
     setTemplateData(prev => ({ ...prev, [key]: value }))
@@ -173,9 +188,48 @@ export default function NewCampaignPage() {
 
           {templateKey === 'review_form_share' && (
             <>
-              <div><label className={labelClass}>Form Title</label><input value={templateData.formTitle || ''} onChange={e => setField('formTitle', e.target.value)} className={inputClass} placeholder="e.g. Leave Us a Google Review" /></div>
-              <div><label className={labelClass}>Form URL *</label><input value={templateData.formUrl || ''} onChange={e => setField('formUrl', e.target.value)} className={inputClass} placeholder="https://forms.jeffistores.in/google-review" /></div>
-              <div><label className={labelClass}>Coupon Code (optional)</label><input value={templateData.couponCode || ''} onChange={e => setField('couponCode', e.target.value)} className={inputClass} placeholder="e.g. REVIEW10" style={{ textTransform: 'uppercase' }} /></div>
+              <AdminSelect
+                label="Review Form *"
+                placeholder={reviewForms.length === 0 ? 'No active forms found' : 'Select a form…'}
+                options={reviewForms.map(f => ({
+                  value: f.id,
+                  label: f.title,
+                  group: undefined,
+                }))}
+                value={templateData.formId || ''}
+                onChange={formId => {
+                  const chosen = reviewForms.find(f => f.id === formId)
+                  if (!chosen) return
+                  setTemplateData(prev => ({
+                    ...prev,
+                    formId: chosen.id,
+                    formTitle: chosen.title,
+                    formUrl: `https://forms.jeffistores.in/${chosen.slug}`,
+                    couponCode: chosen.coupon_code || '',
+                  }))
+                }}
+                disabled={reviewForms.length === 0}
+              />
+              {templateData.formUrl && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-surface-secondary rounded-lg border border-border-default text-xs text-foreground-muted font-mono">
+                  <span className="truncate">{templateData.formUrl}</span>
+                </div>
+              )}
+              {reviewForms.length === 0 && (
+                <p className="text-xs text-amber-600">
+                  No review forms found. <Link href="/admin/review-forms/add" className="underline">Create one first.</Link>
+                </p>
+              )}
+              <div>
+                <label className={labelClass}>Coupon Code (auto-filled, editable)</label>
+                <input
+                  value={templateData.couponCode || ''}
+                  onChange={e => setField('couponCode', e.target.value.toUpperCase())}
+                  className={inputClass}
+                  placeholder="e.g. REVIEW10"
+                  style={{ textTransform: 'uppercase' }}
+                />
+              </div>
             </>
           )}
 
