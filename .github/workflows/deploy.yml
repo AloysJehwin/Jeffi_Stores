@@ -34,6 +34,7 @@ jobs:
             git fetch origin
             git checkout ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
+            docker compose -f docker-compose.prod.yml down --remove-orphans || true
             docker system prune -af --volumes 2>&1 | grep -v "prune operation is already running" || true
             docker compose -f docker-compose.prod.yml build --no-cache app
             docker compose -f docker-compose.prod.yml up -d
