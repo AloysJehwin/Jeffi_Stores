@@ -20,10 +20,11 @@ function shouldShowFooter(pathname: string | null): boolean {
 export default function ConditionalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isAdminPage = pathname?.startsWith('/admin')
+  const isFormsPage = pathname?.startsWith('/forms')
 
-  if (isAdminPage) {
+  if (isAdminPage || isFormsPage) {
     return (
-      <ThemeProvider storageKey="jeffi-admin-theme">
+      <ThemeProvider storageKey={isAdminPage ? 'jeffi-admin-theme' : undefined}>
         <ToastProvider>
           {children}
         </ToastProvider>

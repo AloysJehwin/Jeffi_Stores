@@ -42,16 +42,46 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const offset = (page - 1) * PAGE_SIZE
 
-  const [campaigns, total] = await Promise.all([
-    queryMany<Campaign>(
-      `SELECT id, title, template_key, subject, audience_type, recipient_count, status, scheduled_at, sent_at, created_at
-       FROM email_campaigns ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
-      [PAGE_SIZE, offset]
-    ),
-    queryCount('SELECT COUNT(*) FROM email_campaigns', []),
-  ])
+  let campaigns: Campaign[] = []
+  let total = 0
+  let migrationPending = false
+
+  try {
+    ;[campaigns, total] = await Promise.all([
+      queryMany<Campaign>(
+        `SELECT id, title, template_key, subject, audience_type, recipient_count, status, scheduled_at, sent_at, created_at
+         FROM email_campaigns ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+        [PAGE_SIZE, offset]
+      ),
+      queryCount('SELECT COUNT(*) FROM email_campaigns', []),
+    ])
+  } catch {
+    migrationPending = true
+  }
 
   const buildUrl = (p: number) => `/admin/mailer${p > 1 ? `?page=${p}` : ''}`
+
+  if (migrationPending) {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Mailer</h1>
+            <p className="text-foreground-secondary mt-1 text-sm">Create and send email campaigns to your customers</p>
+          </div>
+        </div>
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6 max-w-xl">
+          <h2 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">Database migration required</h2>
+          <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
+            The <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">email_campaigns</code> table does not exist yet. Run the migration on your production database:
+          </p>
+          <pre className="bg-amber-100 dark:bg-amber-900/40 rounded-lg px-4 py-3 text-xs font-mono text-amber-900 dark:text-amber-200 overflow-x-auto">
+            psql $DATABASE_URL -f database/migrations/mailer.sql
+          </pre>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 sm:p-6">
