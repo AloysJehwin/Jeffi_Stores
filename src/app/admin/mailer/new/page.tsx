@@ -205,7 +205,6 @@ export default function NewCampaignPage() {
                     formId: chosen.id,
                     formTitle: chosen.title,
                     formUrl: `https://forms.jeffistores.in/${chosen.slug}`,
-                    couponCode: chosen.coupon_code || '',
                   }))
                 }}
                 disabled={reviewForms.length === 0}
@@ -220,16 +219,6 @@ export default function NewCampaignPage() {
                   No review forms found. <Link href="/admin/review-forms/add" className="underline">Create one first.</Link>
                 </p>
               )}
-              <div>
-                <label className={labelClass}>Coupon Code (auto-filled, editable)</label>
-                <input
-                  value={templateData.couponCode || ''}
-                  onChange={e => setField('couponCode', e.target.value.toUpperCase())}
-                  className={inputClass}
-                  placeholder="e.g. REVIEW10"
-                  style={{ textTransform: 'uppercase' }}
-                />
-              </div>
             </>
           )}
 

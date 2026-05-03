@@ -48,10 +48,9 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
       const html = baseLayout(subject, `
         <p style="font-size:16px;color:#333;margin:0 0 12px;">${greeting}</p>
         <h2 style="font-size:22px;color:#1a3a4a;margin:0 0 16px;">${data.formTitle || 'Leave Us a Google Review'}</h2>
-        <p style="color:#555;line-height:1.6;margin:0 0 16px;">
+        <p style="color:#555;line-height:1.6;margin:0 0 20px;">
           We'd love to hear what you think! Leave us a Google review and we'll send you a special discount as a thank-you.
         </p>
-        ${data.couponCode ? `<p style="color:#555;margin:0 0 20px;">Use coupon <strong style="color:#e07b3f;font-family:monospace;font-size:16px;">${data.couponCode}</strong> on your next order after submitting.</p>` : ''}
         ${ctaButton('Leave a Review & Claim Reward', data.formUrl || BASE_URL)}
         <p style="color:#999;font-size:13px;margin:20px 0 0;">Or paste this link: <a href="${data.formUrl}" style="color:#e07b3f;">${data.formUrl}</a></p>
       `)
