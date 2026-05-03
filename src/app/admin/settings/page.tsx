@@ -340,15 +340,26 @@ export default async function SettingsPage() {
                 <h2 className="text-lg font-semibold text-foreground">Available Scopes</h2>
                 <p className="text-xs text-foreground-muted mt-1">{ADMIN_SCOPES.length} scopes</p>
               </div>
-              <div className="p-4 divide-y divide-border-default">
-                {ADMIN_SCOPES.map(scope => (
-                  <div key={scope.key} className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0">
-                    <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-secondary border border-border-default text-foreground font-mono">
-                      {scope.label}
-                    </span>
-                    <span className="text-xs text-foreground-secondary leading-relaxed">{scope.description}</span>
-                  </div>
-                ))}
+              <div className="p-4 space-y-4">
+                {(['General', 'Catalogue', 'Operations', 'Marketing', 'Settings'] as const).map(groupName => {
+                  const groupScopes = ADMIN_SCOPES.filter(s => (s.group || 'General') === groupName)
+                  if (groupScopes.length === 0) return null
+                  return (
+                    <div key={groupName}>
+                      <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-2">{groupName}</p>
+                      <div className="divide-y divide-border-default border border-border-default rounded-lg overflow-hidden">
+                        {groupScopes.map(scope => (
+                          <div key={scope.key} className="flex items-start gap-3 px-4 py-2.5">
+                            <span className="shrink-0 mt-0.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-surface-secondary border border-border-default text-foreground font-mono">
+                              {scope.label}
+                            </span>
+                            <span className="text-xs text-foreground-secondary leading-relaxed">{scope.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
