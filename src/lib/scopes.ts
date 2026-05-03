@@ -84,6 +84,18 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     description: 'System settings and admin management',
     routes: ['/admin/settings'],
   },
+  {
+    key: 'coupons',
+    label: 'Coupons',
+    description: 'Create and manage discount coupons',
+    routes: ['/admin/coupons'],
+  },
+  {
+    key: 'review_forms',
+    label: 'Review Forms',
+    description: 'Manage Google review incentive forms',
+    routes: ['/admin/review-forms'],
+  },
 ]
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
@@ -105,6 +117,8 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/users')) return 'settings'
   if (pathname.startsWith('/api/admin/certificates')) return 'settings'
   if (pathname.startsWith('/api/admin/reviews')) return 'reviews'
+  if (pathname.startsWith('/api/admin/coupons')) return 'coupons'
+  if (pathname.startsWith('/api/admin/review-forms')) return 'review_forms'
   if (pathname.startsWith('/api/brands')) return 'brands'
   if (pathname.startsWith('/api/customers')) return 'customers'
 
