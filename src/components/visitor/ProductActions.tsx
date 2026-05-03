@@ -228,21 +228,32 @@ export default function ProductActions({
     }
   }
 
-  const handleBuyNow = async () => {
+  const handleBuyNow = () => {
     setIsBuyingNow(true)
-    try {
-      const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
-      if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
-        showToast('Enter a valid quantity', 'error')
-        setIsBuyingNow(false)
-        return
-      }
-      await addToCart(productId, finalQty, selectedVariantId || undefined, buyMode, currentUnit || undefined)
-      router.push('/cart')
-    } catch (error: any) {
-      showToast(error.message || 'Failed to add to cart', 'error')
+    const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
+    if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
+      showToast('Enter a valid quantity', 'error')
       setIsBuyingNow(false)
+      return
     }
+    const price = buyMode === 'weight' && activeWeightRate
+      ? activeWeightRate
+      : buyMode === 'length' && activeLengthRate
+      ? activeLengthRate
+      : effectivePrice
+
+    const params = new URLSearchParams({
+      buyNow: '1',
+      productId,
+      productName,
+      qty: String(finalQty),
+      buyMode,
+      price: String(price),
+    })
+    if (selectedVariantId) params.set('variantId', selectedVariantId)
+    if (selectedVariant) params.set('variantName', selectedVariant.variant_name)
+    if (currentUnit) params.set('buyUnit', currentUnit)
+    router.push(`/checkout/review?${params.toString()}`)
   }
 
   const handleToggleWishlist = async () => {

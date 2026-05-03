@@ -22,8 +22,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { shippingAddress, notes, paymentMethod } = body
+    const { shippingAddress, notes, paymentMethod, couponId, discountAmount: rawDiscount } = body
     const isRazorpayPayment = paymentMethod === 'razorpay'
+    const appliedDiscount = typeof rawDiscount === 'number' && rawDiscount > 0 ? rawDiscount : 0
 
     const existingUnpaidOrder = await queryOne(
       `SELECT o.id, o.order_number FROM orders o
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const subtotal = cartItems.reduce((sum: number, item: any) => {
+    const subtotal: number = cartItems.reduce((sum: number, item: any) => {
       if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
         return sum + (parseFloat(item.price_at_addition) * parseFloat(item.quantity))
       }
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
       return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
     }, 0)
 
-    const total = subtotal
+    const total = subtotal - appliedDiscount
 
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
@@ -178,12 +179,12 @@ export async function POST(request: NextRequest) {
       orderIgst = Math.round(orderIgst * 100) / 100
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, tax_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, Math.round(taxAmount * 100) / 100, total, shippingAddressId, billingAddressId, notes || null,
+         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, Math.max(0, total), shippingAddressId, billingAddressId, notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST]
       )
@@ -229,6 +230,17 @@ export async function POST(request: NextRequest) {
 
       if (!isRazorpayPayment) {
         await client.query('DELETE FROM cart_items WHERE user_id = $1', [cartUserId])
+      }
+
+      if (couponId && appliedDiscount > 0) {
+        await client.query(
+          `INSERT INTO coupon_usage (coupon_id, user_id, order_id, discount_amount) VALUES ($1, $2, $3, $4)`,
+          [couponId, userId, createdOrder.id, Math.round(appliedDiscount * 100) / 100]
+        )
+        await client.query(
+          `UPDATE coupons SET times_used = times_used + 1 WHERE id = $1`,
+          [couponId]
+        )
       }
 
       return createdOrder
