@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressFormModal from '@/components/visitor/AddressFormModal'
+import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 
 export default function CheckoutReviewPageWrapper() {
   return (
@@ -153,6 +154,22 @@ function CheckoutReviewPage() {
   }
 
   const discountAmount = appliedCoupon?.discountAmount ?? 0
+
+  useEffect(() => {
+    const codeFromUrl = searchParams.get('couponCode')
+    if (!codeFromUrl || appliedCoupon || cartSubtotal === 0) return
+    setCouponCode(codeFromUrl)
+    fetch('/api/coupons/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ code: codeFromUrl, subtotal: cartSubtotal }),
+    })
+      .then(r => r.json())
+      .then(data => { if (data.couponId) setAppliedCoupon(data) })
+      .catch(() => {})
+  }, [searchParams, cartSubtotal])
+
   const finalTotal = Math.max(0, cartSubtotal - discountAmount)
 
   const handleProceedToCheckout = () => {
@@ -401,6 +418,7 @@ function CheckoutReviewPage() {
                   </div>
                 ) : (
                   <div>
+                    <CouponHintBanner />
                     <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Have a coupon?</label>
                     <div className="flex gap-2">
                       <input
