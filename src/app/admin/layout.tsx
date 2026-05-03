@@ -58,8 +58,8 @@ export default async function AdminLayout({
     { href: '/admin/scan', label: 'QuickScan', scope: 'orders', mobileOnly: true },
     { href: '/admin/customers', label: 'Customers', scope: 'customers' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews' },
-    { href: '/admin/coupons', label: 'Coupons', scope: 'coupons' },
-    { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms' },
+    { href: '/admin/coupons', label: 'Coupons', scope: 'coupons', group: 'Marketing' },
+    { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms', group: 'Marketing' },
     { href: '/admin/inflation', label: 'Inflation', scope: 'settings' },
     { href: '/admin/settings', label: 'Settings', scope: 'settings' },
   ]

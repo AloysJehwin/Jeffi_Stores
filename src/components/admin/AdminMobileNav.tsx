@@ -7,6 +7,7 @@ interface NavLink {
   href: string
   label: string
   mobileOnly?: boolean
+  group?: string
 }
 
 interface AdminMobileNavProps {
@@ -33,7 +34,15 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
   }, [isOpen])
 
   const scanLink = navLinks.find(l => l.href === '/admin/scan')
-  const regularLinks = navLinks.filter(l => l.href !== '/admin/scan')
+  const nonScanLinks = navLinks.filter(l => l.href !== '/admin/scan')
+  const ungrouped = nonScanLinks.filter(l => !l.group)
+  const groups = nonScanLinks.reduce<Record<string, NavLink[]>>((acc, l) => {
+    if (l.group) {
+      acc[l.group] = acc[l.group] || []
+      acc[l.group].push(l)
+    }
+    return acc
+  }, {})
 
   return (
     <>
@@ -91,7 +100,7 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
                 QuickScan
               </a>
             )}
-            {regularLinks.map(link => (
+            {ungrouped.map(link => (
               <a
                 key={link.href}
                 href={link.href}
@@ -104,9 +113,55 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
                 {link.label}
               </a>
             ))}
+            {Object.entries(groups).map(([groupName, links]) => (
+              <MobileNavGroup key={groupName} groupName={groupName} links={links} pathname={pathname} />
+            ))}
           </nav>
         </div>
       </div>
     </>
+  )
+}
+
+function MobileNavGroup({ groupName, links, pathname }: { groupName: string; links: NavLink[]; pathname: string | null }) {
+  const isAnyActive = links.some(l => pathname === l.href || pathname?.startsWith(l.href))
+  const [isOpen, setIsOpen] = useState(isAnyActive)
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setIsOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+      >
+        <span>{groupName}</span>
+        <svg
+          className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isOpen && (
+        <div className="ml-4 flex flex-col gap-0.5 mt-0.5">
+          {links.map(link => (
+            <a
+              key={link.href}
+              href={link.href}
+              className={`px-4 py-2.5 rounded-lg font-medium transition-colors ${
+                pathname === link.href || pathname?.startsWith(link.href)
+                  ? 'bg-primary-500/20 text-primary-400'
+                  : 'text-gray-400 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
