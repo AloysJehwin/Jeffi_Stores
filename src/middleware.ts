@@ -8,6 +8,9 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   if (hostname.startsWith('forms.')) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.next()
+    }
     const slug = pathname === '/' ? '' : pathname
     return NextResponse.rewrite(new URL(`/forms${slug}`, request.url))
   }
