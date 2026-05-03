@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS email_campaigns (
   status VARCHAR(20) NOT NULL DEFAULT 'draft',
   scheduled_at TIMESTAMPTZ,
   sent_at TIMESTAMPTZ,
-  created_by UUID REFERENCES admin_users(id) ON DELETE SET NULL,
+  created_by UUID REFERENCES admins(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
