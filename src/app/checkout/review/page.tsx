@@ -16,6 +16,15 @@ export default function CheckoutReviewPageWrapper() {
   )
 }
 
+interface CouponResult {
+  couponId: string
+  code: string
+  description: string | null
+  discountType: string
+  discountValue: number
+  discountAmount: number
+}
+
 function CheckoutReviewPage() {
   const { cartItems, cartCount, getCartTotal, getCartTax, isLoading: cartLoading } = useCart()
   const { user, isLoading: authLoading } = useAuth()
@@ -23,10 +32,29 @@ function CheckoutReviewPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  const isBuyNow = searchParams.get('buyNow') === '1'
+
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [addresses, setAddresses] = useState<any[]>([])
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true)
   const [showAddressModal, setShowAddressModal] = useState(false)
+
+  const [couponCode, setCouponCode] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponResult | null>(null)
+  const [couponError, setCouponError] = useState('')
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
+
+  const [buyNowItem, setBuyNowItem] = useState<{
+    productId: string
+    variantId: string | null
+    qty: number
+    buyMode: string
+    buyUnit: string | null
+    price: number
+    productName: string
+    variantName: string | null
+    imageUrl: string | null
+  } | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -34,14 +62,37 @@ function CheckoutReviewPage() {
       return
     }
 
-    if (!cartLoading && cartCount === 0) {
+    if (isBuyNow) {
+      const productId = searchParams.get('productId')
+      const variantId = searchParams.get('variantId')
+      const qty = parseFloat(searchParams.get('qty') || '1')
+      const buyMode = searchParams.get('buyMode') || 'unit'
+      const buyUnit = searchParams.get('buyUnit')
+      const price = parseFloat(searchParams.get('price') || '0')
+      const productName = searchParams.get('productName') || ''
+      const variantName = searchParams.get('variantName')
+
+      if (!productId || !price) { router.push('/'); return }
+
+      setBuyNowItem({
+        productId,
+        variantId: variantId || null,
+        qty,
+        buyMode,
+        buyUnit: buyUnit || null,
+        price,
+        productName,
+        variantName: variantName || null,
+        imageUrl: null,
+      })
+    } else if (!cartLoading && cartCount === 0) {
       router.push('/cart')
     }
 
     if (user) {
       fetchAddresses()
     }
-  }, [cartCount, user, authLoading, cartLoading, router])
+  }, [cartCount, user, authLoading, cartLoading, router, isBuyNow])
 
   const fetchAddresses = async () => {
     try {
@@ -65,12 +116,67 @@ function CheckoutReviewPage() {
     }
   }
 
+  const cartSubtotal = isBuyNow
+    ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
+    : getCartTotal()
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return
+    setIsApplyingCoupon(true)
+    setCouponError('')
+    try {
+      const res = await fetch('/api/coupons/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code: couponCode, subtotal: cartSubtotal }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setCouponError(data.error || 'Invalid coupon')
+        setAppliedCoupon(null)
+      } else {
+        setAppliedCoupon(data)
+        setCouponError('')
+      }
+    } catch {
+      setCouponError('Failed to apply coupon')
+    } finally {
+      setIsApplyingCoupon(false)
+    }
+  }
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponCode('')
+    setCouponError('')
+  }
+
+  const discountAmount = appliedCoupon?.discountAmount ?? 0
+  const finalTotal = Math.max(0, cartSubtotal - discountAmount)
+
   const handleProceedToCheckout = () => {
     if (!selectedAddress) {
       showToast('Please select a delivery address', 'warning')
       return
     }
-    router.push(`/checkout?addressId=${selectedAddress.id}`)
+
+    const params = new URLSearchParams({ addressId: selectedAddress.id })
+    if (appliedCoupon) {
+      params.set('couponId', appliedCoupon.couponId)
+      params.set('couponCode', appliedCoupon.code)
+      params.set('discountAmount', String(appliedCoupon.discountAmount))
+    }
+    if (isBuyNow && buyNowItem) {
+      params.set('buyNow', '1')
+      params.set('productId', buyNowItem.productId)
+      if (buyNowItem.variantId) params.set('variantId', buyNowItem.variantId)
+      params.set('qty', String(buyNowItem.qty))
+      params.set('buyMode', buyNowItem.buyMode)
+      if (buyNowItem.buyUnit) params.set('buyUnit', buyNowItem.buyUnit)
+      params.set('price', String(buyNowItem.price))
+    }
+    router.push(`/checkout?${params.toString()}`)
   }
 
   if (authLoading || cartLoading || isLoadingAddresses) {
@@ -81,12 +187,10 @@ function CheckoutReviewPage() {
     )
   }
 
-  if (!user || cartCount === 0) {
-    return null
-  }
+  if (!user) return null
+  if (!isBuyNow && cartCount === 0) return null
 
-  const total = getCartTotal()
-  const tax = getCartTax()
+  const tax = isBuyNow ? 0 : getCartTax()
 
   return (
     <div className="bg-surface min-h-screen py-4 sm:py-6 lg:py-8">
@@ -97,7 +201,6 @@ function CheckoutReviewPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Delivery Address */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
@@ -174,58 +277,78 @@ function CheckoutReviewPage() {
             {/* Order Items */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <h2 className="text-xl font-bold text-foreground mb-6">
-                Order Items ({cartCount} {cartCount === 1 ? 'item' : 'items'})
+                {isBuyNow ? 'Item' : `Order Items (${cartCount} ${cartCount === 1 ? 'item' : 'items'})`}
               </h2>
 
               <div className="space-y-4">
-                {cartItems.map((item) => {
-                  const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                  const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
-                  const itemTotal = price * item.quantity
-
-                  return (
-                    <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
-                      <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
-                        {primaryImage ? (
-                          <img
-                            src={primaryImage.thumbnail_url}
-                            alt={item.products.name}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">{item.products.name}</h3>
-                        {item.variant && (
-                          <p className="text-sm text-foreground-muted">{item.variant.variant_name}</p>
-                        )}
-                        <div className="flex items-center justify-between mt-2">
-                          <p className="text-sm text-foreground-secondary">
-                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
-                          </p>
-                          <p className="text-sm font-semibold text-foreground">
-                            ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </p>
+                {isBuyNow && buyNowItem ? (
+                  <div className="flex gap-4 pb-4">
+                    <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
+                      {buyNowItem.imageUrl ? (
+                        <img src={buyNowItem.imageUrl} alt={buyNowItem.productName} className="w-full h-full object-cover rounded-lg" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
                         </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">{buyNowItem.productName}</h3>
+                      {buyNowItem.variantName && <p className="text-sm text-foreground-muted">{buyNowItem.variantName}</p>}
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-sm text-foreground-secondary">
+                          ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
+                        </p>
+                        <p className="text-sm font-semibold text-foreground">
+                          ₹{(buyNowItem.price * buyNowItem.qty).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </p>
                       </div>
                     </div>
-                  )
-                })}
+                  </div>
+                ) : (
+                  cartItems.map((item) => {
+                    const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
+                    const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+                    const itemTotal = price * item.quantity
+
+                    return (
+                      <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
+                        <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
+                          {primaryImage ? (
+                            <img src={primaryImage.thumbnail_url} alt={item.products.name} className="w-full h-full object-cover rounded-lg" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-foreground">{item.products.name}</h3>
+                          {item.variant && <p className="text-sm text-foreground-muted">{item.variant.variant_name}</p>}
+                          <div className="flex items-center justify-between mt-2">
+                            <p className="text-sm text-foreground-secondary">
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
+                            </p>
+                            <p className="text-sm font-semibold text-foreground">
+                              ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
               </div>
 
-              <Link
-                href="/cart"
-                className="block text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4"
-              >
-                ← Modify Cart
-              </Link>
+              {!isBuyNow && (
+                <Link href="/cart" className="block text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4">
+                  ← Modify Cart
+                </Link>
+              )}
             </div>
           </div>
 
@@ -236,13 +359,21 @@ function CheckoutReviewPage() {
 
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-foreground-secondary">
-                  <span>Subtotal ({cartCount} items)</span>
-                  <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span>Subtotal{!isBuyNow ? ` (${cartCount} items)` : ''}</span>
+                  <span>₹{cartSubtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between text-foreground-muted text-sm">
-                  <span>Incl. GST</span>
-                  <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
+                {!isBuyNow && (
+                  <div className="flex justify-between text-foreground-muted text-sm">
+                    <span>Incl. GST</span>
+                    <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {appliedCoupon && (
+                  <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
+                    <span>Coupon ({appliedCoupon.code})</span>
+                    <span>−₹{appliedCoupon.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-foreground-secondary">
                   <span>Delivery Charges</span>
                   <span className="text-green-600 dark:text-green-400">FREE</span>
@@ -250,10 +381,47 @@ function CheckoutReviewPage() {
                 <div className="border-t border-border-default pt-3">
                   <div className="flex justify-between text-xl font-bold text-foreground">
                     <span>Total</span>
-                    <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>
                 </div>
+              </div>
+
+              {/* Coupon */}
+              <div className="mb-6">
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
+                    <div>
+                      <span className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code}</span>
+                      {appliedCoupon.description && (
+                        <p className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</p>
+                      )}
+                    </div>
+                    <button onClick={handleRemoveCoupon} className="text-xs text-red-500 hover:text-red-600 font-medium ml-3">Remove</button>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Have a coupon?</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponCode}
+                        onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponError('') }}
+                        onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                        placeholder="Enter code"
+                        className="flex-1 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      />
+                      <button
+                        onClick={handleApplyCoupon}
+                        disabled={isApplyingCoupon || !couponCode.trim()}
+                        className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed"
+                      >
+                        {isApplyingCoupon ? '...' : 'Apply'}
+                      </button>
+                    </div>
+                    {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
+                  </div>
+                )}
               </div>
 
               <button
@@ -267,14 +435,10 @@ function CheckoutReviewPage() {
                 </svg>
               </button>
 
-              <Link
-                href="/cart"
-                className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4"
-              >
+              <Link href="/cart" className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
                 ← Back to Cart
               </Link>
 
-              {/* Security Badge */}
               <div className="mt-6 pt-6 border-t border-border-default">
                 <div className="flex items-center gap-2 text-sm text-foreground-secondary">
                   <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
