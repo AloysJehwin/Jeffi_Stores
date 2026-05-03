@@ -12,6 +12,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL(`/forms${slug}`, request.url))
   }
 
+  if (pathname.startsWith('/forms/')) {
+    const slug = pathname.replace('/forms/', '')
+    return NextResponse.redirect(new URL(`https://forms.jeffistores.in/${slug}`, request.url), 301)
+  }
+
   const isAdminSubdomain = hostname.startsWith('admin.')
   const isAdminPath = pathname.startsWith('/admin')
   const isAdminApiPath = pathname.startsWith('/api/admin')
