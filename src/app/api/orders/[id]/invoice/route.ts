@@ -87,6 +87,8 @@ export async function GET(
       subtotal: parseFloat(order.subtotal),
       tax_amount: parseFloat(order.tax_amount),
       total_amount: parseFloat(order.total_amount),
+      discount_amount: parseFloat(order.discount_amount || '0'),
+      shipping_amount: parseFloat(order.shipping_amount || '0'),
       taxable_amount: parseFloat(order.taxable_amount || '0'),
       cgst_amount: parseFloat(order.cgst_amount || '0'),
       sgst_amount: parseFloat(order.sgst_amount || '0'),
