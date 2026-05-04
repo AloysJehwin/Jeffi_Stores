@@ -13,6 +13,7 @@ interface ReturnRequest {
   admin_notes?: string | null
   return_tracking_number?: string | null
   replacement_order_id?: string | null
+  rvp_awb_number?: string | null
   created_at: string
 }
 
@@ -38,6 +39,23 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
   const [success, setSuccess] = useState<string | null>(null)
   const [refundFailed, setRefundFailed] = useState(false)
   const router = useRouter()
+
+  async function handleCreateRVP() {
+    setIsSubmitting(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/create-rvp-shipment`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      setSuccess(`RVP shipment created. AWB: ${data.awb}`)
+      router.refresh()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   async function submit(action: string) {
     if (action === 'reject' && !adminNotes.trim()) {
@@ -187,6 +205,23 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
 
       {status === 'approved' && (
         <div className="space-y-3 pt-2 border-t border-border-default">
+          <div className="pb-1">
+            {returnRequest.rvp_awb_number ? (
+              <div className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <span className="text-foreground-secondary">RVP AWB:</span>
+                <span className="font-mono font-medium text-foreground">{returnRequest.rvp_awb_number}</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCreateRVP}
+                disabled={isSubmitting}
+                className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? 'Creating...' : 'Create RVP Pickup (Delhivery QC)'}
+              </button>
+            )}
+          </div>
           <div>
             <label className="block text-sm font-medium text-foreground-secondary mb-1">
               Return tracking number (optional)
