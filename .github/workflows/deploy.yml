@@ -34,9 +34,10 @@ jobs:
             git fetch origin
             git checkout ${{ github.ref_name }}
             git reset --hard origin/${{ github.ref_name }}
-            docker compose -f docker-compose.prod.yml down --remove-orphans || true
+            docker compose -f docker-compose.prod.yml down --remove-orphans --volumes || true
             docker rm -f jeffi-redis jeffi-app jeffi-nginx 2>/dev/null || true
-            docker system prune -af --volumes 2>&1 | grep -v "prune operation is already running" || true
+            docker network rm jeffi-stores_internal 2>/dev/null || true
+            docker system prune -af 2>&1 | grep -v "prune operation is already running" || true
             docker compose -f docker-compose.prod.yml build --no-cache app
             docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
