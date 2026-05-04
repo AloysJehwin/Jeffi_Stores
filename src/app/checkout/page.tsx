@@ -320,7 +320,7 @@ function CheckoutPage() {
     ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
     : getCartTotal()
   const tax = isBuyNow ? 0 : getCartTax()
-  const finalTotal = Math.max(0, subtotal - discountAmount)
+  const finalTotal = Math.max(0, subtotal - discountAmount + (shippingCharge ?? 0))
   const displayItems = isBuyNow ? (buyNowItem ? [buyNowItem] : []) : cartItems
 
   return (
@@ -512,6 +512,12 @@ function CheckoutPage() {
                     <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                       <span>Coupon ({couponCode})</span>
                       <span>−₹{discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {shippingCharge != null && (
+                    <div className="flex justify-between text-foreground-secondary text-sm">
+                      <span>Delivery</span>
+                      <span>{shippingCharge === 0 ? 'Free' : `₹${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}</span>
                     </div>
                   )}
                   <div className="border-t border-border-default pt-3">
