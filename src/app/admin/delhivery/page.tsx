@@ -15,6 +15,16 @@ type EligibleOrder = {
   postal_code: string
 }
 
+type PickupRequest = {
+  id: string
+  pickup_id: string | null
+  pickup_date: string
+  awb_count: number
+  awbs: string[]
+  raw_response: Record<string, unknown> | null
+  created_at: string
+}
+
 function todayIST(): string {
   const now = new Date()
   const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000))
@@ -23,6 +33,7 @@ function todayIST(): string {
 
 export default function DelhiveryPickupPage() {
   const [orders, setOrders] = useState<EligibleOrder[]>([])
+  const [pickupHistory, setPickupHistory] = useState<PickupRequest[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [pickupDate, setPickupDate] = useState(todayIST())
   const [loading, setLoading] = useState(true)
@@ -34,6 +45,7 @@ export default function DelhiveryPickupPage() {
       .then(r => r.json())
       .then(d => {
         setOrders(d.orders || [])
+        setPickupHistory(d.pickupHistory || [])
         setSelected(new Set((d.orders || []).map((o: EligibleOrder) => o.id)))
       })
       .catch(() => setOrders([]))
@@ -74,6 +86,15 @@ export default function DelhiveryPickupPage() {
           message: `Pickup request sent for ${data.orderCount} order${data.orderCount !== 1 ? 's' : ''} on ${data.pickupDate}. AWBs: ${data.awbs.join(', ')}`,
         })
         setOrders(prev => prev.filter(o => !selected.has(o.id)))
+        setPickupHistory(prev => [{
+          id: crypto.randomUUID(),
+          pickup_id: data.pickupId ?? null,
+          pickup_date: data.pickupDate,
+          awb_count: data.orderCount,
+          awbs: data.awbs,
+          raw_response: data.raw ?? null,
+          created_at: new Date().toISOString(),
+        }, ...prev])
         setSelected(new Set())
       }
     } catch (err: any) {
@@ -230,6 +251,55 @@ export default function DelhiveryPickupPage() {
           </>
         )}
       </div>
+
+      {/* Pickup Request History */}
+      {pickupHistory.length > 0 && (
+        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+          <div className="px-6 py-4 border-b border-border-default">
+            <h2 className="text-lg font-semibold text-foreground">Pickup Request History</h2>
+            <p className="text-sm text-foreground-secondary mt-0.5">Recent pickup requests submitted to Delhivery</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border-default bg-surface-secondary">
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Pickup Date</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Delhivery ID</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWBs</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Requested At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pickupHistory.map(req => (
+                  <tr key={req.id} className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50">
+                    <td className="px-4 py-3 text-foreground font-medium">
+                      {new Date(req.pickup_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-foreground-secondary">
+                      {req.pickup_id ?? <span className="italic text-foreground-muted">—</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {req.awbs.map(awb => (
+                          <span key={awb} className="px-1.5 py-0.5 rounded bg-surface-secondary font-mono text-xs text-foreground">
+                            {awb}
+                          </span>
+                        ))}
+                        <span className="text-xs text-foreground-secondary self-center">({req.awb_count})</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-foreground-secondary">
+                      {new Date(req.created_at).toLocaleString('en-IN', {
+                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
