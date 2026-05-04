@@ -3,6 +3,7 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice } from '@/lib/invoice'
+import { cancelDelhiveryShipment } from '@/lib/delhivery'
 
 export async function GET(
   request: NextRequest,
@@ -211,6 +212,13 @@ export async function PATCH(
       const user = currentOrder.users
       const userEmail = user?.email || currentOrder.customer_email
       const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : currentOrder.customer_name
+
+      if (statusChanged && status === 'cancelled') {
+        const orderWithAwb = await queryOne<{ awb_number: string | null }>('SELECT awb_number FROM orders WHERE id = $1', [orderId])
+        if (orderWithAwb?.awb_number) {
+          await cancelDelhiveryShipment(orderWithAwb.awb_number).catch(() => {})
+        }
+      }
 
       if (userEmail && userName) {
         if (statusChanged) {

@@ -3,6 +3,7 @@ import { queryOne, query, withTransaction } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
+import { cancelDelhiveryShipment } from '@/lib/delhivery'
 
 export async function POST(
   request: NextRequest,
@@ -28,7 +29,7 @@ export async function POST(
 
     const order = await queryOne(`
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
-        o.customer_name, o.customer_email, o.user_id,
+        o.customer_name, o.customer_email, o.user_id, o.awb_number,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -144,6 +145,10 @@ export async function POST(
         })
       }
       newStatus = 'cancelled'
+
+      if (order.awb_number) {
+        await cancelDelhiveryShipment(order.awb_number).catch(() => {})
+      }
 
       if (refundSuccess) {
         const refundUser = order.users
