@@ -705,7 +705,8 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
           )}
 
-          {/* Shipping Weight */}
+          {/* Shipping Weight — only when no variants; per-variant weight is in the variant table */}
+          {!hasVariants && (
           <div>
             <label htmlFor="weight_grams" className="block text-sm font-medium text-foreground-secondary mb-2">
               Shipping Weight (g)
@@ -721,8 +722,10 @@ export default function ProductForm({ categories, brands, action, product, produ
               placeholder="e.g., 500"
             />
           </div>
+          )}
 
-          {/* Shipping Dimensions */}
+          {/* Shipping Dimensions — hidden when variants enabled; shown inside variants section instead */}
+          {!hasVariants && (
           <div>
             <label className="block text-sm font-medium text-foreground-secondary mb-2">
               Shipping Dimensions (cm)
@@ -769,6 +772,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               </div>
             </div>
           </div>
+          )}
 
           {/* Description */}
           <div className="md:col-span-2">
@@ -1284,6 +1288,50 @@ export default function ProductForm({ categories, brands, action, product, produ
               <p className="text-xs text-foreground-muted mt-4">
                 Stock is managed per variant. Product-level stock is not used when variants are enabled.
               </p>
+
+              {/* Shipping dimensions — per product box, shown inside variants section */}
+              <div className="mt-6 pt-5 border-t border-border-default">
+                <h3 className="text-sm font-semibold text-foreground mb-3">Shipping Dimensions (cm)</h3>
+                <div className="grid grid-cols-3 gap-3 max-w-xs">
+                  <div>
+                    <input
+                      type="number"
+                      name="length_cm"
+                      step="0.1"
+                      min="0"
+                      defaultValue={product?.length_cm ?? ''}
+                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                      placeholder="L"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1 text-center">Length</p>
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      name="breadth_cm"
+                      step="0.1"
+                      min="0"
+                      defaultValue={product?.breadth_cm ?? ''}
+                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                      placeholder="B"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1 text-center">Breadth</p>
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      name="height_cm"
+                      step="0.1"
+                      min="0"
+                      defaultValue={product?.height_cm ?? ''}
+                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                      placeholder="H"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1 text-center">Height</p>
+                  </div>
+                </div>
+                <p className="text-xs text-foreground-muted mt-2">Box size used for shipping rate calculation. Variant weights are set per row above.</p>
+              </div>
             </div>
           )}
         </div>
