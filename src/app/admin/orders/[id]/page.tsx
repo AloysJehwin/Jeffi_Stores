@@ -7,6 +7,7 @@ import ReturnReview from '@/components/admin/ReturnReview'
 import GenerateInvoiceButton from '@/components/admin/GenerateInvoiceButton'
 import InitiateRefundButton from '@/components/admin/InitiateRefundButton'
 import RetryPaymentEmailButton from '@/components/admin/RetryPaymentEmailButton'
+import CreateShipmentButton from '@/components/admin/CreateShipmentButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -243,6 +244,17 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
             <div className="p-4 sm:p-6">
               <UpdateOrderStatus orderId={order.id} currentStatus={order.status} currentPaymentStatus={order.payment_status} currentTrackingUrl={order.tracking_url} />
+            </div>
+          </div>
+          )}
+
+          {order.payment_status === 'paid' && !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) && (
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Delhivery Shipment</h2>
+            </div>
+            <div className="p-4 sm:p-6">
+              <CreateShipmentButton orderId={order.id} awbNumber={order.awb_number} />
             </div>
           </div>
           )}
