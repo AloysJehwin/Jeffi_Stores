@@ -60,6 +60,7 @@ export async function GET(
       deliveredAt: order.delivered_at || null,
       notes: order.notes,
       trackingUrl: order.tracking_url || null,
+      awbNumber: order.awb_number || null,
       originalOrderId: order.original_order_id || null,
       originalOrderNumber: order.original_order_number || null,
       shippingAddress: order.shipping_address,
@@ -96,10 +97,6 @@ export async function PATCH(
     const orderId = params.id
     const body = await request.json()
     const { status, payment_status, tracking_url } = body
-
-    if (status === 'shipped' && !tracking_url?.trim()) {
-      return NextResponse.json({ error: 'A tracking URL is required when marking an order as shipped.' }, { status: 400 })
-    }
 
     const currentOrder = await queryOne(`
       SELECT
