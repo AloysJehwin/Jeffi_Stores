@@ -271,6 +271,17 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           </div>
           )}
+
+          {order.awb_number && (
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Shipment Tracking</h2>
+            </div>
+            <div className="p-4 sm:p-6">
+              <DelhiveryTracking orderId={order.id} apiBase="/api/admin/orders" variant="admin" />
+            </div>
+          </div>
+          )}
         </div>
 
         <div className="space-y-4 sm:space-y-6">
@@ -382,17 +393,6 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 )}
               </div>
             </div>
-
-            {order.awb_number && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-              <div className="px-6 py-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-foreground">Shipment Tracking</h2>
-              </div>
-              <div className="p-4 sm:p-6">
-                <DelhiveryTracking orderId={order.id} apiBase="/api/admin/orders" />
-              </div>
-            </div>
-            )}
           </div>
         </div>
       </div>
