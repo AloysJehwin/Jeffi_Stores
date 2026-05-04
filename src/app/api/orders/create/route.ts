@@ -70,6 +70,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
     }
 
+    const subtotal: number = cartItems.reduce((sum: number, item: any) => {
+      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
+        return sum + (parseFloat(item.price_at_addition) * parseFloat(item.quantity))
+      }
+      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+      return sum + (parseFloat(price) * parseFloat(item.quantity))
+    }, 0)
+
+    if (subtotal < 500) {
+      return NextResponse.json({ error: 'Minimum order value is ₹500' }, { status: 400 })
+    }
+
     for (const item of cartItems) {
       const stockQty = item.variant ? item.variant.stock_quantity : item.products.stock_quantity
       const itemName = item.variant
@@ -82,14 +94,6 @@ export async function POST(request: NextRequest) {
         )
       }
     }
-
-    const subtotal: number = cartItems.reduce((sum: number, item: any) => {
-      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
-        return sum + (parseFloat(item.price_at_addition) * parseFloat(item.quantity))
-      }
-      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
-      return sum + (parseFloat(price) * parseFloat(item.quantity))
-    }, 0)
 
     const taxAmount = cartItems.reduce((sum: number, item: any) => {
       const lineTotal = item.buy_mode === 'weight' || item.buy_mode === 'length'
