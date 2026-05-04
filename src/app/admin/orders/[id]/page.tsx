@@ -6,6 +6,7 @@ import CancelReview from '@/components/admin/CancelReview'
 import ReturnReview from '@/components/admin/ReturnReview'
 import GenerateInvoiceButton from '@/components/admin/GenerateInvoiceButton'
 import InitiateRefundButton from '@/components/admin/InitiateRefundButton'
+import RetryPaymentEmailButton from '@/components/admin/RetryPaymentEmailButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -21,6 +22,9 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
 
   const returnRequest = await getReturnRequest(params.id).catch(() => null)
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
+  const showRetryEmailButton =
+    order.payment_status === 'failed' &&
+    (Date.now() - new Date(order.created_at).getTime()) / 3600000 < 24
 
   return (
     <div className="p-4 sm:p-6">
@@ -103,6 +107,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             ) : (order.payment_status === 'paid' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') && (
               <GenerateInvoiceButton orderId={order.id} />
             ))}
+            {showRetryEmailButton && <RetryPaymentEmailButton orderId={order.id} />}
           </div>
         </div>
       </div>
