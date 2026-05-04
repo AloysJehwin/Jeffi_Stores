@@ -35,6 +35,7 @@ interface VariantRow {
   length_rate: string
   length_unit: string
   length_rate_on: boolean
+  weight_grams: string
   _isDeleted?: boolean
 }
 
@@ -97,6 +98,7 @@ function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string):
     pricing_type, unit, numeric_value: '',
     weight_rate: '', weight_unit: 'kg', weight_rate_on: false,
     length_rate: '', length_unit: 'm', length_rate_on: false,
+    weight_grams: '',
   }
 }
 
@@ -168,6 +170,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         length_rate: v.length_rate != null ? String(v.length_rate) : '',
         length_unit: v.length_unit || 'm',
         length_rate_on: v.length_rate != null,
+        weight_grams: v.weight_grams != null ? String(v.weight_grams) : '',
       }))
     }
     return []
@@ -702,37 +705,74 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
           )}
 
-          {/* Weight */}
+          {/* Shipping Weight — only when no variants; per-variant weight is in the variant table */}
+          {!hasVariants && (
           <div>
-            <label htmlFor="weight" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Weight (kg)
+            <label htmlFor="weight_grams" className="block text-sm font-medium text-foreground-secondary mb-2">
+              Shipping Weight (g)
             </label>
             <input
               type="number"
-              id="weight"
-              name="weight"
-              step="0.01"
+              id="weight_grams"
+              name="weight_grams"
+              step="1"
               min="0"
-              defaultValue={product?.weight}
+              defaultValue={product?.weight_grams ?? ''}
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="0.00"
+              placeholder="e.g., 500"
             />
           </div>
+          )}
 
-          {/* Dimensions */}
+          {/* Shipping Dimensions — hidden when variants enabled; shown inside variants section instead */}
+          {!hasVariants && (
           <div>
-            <label htmlFor="dimensions" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Dimensions (L x W x H cm)
+            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+              Shipping Dimensions (cm)
             </label>
-            <input
-              type="text"
-              id="dimensions"
-              name="dimensions"
-              defaultValue={product?.dimensions}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="e.g., 10 x 5 x 2"
-            />
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <input
+                  type="number"
+                  id="length_cm"
+                  name="length_cm"
+                  step="0.1"
+                  min="0"
+                  defaultValue={product?.length_cm ?? ''}
+                  className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                  placeholder="L"
+                />
+                <p className="text-xs text-foreground-muted mt-1 text-center">Length</p>
+              </div>
+              <div>
+                <input
+                  type="number"
+                  id="breadth_cm"
+                  name="breadth_cm"
+                  step="0.1"
+                  min="0"
+                  defaultValue={product?.breadth_cm ?? ''}
+                  className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                  placeholder="B"
+                />
+                <p className="text-xs text-foreground-muted mt-1 text-center">Breadth</p>
+              </div>
+              <div>
+                <input
+                  type="number"
+                  id="height_cm"
+                  name="height_cm"
+                  step="0.1"
+                  min="0"
+                  defaultValue={product?.height_cm ?? ''}
+                  className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                  placeholder="H"
+                />
+                <p className="text-xs text-foreground-muted mt-1 text-center">Height</p>
+              </div>
+            </div>
           </div>
+          )}
 
           {/* Description */}
           <div className="md:col-span-2">
@@ -977,6 +1017,10 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
                                 <input type="text" value={variant.gtin} onChange={(e) => updateVariant(index, 'gtin', e.target.value)} className={inputCls} placeholder="Barcode" />
                               </div>
+                              <div>
+                                <label className="block text-xs font-medium text-foreground-secondary mb-1">Shipping Weight (g)</label>
+                                <input type="number" step="1" min="0" value={variant.weight_grams} onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)} className={inputCls} placeholder="e.g. 500" />
+                              </div>
                               <div className="pt-2 border-t border-border-default space-y-2">
                                 <div className="flex items-center gap-2">
                                   <button
@@ -1049,6 +1093,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                               {product?.sku && <th className="text-left py-2 px-2 font-medium text-foreground-secondary">SKU</th>}
                               <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Wt. Rate</th>
                               <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Len. Rate</th>
+                              <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Ship Wt.(g)</th>
                               <th className="py-2 px-2 w-8"></th>
                             </tr>
                           </thead>
@@ -1194,6 +1239,17 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     </div>
                                   </td>
                                   <td className="py-2 px-2">
+                                    <input
+                                      type="number"
+                                      step="1"
+                                      min="0"
+                                      value={variant.weight_grams}
+                                      onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)}
+                                      className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                                      placeholder="g"
+                                    />
+                                  </td>
+                                  <td className="py-2 px-2">
                                     {(allGroupVariants.filter(v => !v._isDeleted).length > 1) && (
                                       <button
                                         type="button"
@@ -1232,6 +1288,50 @@ export default function ProductForm({ categories, brands, action, product, produ
               <p className="text-xs text-foreground-muted mt-4">
                 Stock is managed per variant. Product-level stock is not used when variants are enabled.
               </p>
+
+              {/* Shipping dimensions — per product box, shown inside variants section */}
+              <div className="mt-6 pt-5 border-t border-border-default">
+                <h3 className="text-sm font-semibold text-foreground mb-3">Shipping Dimensions (cm)</h3>
+                <div className="grid grid-cols-3 gap-3 max-w-xs">
+                  <div>
+                    <input
+                      type="number"
+                      name="length_cm"
+                      step="0.1"
+                      min="0"
+                      defaultValue={product?.length_cm ?? ''}
+                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                      placeholder="L"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1 text-center">Length</p>
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      name="breadth_cm"
+                      step="0.1"
+                      min="0"
+                      defaultValue={product?.breadth_cm ?? ''}
+                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                      placeholder="B"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1 text-center">Breadth</p>
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      name="height_cm"
+                      step="0.1"
+                      min="0"
+                      defaultValue={product?.height_cm ?? ''}
+                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                      placeholder="H"
+                    />
+                    <p className="text-xs text-foreground-muted mt-1 text-center">Height</p>
+                  </div>
+                </div>
+                <p className="text-xs text-foreground-muted mt-2">Box size used for shipping rate calculation. Variant weights are set per row above.</p>
+              </div>
             </div>
           )}
         </div>
