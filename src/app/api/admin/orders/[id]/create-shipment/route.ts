@@ -5,7 +5,7 @@ import { queryOne, query } from '@/lib/db'
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 const TOKEN = process.env.DELHIVERY_API_KEY
 const ORIGIN_PIN = process.env.DELHIVERY_ORIGIN_PINCODE || '492001'
-const PICKUP_LOCATION = process.env.DELHIVERY_PICKUP_LOCATION || 'Primary'
+const PICKUP_LOCATION = process.env.DELHIVERY_PICKUP_LOCATION || 'Jeffi Stores'
 const SELLER_NAME = process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores'
 const SELLER_ADD = process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
 const SELLER_PHONE = process.env.DELHIVERY_SELLER_PHONE || '07713585374'
