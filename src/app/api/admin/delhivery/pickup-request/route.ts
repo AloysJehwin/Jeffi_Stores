@@ -13,19 +13,27 @@ export async function GET(request: NextRequest) {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const orders = await queryMany(`
-      SELECT o.id, o.order_number, o.awb_number, o.status, o.created_at,
-             o.customer_name, sa.city, sa.state, sa.postal_code
-      FROM orders o
-      LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
-      WHERE o.awb_number IS NOT NULL
-        AND o.payment_status = 'paid'
-        AND o.status NOT IN (${EXCLUDE_STATUSES.map((_, i) => `$${i + 1}`).join(', ')})
-      ORDER BY o.created_at DESC
-      LIMIT 100
-    `, [...EXCLUDE_STATUSES])
+    const [orders, pickupHistory] = await Promise.all([
+      queryMany(`
+        SELECT o.id, o.order_number, o.awb_number, o.status, o.created_at,
+               o.customer_name, sa.city, sa.state, sa.postal_code
+        FROM orders o
+        LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
+        WHERE o.awb_number IS NOT NULL
+          AND o.payment_status = 'paid'
+          AND o.status NOT IN (${EXCLUDE_STATUSES.map((_, i) => `$${i + 1}`).join(', ')})
+        ORDER BY o.created_at DESC
+        LIMIT 100
+      `, [...EXCLUDE_STATUSES]),
+      queryMany(`
+        SELECT id, pickup_id, pickup_date, awb_count, awbs, raw_response, created_at
+        FROM delhivery_pickup_requests
+        ORDER BY created_at DESC
+        LIMIT 20
+      `, []),
+    ])
 
-    return NextResponse.json({ orders: orders || [] })
+    return NextResponse.json({ orders: orders || [], pickupHistory: pickupHistory || [] })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
@@ -85,6 +93,12 @@ export async function POST(request: NextRequest) {
     }
 
     const pickupId = data.id || data.pickup_id || data.pk || null
+
+    await query(
+      `INSERT INTO delhivery_pickup_requests (pickup_id, pickup_date, awb_count, awbs, raw_response)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [pickupId, pickupDate, awbList.length, awbList, JSON.stringify(data)]
+    )
 
     for (const ord of eligible) {
       await query(
