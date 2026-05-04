@@ -15,6 +15,7 @@ COPY . .
 
 # Build the Next.js app in standalone mode
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # ---- Runner ----
