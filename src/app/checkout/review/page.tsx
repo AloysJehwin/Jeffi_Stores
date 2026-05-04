@@ -218,7 +218,7 @@ function CheckoutReviewPage() {
       return
     }
     if (belowMinimum) {
-      showToast(`Minimum order value is ₹${MIN_ORDER}. Add ₹${(MIN_ORDER - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.`, 'warning')
+      showToast(`Minimum order value is ₹${minOrderAmount}. Add ₹${(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.`, 'warning')
       return
     }
 
