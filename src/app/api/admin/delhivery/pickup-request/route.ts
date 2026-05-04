@@ -22,11 +22,15 @@ export async function GET(request: NextRequest) {
         WHERE o.awb_number IS NOT NULL
           AND o.payment_status = 'paid'
           AND o.status NOT IN (${EXCLUDE_STATUSES.map((_, i) => `$${i + 1}`).join(', ')})
+          AND o.awb_number NOT IN (
+            SELECT UNNEST(awbs) FROM delhivery_pickup_requests
+            WHERE pickup_status IN ('pending', 'picked_up')
+          )
         ORDER BY o.created_at DESC
         LIMIT 100
       `, [...EXCLUDE_STATUSES]),
       queryMany(`
-        SELECT id, pickup_id, pickup_date, awb_count, awbs, raw_response, created_at
+        SELECT id, pickup_id, pickup_date, awb_count, awbs, raw_response, pickup_status, created_at
         FROM delhivery_pickup_requests
         ORDER BY created_at DESC
         LIMIT 20
@@ -34,6 +38,29 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({ orders: orders || [], pickupHistory: pickupHistory || [] })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const admin = await authenticateAdmin(request)
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const body = await request.json()
+    const { id, pickup_status } = body
+
+    if (!id || !['pending', 'picked_up', 'failed'].includes(pickup_status)) {
+      return NextResponse.json({ error: 'Invalid id or pickup_status' }, { status: 400 })
+    }
+
+    await query(
+      `UPDATE delhivery_pickup_requests SET pickup_status = $1 WHERE id = $2`,
+      [pickup_status, id]
+    )
+
+    return NextResponse.json({ success: true })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
@@ -95,8 +122,8 @@ export async function POST(request: NextRequest) {
     const pickupId = data.id || data.pickup_id || data.pk || null
 
     await query(
-      `INSERT INTO delhivery_pickup_requests (pickup_id, pickup_date, awb_count, awbs, raw_response)
-       VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO delhivery_pickup_requests (pickup_id, pickup_date, awb_count, awbs, raw_response, pickup_status)
+       VALUES ($1, $2, $3, $4, $5, 'pending')`,
       [pickupId, pickupDate, awbList.length, awbList, JSON.stringify(data)]
     )
 
