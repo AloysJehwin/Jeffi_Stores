@@ -28,6 +28,7 @@ function CheckoutPage() {
   const couponId = searchParams.get('couponId')
   const couponCode = searchParams.get('couponCode')
   const discountAmount = parseFloat(searchParams.get('discountAmount') || '0')
+  const shippingCharge = searchParams.get('shippingCharge') ? parseFloat(searchParams.get('shippingCharge')!) : null
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -258,6 +259,7 @@ function CheckoutPage() {
         paymentMethod,
         couponId: couponId || null,
         discountAmount: discountAmount || 0,
+        shippingAmount: shippingCharge ?? 0,
       }
 
       if (isBuyNow && buyNowItem) {

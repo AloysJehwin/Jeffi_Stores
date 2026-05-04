@@ -21,9 +21,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { shippingAddress, notes, paymentMethod, couponId, discountAmount: rawDiscount, item } = body
+    const { shippingAddress, notes, paymentMethod, couponId, discountAmount: rawDiscount, shippingAmount: rawShipping, item } = body
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const appliedDiscount = typeof rawDiscount === 'number' && rawDiscount > 0 ? rawDiscount : 0
+    const appliedShipping = typeof rawShipping === 'number' && rawShipping > 0 ? Math.round(rawShipping * 100) / 100 : 0
 
     if (!item || !item.productId || !item.qty || !item.price) {
       return NextResponse.json({ error: 'Item details are required' }, { status: 400 })
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       taxAmount = Math.round((itemTotal - (itemTotal / (1 + gstRate / 100))) * 100) / 100
     }
 
-    const total = Math.max(0, subtotal - appliedDiscount)
+    const total = Math.max(0, subtotal - appliedDiscount + appliedShipping)
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
     const order = await withTransaction(async (client) => {
@@ -127,12 +128,12 @@ export async function POST(request: NextRequest) {
       }
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, total,
+         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, total,
          shippingAddressId, billingAddressId, notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST]
