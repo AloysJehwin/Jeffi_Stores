@@ -48,6 +48,7 @@ function CheckoutReviewPage() {
   const [shippingCharge, setShippingCharge] = useState<number | null>(null)
   const [isLoadingShipping, setIsLoadingShipping] = useState(false)
   const [shippingError, setShippingError] = useState('')
+  const [minOrderAmount, setMinOrderAmount] = useState(0)
 
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
@@ -60,6 +61,12 @@ function CheckoutReviewPage() {
     variantName: string | null
     imageUrl: string | null
   } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/store-settings').then(r => r.json()).then(d => {
+      if (typeof d.minOrderAmount === 'number') setMinOrderAmount(d.minOrderAmount)
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -125,8 +132,7 @@ function CheckoutReviewPage() {
     ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
     : getCartTotal()
 
-  const MIN_ORDER = 500
-  const belowMinimum = cartSubtotal > 0 && cartSubtotal < MIN_ORDER
+  const belowMinimum = minOrderAmount > 0 && cartSubtotal > 0 && cartSubtotal < minOrderAmount
 
   useEffect(() => {
     const pin = selectedAddress?.postal_code
@@ -493,7 +499,7 @@ function CheckoutReviewPage() {
 
               {belowMinimum && (
                 <p className="text-xs text-red-500 mb-3 text-center font-medium">
-                  Minimum order ₹{MIN_ORDER} — add ₹{(MIN_ORDER - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.
+                  Minimum order ₹{minOrderAmount} — add ₹{(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.
                 </p>
               )}
               <button
