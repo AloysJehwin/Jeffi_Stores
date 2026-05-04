@@ -45,6 +45,10 @@ function CheckoutReviewPage() {
   const [couponError, setCouponError] = useState('')
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
 
+  const [shippingCharge, setShippingCharge] = useState<number | null>(null)
+  const [isLoadingShipping, setIsLoadingShipping] = useState(false)
+  const [shippingError, setShippingError] = useState('')
+
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
     variantId: string | null
@@ -124,6 +128,33 @@ function CheckoutReviewPage() {
   const MIN_ORDER = 500
   const belowMinimum = cartSubtotal > 0 && cartSubtotal < MIN_ORDER
 
+  useEffect(() => {
+    const pin = selectedAddress?.postal_code
+    if (!pin || cartSubtotal === 0) {
+      setShippingCharge(null)
+      setShippingError('')
+      return
+    }
+    setIsLoadingShipping(true)
+    setShippingError('')
+    const items = isBuyNow && buyNowItem
+      ? [{ productId: buyNowItem.productId, variantId: buyNowItem.variantId, quantity: buyNowItem.qty }]
+      : cartItems.map((i: any) => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: parseFloat(i.quantity) }))
+    fetch('/api/shipping/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ destinationPin: pin, cartItems: items }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.charge != null) setShippingCharge(data.charge)
+        else setShippingError(data.error || 'Unavailable')
+      })
+      .catch(() => setShippingError('Could not fetch rate'))
+      .finally(() => setIsLoadingShipping(false))
+  }, [selectedAddress?.postal_code, cartSubtotal])
+
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return
     setIsApplyingCoupon(true)
@@ -173,7 +204,7 @@ function CheckoutReviewPage() {
       .catch(() => {})
   }, [searchParams, cartSubtotal])
 
-  const finalTotal = Math.max(0, cartSubtotal - discountAmount)
+  const finalTotal = Math.max(0, cartSubtotal - discountAmount + (shippingCharge ?? 0))
 
   const handleProceedToCheckout = () => {
     if (!selectedAddress) {
@@ -190,6 +221,9 @@ function CheckoutReviewPage() {
       params.set('couponId', appliedCoupon.couponId)
       params.set('couponCode', appliedCoupon.code)
       params.set('discountAmount', String(appliedCoupon.discountAmount))
+    }
+    if (shippingCharge != null) {
+      params.set('shippingCharge', String(shippingCharge))
     }
     if (isBuyNow && buyNowItem) {
       params.set('buyNow', '1')
@@ -400,7 +434,15 @@ function CheckoutReviewPage() {
                 )}
                 <div className="flex justify-between text-foreground-secondary">
                   <span>Delivery Charges</span>
-                  <span className="text-green-600 dark:text-green-400">FREE</span>
+                  {isLoadingShipping ? (
+                    <span className="text-foreground-muted text-sm animate-pulse">Calculating...</span>
+                  ) : shippingError ? (
+                    <span className="text-yellow-600 dark:text-yellow-400 text-sm">Unavailable</span>
+                  ) : shippingCharge != null ? (
+                    <span className="font-medium">₹{shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  ) : (
+                    <span className="text-foreground-muted text-sm">Select address</span>
+                  )}
                 </div>
                 <div className="border-t border-border-default pt-3">
                   <div className="flex justify-between text-xl font-bold text-foreground">
