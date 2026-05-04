@@ -57,7 +57,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       WHERE oi.order_id = $1
     `, [params.id])
 
-    const weightKg = Math.max(0.1, Math.round((orderItems?.total_weight || 500) / 100) / 10)
+    const weightKg = Math.max(0.1, Math.round((orderItems?.total_weight || 500) / 10) / 100)
 
     const shipmentPayload = {
       shipments: [{
