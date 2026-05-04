@@ -1,6 +1,6 @@
--- Delhivery integration prep: add weight and dimensions to products
--- weight_grams: used for shipping rate calculation (required by Delhivery API)
--- length_cm, breadth_cm, height_cm: volumetric weight calculation (optional but recommended)
+-- Delhivery integration prep: add weight and dimensions to products and variants
+-- weight_grams on product_variants: per-variant shipping weight (primary — varies by size)
+-- weight_grams on products: fallback when no variant, or product has no variants
 
 ALTER TABLE products
   ADD COLUMN IF NOT EXISTS weight_grams INTEGER DEFAULT 500,
@@ -8,7 +8,5 @@ ALTER TABLE products
   ADD COLUMN IF NOT EXISTS breadth_cm NUMERIC(6,2) DEFAULT 10,
   ADD COLUMN IF NOT EXISTS height_cm NUMERIC(6,2) DEFAULT 10;
 
-COMMENT ON COLUMN products.weight_grams IS 'Actual product weight in grams for Delhivery shipping rate calculation';
-COMMENT ON COLUMN products.length_cm IS 'Package length in cm for volumetric weight';
-COMMENT ON COLUMN products.breadth_cm IS 'Package breadth in cm for volumetric weight';
-COMMENT ON COLUMN products.height_cm IS 'Package height in cm for volumetric weight';
+ALTER TABLE product_variants
+  ADD COLUMN IF NOT EXISTS weight_grams INTEGER DEFAULT 500;
