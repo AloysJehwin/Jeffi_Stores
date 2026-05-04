@@ -23,7 +23,7 @@ export async function GET(
     if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 
     const res = await fetch(
-      `https://track.delhivery.com/api/status/packages/json/?waybill=${order.awb_number}`,
+      `https://track.delhivery.com/api/v1/packages/json/?waybill=${order.awb_number}`,
       {
         headers: { Authorization: `Token ${TOKEN}` },
         next: { revalidate: 60 },
