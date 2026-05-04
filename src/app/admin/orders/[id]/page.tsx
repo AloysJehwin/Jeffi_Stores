@@ -8,6 +8,7 @@ import GenerateInvoiceButton from '@/components/admin/GenerateInvoiceButton'
 import InitiateRefundButton from '@/components/admin/InitiateRefundButton'
 import RetryPaymentEmailButton from '@/components/admin/RetryPaymentEmailButton'
 import CreateShipmentButton from '@/components/admin/CreateShipmentButton'
+import DelhiveryTracking from '@/components/DelhiveryTracking'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -369,6 +370,17 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 )}
               </div>
             </div>
+
+            {order.awb_number && (
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+              <div className="px-6 py-4 border-b border-border-default">
+                <h2 className="text-lg font-semibold text-foreground">Shipment Tracking</h2>
+              </div>
+              <div className="p-4 sm:p-6">
+                <DelhiveryTracking orderId={order.id} apiBase="/api/admin/orders" />
+              </div>
+            </div>
+            )}
           </div>
         </div>
       </div>
