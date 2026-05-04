@@ -90,8 +90,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         shipment_height: '15',
         shipment_length: '20',
         weight: String(weightKg),
-        pickup_location: PICKUP_LOCATION,
       }],
+      pickup_location: { name: PICKUP_LOCATION },
     }
 
     const formData = new URLSearchParams()

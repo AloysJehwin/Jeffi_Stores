@@ -13,8 +13,6 @@ export async function GET(request: NextRequest) {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
     const orders = await queryMany(`
       SELECT o.id, o.order_number, o.awb_number, o.status, o.created_at,
              o.customer_name, sa.city, sa.state, sa.postal_code
@@ -22,10 +20,10 @@ export async function GET(request: NextRequest) {
       LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
       WHERE o.awb_number IS NOT NULL
         AND o.payment_status = 'paid'
-        AND o.status NOT IN (${EXCLUDE_STATUSES.map((_, i) => `$${i + 2}`).join(', ')})
-        AND o.created_at >= $1
+        AND o.status NOT IN (${EXCLUDE_STATUSES.map((_, i) => `$${i + 1}`).join(', ')})
       ORDER BY o.created_at DESC
-    `, [since, ...EXCLUDE_STATUSES])
+      LIMIT 100
+    `, [...EXCLUDE_STATUSES])
 
     return NextResponse.json({ orders: orders || [] })
   } catch (err: any) {
@@ -48,43 +46,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid pickup date' }, { status: 400 })
     }
 
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
     const eligible = await queryMany(`
       SELECT id, awb_number FROM orders
       WHERE id = ANY($1::uuid[])
         AND awb_number IS NOT NULL
         AND payment_status = 'paid'
         AND status NOT IN (${EXCLUDE_STATUSES.map((_, i) => `$${i + 2}`).join(', ')})
-        AND created_at >= $${EXCLUDE_STATUSES.length + 2}
-    `, [orderIds, ...EXCLUDE_STATUSES, since])
+    `, [orderIds, ...EXCLUDE_STATUSES])
 
     if (!eligible || eligible.length === 0) {
-      return NextResponse.json({ error: 'No eligible orders found (must have AWB, be paid, not yet shipped, and placed within 24 hours)' }, { status: 422 })
+      return NextResponse.json({ error: 'No eligible orders found (must have AWB, be paid, not yet shipped/cancelled)' }, { status: 422 })
     }
 
-    const params = new URLSearchParams()
-    params.append('pickup_time', '14:00:00')
-    params.append('pickup_date', pickupDate)
-    params.append('pickup_location', PICKUP_LOCATION)
-    params.append('expected_package_count', String(eligible.length))
+    const awbList = eligible.map((o: any) => o.awb_number as string)
 
     const res = await fetch(DELHIVERY_PICKUP_URL, {
       method: 'POST',
       headers: {
         Authorization: `Token ${TOKEN}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: params.toString(),
+      body: JSON.stringify({
+        pickup_time: '14:00:00',
+        pickup_date: pickupDate,
+        pickup_location: PICKUP_LOCATION,
+        expected_package_count: awbList.length,
+      }),
       next: { revalidate: 0 },
     })
 
-    const data = await res.json()
+    const data = await res.json().catch(() => ({}))
 
-    if (data.error || (typeof data.prepaid === 'string' && data.prepaid.toLowerCase().includes('wallet'))) {
+    if (!res.ok || data.error) {
       return NextResponse.json({
         error: 'Delhivery rejected the pickup request',
-        details: data.prepaid || data.error || JSON.stringify(data),
+        details: data.error || data.prepaid || JSON.stringify(data),
       }, { status: 422 })
     }
 
