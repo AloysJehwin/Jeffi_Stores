@@ -3,6 +3,7 @@ import ChangePasswordForm from '@/components/admin/ChangePasswordForm'
 import CreateAdminForm from '@/components/admin/CreateAdminForm'
 import AdminUserActions from '@/components/admin/AdminUserActions'
 import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
+import StoreRulesForm from '@/components/admin/StoreRulesForm'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES } from '@/lib/scopes'
 
@@ -33,6 +34,8 @@ export default async function SettingsPage() {
 
   const adminInfo = await getAdminInfo(adminId)
   const allAdmins = await getAllAdmins()
+  const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
+  const minOrderAmount = minOrderSetting ? parseFloat(minOrderSetting.value) || 0 : 0
 
   const scopeLabels: Record<string, string> = {}
   ADMIN_SCOPES.forEach(s => { scopeLabels[s.key] = s.label })
@@ -333,6 +336,15 @@ export default async function SettingsPage() {
           </div>
 
           <ExtensionTokenCard />
+
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Store Rules</h2>
+            </div>
+            <div className="p-4 sm:p-6">
+              <StoreRulesForm minOrderAmount={minOrderAmount} />
+            </div>
+          </div>
 
           {adminInfo?.role === 'super_admin' && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">

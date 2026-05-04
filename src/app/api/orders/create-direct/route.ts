@@ -69,6 +69,13 @@ export async function POST(request: NextRequest) {
     const qty = parseFloat(item.qty)
     const itemTotal = unitPrice * qty
     const subtotal = itemTotal
+
+    const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
+    const minOrderAmount = minOrderSetting ? parseFloat(minOrderSetting.value) || 0 : 0
+    if (minOrderAmount > 0 && subtotal < minOrderAmount) {
+      return NextResponse.json({ error: `Minimum order value is ₹${minOrderAmount}` }, { status: 400 })
+    }
+
     const gstRate = parseFloat(product.gst_percentage || '0')
 
     let taxAmount = 0

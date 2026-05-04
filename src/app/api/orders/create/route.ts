@@ -79,8 +79,10 @@ export async function POST(request: NextRequest) {
       return sum + (parseFloat(price) * parseFloat(item.quantity))
     }, 0)
 
-    if (subtotal < 500) {
-      return NextResponse.json({ error: 'Minimum order value is ₹500' }, { status: 400 })
+    const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
+    const minOrderAmount = minOrderSetting ? parseFloat(minOrderSetting.value) || 0 : 0
+    if (minOrderAmount > 0 && subtotal < minOrderAmount) {
+      return NextResponse.json({ error: `Minimum order value is ₹${minOrderAmount}` }, { status: 400 })
     }
 
     for (const item of cartItems) {
