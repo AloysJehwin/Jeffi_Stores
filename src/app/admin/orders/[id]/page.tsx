@@ -23,7 +23,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
   const returnRequest = await getReturnRequest(params.id).catch(() => null)
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
   const showRetryEmailButton =
-    order.payment_status === 'failed' &&
+    (order.payment_status === 'failed' || order.payment_status === 'unpaid') &&
     (Date.now() - new Date(order.created_at).getTime()) / 3600000 < 24
 
   return (

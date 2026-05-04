@@ -22,8 +22,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
-  if (order.payment_status !== 'failed') {
-    return NextResponse.json({ error: 'Order payment status is not failed' }, { status: 400 })
+  if (order.payment_status !== 'failed' && order.payment_status !== 'unpaid') {
+    return NextResponse.json({ error: 'Order payment status is not failed or unpaid' }, { status: 400 })
   }
 
   const ageHours = (Date.now() - new Date(order.created_at).getTime()) / 3600000
