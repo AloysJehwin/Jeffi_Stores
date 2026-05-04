@@ -121,6 +121,9 @@ function CheckoutReviewPage() {
     ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
     : getCartTotal()
 
+  const MIN_ORDER = 500
+  const belowMinimum = cartSubtotal > 0 && cartSubtotal < MIN_ORDER
+
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return
     setIsApplyingCoupon(true)
@@ -175,6 +178,10 @@ function CheckoutReviewPage() {
   const handleProceedToCheckout = () => {
     if (!selectedAddress) {
       showToast('Please select a delivery address', 'warning')
+      return
+    }
+    if (belowMinimum) {
+      showToast(`Minimum order value is ₹${MIN_ORDER}. Add ₹${(MIN_ORDER - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.`, 'warning')
       return
     }
 
@@ -442,9 +449,14 @@ function CheckoutReviewPage() {
                 )}
               </div>
 
+              {belowMinimum && (
+                <p className="text-xs text-red-500 mb-3 text-center font-medium">
+                  Minimum order ₹{MIN_ORDER} — add ₹{(MIN_ORDER - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.
+                </p>
+              )}
               <button
                 onClick={handleProceedToCheckout}
-                disabled={!selectedAddress || addresses.length === 0}
+                disabled={!selectedAddress || addresses.length === 0 || belowMinimum}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 Proceed to Place Order
