@@ -1622,3 +1622,57 @@ export async function sendReturnStatusEmail(
     return { success: false, error }
   }
 }
+
+export async function sendPaymentRetryEmail(
+  customerEmail: string,
+  customerName: string,
+  orderNumber: string,
+  orderTotal: number,
+) {
+  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
+  const shopUrl = `${BASE_URL}/products`
+  const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(orderTotal)
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+  .wrap{max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  .hdr{background:#1a3a4a;padding:20px 32px}
+  .hdr a{color:#fff;font-size:20px;font-weight:700;text-decoration:none}
+  .body{padding:32px}
+  .badge{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;margin:20px 0;text-align:center}
+  .badge p{margin:0;color:#dc2626;font-weight:700;font-size:18px}
+  .badge small{color:#6b7280;font-size:13px}
+  .amount{font-size:28px;font-weight:900;color:#1a3a4a;display:block;margin:8px 0 0}
+  .cta{display:inline-block;background:#e07b3f;color:#fff;text-decoration:none;padding:13px 28px;border-radius:6px;font-weight:700;font-size:15px;margin:24px 0 8px}
+  .note{color:#6b7280;font-size:13px;line-height:1.6;margin:16px 0 0}
+  .ftr{background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 32px;text-align:center;font-size:12px;color:#9ca3af}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="hdr"><a href="${BASE_URL}">Jeffi Store's</a></div>
+  <div class="body">
+    <p style="color:#333;font-size:16px;margin:0 0 8px">Hi ${customerName},</p>
+    <p style="color:#555;line-height:1.6;margin:0 0 16px">We're sorry your purchase didn't go through. It looks like the payment for order <strong>#${orderNumber}</strong> (${formatted}) could not be processed.</p>
+    <p style="color:#555;line-height:1.6;margin:0 0 16px">No worries — simply visit our store and place a new order whenever you're ready. Your cart items are still available.</p>
+    <a href="${shopUrl}" class="cta">Shop Again →</a>
+    <p class="note">If you need any help or have questions, just reply to this email and we'll be happy to assist.</p>
+  </div>
+  <div class="ftr">© ${new Date().getFullYear()} Jeffi Store's &bull; <a href="${BASE_URL}" style="color:#9ca3af">jeffistores.in</a></div>
+</div>
+</body></html>`
+
+  try {
+    await transporter.sendMail({
+      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      to: customerEmail,
+      subject: `Sorry your order didn't go through — Order #${orderNumber}`,
+      html,
+    })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
