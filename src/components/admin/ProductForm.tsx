@@ -36,6 +36,9 @@ interface VariantRow {
   length_unit: string
   length_rate_on: boolean
   weight_grams: string
+  length_cm: string
+  breadth_cm: string
+  height_cm: string
   _isDeleted?: boolean
 }
 
@@ -98,7 +101,7 @@ function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string):
     pricing_type, unit, numeric_value: '',
     weight_rate: '', weight_unit: 'kg', weight_rate_on: false,
     length_rate: '', length_unit: 'm', length_rate_on: false,
-    weight_grams: '',
+    weight_grams: '', length_cm: '', breadth_cm: '', height_cm: '',
   }
 }
 
@@ -171,6 +174,9 @@ export default function ProductForm({ categories, brands, action, product, produ
         length_unit: v.length_unit || 'm',
         length_rate_on: v.length_rate != null,
         weight_grams: v.weight_grams != null ? String(v.weight_grams) : '',
+        length_cm: v.length_cm != null ? String(v.length_cm) : '',
+        breadth_cm: v.breadth_cm != null ? String(v.breadth_cm) : '',
+        height_cm: v.height_cm != null ? String(v.height_cm) : '',
       }))
     }
     return []
@@ -1021,6 +1027,14 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Shipping Weight (g)</label>
                                 <input type="number" step="1" min="0" value={variant.weight_grams} onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)} className={inputCls} placeholder="e.g. 500" />
                               </div>
+                              <div>
+                                <label className="block text-xs font-medium text-foreground-secondary mb-1">Dimensions (L × B × H cm)</label>
+                                <div className="grid grid-cols-3 gap-1">
+                                  <input type="number" step="0.1" min="0" value={variant.length_cm} onChange={(e) => updateVariant(index, 'length_cm', e.target.value)} className={inputCls} placeholder="L" />
+                                  <input type="number" step="0.1" min="0" value={variant.breadth_cm} onChange={(e) => updateVariant(index, 'breadth_cm', e.target.value)} className={inputCls} placeholder="B" />
+                                  <input type="number" step="0.1" min="0" value={variant.height_cm} onChange={(e) => updateVariant(index, 'height_cm', e.target.value)} className={inputCls} placeholder="H" />
+                                </div>
+                              </div>
                               <div className="pt-2 border-t border-border-default space-y-2">
                                 <div className="flex items-center gap-2">
                                   <button
@@ -1094,6 +1108,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                               <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Wt. Rate</th>
                               <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Len. Rate</th>
                               <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Ship Wt.(g)</th>
+                              <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">L(cm)</th>
+                              <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">B(cm)</th>
+                              <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">H(cm)</th>
                               <th className="py-2 px-2 w-8"></th>
                             </tr>
                           </thead>
@@ -1250,6 +1267,15 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     />
                                   </td>
                                   <td className="py-2 px-2">
+                                    <input type="number" step="0.1" min="0" value={variant.length_cm} onChange={(e) => updateVariant(index, 'length_cm', e.target.value)} className="w-16 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="L" />
+                                  </td>
+                                  <td className="py-2 px-2">
+                                    <input type="number" step="0.1" min="0" value={variant.breadth_cm} onChange={(e) => updateVariant(index, 'breadth_cm', e.target.value)} className="w-16 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="B" />
+                                  </td>
+                                  <td className="py-2 px-2">
+                                    <input type="number" step="0.1" min="0" value={variant.height_cm} onChange={(e) => updateVariant(index, 'height_cm', e.target.value)} className="w-16 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="H" />
+                                  </td>
+                                  <td className="py-2 px-2">
                                     {(allGroupVariants.filter(v => !v._isDeleted).length > 1) && (
                                       <button
                                         type="button"
@@ -1288,50 +1314,6 @@ export default function ProductForm({ categories, brands, action, product, produ
               <p className="text-xs text-foreground-muted mt-4">
                 Stock is managed per variant. Product-level stock is not used when variants are enabled.
               </p>
-
-              {/* Shipping dimensions — per product box, shown inside variants section */}
-              <div className="mt-6 pt-5 border-t border-border-default">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Shipping Dimensions (cm)</h3>
-                <div className="grid grid-cols-3 gap-3 max-w-xs">
-                  <div>
-                    <input
-                      type="number"
-                      name="length_cm"
-                      step="0.1"
-                      min="0"
-                      defaultValue={product?.length_cm ?? ''}
-                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                      placeholder="L"
-                    />
-                    <p className="text-xs text-foreground-muted mt-1 text-center">Length</p>
-                  </div>
-                  <div>
-                    <input
-                      type="number"
-                      name="breadth_cm"
-                      step="0.1"
-                      min="0"
-                      defaultValue={product?.breadth_cm ?? ''}
-                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                      placeholder="B"
-                    />
-                    <p className="text-xs text-foreground-muted mt-1 text-center">Breadth</p>
-                  </div>
-                  <div>
-                    <input
-                      type="number"
-                      name="height_cm"
-                      step="0.1"
-                      min="0"
-                      defaultValue={product?.height_cm ?? ''}
-                      className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                      placeholder="H"
-                    />
-                    <p className="text-xs text-foreground-muted mt-1 text-center">Height</p>
-                  </div>
-                </div>
-                <p className="text-xs text-foreground-muted mt-2">Box size used for shipping rate calculation. Variant weights are set per row above.</p>
-              </div>
             </div>
           )}
         </div>

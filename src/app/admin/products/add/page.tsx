@@ -155,8 +155,8 @@ async function createProduct(formData: FormData) {
           if (!isWeightOrLength && !variant.variant_name) continue
           const variantSku = generateVariantSku(sku, variant.variant_name)
           await query(
-            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, sale_price, wholesale_price, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_rate, weight_unit, length_rate, length_unit, weight_grams, is_active)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, true)`,
+            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, sale_price, wholesale_price, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_rate, weight_unit, length_rate, length_unit, weight_grams, length_cm, breadth_cm, height_cm, is_active)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, true)`,
             [
               data.id,
               variantSku,
@@ -176,6 +176,9 @@ async function createProduct(formData: FormData) {
               variant.length_rate ? Math.round(parseFloat(variant.length_rate) * 100) / 100 : null,
               variant.length_rate ? (variant.length_unit || null) : null,
               variant.weight_grams ? parseInt(variant.weight_grams) : null,
+              variant.length_cm ? parseFloat(variant.length_cm) : null,
+              variant.breadth_cm ? parseFloat(variant.breadth_cm) : null,
+              variant.height_cm ? parseFloat(variant.height_cm) : null,
             ]
           )
         }
