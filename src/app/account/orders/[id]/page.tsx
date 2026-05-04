@@ -41,6 +41,8 @@ interface OrderDetails {
   totalAmount: number
   subtotal: number
   taxAmount: number
+  discountAmount: number
+  shippingAmount: number
   status: string
   paymentStatus: string
   createdAt: string
@@ -820,6 +822,18 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   <div className="flex justify-between text-sm text-foreground-muted">
                     <span>Incl. GST</span>
                     <span>{order.taxAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
+                  </div>
+                )}
+                {order.discountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-medium">
+                    <span>Discount</span>
+                    <span>−{order.discountAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
+                  </div>
+                )}
+                {order.shippingAmount > 0 && (
+                  <div className="flex justify-between text-sm text-foreground-secondary">
+                    <span>Delivery</span>
+                    <span>{order.shippingAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center pt-2">

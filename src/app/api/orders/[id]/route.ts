@@ -53,6 +53,8 @@ export async function GET(
       totalAmount: parseFloat(order.total_amount),
       subtotal: parseFloat(order.subtotal || order.total_amount),
       taxAmount: parseFloat(order.tax_amount || '0'),
+      discountAmount: parseFloat(order.discount_amount || '0'),
+      shippingAmount: parseFloat(order.shipping_amount || '0'),
       status: order.status,
       paymentStatus: order.payment_status,
       createdAt: order.created_at,

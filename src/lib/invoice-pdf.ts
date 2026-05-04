@@ -39,6 +39,8 @@ export interface InvoiceOrder {
   subtotal: number
   tax_amount: number
   total_amount: number
+  discount_amount: number
+  shipping_amount: number
   taxable_amount: number
   cgst_amount: number
   sgst_amount: number
@@ -398,7 +400,23 @@ export function generateInvoicePDF(
       y += rowH
     }
 
-    const roundOff = order.total_amount - (order.taxable_amount + order.cgst_amount + order.sgst_amount + order.igst_amount)
+    const roundOff = order.total_amount - (order.taxable_amount + order.cgst_amount + order.sgst_amount + order.igst_amount + (order.shipping_amount || 0) - (order.discount_amount || 0))
+    if (order.discount_amount > 0) {
+      checkPageBreak(rowH)
+      drawHLine(doc, LM, R, y)
+      doc.font(FBI).fontSize(8).text('DISCOUNT', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc.font(F).fontSize(7).text(`-${fmt(order.discount_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      y += rowH
+    }
+
+    if (order.shipping_amount > 0) {
+      checkPageBreak(rowH)
+      drawHLine(doc, LM, R, y)
+      doc.font(FBI).fontSize(8).text('DELIVERY CHARGES', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc.font(F).fontSize(7).text(fmt(order.shipping_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      y += rowH
+    }
+
     if (Math.abs(roundOff) >= 0.01) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
