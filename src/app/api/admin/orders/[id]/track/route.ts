@@ -11,11 +11,12 @@ const STATUS_SYNC: Record<string, {
   clearAwb?: boolean
   onlyIfCurrent?: string[]
 }> = {
-  PU:      { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  IT:      { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  OT:      { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  DL:      { orderStatus: 'delivered', setDeliveredAt: true, onlyIfCurrent: ['shipped', 'processing', 'confirmed'] },
-  'RTO-DL':{ orderStatus: 'returned',  clearAwb: true,       onlyIfCurrent: ['shipped', 'processing'] },
+  PU:      { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  IT:      { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  OT:      { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  OD:      { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  DL:      { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-DL':{ orderStatus: 'returned',         clearAwb: true,       onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
 }
 
 export async function GET(

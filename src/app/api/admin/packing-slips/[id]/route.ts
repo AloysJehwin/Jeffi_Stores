@@ -37,10 +37,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   try {
     const pdfBuffer = await generatePackingSlipPDF(order, store)
+    const inline = request.nextUrl.searchParams.get('inline') === '1'
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="packing-slip-${order.order_number}.pdf"`,
+        'Content-Disposition': inline
+          ? `inline; filename="packing-slip-${order.order_number}.pdf"`
+          : `attachment; filename="packing-slip-${order.order_number}.pdf"`,
         'Content-Length': String(pdfBuffer.length),
       },
     })

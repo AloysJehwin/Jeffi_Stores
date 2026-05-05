@@ -76,6 +76,8 @@ function getStatusColor(status: string) {
       return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
     case 'shipped':
       return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+    case 'out_for_delivery':
+      return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
     case 'delivered':
       return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
     case 'cancel_requested':
@@ -494,14 +496,16 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(order.status)}`}>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                     {order.status === 'cancel_requested' ? 'Cancellation Requested'
                       : order.status === 'cancel_rejected' ? 'Cancellation Rejected'
+                      : order.status === 'out_for_delivery' ? 'Out for Delivery'
                       : order.status === 'return_requested' ? 'Return Requested'
                       : order.status === 'return_approved' ? 'Return Approved'
                       : order.status === 'return_received' ? 'Return Received'
                       : order.status === 'return_rejected' ? 'Return Rejected'
-                      : order.status}
+                      : order.status === 'returned' ? 'Returned'
+                      : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                   </span>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
                     Payment: {order.paymentStatus}
@@ -748,7 +752,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             )}
 
             {/* Tracking */}
-            {(['shipped', 'delivered'].includes(order.status) && order.awbNumber) && (
+            {(['shipped', 'out_for_delivery', 'delivered'].includes(order.status) && order.awbNumber) && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
                 <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center gap-2">
                   <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,0 +1,17 @@
+name: Sync Delhivery Statuses
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ secrets.APP_URL }}/api/admin/delhivery/sync-statuses" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            | grep -qE '^2' && echo "Sync OK" || echo "Sync failed"
