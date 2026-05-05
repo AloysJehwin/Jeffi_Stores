@@ -62,6 +62,11 @@ export async function GET(
       for (let i = scans.length - 1; i >= 0; i--) {
         const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
         if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
+        const activity = (scans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
+        if (activity.includes('out for delivery')) { statusType = 'OD'; break }
+        if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
+        if (activity.includes('picked up') || activity.includes('shipment picked')) { statusType = 'PU'; break }
+        if (activity.includes('delivered')) { statusType = 'DL'; break }
       }
     }
 
