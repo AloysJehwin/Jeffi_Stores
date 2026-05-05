@@ -38,6 +38,7 @@ next-env.d.ts
 
 # Temporary scripts & guides
 *.sh
+/scripts/
 *.csv
 RDS_SECURITY_GROUP_FIX.md
 ADD_IP_TO_SECURITY_GROUP.md
