@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
   const isAdminPath = pathname.startsWith('/admin')
   const isAdminApiPath = pathname.startsWith('/api/admin')
 
-  const publicApiPaths = ['/api/admin/login', '/api/admin/check-session']
+  const publicApiPaths = ['/api/admin/login', '/api/admin/check-session', '/api/admin/delhivery/sync-statuses']
   if (isAdminApiPath && publicApiPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next()
   }
