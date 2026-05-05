@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { queryMany, queryOne } from '@/lib/db'
 import SortDropdown from '@/components/visitor/SortDropdown'
-import MobileFilterToggle from '@/components/visitor/MobileFilterToggle'
+import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 
 const PAGE_SIZE = 21
 
@@ -125,8 +125,11 @@ export default async function ProductsPage({
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 lg:h-full">
           {/* Sidebar Filters */}
           <aside className="lg:col-span-1 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
-            <MobileFilterToggle>
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+            {/* Mobile bottom-sheet filter */}
+            <MobileFilterSheet categories={allCats} brands={brands as any[]} />
+
+            {/* Desktop sidebar filter */}
+            <div className="hidden lg:block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
                 <h2 className="font-bold text-lg text-foreground mb-4">Filters</h2>
 
                 {/* Search */}
@@ -244,8 +247,7 @@ export default async function ProductsPage({
                     Clear All Filters
                   </Link>
                 )}
-              </div>
-            </MobileFilterToggle>
+            </div>
           </aside>
 
           {/* Products Grid */}
