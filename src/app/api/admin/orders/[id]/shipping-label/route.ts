@@ -19,7 +19,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.awb_number) return NextResponse.json({ error: 'No AWB number for this order' }, { status: 404 })
 
-    const labelUrl = `https://track.delhivery.com/api/p/packing_slip?wbns=${encodeURIComponent(order.awb_number)}&pdf=true`
+    const pdfSize = (request.nextUrl.searchParams.get('size') === '4R') ? '4R' : 'A4'
+    const labelUrl = `https://track.delhivery.com/api/p/packing_slip?wbns=${encodeURIComponent(order.awb_number)}&pdf=true&pdf_size=${pdfSize}`
 
     const res = await fetch(labelUrl, {
       headers: { Authorization: `Token ${TOKEN}` },
@@ -30,15 +31,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: `Delhivery label API returned ${res.status}` }, { status: 502 })
     }
 
-    const contentType = res.headers.get('content-type') || 'application/pdf'
     const buffer = await res.arrayBuffer()
 
     const safeOrderNum = (order.order_number || params.id.slice(0, 8)).replace(/[^a-zA-Z0-9-]/g, '-')
+    const inline = request.nextUrl.searchParams.get('inline') === '1'
 
     return new NextResponse(buffer, {
       headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="shipping-label-${safeOrderNum}.pdf"`,
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': inline
+          ? `inline; filename="shipping-label-${safeOrderNum}.pdf"`
+          : `attachment; filename="shipping-label-${safeOrderNum}.pdf"`,
         'Content-Length': String(buffer.byteLength),
       },
     })
