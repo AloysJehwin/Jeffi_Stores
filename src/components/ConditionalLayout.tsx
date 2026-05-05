@@ -8,13 +8,8 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 
-const FOOTER_ROUTES = ['/', '/products', '/categories', '/about', '/contact', '/return-policy']
-
 function shouldShowFooter(pathname: string | null): boolean {
-  if (!pathname) return false
-  return FOOTER_ROUTES.some(route =>
-    route === '/' ? pathname === '/' : pathname === route || pathname.startsWith(route + '/')
-  )
+  return pathname === '/'
 }
 
 export default function ConditionalLayout({ children, isFormsSubdomain }: { children: React.ReactNode; isFormsSubdomain?: boolean }) {
