@@ -167,7 +167,9 @@ function OrderConfirmationPage() {
               order.status === 'delivered' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
               'bg-surface-secondary text-foreground'
             }`}>
-              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+              {order.status === 'out_for_delivery' ? 'Out for Delivery'
+                : order.status === 'cancel_requested' ? 'Cancellation Requested'
+                : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
             </span>
             <span className="text-foreground-secondary">
               Placed on {new Date(order.createdAt).toLocaleDateString('en-IN', {
