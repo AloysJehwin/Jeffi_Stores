@@ -83,6 +83,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
               { value: 'confirmed', label: 'Confirmed' },
               { value: 'processing', label: 'Processing' },
               { value: 'shipped', label: 'Shipped' },
+              { value: 'out_for_delivery', label: 'Out for Delivery' },
               { value: 'delivered', label: 'Delivered' },
               { value: 'cancel_requested', label: 'Cancel Requested' },
               { value: 'cancelled', label: 'Cancelled' },
@@ -119,11 +120,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                 <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                   order.status === 'delivered' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                   : order.status === 'processing' || order.status === 'shipped' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                  : order.status === 'out_for_delivery' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
                   : order.status === 'cancelled' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                   : order.status === 'cancel_requested' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
                   : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
                 }`}>
-                  {order.status === 'cancel_requested' ? 'Cancel Req.' : order.status}
+                  {order.status === 'cancel_requested' ? 'Cancel Req.' : order.status === 'out_for_delivery' ? 'Out for Delivery' : order.status}
                 </span>
               </div>
               <div className="flex items-center justify-between mb-1">
@@ -205,11 +207,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         order.status === 'delivered' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                         : order.status === 'processing' || order.status === 'shipped' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                        : order.status === 'out_for_delivery' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
                         : order.status === 'cancelled' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                         : order.status === 'cancel_requested' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
                         : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
                       }`}>
-                        {order.status === 'cancel_requested' ? 'Cancel Requested' : order.status}
+                        {order.status === 'cancel_requested' ? 'Cancel Requested' : order.status === 'out_for_delivery' ? 'Out for Delivery' : order.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
