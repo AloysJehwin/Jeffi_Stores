@@ -52,8 +52,18 @@ export async function GET(
 
     if (!shipment) return NextResponse.json({ tracking: null })
 
-    const statusType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+    const rawStatusType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
     const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
+
+    const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
+    let statusType = rawStatusType
+    if (EXCEPTION_TYPES.has(rawStatusType)) {
+      const scans: any[] = shipment.Scans ?? []
+      for (let i = scans.length - 1; i >= 0; i--) {
+        const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
+        if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
+      }
+    }
 
     const syncRule = STATUS_SYNC[statusType]
     let statusSynced = false

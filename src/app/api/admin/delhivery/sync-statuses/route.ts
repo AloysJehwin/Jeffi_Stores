@@ -73,7 +73,16 @@ export async function POST(request: NextRequest) {
         const order = batch.find(o => o.awb_number === awb)
         if (!order) continue
 
-        const statusType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+        const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+        const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
+        let statusType = rawType
+        if (EXCEPTION_TYPES.has(rawType)) {
+          const scans: any[] = shipment.Scans ?? []
+          for (let i = scans.length - 1; i >= 0; i--) {
+            const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
+            if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
+          }
+        }
         const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
         const syncRule = STATUS_SYNC[statusType]
 
