@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const setting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
   return NextResponse.json({
