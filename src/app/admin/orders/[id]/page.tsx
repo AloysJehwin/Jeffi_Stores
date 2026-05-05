@@ -70,6 +70,8 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                 : order.status === 'processing' || order.status === 'shipped'
                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                : order.status === 'out_for_delivery'
+                ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
                 : order.status === 'cancelled' || order.status === 'return_rejected'
                 ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                 : order.status === 'cancel_requested' || order.status === 'return_requested'
@@ -118,7 +120,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 </svg>
                 Invoice {order.invoice_number}
               </a>
-            ) : (order.payment_status === 'paid' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') && (
+            ) : (order.payment_status === 'paid' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'out_for_delivery' || order.status === 'delivered') && (
               <GenerateInvoiceButton orderId={order.id} />
             ))}
             {showRetryEmailButton && <RetryPaymentEmailButton orderId={order.id} />}

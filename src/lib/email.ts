@@ -549,6 +549,11 @@ export async function sendOrderStatusUpdate(
       message: 'Great news! Your order has been shipped and is on its way to you.',
       color: '#8b5cf6',
     },
+    out_for_delivery: {
+      title: 'Out for Delivery',
+      message: 'Your order is out for delivery today! Our delivery partner will arrive soon.',
+      color: '#6366f1',
+    },
     delivered: {
       title: 'Order Delivered',
       message: 'Your order has been successfully delivered. Thank you for shopping with us!',
