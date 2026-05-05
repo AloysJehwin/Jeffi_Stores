@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 type EligibleOrder = {
   id: string
@@ -337,16 +338,13 @@ export default function DelhiveryPickupPage() {
                             </button>
                           )}
                           {req.pickup_status !== 'picked_up' && (
-                            <select
+                            <AdminSelect
+                              compact
                               value={req.pickup_status}
                               disabled={updatingId === req.id}
-                              onChange={e => handleStatusChange(req, e.target.value as PickupRequest['pickup_status'])}
-                              className="text-xs border border-border-default rounded px-2 py-1 bg-surface text-foreground disabled:opacity-50"
-                            >
-                              {STATUS_OPTIONS.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                              ))}
-                            </select>
+                              options={STATUS_OPTIONS}
+                              onChange={val => handleStatusChange(req, val as PickupRequest['pickup_status'])}
+                            />
                           )}
                           {updatingId === req.id && (
                             <svg className="animate-spin w-3.5 h-3.5 text-foreground-secondary" fill="none" viewBox="0 0 24 24">
@@ -362,18 +360,17 @@ export default function DelhiveryPickupPage() {
                         <td colSpan={5} className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">Add order to this pickup:</label>
-                            <select
+                            <AdminSelect
+                              compact
                               value={addAwbOrderId}
-                              onChange={e => setAddAwbOrderId(e.target.value)}
-                              className="flex-1 text-xs border border-border-default rounded px-2 py-1.5 bg-surface text-foreground"
-                            >
-                              <option value="">— select an order —</option>
-                              {orders.map(o => (
-                                <option key={o.id} value={o.id}>
-                                  #{o.order_number || o.id.slice(0, 8)} · {o.awb_number} · {o.customer_name}
-                                </option>
-                              ))}
-                            </select>
+                              placeholder="— select an order —"
+                              options={orders.map(o => ({
+                                value: o.id,
+                                label: `#${o.order_number || o.id.slice(0, 8)} · ${o.awb_number} · ${o.customer_name}`,
+                              }))}
+                              onChange={val => setAddAwbOrderId(val)}
+                              className="flex-1"
+                            />
                             <button
                               onClick={() => handleAddAwb(req.id)}
                               disabled={!addAwbOrderId || addAwbLoading}
