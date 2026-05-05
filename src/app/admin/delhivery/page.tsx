@@ -53,6 +53,9 @@ export default function DelhiveryPickupPage() {
   const [submitting, setSubmitting] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [result, setResult] = useState<{ success: boolean; message: string; details?: string } | null>(null)
+  const [addAwbFor, setAddAwbFor] = useState<string | null>(null)
+  const [addAwbOrderId, setAddAwbOrderId] = useState<string>('')
+  const [addAwbLoading, setAddAwbLoading] = useState(false)
 
   const loadData = () => {
     setLoading(true)
@@ -118,12 +121,40 @@ export default function DelhiveryPickupPage() {
       })
       if (res.ok) {
         setPickupHistory(prev => prev.map(r => r.id === req.id ? { ...r, pickup_status: newStatus } : r))
-        if (newStatus === 'failed') {
-          loadData()
-        }
+        if (newStatus === 'failed') loadData()
       }
     } finally {
       setUpdatingId(null)
+    }
+  }
+
+  const handleAddAwb = async (pickupId: string) => {
+    if (!addAwbOrderId) return
+    setAddAwbLoading(true)
+    try {
+      const res = await fetch('/api/admin/delhivery/pickup-request', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pickupId, add_awb_order_id: addAwbOrderId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setResult({ success: false, message: data.error || 'Failed to add AWB' })
+      } else {
+        setPickupHistory(prev => prev.map(r => {
+          if (r.id !== pickupId) return r
+          return { ...r, awbs: [...r.awbs, data.awb], awb_count: r.awb_count + 1 }
+        }))
+        setOrders(prev => prev.filter(o => o.id !== addAwbOrderId))
+        setSelected(prev => { const n = new Set(prev); n.delete(addAwbOrderId); return n })
+        setResult({ success: true, message: `AWB ${data.awb} added to pickup request.` })
+        setAddAwbFor(null)
+        setAddAwbOrderId('')
+      }
+    } catch (err: any) {
+      setResult({ success: false, message: err.message || 'Request failed' })
+    } finally {
+      setAddAwbLoading(false)
     }
   }
 
@@ -273,50 +304,94 @@ export default function DelhiveryPickupPage() {
               </thead>
               <tbody>
                 {pickupHistory.map(req => (
-                  <tr key={req.id} className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50">
-                    <td className="px-4 py-3 text-foreground font-medium">
-                      {new Date(req.pickup_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-foreground-secondary">
-                      {req.pickup_id ?? <span className="italic text-foreground-muted">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {req.awbs.map(awb => (
-                          <span key={awb} className="px-1.5 py-0.5 rounded bg-surface-secondary font-mono text-xs text-foreground">{awb}</span>
-                        ))}
-                        <span className="text-xs text-foreground-secondary self-center">({req.awb_count})</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-foreground-secondary">
-                      {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[req.pickup_status]}`}>
-                          {req.pickup_status.replace('_', ' ')}
-                        </span>
-                        {req.pickup_status !== 'picked_up' && (
-                          <select
-                            value={req.pickup_status}
-                            disabled={updatingId === req.id}
-                            onChange={e => handleStatusChange(req, e.target.value as PickupRequest['pickup_status'])}
-                            className="text-xs border border-border-default rounded px-2 py-1 bg-surface text-foreground disabled:opacity-50"
-                          >
-                            {STATUS_OPTIONS.map(opt => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        )}
-                        {updatingId === req.id && (
-                          <svg className="animate-spin w-3.5 h-3.5 text-foreground-secondary" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <>
+                    <tr key={req.id} className="border-b border-border-default last:border-0 hover:bg-surface-secondary/50">
+                      <td className="px-4 py-3 text-foreground font-medium">
+                        {new Date(req.pickup_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-foreground-secondary">
+                        {req.pickup_id ?? <span className="italic text-foreground-muted">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {req.awbs.map(awb => (
+                            <span key={awb} className="px-1.5 py-0.5 rounded bg-surface-secondary font-mono text-xs text-foreground">{awb}</span>
+                          ))}
+                          <span className="text-xs text-foreground-secondary self-center">({req.awb_count})</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-foreground-secondary">
+                        {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[req.pickup_status]}`}>
+                            {req.pickup_status.replace('_', ' ')}
+                          </span>
+                          {req.pickup_status === 'pending' && orders.length > 0 && (
+                            <button
+                              onClick={() => { setAddAwbFor(addAwbFor === req.id ? null : req.id); setAddAwbOrderId('') }}
+                              className="px-2 py-0.5 rounded text-xs font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors"
+                            >
+                              + Add AWB
+                            </button>
+                          )}
+                          {req.pickup_status !== 'picked_up' && (
+                            <select
+                              value={req.pickup_status}
+                              disabled={updatingId === req.id}
+                              onChange={e => handleStatusChange(req, e.target.value as PickupRequest['pickup_status'])}
+                              className="text-xs border border-border-default rounded px-2 py-1 bg-surface text-foreground disabled:opacity-50"
+                            >
+                              {STATUS_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          )}
+                          {updatingId === req.id && (
+                            <svg className="animate-spin w-3.5 h-3.5 text-foreground-secondary" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {addAwbFor === req.id && (
+                      <tr key={`${req.id}-add`} className="bg-surface-secondary border-b border-border-default">
+                        <td colSpan={5} className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">Add order to this pickup:</label>
+                            <select
+                              value={addAwbOrderId}
+                              onChange={e => setAddAwbOrderId(e.target.value)}
+                              className="flex-1 text-xs border border-border-default rounded px-2 py-1.5 bg-surface text-foreground"
+                            >
+                              <option value="">— select an order —</option>
+                              {orders.map(o => (
+                                <option key={o.id} value={o.id}>
+                                  #{o.order_number || o.id.slice(0, 8)} · {o.awb_number} · {o.customer_name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => handleAddAwb(req.id)}
+                              disabled={!addAwbOrderId || addAwbLoading}
+                              className="px-3 py-1.5 text-xs font-semibold rounded bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
+                            >
+                              {addAwbLoading ? 'Adding…' : 'Confirm'}
+                            </button>
+                            <button
+                              onClick={() => { setAddAwbFor(null); setAddAwbOrderId('') }}
+                              className="px-3 py-1.5 text-xs font-medium rounded border border-border-default text-foreground-secondary hover:text-foreground transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
