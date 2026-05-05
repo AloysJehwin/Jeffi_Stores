@@ -13,12 +13,12 @@ const STATUS_SYNC: Record<string, {
   clearAwb?: boolean
   onlyIfCurrent?: string[]
 }> = {
-  PU:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  IT:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  OT:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  OD:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  DL:       { orderStatus: 'delivered', setDeliveredAt: true, onlyIfCurrent: ['shipped', 'processing', 'confirmed'] },
-  'RTO-DL': { orderStatus: 'returned',  clearAwb: true,       onlyIfCurrent: ['shipped', 'processing'] },
+  PU:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  IT:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  OT:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  OD:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  DL:       { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-DL': { orderStatus: 'returned',         clearAwb: true,       onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
 }
 
 export async function POST(request: NextRequest) {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const orders = await queryMany<{ id: string; awb_number: string; status: string }>(
     `SELECT id, awb_number, status FROM orders
      WHERE awb_number IS NOT NULL
-       AND status IN ('processing', 'confirmed', 'pending', 'shipped')
+       AND status IN ('processing', 'confirmed', 'pending', 'shipped', 'out_for_delivery')
      ORDER BY updated_at DESC`,
     []
   )
