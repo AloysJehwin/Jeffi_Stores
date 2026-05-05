@@ -261,7 +261,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
           </div>
           )}
 
-          {order.payment_status === 'paid' && !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) && (
+          {order.payment_status === 'paid' && (order.status === 'processing' || order.awb_number) && !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) && (
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Delhivery Shipment</h2>
