@@ -23,23 +23,42 @@ type TrackingData = {
 
 function statusBadge(type: string | null) {
   switch (type?.toUpperCase()) {
-    case 'DL': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-    case 'OT': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-    case 'IT': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-    case 'UD': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-    default:   return 'bg-surface-secondary text-foreground-secondary'
+    case 'DL':     return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+    case 'OT':
+    case 'OD':     return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+    case 'IT':
+    case 'PU':     return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+    case 'UD':
+    case 'NDR':    return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+    case 'RTO':
+    case 'RTO-IT':
+    case 'RTO-OT':
+    case 'RTO-DL': return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+    case 'HOLD':
+    case 'MIS':
+    case 'LOST':   return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+    default:       return 'bg-surface-secondary text-foreground-secondary'
   }
 }
 
 function statusLabel(type: string | null) {
   switch (type?.toUpperCase()) {
-    case 'DL': return 'Delivered'
-    case 'OT': return 'Out for Delivery'
-    case 'IT': return 'In Transit'
-    case 'UD': return 'Undelivered'
-    case 'PP': return 'Pickup Pending'
-    case 'PU': return 'Picked Up'
-    default:   return type || 'In Progress'
+    case 'PP':     return 'Pickup Pending'
+    case 'PU':     return 'Picked Up'
+    case 'IT':     return 'In Transit'
+    case 'OT':
+    case 'OD':     return 'Out for Delivery'
+    case 'DL':     return 'Delivered'
+    case 'UD':     return 'Undelivered'
+    case 'NDR':    return 'Delivery Attempted'
+    case 'RTO':    return 'Return Initiated'
+    case 'RTO-IT': return 'Returning to Origin'
+    case 'RTO-OT': return 'Out for Return'
+    case 'RTO-DL': return 'Returned to Origin'
+    case 'HOLD':   return 'On Hold'
+    case 'MIS':    return 'Misrouted'
+    case 'LOST':   return 'Lost'
+    default:       return type || 'In Progress'
   }
 }
 
@@ -52,11 +71,12 @@ const TIMELINE_STEPS: { key: string; label: string; types: string[] }[] = [
 ]
 
 function resolveStep(scans: Scan[], statusType: string | null): number {
-  const type = statusType?.toLowerCase() ?? ''
-  if (type === 'dl') return 4
-  if (type === 'ot') return 3
-  if (type === 'it') return 2
-  if (type === 'pu') return 1
+  const type = statusType?.toUpperCase() ?? ''
+  if (type === 'DL') return 4
+  if (type === 'OT' || type === 'OD') return 3
+  if (type === 'IT') return 2
+  if (type === 'PU') return 1
+  if (['RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL', 'UD', 'NDR', 'HOLD', 'LOST', 'MIS'].includes(type)) return -1
 
   const activities = scans.map(s => s.activity?.toLowerCase() ?? '')
   if (activities.some(a => a.includes('deliver'))) return 4
@@ -126,13 +146,17 @@ export default function DelhiveryTracking({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
+  const [statusSynced, setStatusSynced] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${apiBase}/${orderId}/track`)
       .then(r => r.json())
       .then(d => {
         if (d.error) setError(d.error)
-        else setTracking(d.tracking)
+        else {
+          setTracking(d.tracking)
+          if (d.statusSynced && d.syncedTo) setStatusSynced(d.syncedTo)
+        }
       })
       .catch(() => setError('Could not load tracking'))
       .finally(() => setLoading(false))
@@ -159,10 +183,27 @@ export default function DelhiveryTracking({
   }
 
   const latestScan = tracking.scans?.[0]
+  const isException = ['RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL', 'UD', 'NDR', 'HOLD', 'LOST', 'MIS'].includes(tracking.statusType?.toUpperCase() ?? '')
 
   if (variant === 'admin') {
     return (
       <div className="space-y-5">
+        {statusSynced && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-xs text-green-800 dark:text-green-300">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            Order status automatically updated to <span className="font-semibold capitalize">{statusSynced}</span> based on Delhivery tracking.
+          </div>
+        )}
+        {isException && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs text-red-800 dark:text-red-300">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            Shipment exception: <span className="font-semibold">{statusLabel(tracking.statusType)}</span>
+          </div>
+        )}
         <HorizontalTimeline tracking={tracking} />
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm border-t border-border-default pt-4">
