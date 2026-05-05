@@ -182,6 +182,10 @@ export async function PATCH(
       paramIndex++
     }
 
+    if (status === 'shipped') {
+      updates.push(`shipped_at = COALESCE(shipped_at, NOW())`)
+    }
+
     if (status === 'delivered') {
       updates.push(`delivered_at = NOW()`)
     }

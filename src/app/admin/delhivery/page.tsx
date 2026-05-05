@@ -339,7 +339,6 @@ export default function DelhiveryPickupPage() {
                           )}
                           {req.pickup_status !== 'picked_up' && (
                             <AdminSelect
-                              compact
                               value={req.pickup_status}
                               disabled={updatingId === req.id}
                               options={STATUS_OPTIONS}
