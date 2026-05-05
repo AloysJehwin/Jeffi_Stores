@@ -496,14 +496,16 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor(order.status)}`}>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                     {order.status === 'cancel_requested' ? 'Cancellation Requested'
                       : order.status === 'cancel_rejected' ? 'Cancellation Rejected'
+                      : order.status === 'out_for_delivery' ? 'Out for Delivery'
                       : order.status === 'return_requested' ? 'Return Requested'
                       : order.status === 'return_approved' ? 'Return Approved'
                       : order.status === 'return_received' ? 'Return Received'
                       : order.status === 'return_rejected' ? 'Return Rejected'
-                      : order.status}
+                      : order.status === 'returned' ? 'Returned'
+                      : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                   </span>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
                     Payment: {order.paymentStatus}
