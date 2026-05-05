@@ -21,6 +21,26 @@ type TrackingData = {
   scans: Scan[]
 }
 
+const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
+
+function resolveDisplayType(statusType: string | null, scans: Scan[]): string | null {
+  const type = statusType?.toUpperCase() ?? ''
+  if (!EXCEPTION_TYPES.has(type)) return statusType
+
+  for (let i = scans.length - 1; i >= 0; i--) {
+    const activity = (scans[i]?.activity ?? '').toLowerCase()
+    if (activity.includes('out for delivery')) return 'OD'
+    if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) return 'RTO-DL'
+    if (activity.includes('out for return')) return 'RTO-OT'
+    if (activity.includes('return in transit') || activity.includes('in return transit')) return 'RTO-IT'
+    if (activity.includes('rto initiated') || activity.includes('return initiated')) return 'RTO'
+    if (activity.includes('in transit') || activity === 'transit') return 'IT'
+    if (activity.includes('picked up') || activity.includes('shipment picked')) return 'PU'
+    if (activity.includes('delivered')) return 'DL'
+  }
+  return statusType
+}
+
 function statusBadge(type: string | null) {
   switch (type?.toUpperCase()) {
     case 'DL':     return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
@@ -49,7 +69,7 @@ function statusLabel(type: string | null) {
     case 'OT':
     case 'OD':     return 'Out for Delivery'
     case 'DL':     return 'Delivered'
-    case 'UD':     return 'Undelivered'
+    case 'UD':     return 'Delivery Attempted'
     case 'NDR':    return 'Delivery Attempted'
     case 'RTO':    return 'Return Initiated'
     case 'RTO-IT': return 'Returning to Origin'
@@ -62,16 +82,16 @@ function statusLabel(type: string | null) {
   }
 }
 
-const TIMELINE_STEPS: { key: string; label: string; types: string[] }[] = [
-  { key: 'manifested', label: 'Manifested',        types: ['mn', 'manifest'] },
-  { key: 'picked_up',  label: 'Picked Up',         types: ['pu', 'pickup'] },
-  { key: 'in_transit', label: 'In Transit',         types: ['it', 'transit'] },
-  { key: 'out',        label: 'Out for Delivery',   types: ['ot'] },
-  { key: 'delivered',  label: 'Delivered',          types: ['dl'] },
+const TIMELINE_STEPS: { key: string; label: string }[] = [
+  { key: 'manifested', label: 'Manifested' },
+  { key: 'picked_up',  label: 'Picked Up'  },
+  { key: 'in_transit', label: 'In Transit'  },
+  { key: 'out',        label: 'Out for Delivery' },
+  { key: 'delivered',  label: 'Delivered'   },
 ]
 
 function resolveStep(scans: Scan[], statusType: string | null): number {
-  const type = statusType?.toUpperCase() ?? ''
+  const type = resolveDisplayType(statusType, scans)?.toUpperCase() ?? ''
   if (type === 'DL') return 4
   if (type === 'OT' || type === 'OD') return 3
   if (type === 'IT') return 2
@@ -97,12 +117,11 @@ function HorizontalTimeline({ tracking }: { tracking: TrackingData }) {
           return (
             <div key={step.key} className="flex-1 flex flex-col items-center relative">
               {i > 0 && (
-                <div className={`absolute left-0 top-3.5 h-0.5 w-1/2 -translate-x-0 ${done || current ? 'bg-accent-500' : 'bg-border-default'}`} />
+                <div className={`absolute left-0 top-3.5 h-0.5 w-1/2 ${done || current ? 'bg-accent-500' : 'bg-border-default'}`} />
               )}
               {i < TIMELINE_STEPS.length - 1 && (
                 <div className={`absolute right-0 top-3.5 h-0.5 w-1/2 ${done ? 'bg-accent-500' : 'bg-border-default'}`} />
               )}
-
               <div className={`relative z-10 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${
                 done    ? 'bg-accent-500 border-accent-500' :
                 current ? 'bg-white dark:bg-surface-elevated border-accent-500' :
@@ -116,7 +135,6 @@ function HorizontalTimeline({ tracking }: { tracking: TrackingData }) {
                   <div className={`w-2.5 h-2.5 rounded-full ${current ? 'bg-accent-500' : 'bg-border-default'}`} />
                 )}
               </div>
-
               <p className={`mt-2 text-xs text-center leading-tight px-1 ${
                 current ? 'text-accent-500 font-semibold' :
                 done    ? 'text-foreground font-medium' :
@@ -127,6 +145,48 @@ function HorizontalTimeline({ tracking }: { tracking: TrackingData }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+function ScanHistoryModal({ scans, onClose }: { scans: Scan[]; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/50" />
+      <div
+        className="relative bg-surface-elevated w-full sm:max-w-lg sm:rounded-xl rounded-t-xl shadow-2xl max-h-[80vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
+          <h3 className="font-semibold text-foreground text-base">Shipment History</h3>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface transition-colors text-foreground-muted hover:text-foreground"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="overflow-y-auto p-5">
+          <div className="border-l-2 border-border-default ml-2 space-y-0">
+            {scans.map((scan, i) => (
+              <div key={i} className="relative pl-4 pb-4">
+                <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${i === 0 ? 'bg-accent-500' : 'bg-border-default'}`} />
+                <p className="text-xs text-foreground-muted">
+                  {scan.date ? new Date(scan.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}
+                </p>
+                <p className="text-sm text-foreground font-medium">{scan.activity || '—'}</p>
+                {scan.location && <p className="text-xs text-foreground-secondary">{scan.location}</p>}
+                {scan.instructions && <p className="text-xs text-foreground-muted italic">{scan.instructions}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -144,7 +204,7 @@ export default function DelhiveryTracking({
   const [tracking, setTracking] = useState<TrackingData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   const [statusSynced, setStatusSynced] = useState<string | null>(null)
 
   useEffect(() => {
@@ -181,12 +241,15 @@ export default function DelhiveryTracking({
     )
   }
 
+  const displayType = resolveDisplayType(tracking.statusType, tracking.scans)
   const latestScan = tracking.scans?.[0]
   const isException = ['RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL', 'UD', 'NDR', 'HOLD', 'LOST', 'MIS'].includes(tracking.statusType?.toUpperCase() ?? '')
 
   if (variant === 'admin') {
     return (
       <div className="space-y-5">
+        {showHistory && <ScanHistoryModal scans={tracking.scans} onClose={() => setShowHistory(false)} />}
+
         {statusSynced && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-xs text-green-800 dark:text-green-300">
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -203,11 +266,12 @@ export default function DelhiveryTracking({
             Shipment exception: <span className="font-semibold">{statusLabel(tracking.statusType)}</span>
           </div>
         )}
+
         <HorizontalTimeline tracking={tracking} />
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm border-t border-border-default pt-4">
-          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusBadge(tracking.statusType)}`}>
-            {statusLabel(tracking.statusType)}
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusBadge(displayType)}`}>
+            {statusLabel(displayType)}
           </span>
           <span className="text-foreground-secondary">
             AWB: <span className="font-mono text-foreground">{tracking.awb}</span>
@@ -235,35 +299,20 @@ export default function DelhiveryTracking({
         </div>
 
         {tracking.scans?.length > 0 && (
-          <div>
+          <div className="flex items-center justify-between pt-1">
+            <p className="text-xs text-foreground-secondary">
+              Last update: {latestScan?.date ? new Date(latestScan.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}
+              {latestScan?.location ? ` · ${latestScan.location}` : ''}
+            </p>
             <button
-              onClick={() => setExpanded(e => !e)}
-              className="text-sm text-accent-500 hover:text-accent-600 flex items-center gap-1"
+              onClick={() => setShowHistory(true)}
+              className="text-sm text-accent-500 hover:text-accent-600 flex items-center gap-1 shrink-0"
             >
-              {expanded ? 'Hide' : 'Show'} scan history ({tracking.scans.length})
-              <svg className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              View history ({tracking.scans.length})
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
-            {expanded && (
-              <div className="mt-2 border-l-2 border-border-default ml-2 space-y-0">
-                {tracking.scans.map((scan, i) => (
-                  <div key={i} className="relative pl-4 pb-3">
-                    <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${i === 0 ? 'bg-accent-500' : 'bg-border-default'}`} />
-                    <p className="text-xs text-foreground-muted">{scan.date ? new Date(scan.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}</p>
-                    <p className="text-sm text-foreground font-medium">{scan.activity || '—'}</p>
-                    {scan.location && <p className="text-xs text-foreground-secondary">{scan.location}</p>}
-                    {scan.instructions && <p className="text-xs text-foreground-muted italic">{scan.instructions}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-            {!expanded && latestScan && (
-              <p className="text-xs text-foreground-secondary mt-1">
-                Last update: {latestScan.date ? new Date(latestScan.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}
-                {latestScan.location ? ` · ${latestScan.location}` : ''}
-              </p>
-            )}
           </div>
         )}
       </div>
@@ -271,10 +320,14 @@ export default function DelhiveryTracking({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {showHistory && <ScanHistoryModal scans={tracking.scans} onClose={() => setShowHistory(false)} />}
+
+      <HorizontalTimeline tracking={tracking} />
+
       <div className="flex flex-wrap items-start gap-3">
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(tracking.statusType)}`}>
-          {statusLabel(tracking.statusType)}
+        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(displayType)}`}>
+          {statusLabel(displayType)}
         </span>
         <div className="text-sm text-foreground-secondary">
           AWB: <span className="font-mono text-foreground">{tracking.awb}</span>
@@ -314,37 +367,20 @@ export default function DelhiveryTracking({
       </div>
 
       {tracking.scans?.length > 0 && (
-        <div>
+        <div className="flex items-center justify-between border-t border-border-default pt-3">
+          <p className="text-xs text-foreground-secondary">
+            Last update: {latestScan?.date ? new Date(latestScan.date).toLocaleString('en-IN') : '—'}
+            {latestScan?.location ? ` · ${latestScan.location}` : ''}
+          </p>
           <button
-            onClick={() => setExpanded(e => !e)}
-            className="text-sm text-accent-500 hover:text-accent-600 flex items-center gap-1 mt-1"
+            onClick={() => setShowHistory(true)}
+            className="text-sm text-accent-500 hover:text-accent-600 flex items-center gap-1 shrink-0"
           >
-            {expanded ? 'Hide' : 'Show'} scan history ({tracking.scans.length})
-            <svg className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            View history ({tracking.scans.length})
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
-
-          {expanded && (
-            <div className="mt-2 space-y-0 border-l-2 border-border-default ml-2">
-              {tracking.scans.map((scan, i) => (
-                <div key={i} className="relative pl-4 pb-3">
-                  <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${i === 0 ? 'bg-accent-500' : 'bg-border-default'}`} />
-                  <p className="text-xs text-foreground-muted">{scan.date ? new Date(scan.date).toLocaleString('en-IN') : '—'}</p>
-                  <p className="text-sm text-foreground font-medium">{scan.activity || '—'}</p>
-                  {scan.location && <p className="text-xs text-foreground-secondary">{scan.location}</p>}
-                  {scan.instructions && <p className="text-xs text-foreground-muted italic">{scan.instructions}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {latestScan && !expanded && (
-        <div className="text-xs text-foreground-secondary border-t border-border-default pt-2 mt-1">
-          Last update: {latestScan.date ? new Date(latestScan.date).toLocaleString('en-IN') : '—'}
-          {latestScan.location ? ` · ${latestScan.location}` : ''}
         </div>
       )}
     </div>
