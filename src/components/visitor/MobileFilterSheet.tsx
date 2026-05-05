@@ -43,15 +43,15 @@ export default function MobileFilterSheet({
   const currentSort     = searchParams.get('sort') || ''
   const currentOrder    = searchParams.get('order') || ''
 
-  const [pendingCategory, setPendingCategory] = useState(currentCategory)
-  const [pendingBrand,    setPendingBrand]    = useState(currentBrand)
-  const [pendingSort,     setPendingSort]     = useState(currentSort)
-  const [pendingOrder,    setPendingOrder]    = useState(currentOrder)
+  const [pendingCategories, setPendingCategories] = useState<string[]>(currentCategory ? currentCategory.split(',') : [])
+  const [pendingBrands,     setPendingBrands]     = useState<string[]>(currentBrand ? currentBrand.split(',') : [])
+  const [pendingSort,       setPendingSort]       = useState(currentSort)
+  const [pendingOrder,      setPendingOrder]      = useState(currentOrder)
 
   useEffect(() => {
     if (open) {
-      setPendingCategory(currentCategory)
-      setPendingBrand(currentBrand)
+      setPendingCategories(currentCategory ? currentCategory.split(',') : [])
+      setPendingBrands(currentBrand ? currentBrand.split(',') : [])
       setPendingSort(currentSort)
       setPendingOrder(currentOrder)
       document.body.style.overflow = 'hidden'
@@ -65,10 +65,10 @@ export default function MobileFilterSheet({
 
   function applyFilters() {
     const params = new URLSearchParams()
-    if (pendingCategory) params.set('category', pendingCategory)
-    if (pendingBrand)    params.set('brand', pendingBrand)
-    if (pendingSort)     params.set('sort', pendingSort)
-    if (pendingOrder)    params.set('order', pendingOrder)
+    if (pendingCategories.length) params.set('category', pendingCategories.join(','))
+    if (pendingBrands.length)     params.set('brand',    pendingBrands.join(','))
+    if (pendingSort)              params.set('sort',     pendingSort)
+    if (pendingOrder)             params.set('order',    pendingOrder)
     const search = searchParams.get('search')
     if (search) params.set('search', search)
     router.push(`/products${params.toString() ? `?${params.toString()}` : ''}`)
@@ -76,18 +76,22 @@ export default function MobileFilterSheet({
   }
 
   function clearAll() {
-    setPendingCategory('')
-    setPendingBrand('')
+    setPendingCategories([])
+    setPendingBrands([])
     setPendingSort('')
     setPendingOrder('')
   }
 
   function toggleCategory(id: string) {
-    setPendingCategory(prev => prev === id ? '' : id)
+    setPendingCategories(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    )
   }
 
   function toggleBrand(id: string) {
-    setPendingBrand(prev => prev === id ? '' : id)
+    setPendingBrands(prev =>
+      prev.includes(id) ? prev.filter(b => b !== id) : [...prev, id]
+    )
   }
 
   function selectSort(sort: string, order: string) {
@@ -130,7 +134,7 @@ export default function MobileFilterSheet({
             <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
               <h2 className="font-semibold text-foreground text-base">Filters</h2>
               <div className="flex items-center gap-3">
-                {(pendingCategory || pendingBrand || pendingSort) && (
+        {(pendingCategories.length > 0 || pendingBrands.length > 0 || pendingSort) && (
                   <button onClick={clearAll} className="text-sm text-accent-500 hover:text-accent-600 font-medium">
                     Clear all
                   </button>
@@ -182,15 +186,15 @@ export default function MobileFilterSheet({
                 <h3 className="text-sm font-semibold text-foreground mb-3">Categories</h3>
                 <div className="space-y-2">
                   <button
-                    onClick={() => setPendingCategory('')}
+                    onClick={() => setPendingCategories([])}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
-                      !pendingCategory
+                      pendingCategories.length === 0
                         ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400'
                         : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'
                     }`}
                   >
                     All Categories
-                    {!pendingCategory && (
+                    {pendingCategories.length === 0 && (
                       <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
@@ -198,8 +202,8 @@ export default function MobileFilterSheet({
                   </button>
                   {mainCats.map(cat => {
                     const subs = subCats.filter(s => s.parent_category_id === cat.id)
-                    const isSelected = pendingCategory === cat.id
-                    const hasSelectedChild = subs.some(s => s.id === pendingCategory)
+                    const isSelected = pendingCategories.includes(cat.id)
+                    const hasSelectedChild = subs.some(s => pendingCategories.includes(s.id))
                     const isExpanded = expandedCats[cat.id]
 
                     return (
@@ -240,7 +244,7 @@ export default function MobileFilterSheet({
                         {subs.length > 0 && isExpanded && (
                           <div className="ml-4 mt-1 space-y-1">
                             {subs.map(sub => {
-                              const isSubSelected = pendingCategory === sub.id
+                              const isSubSelected = pendingCategories.includes(sub.id)
                               return (
                                 <button
                                   key={sub.id}
@@ -273,22 +277,22 @@ export default function MobileFilterSheet({
                 <h3 className="text-sm font-semibold text-foreground mb-3">Brands</h3>
                 <div className="space-y-2">
                   <button
-                    onClick={() => setPendingBrand('')}
+                    onClick={() => setPendingBrands([])}
                     className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
-                      !pendingBrand
+                      pendingBrands.length === 0
                         ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400'
                         : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'
                     }`}
                   >
                     All Brands
-                    {!pendingBrand && (
+                    {pendingBrands.length === 0 && (
                       <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
                     )}
                   </button>
                   {brands.map(brand => {
-                    const isSelected = pendingBrand === brand.id
+                    const isSelected = pendingBrands.includes(brand.id)
                     return (
                       <button
                         key={brand.id}
