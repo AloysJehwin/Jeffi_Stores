@@ -13,8 +13,8 @@ const STATUS_SYNC: Record<string, {
   clearAwb?: boolean
   onlyIfCurrent?: string[]
 }> = {
-  PU:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  IT:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  PU:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  IT:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
   OT:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   OD:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   DL:       { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
