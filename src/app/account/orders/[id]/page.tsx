@@ -489,6 +489,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     })} at {new Date(order.createdAt).toLocaleTimeString('en-IN', {
                       hour: '2-digit',
                       minute: '2-digit',
+                      timeZone: 'Asia/Kolkata',
                     })}
                   </p>
                 </div>

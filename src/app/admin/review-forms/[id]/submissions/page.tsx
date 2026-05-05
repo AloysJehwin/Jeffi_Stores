@@ -158,7 +158,7 @@ export default function SubmissionsPage({ params }: { params: { id: string } }) 
                   </div>
                 )}
 
-                <p className="text-xs text-foreground-muted">{new Date(s.submitted_at).toLocaleString('en-IN')}</p>
+                <p className="text-xs text-foreground-muted">{new Date(s.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
 
                 {s.status === 'pending' && (
                   <div className="flex gap-2 pt-1">

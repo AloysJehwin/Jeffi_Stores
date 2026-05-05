@@ -68,7 +68,7 @@ export default function SupportRequestsAlert() {
                 <span className="text-xs text-red-600 dark:text-red-400 font-semibold">Waiting</span>
               )}
               <span className="text-xs text-foreground-muted">
-                {new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {new Date(s.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
               </span>
               <svg className="w-4 h-4 text-foreground-muted group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

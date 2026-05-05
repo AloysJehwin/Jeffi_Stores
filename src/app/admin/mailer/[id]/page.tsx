@@ -98,9 +98,9 @@ export default async function CampaignDetailPage({
           { label: 'Recipients', value: campaign.recipient_count ?? '—' },
           { label: campaign.sent_at ? 'Sent' : campaign.scheduled_at ? 'Scheduled' : 'Created',
             value: campaign.sent_at
-              ? new Date(campaign.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+              ? new Date(campaign.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
               : campaign.scheduled_at
-              ? new Date(campaign.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+              ? new Date(campaign.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
               : new Date(campaign.created_at).toLocaleDateString('en-IN') },
         ].map(stat => (
           <div key={stat.label} className="bg-surface-elevated rounded-lg border border-border-default p-4">
@@ -152,7 +152,7 @@ export default async function CampaignDetailPage({
                           {l.status}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-foreground-secondary text-xs">{new Date(l.sent_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                      <td className="px-4 py-2.5 text-foreground-secondary text-xs">{new Date(l.sent_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}</td>
                       <td className="px-4 py-2.5 text-red-500 text-xs">{l.error || '—'}</td>
                     </tr>
                   ))}
