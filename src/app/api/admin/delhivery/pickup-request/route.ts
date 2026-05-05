@@ -49,10 +49,41 @@ export async function PATCH(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { id, pickup_status } = body
+    const { id, pickup_status, add_awb_order_id } = body
 
-    if (!id || !['pending', 'picked_up', 'failed'].includes(pickup_status)) {
-      return NextResponse.json({ error: 'Invalid id or pickup_status' }, { status: 400 })
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+
+    if (add_awb_order_id) {
+      const order = await queryMany(`
+        SELECT id, awb_number FROM orders
+        WHERE id = $1
+          AND awb_number IS NOT NULL
+          AND payment_status = 'paid'
+          AND status NOT IN (${EXCLUDE_STATUSES.map((_, i) => `$${i + 2}`).join(', ')})
+          AND awb_number NOT IN (
+            SELECT UNNEST(awbs) FROM delhivery_pickup_requests
+            WHERE pickup_status IN ('pending', 'picked_up')
+          )
+      `, [add_awb_order_id, ...EXCLUDE_STATUSES])
+
+      if (!order || order.length === 0) {
+        return NextResponse.json({ error: 'Order not eligible to add to pickup' }, { status: 422 })
+      }
+
+      const awb = (order[0] as any).awb_number as string
+
+      await query(
+        `UPDATE delhivery_pickup_requests
+         SET awbs = array_append(awbs, $1), awb_count = awb_count + 1
+         WHERE id = $2 AND pickup_status = 'pending'`,
+        [awb, id]
+      )
+
+      return NextResponse.json({ success: true, awb })
+    }
+
+    if (!['pending', 'picked_up', 'failed'].includes(pickup_status)) {
+      return NextResponse.json({ error: 'Invalid pickup_status' }, { status: 400 })
     }
 
     await query(
