@@ -210,7 +210,7 @@ export default function DelhiveryTracking({
                 {tracking.scans.map((scan, i) => (
                   <div key={i} className="relative pl-4 pb-3">
                     <div className={`absolute -left-[5px] top-1.5 w-2 h-2 rounded-full ${i === 0 ? 'bg-accent-500' : 'bg-border-default'}`} />
-                    <p className="text-xs text-foreground-muted">{scan.date ? new Date(scan.date).toLocaleString('en-IN') : '—'}</p>
+                    <p className="text-xs text-foreground-muted">{scan.date ? new Date(scan.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}</p>
                     <p className="text-sm text-foreground font-medium">{scan.activity || '—'}</p>
                     {scan.location && <p className="text-xs text-foreground-secondary">{scan.location}</p>}
                     {scan.instructions && <p className="text-xs text-foreground-muted italic">{scan.instructions}</p>}
@@ -220,7 +220,7 @@ export default function DelhiveryTracking({
             )}
             {!expanded && latestScan && (
               <p className="text-xs text-foreground-secondary mt-1">
-                Last update: {latestScan.date ? new Date(latestScan.date).toLocaleString('en-IN') : '—'}
+                Last update: {latestScan.date ? new Date(latestScan.date).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '—'}
                 {latestScan.location ? ` · ${latestScan.location}` : ''}
               </p>
             )}

@@ -122,9 +122,9 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
                   </td>
                   <td className="px-4 py-3 text-foreground-secondary text-xs">
                     {c.status === 'scheduled' && c.scheduled_at
-                      ? `Scheduled ${new Date(c.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`
+                      ? `Scheduled ${new Date(c.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}`
                       : c.sent_at
-                      ? new Date(c.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+                      ? new Date(c.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
                       : new Date(c.created_at).toLocaleDateString('en-IN')}
                   </td>
                   <td className="px-4 py-3">

@@ -52,7 +52,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             )}
             <p className="text-foreground-secondary mt-1">
               Placed on {new Date(order.created_at).toLocaleDateString('en-IN')} at{' '}
-              {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+              {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
             </p>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-4">

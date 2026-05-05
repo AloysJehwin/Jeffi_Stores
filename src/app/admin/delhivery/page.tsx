@@ -215,7 +215,7 @@ export default function DelhiveryPickupPage() {
                         {[order.city, order.state, order.postal_code].filter(Boolean).join(', ')}
                       </td>
                       <td className="px-4 py-3 text-foreground-secondary">
-                        {new Date(order.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        {new Date(order.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                       </td>
                       <td className="px-4 py-3">
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 capitalize">
@@ -289,7 +289,7 @@ export default function DelhiveryPickupPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-foreground-secondary">
-                      {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">

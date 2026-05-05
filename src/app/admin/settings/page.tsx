@@ -89,7 +89,7 @@ export default async function SettingsPage() {
                       <p className="text-sm text-foreground-secondary">Last Login</p>
                       <p className="font-medium text-foreground mt-1">
                         {new Date(adminInfo.last_login).toLocaleDateString('en-IN')} at{' '}
-                        {new Date(adminInfo.last_login).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(adminInfo.last_login).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                       </p>
                     </div>
                   )}
