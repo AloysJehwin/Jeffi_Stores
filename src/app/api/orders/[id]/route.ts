@@ -99,7 +99,7 @@ export async function PATCH(
 
     const orderId = params.id
     const body = await request.json()
-    const { status, payment_status, tracking_url } = body
+    const { status, payment_status } = body
 
     const currentOrder = await queryOne(`
       SELECT
@@ -177,12 +177,6 @@ export async function PATCH(
       paramIndex++
     }
 
-    if (status === 'shipped' && tracking_url?.trim()) {
-      updates.push(`tracking_url = $${paramIndex}`)
-      values.push(tracking_url.trim())
-      paramIndex++
-    }
-
     if (status === 'shipped') {
       updates.push(`shipped_at = COALESCE(shipped_at, NOW())`)
     }
@@ -229,8 +223,7 @@ export async function PATCH(
         if (statusChanged) {
           await sendOrderStatusUpdate(
             userEmail, userName, currentOrder.order_number, orderId, status,
-            currentOrder.status, invoicePdfBuffer, undefined,
-            status === 'shipped' ? tracking_url?.trim() : undefined
+            currentOrder.status, invoicePdfBuffer
           ).catch(() => {})
         }
         if (paymentStatusChanged) {

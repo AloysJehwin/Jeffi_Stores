@@ -526,7 +526,6 @@ export async function sendOrderStatusUpdate(
   previousStatus?: string,
   invoicePdfBuffer?: Buffer | null,
   cancellationNote?: string,
-  trackingUrl?: string
 ) {
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
     pending: {
@@ -693,18 +692,13 @@ export async function sendOrderStatusUpdate(
             ${newStatus === 'shipped' ? `
               <div class="info-box" style="background-color: #f0f9ff; border-left-color: #2563eb;">
                 <h4 style="margin-top: 0; color: #1e40af;">Your order is on its way!</h4>
-                ${trackingUrl ? `
-                <p style="margin-bottom: 12px;">Use the link below to track your shipment in real time:</p>
+                <p>Track your shipment live by visiting your order page:</p>
                 <p style="text-align: center; margin: 0;">
-                  <a href="${trackingUrl}" target="_blank"
+                  <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
                      style="display: inline-block; background-color: #2563eb; color: white; padding: 10px 24px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 14px;">
                     Track Your Order
                   </a>
                 </p>
-                <p style="font-size: 12px; color: #64748b; margin-top: 10px; word-break: break-all;">
-                  Or copy this link: <a href="${trackingUrl}" style="color: #2563eb;">${trackingUrl}</a>
-                </p>
-                ` : `<p>You can track your order by logging into your account.</p>`}
               </div>
             ` : ''}
 

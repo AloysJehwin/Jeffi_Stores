@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryMany } from '@/lib/db'
+import { sendOrderStatusUpdate } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,11 +35,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
   }
 
-  const orders = await queryMany<{ id: string; awb_number: string; status: string }>(
-    `SELECT id, awb_number, status FROM orders
-     WHERE awb_number IS NOT NULL
-       AND status IN ('processing', 'confirmed', 'pending', 'shipped', 'out_for_delivery')
-     ORDER BY updated_at DESC`,
+  const orders = await queryMany<{
+    id: string; awb_number: string; status: string
+    order_number: string; customer_name: string; customer_email: string
+  }>(
+    `SELECT o.id, o.awb_number, o.status, o.order_number,
+            COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
+            COALESCE(u.email, o.customer_email) AS customer_email
+     FROM orders o
+     LEFT JOIN users u ON u.id = o.user_id
+     WHERE o.awb_number IS NOT NULL
+       AND o.status IN ('processing', 'confirmed', 'pending', 'shipped', 'out_for_delivery')
+     ORDER BY o.updated_at DESC`,
     []
   )
 
@@ -128,6 +136,14 @@ export async function POST(request: NextRequest) {
           `UPDATE orders SET ${setClauses.join(', ')} WHERE id = $1`,
           queryParams
         ).catch(() => {})
+
+        if (order.customer_email && order.customer_name) {
+          sendOrderStatusUpdate(
+            order.customer_email, order.customer_name,
+            order.order_number, order.id,
+            syncRule.orderStatus, order.status
+          ).catch(() => {})
+        }
 
         results.push({ orderId: order.id, awb, syncedTo: syncRule.orderStatus })
       }

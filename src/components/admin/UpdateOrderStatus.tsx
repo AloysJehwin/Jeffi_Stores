@@ -8,7 +8,6 @@ interface UpdateOrderStatusProps {
   orderId: string
   currentStatus: string
   currentPaymentStatus: string
-  currentTrackingUrl?: string | null
 }
 
 const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -61,10 +60,9 @@ const ALL_PAYMENT_OPTIONS = [
   { value: 'refunded', label: 'Refunded' },
 ]
 
-export default function UpdateOrderStatus({ orderId, currentStatus, currentPaymentStatus, currentTrackingUrl }: UpdateOrderStatusProps) {
+export default function UpdateOrderStatus({ orderId, currentStatus, currentPaymentStatus }: UpdateOrderStatusProps) {
   const [status, setStatus] = useState(currentStatus)
   const [paymentStatus, setPaymentStatus] = useState(currentPaymentStatus)
-  const [trackingUrl, setTrackingUrl] = useState(currentTrackingUrl || '')
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -98,10 +96,6 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
     : null
 
   async function handleUpdate() {
-    if (status === 'shipped' && !trackingUrl.trim()) {
-      setError('A tracking URL is required when marking an order as shipped.')
-      return
-    }
     if (crossFieldError) {
       setError(crossFieldError)
       return
@@ -113,9 +107,6 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
 
     try {
       const body: Record<string, string> = { status, payment_status: paymentStatus }
-      if (status === 'shipped' && trackingUrl.trim()) {
-        body.tracking_url = trackingUrl.trim()
-      }
 
       const response = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
@@ -150,8 +141,7 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
     }
   }
 
-  const hasChanges = status !== currentStatus || paymentStatus !== currentPaymentStatus ||
-    (status === 'shipped' && trackingUrl.trim() !== (currentTrackingUrl || ''))
+  const hasChanges = status !== currentStatus || paymentStatus !== currentPaymentStatus
 
   const isTerminal = (VALID_STATUS_TRANSITIONS[currentStatus]?.length === 0) &&
     (VALID_PAYMENT_TRANSITIONS[currentPaymentStatus]?.length === 0)
@@ -199,23 +189,6 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
           options={paymentOptions}
         />
       </div>
-
-      {status === 'shipped' && (
-        <div>
-          <label htmlFor="tracking_url" className="block text-sm font-medium text-foreground-secondary mb-2">
-            Tracking URL <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="url"
-            id="tracking_url"
-            value={trackingUrl}
-            onChange={e => setTrackingUrl(e.target.value)}
-            placeholder="https://track.delhivery.com/..."
-            className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-          />
-          <p className="text-xs text-foreground-muted mt-1">Paste the courier tracking link. This will be shown to the customer on their order page and in the shipment email.</p>
-        </div>
-      )}
 
       {crossFieldError && (
         <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
