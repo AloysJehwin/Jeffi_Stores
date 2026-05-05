@@ -134,6 +134,8 @@ export default function OrdersPage() {
       default: return status.charAt(0).toUpperCase() + status.slice(1)
     }
   }
+
+  if (isLoading || loading) {
     return (
       <div className="container mx-auto px-4 py-16">
         <div className="text-center">
