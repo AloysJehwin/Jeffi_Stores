@@ -262,7 +262,7 @@ export default async function ProductDetailPage({
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
                         <span className="text-green-700 dark:text-green-400 font-semibold">
-                          In Stock ({product.stock_quantity} available)
+                          In Stock{product.stock_quantity < 10 ? ` (${product.stock_quantity} left)` : ''}
                         </span>
                       </div>
                     ) : (
@@ -272,11 +272,6 @@ export default async function ProductDetailPage({
                         </svg>
                         <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
                       </div>
-                    )}
-                    {product.stock_quantity > 0 && product.stock_quantity <= product.low_stock_threshold && (
-                      <p className="text-sm text-orange-600 dark:text-orange-400 mt-1">
-                        Only {product.stock_quantity} left in stock - order soon!
-                      </p>
                     )}
                   </div>
                 </>
