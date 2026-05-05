@@ -76,7 +76,6 @@ function resolveStep(scans: Scan[], statusType: string | null): number {
   if (type === 'OT' || type === 'OD') return 3
   if (type === 'IT') return 2
   if (type === 'PU') return 1
-  if (['RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL', 'UD', 'NDR', 'HOLD', 'LOST', 'MIS'].includes(type)) return -1
 
   const activities = scans.map(s => s.activity?.toLowerCase() ?? '')
   if (activities.some(a => a.includes('deliver'))) return 4

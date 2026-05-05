@@ -15,10 +15,10 @@ const STATUS_SYNC: Record<string, {
 }> = {
   PU:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
   IT:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  OT:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  OD:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  DL:       { orderStatus: 'delivered', setDeliveredAt: true, onlyIfCurrent: ['shipped', 'processing', 'confirmed'] },
-  'RTO-DL': { orderStatus: 'returned',  clearAwb: true,       onlyIfCurrent: ['shipped', 'processing'] },
+  OT:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  OD:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  DL:       { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-DL': { orderStatus: 'returned',         clearAwb: true,       onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
 }
 
 export async function POST(request: NextRequest) {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
   const orders = await queryMany<{ id: string; awb_number: string; status: string }>(
     `SELECT id, awb_number, status FROM orders
      WHERE awb_number IS NOT NULL
-       AND status IN ('processing', 'confirmed', 'pending', 'shipped')
+       AND status IN ('processing', 'confirmed', 'pending', 'shipped', 'out_for_delivery')
      ORDER BY updated_at DESC`,
     []
   )
@@ -73,7 +73,16 @@ export async function POST(request: NextRequest) {
         const order = batch.find(o => o.awb_number === awb)
         if (!order) continue
 
-        const statusType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+        const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+        const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
+        let statusType = rawType
+        if (EXCEPTION_TYPES.has(rawType)) {
+          const scans: any[] = shipment.Scans ?? []
+          for (let i = scans.length - 1; i >= 0; i--) {
+            const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
+            if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
+          }
+        }
         const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
         const syncRule = STATUS_SYNC[statusType]
 
