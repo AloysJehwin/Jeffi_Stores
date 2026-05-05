@@ -13,11 +13,14 @@ const STATUS_SYNC: Record<string, {
   clearAwb?: boolean
   onlyIfCurrent?: string[]
 }> = {
-  PU:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  IT:       { orderStatus: 'shipped',   setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  PU:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  IT:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
   OT:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   OD:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   DL:       { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  RTO:      { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-IT': { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-OT': { orderStatus: 'out_for_delivery',                      onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
   'RTO-DL': { orderStatus: 'returned',         clearAwb: true,       onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
 }
 
@@ -83,6 +86,10 @@ export async function POST(request: NextRequest) {
             if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
             const activity = (scans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
             if (activity.includes('out for delivery')) { statusType = 'OD'; break }
+            if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
+            if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
+            if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
+            if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
             if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
             if (activity.includes('picked up') || activity.includes('shipment picked')) { statusType = 'PU'; break }
             if (activity.includes('delivered')) { statusType = 'DL'; break }
