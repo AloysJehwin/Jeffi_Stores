@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne, query } from '@/lib/db'
+import { sendOrderStatusUpdate } from '@/lib/email'
 
 const TOKEN = process.env.DELHIVERY_API_KEY
 
@@ -30,8 +31,16 @@ export async function GET(
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const order = await queryOne<{ awb_number: string | null; status: string }>(
-      `SELECT awb_number, status FROM orders WHERE id = $1`,
+    const order = await queryOne<{
+      awb_number: string | null; status: string
+      order_number: string; customer_name: string; customer_email: string
+    }>(
+      `SELECT o.awb_number, o.status, o.order_number,
+              COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
+              COALESCE(u.email, o.customer_email) AS customer_email
+       FROM orders o
+       LEFT JOIN users u ON u.id = o.user_id
+       WHERE o.id = $1`,
       [params.id]
     )
 
@@ -108,6 +117,14 @@ export async function GET(
         `UPDATE orders SET ${setClauses.join(', ')} WHERE id = $1`,
         queryParams
       ).catch(() => {})
+
+      if (order.customer_email && order.customer_name) {
+        sendOrderStatusUpdate(
+          order.customer_email, order.customer_name,
+          order.order_number, params.id,
+          syncRule.orderStatus, order.status
+        ).catch(() => {})
+      }
 
       statusSynced = true
     }
