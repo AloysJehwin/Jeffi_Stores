@@ -337,10 +337,6 @@ export function generateInvoicePDF(
     drawTableHeader()
 
     for (let i = 0; i < items.length; i++) {
-      const isLastItem = i === items.length - 1
-      const spaceNeeded = isLastItem ? rowH + summaryRowsHeight : rowH
-      checkPageBreak(spaceNeeded)
-
       const item = items[i]
       const unitExcl = item.taxable_amount / item.quantity
       const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
@@ -349,7 +345,6 @@ export function generateInvoicePDF(
         : `${item.quantity} NOS`
       const perLabel = isCustomQty && item.buy_unit ? item.buy_unit : 'NOS'
 
-      let cx = LM
       const rowData = [
         String(i + 1),
         item.product_name,
@@ -363,7 +358,16 @@ export function generateInvoicePDF(
         fmt(item.taxable_amount),
       ]
 
-      doc.font(F).fontSize(7)
+      const descColW = itemCols[1].w - 4
+      doc.font(FB).fontSize(7)
+      const descH = doc.heightOfString(item.product_name, { width: descColW })
+      const thisRowH = Math.max(rowH, descH + 4)
+
+      const isLastItem = i === items.length - 1
+      const spaceNeeded = isLastItem ? thisRowH + summaryRowsHeight : thisRowH
+      checkPageBreak(spaceNeeded)
+
+      let cx = LM
       for (let j = 0; j < itemCols.length; j++) {
         const col = itemCols[j]
         if (j === 1 || j === 9) doc.font(FB).fontSize(7)
@@ -371,7 +375,7 @@ export function generateInvoicePDF(
         doc.text(rowData[j], cx + 2, y + 2, { width: col.w - 4, align: col.align })
         cx += col.w
       }
-      y += rowH
+      y += thisRowH
     }
 
     checkPageBreak(rowH)
