@@ -1,5 +1,6 @@
 import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
+import { buildSearchClause } from './search'
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
@@ -131,9 +132,10 @@ export async function getFilteredOrders(filters: {
     params.push(filters.payment_status)
   }
   if (filters.search) {
-    conditions.push(`(o.order_number ILIKE $${i} OR o.customer_name ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildSearchClause(filters.search, ['o.order_number', 'o.customer_name'], i)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -206,9 +208,10 @@ export async function getFilteredProducts(filters: {
     )`)
   }
   if (filters.search) {
-    conditions.push(`(p.name ILIKE $${i} OR p.sku ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildSearchClause(filters.search, ['p.name', 'p.sku'], i)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -293,9 +296,10 @@ export async function getCustomers(filters: {
   }
 
   if (filters.search) {
-    conditions.push(`(u.email ILIKE $${i} OR u.first_name ILIKE $${i} OR u.last_name ILIKE $${i} OR u.phone ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildSearchClause(filters.search, ['u.email', 'u.first_name', 'u.last_name', 'u.phone'], i)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`

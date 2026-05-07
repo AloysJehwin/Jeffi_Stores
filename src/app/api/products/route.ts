@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, queryOne } from '@/lib/db'
+import { buildSearchClause, buildSearchRank } from '@/lib/search'
 
 const PAGE_SIZE = 21
 
@@ -20,8 +21,10 @@ export async function GET(request: NextRequest) {
     let idx = 1
 
     if (search) {
-      conditions.push(`p.name ILIKE $${idx++}`)
-      params.push(`%${search}%`)
+      const sc = buildSearchClause(search, ['p.name', 'p.sku'], idx)
+      conditions.push(sc.clause)
+      params.push(...sc.params)
+      idx = sc.nextIdx
     }
     if (categorySlug) {
       conditions.push(`p.category_id IN (
@@ -47,7 +50,9 @@ export async function GET(request: NextRequest) {
     const sortCol = allowedSort[sort] || null
     const orderBy = sortCol
       ? `${sortCol} ${order}`
-      : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
+      : search
+        ? `${buildSearchRank(search, 'p.name')}, p.name ASC`
+        : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
 
     const whereClause = conditions.join(' AND ')
 

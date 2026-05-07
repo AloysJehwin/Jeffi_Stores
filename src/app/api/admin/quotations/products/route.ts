@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany } from '@/lib/db'
+import { buildSearchClause, buildSearchRank } from '@/lib/search'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,46 +13,69 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('category_id')?.trim() || ''
     const limit = Math.min(parseInt(searchParams.get('limit') || '40'), 100)
 
+    let idx = 1
+    const params: unknown[] = []
+
+    const catClause = categoryId ? `p.category_id = $${idx++}::uuid` : 'TRUE'
+    if (categoryId) params.push(categoryId)
+
+    let searchWhere = 'TRUE'
+    let searchWherePv = 'TRUE'
+    if (q) {
+      const sc = buildSearchClause(q, ['p.name', 'p.sku'], idx)
+      searchWhere = sc.clause
+      params.push(...sc.params)
+      idx = sc.nextIdx
+
+      const sc2 = buildSearchClause(q, ['p.name', 'pv.variant_name', 'pv.sku'], idx)
+      searchWherePv = sc2.clause
+      params.push(...sc2.params)
+      idx = sc2.nextIdx
+    }
+
+    const limitIdx = idx++
+    params.push(limit)
+
+    const rank = q ? buildSearchRank(q, 'name') : '0'
+
     const rows = await queryMany(
-      `SELECT
-         'product:' || p.id AS id,
-         p.id AS product_id,
-         NULL::uuid AS variant_id,
-         p.name,
-         NULL AS variant_name,
-         p.sku,
-         COALESCE(p.mrp, 0)::numeric AS mrp,
-         p.base_price,
-         COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
-         p.hsn_code,
-         p.is_active
-       FROM products p
-       WHERE p.has_variants = false
-         AND ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR p.sku ILIKE '%' || $1 || '%')
-         AND ($2 = '' OR p.category_id = $2::uuid)
+      `SELECT * FROM (
+         SELECT
+           'product:' || p.id AS id,
+           p.id AS product_id,
+           NULL::uuid AS variant_id,
+           p.name,
+           NULL AS variant_name,
+           p.sku,
+           COALESCE(p.mrp, 0)::numeric AS mrp,
+           p.base_price,
+           COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
+           p.hsn_code,
+           p.is_active
+         FROM products p
+         WHERE p.has_variants = false AND ${catClause} AND ${searchWhere}
 
-       UNION ALL
+         UNION ALL
 
-       SELECT
-         'variant:' || pv.id AS id,
-         p.id AS product_id,
-         pv.id AS variant_id,
-         p.name,
-         pv.variant_name,
-         pv.sku,
-         COALESCE(pv.mrp, 0)::numeric AS mrp,
-         COALESCE(pv.price, p.base_price) AS base_price,
-         COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
-         p.hsn_code,
-         p.is_active AND pv.is_active AS is_active
-       FROM product_variants pv
-       JOIN products p ON p.id = pv.product_id
-       WHERE ($1 = '' OR p.name ILIKE '%' || $1 || '%' OR pv.variant_name ILIKE '%' || $1 || '%' OR pv.sku ILIKE '%' || $1 || '%')
-         AND ($2 = '' OR p.category_id = $2::uuid)
-
-       ORDER BY name ASC, variant_name ASC NULLS FIRST
-       LIMIT $3`,
-      [q, categoryId, limit]
+         SELECT
+           'variant:' || pv.id AS id,
+           p.id AS product_id,
+           pv.id AS variant_id,
+           p.name,
+           pv.variant_name,
+           pv.sku,
+           COALESCE(pv.mrp, 0)::numeric AS mrp,
+           COALESCE(pv.price, p.base_price) AS base_price,
+           COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
+           p.hsn_code,
+           p.is_active AND pv.is_active AS is_active
+         FROM product_variants pv
+         JOIN products p ON p.id = pv.product_id
+         WHERE ${catClause} AND ${searchWherePv}
+       ) results
+       ORDER BY ${rank}, name ASC, variant_name ASC NULLS FIRST
+       LIMIT $${limitIdx}`,
+      params
     )
 
     return NextResponse.json({ products: rows || [] })

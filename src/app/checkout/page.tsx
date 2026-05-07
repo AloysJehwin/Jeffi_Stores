@@ -96,6 +96,15 @@ function CheckoutPage() {
         variantName: variantName || null,
         imageUrl: null,
       })
+
+      fetch(`/api/products/${productId}/primary-image`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.imageUrl) {
+            setBuyNowItem(prev => prev ? { ...prev, imageUrl: data.imageUrl } : prev)
+          }
+        })
+        .catch(() => {})
     }
   }, [cartCount, user, authLoading, cartLoading, router, searchParams, isBuyNow])
 
