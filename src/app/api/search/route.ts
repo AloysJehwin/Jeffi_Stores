@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
+import { buildSearchClause, buildSearchRank } from '@/lib/search'
 
-// Mark as dynamic to prevent static generation errors
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const query = searchParams.get('q')
+    const query = request.nextUrl.searchParams.get('q')?.trim() || ''
 
-    if (!query || query.trim().length < 2) {
+    if (query.length < 2) {
       return NextResponse.json({ products: [] })
     }
+
+    const sc = buildSearchClause(query, ['p.name', 'p.sku'], 1)
+    const rank = buildSearchRank(query, 'p.name')
 
     const products = await queryMany(`
       SELECT
@@ -23,14 +25,13 @@ export async function GET(request: NextRequest) {
           '[]'::json
         ) AS product_images
       FROM products p
-      WHERE p.is_active = true AND p.name ILIKE $1
-      ORDER BY p.name ASC
-      LIMIT 5
-    `, [`%${query}%`])
+      WHERE p.is_active = true AND ${sc.clause}
+      ORDER BY ${rank}, p.name ASC
+      LIMIT 8
+    `, sc.params)
 
     return NextResponse.json({ products: products || [] })
-  } catch (error) {
-    console.error('Search API error:', error)
+  } catch {
     return NextResponse.json({ products: [] }, { status: 500 })
   }
 }
