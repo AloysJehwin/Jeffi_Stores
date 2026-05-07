@@ -1,4 +1,3 @@
-// Database Types
 export interface Product {
   id: string
   category_id: string
@@ -31,6 +30,11 @@ export interface Product {
   is_active: boolean
   views_count: number
   sales_count: number
+  weight_grams?: number
+  package_type?: string
+  length_cm?: number
+  breadth_cm?: number
+  height_cm?: number
   created_at: string
   updated_at: string
 }
@@ -49,6 +53,11 @@ export interface ProductVariant {
   gtin?: string
   attributes: Record<string, string> | null
   is_active: boolean
+  weight_grams?: number
+  package_type?: string
+  length_cm?: number
+  breadth_cm?: number
+  height_cm?: number
   created_at: string
 }
 

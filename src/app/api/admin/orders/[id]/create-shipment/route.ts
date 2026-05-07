@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { queryOne, query } from '@/lib/db'
+import { queryOne, query, queryMany } from '@/lib/db'
+import { computeShipmentDims, ShipmentItem, PackageType } from '@/lib/shipping'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 const TOKEN = process.env.DELHIVERY_API_KEY
@@ -47,17 +48,42 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const orderDate = new Date(order.created_at).toISOString().slice(0, 10)
     const invoiceRef = order.order_number || order.id.slice(0, 12)
 
-    const orderItems = await queryOne<{ total_weight: number }>(`
-      SELECT COALESCE(SUM(
-        COALESCE(pv.weight_grams, p.weight_grams, 500) * oi.quantity::numeric
-      ), 500) AS total_weight
+    const orderItemRows = await queryMany<any>(`
+      SELECT
+        oi.quantity,
+        oi.variant_id,
+        COALESCE(pv.variant_name, '') AS variant_name,
+        COALESCE(pv.weight_grams, p.weight_grams, 500) AS weight_grams,
+        COALESCE(pv.package_type, p.package_type) AS package_type,
+        COALESCE(pv.length_cm, p.length_cm) AS length_cm,
+        COALESCE(pv.breadth_cm, p.breadth_cm) AS breadth_cm,
+        COALESCE(pv.height_cm, p.height_cm) AS height_cm
       FROM order_items oi
       LEFT JOIN products p ON p.id = oi.product_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
       WHERE oi.order_id = $1
     `, [params.id])
 
-    const weightKg = Math.max(0.1, Math.round((orderItems?.total_weight || 500) / 10) / 100)
+    const shipmentItems: ShipmentItem[] = (orderItemRows || []).map((row: any) => ({
+      packageType: (row.package_type as PackageType) || null,
+      weightGrams: parseFloat(row.weight_grams) || 500,
+      quantity: parseInt(row.quantity) || 1,
+      storedDims: {
+        length_cm:  row.length_cm  ? parseFloat(row.length_cm)  : null,
+        breadth_cm: row.breadth_cm ? parseFloat(row.breadth_cm) : null,
+        height_cm:  row.height_cm  ? parseFloat(row.height_cm)  : null,
+      },
+      variantName: row.variant_name || undefined,
+    }))
+
+    const dims = computeShipmentDims(shipmentItems.length > 0 ? shipmentItems : [{
+      packageType: 'flat_poly_auto',
+      weightGrams: 500,
+      quantity: 1,
+      storedDims: { length_cm: null, breadth_cm: null, height_cm: null },
+    }])
+
+    const weightKg = Math.max(0.1, Math.round(dims.chargedWeightGrams / 10) / 100)
 
     const shipmentPayload = {
       shipments: [{
@@ -86,9 +112,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         seller_inv: invoiceRef,
         quantity: '1',
         waybill: '',
-        shipment_width: '15',
-        shipment_height: '15',
-        shipment_length: '20',
+        shipment_width: String(dims.breadth_cm),
+        shipment_height: String(dims.height_cm),
+        shipment_length: String(dims.length_cm),
         weight: String(weightKg),
       }],
       pickup_location: { name: PICKUP_LOCATION },
