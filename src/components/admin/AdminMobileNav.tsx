@@ -83,7 +83,7 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
             {username} <span className="text-gray-400">({role})</span>
           </div>
 
-          <nav className="flex flex-col p-3 gap-1 flex-1">
+          <nav className="flex flex-col p-3 gap-1 flex-1 overflow-y-auto">
             {scanLink && (
               <a
                 href={scanLink.href}

@@ -23,6 +23,33 @@ type TrackingData = {
 
 const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
 
+const SUPPRESSED_INSTRUCTIONS = new Set([
+  'added to bag',
+  'bag added to trip',
+  'vehicle departed',
+  'trip arrived',
+  'bag received at facility',
+  'shipment received at facility',
+])
+
+function filterScansForCustomer(scans: Scan[]): Scan[] {
+  return scans
+    .map(scan => {
+      const instr = (scan.instructions ?? '').toLowerCase().trim()
+      if (instr === 'manifest uploaded') {
+        return { ...scan, activity: 'Shipment Created', instructions: 'Your order has been handed over to the courier' }
+      }
+      if (instr === 'shipment received at origin center') {
+        return { ...scan, activity: 'In Transit', instructions: 'Shipment is on its way' }
+      }
+      return scan
+    })
+    .filter(scan => {
+      const instr = (scan.instructions ?? '').toLowerCase().trim()
+      return !SUPPRESSED_INSTRUCTIONS.has(instr)
+    })
+}
+
 function resolveDisplayType(statusType: string | null, scans: Scan[]): string | null {
   const type = statusType?.toUpperCase() ?? ''
   if (!EXCEPTION_TYPES.has(type)) return statusType
@@ -83,7 +110,7 @@ function statusLabel(type: string | null) {
 }
 
 const TIMELINE_STEPS: { key: string; label: string }[] = [
-  { key: 'manifested', label: 'Manifested' },
+  { key: 'manifested', label: 'Order Dispatched' },
   { key: 'picked_up',  label: 'Picked Up'  },
   { key: 'in_transit', label: 'In Transit'  },
   { key: 'out',        label: 'Out for Delivery' },
@@ -151,12 +178,17 @@ function HorizontalTimeline({ tracking }: { tracking: TrackingData }) {
 }
 
 function ScanHistoryModal({ scans, onClose }: { scans: Scan[]; onClose: () => void }) {
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
       <div
         className="relative bg-surface-elevated w-full sm:max-w-lg sm:rounded-xl rounded-t-xl shadow-2xl max-h-[80vh] flex flex-col"
         onClick={e => e.stopPropagation()}
@@ -321,7 +353,7 @@ export default function DelhiveryTracking({
 
   return (
     <div className="space-y-4">
-      {showHistory && <ScanHistoryModal scans={tracking.scans} onClose={() => setShowHistory(false)} />}
+      {showHistory && <ScanHistoryModal scans={filterScansForCustomer(tracking.scans)} onClose={() => setShowHistory(false)} />}
 
       <HorizontalTimeline tracking={tracking} />
 
@@ -366,23 +398,27 @@ export default function DelhiveryTracking({
         )}
       </div>
 
-      {tracking.scans?.length > 0 && (
-        <div className="flex items-center justify-between border-t border-border-default pt-3">
-          <p className="text-xs text-foreground-secondary">
-            Last update: {latestScan?.date ? new Date(latestScan.date).toLocaleString('en-IN') : '—'}
-            {latestScan?.location ? ` · ${latestScan.location}` : ''}
-          </p>
-          <button
-            onClick={() => setShowHistory(true)}
-            className="text-sm text-accent-500 hover:text-accent-600 flex items-center gap-1 shrink-0"
-          >
-            View history ({tracking.scans.length})
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-      )}
+      {tracking.scans?.length > 0 && (() => {
+        const filtered = filterScansForCustomer(tracking.scans)
+        const latest = filtered[0]
+        return (
+          <div className="flex items-center justify-between border-t border-border-default pt-3">
+            <p className="text-xs text-foreground-secondary">
+              Last update: {latest?.date ? new Date(latest.date).toLocaleString('en-IN') : '—'}
+              {latest?.location ? ` · ${latest.location}` : ''}
+            </p>
+            <button
+              onClick={() => setShowHistory(true)}
+              className="text-sm text-accent-500 hover:text-accent-600 flex items-center gap-1 shrink-0"
+            >
+              View history ({filtered.length})
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 }

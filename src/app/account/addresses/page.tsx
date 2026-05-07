@@ -258,7 +258,9 @@ export default function AddressesPage() {
                 type="button"
                 onClick={() => {
                   setEditingAddress(null)
-                  setFormData({ ...emptyForm })
+                  const fullName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') : ''
+                  const phone = user?.phone ? user.phone.replace(/^\+91/, '') : ''
+                  setFormData({ ...emptyForm, full_name: fullName, phone })
                   setPinLookupState('idle')
                   setLocalities([])
                   setShowForm(!showForm)

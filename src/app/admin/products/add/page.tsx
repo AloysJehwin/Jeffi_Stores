@@ -29,7 +29,8 @@ async function createProduct(formData: FormData) {
   const lengthCm = formData.get('length_cm') ? parseFloat(formData.get('length_cm') as string) : null
   const breadthCm = formData.get('breadth_cm') ? parseFloat(formData.get('breadth_cm') as string) : null
   const heightCm = formData.get('height_cm') ? parseFloat(formData.get('height_cm') as string) : null
-  const isActive = formData.get('is_active') === 'true'
+  const intent = formData.get('intent') as string | null
+  const isActive = intent === 'draft' ? false : (intent === 'publish' ? true : formData.get('is_active') === 'true')
   const isFeatured = formData.get('is_featured') === 'true'
   const weightRate = formData.get('weight_rate') ? Math.round(parseFloat(formData.get('weight_rate') as string) * 100) / 100 : null
   const weightUnit = formData.get('weight_unit') as string || null

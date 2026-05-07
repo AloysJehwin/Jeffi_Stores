@@ -59,7 +59,7 @@ export default function ImageUpload({
   const [showGallery, setShowGallery] = useState(false)
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([])
   const [galleryLoading, setGalleryLoading] = useState(false)
-  const [selectedGalleryId, setSelectedGalleryId] = useState<string | null>(null)
+  const [selectedGalleryIds, setSelectedGalleryIds] = useState<string[]>([])
   const [gallerySearch, setGallerySearch] = useState('')
   const [galleryCategory, setGalleryCategory] = useState('')
   const [categories, setCategories] = useState<Category[]>([])
@@ -176,7 +176,7 @@ export default function ImageUpload({
 
   const openGallery = useCallback(async () => {
     setShowGallery(true)
-    setSelectedGalleryId(null)
+    setSelectedGalleryIds([])
     setGallerySearch('')
     setGalleryCategory('')
     setGalleryLoading(true)
@@ -196,27 +196,39 @@ export default function ImageUpload({
     }
   }, [])
 
-  async function handleUseGalleryImage() {
-    const gimg = galleryImages.find(g => g.id === selectedGalleryId)
-    if (!gimg) return
-    if (images.length >= maxImages) {
+  function handleUseGalleryImages() {
+    const slotsLeft = maxImages - images.length
+    if (slotsLeft <= 0) {
       setError(`You can only upload up to ${maxImages} images`)
       setShowGallery(false)
+      setSelectedGalleryIds([])
       return
     }
-    const newImg: LocalImage = {
-      previewUrl: gimg.thumbnail_url || gimg.image_url,
-      fileName: gimg.custom_name || gimg.file_name || 'gallery-image.png',
-      fileSize: gimg.file_size,
-      isPrimary: images.length === 0,
-      isGallery: true,
-      id: gimg.id,
-    }
-    const updated = [...images, newImg]
+    const toAdd = selectedGalleryIds.slice(0, slotsLeft)
+    const existingIds = new Set(images.filter(i => i.id).map(i => i.id!))
+    const newImgs: LocalImage[] = toAdd
+      .filter(id => !existingIds.has(id))
+      .map((id, idx) => {
+        const gimg = galleryImages.find(g => g.id === id)!
+        return {
+          previewUrl: gimg.thumbnail_url || gimg.image_url,
+          fileName: gimg.custom_name || gimg.file_name || 'gallery-image.png',
+          fileSize: gimg.file_size,
+          isPrimary: images.length === 0 && idx === 0,
+          isGallery: true,
+          id: gimg.id,
+        }
+      })
+    const updated = [...images, ...newImgs]
     setImages(updated)
     notifyChange(updated)
     setShowGallery(false)
-    setError(null)
+    setSelectedGalleryIds([])
+    if (selectedGalleryIds.length > slotsLeft) {
+      setError(`Only ${slotsLeft} slot(s) remaining. Added first ${slotsLeft} image(s).`)
+    } else {
+      setError(null)
+    }
   }
 
   const canUploadMore = images.length < maxImages
@@ -325,7 +337,7 @@ export default function ImageUpload({
               <h2 className="text-lg font-semibold text-foreground">Choose from Gallery</h2>
               <button
                 type="button"
-                onClick={() => setShowGallery(false)}
+                onClick={() => { setShowGallery(false); setSelectedGalleryIds([]) }}
                 className="text-foreground-muted hover:text-foreground transition-colors text-2xl leading-none"
               >
                 &times;
@@ -373,13 +385,23 @@ export default function ImageUpload({
                   <p className="text-center text-foreground-secondary py-16">No images match &ldquo;{gallerySearch}&rdquo;</p>
                 ) : (
                   <div className="grid grid-cols-4 gap-3 w-full">
-                    {filtered.map(gimg => (
+                    {filtered.map(gimg => {
+                      const selIdx = selectedGalleryIds.indexOf(gimg.id)
+                      const isSelected = selIdx !== -1
+                      return (
                       <button
                         key={gimg.id}
                         type="button"
-                        onClick={() => setSelectedGalleryId(gimg.id)}
-                        className={`rounded-lg overflow-hidden border-2 transition-colors text-left ${selectedGalleryId === gimg.id ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-default hover:border-accent-400'}`}
+                        onClick={() => setSelectedGalleryIds(prev =>
+                          prev.includes(gimg.id) ? prev.filter(id => id !== gimg.id) : [...prev, gimg.id]
+                        )}
+                        className={`relative rounded-lg overflow-hidden border-2 transition-colors text-left ${isSelected ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-default hover:border-accent-400'}`}
                       >
+                        {isSelected && (
+                          <div className="absolute top-1 right-1 bg-accent-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold z-10">
+                            {selIdx + 1}
+                          </div>
+                        )}
                         <div className="aspect-square">
                           <img src={gimg.thumbnail_url || gimg.image_url} alt={gimg.custom_name || gimg.file_name} className="w-full h-full object-cover" />
                         </div>
@@ -390,7 +412,7 @@ export default function ImageUpload({
                           )}
                         </div>
                       </button>
-                    ))}
+                    )})}
                   </div>
                 )
               })()}
@@ -399,18 +421,18 @@ export default function ImageUpload({
             <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setShowGallery(false)}
+                onClick={() => { setShowGallery(false); setSelectedGalleryIds([]) }}
                 className="px-4 py-2 text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleUseGalleryImage}
-                disabled={!selectedGalleryId}
+                onClick={handleUseGalleryImages}
+                disabled={selectedGalleryIds.length === 0}
                 className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:bg-surface-secondary disabled:text-foreground-muted text-white rounded-lg text-sm font-semibold transition-colors"
               >
-                Use Image
+                {selectedGalleryIds.length > 0 ? `Add ${selectedGalleryIds.length} Image${selectedGalleryIds.length > 1 ? 's' : ''}` : 'Add Images'}
               </button>
             </div>
           </div>

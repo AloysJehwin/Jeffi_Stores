@@ -112,7 +112,7 @@ export default function CartPage() {
                         <div className="w-24 h-24 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
                           {primaryImage ? (
                             <img
-                              src={primaryImage.thumbnail_url}
+                              src={primaryImage.thumbnail_url || primaryImage.image_url}
                               alt={item.products.name}
                               className="w-full h-full object-cover rounded-lg"
                             />

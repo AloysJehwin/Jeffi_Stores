@@ -31,7 +31,19 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: `Delhivery label API returned ${res.status}` }, { status: 502 })
     }
 
-    const buffer = await res.arrayBuffer()
+    const contentType = res.headers.get('content-type') || ''
+    let buffer: ArrayBuffer
+
+    if (contentType.includes('application/json')) {
+      const json = await res.json()
+      const pdfUrl = json?.packages?.[0]?.pdf_download_link
+      if (!pdfUrl) return NextResponse.json({ error: 'No PDF link in Delhivery response' }, { status: 502 })
+      const pdfRes = await fetch(pdfUrl)
+      if (!pdfRes.ok) return NextResponse.json({ error: `Failed to fetch PDF from S3: ${pdfRes.status}` }, { status: 502 })
+      buffer = await pdfRes.arrayBuffer()
+    } else {
+      buffer = await res.arrayBuffer()
+    }
 
     const safeOrderNum = (order.order_number || params.id.slice(0, 8)).replace(/[^a-zA-Z0-9-]/g, '-')
     const inline = request.nextUrl.searchParams.get('inline') === '1'

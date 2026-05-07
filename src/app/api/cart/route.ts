@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
           'gst_percentage', p.gst_percentage,
           'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
           'product_images', COALESCE(
-            (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
+            (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'image_url', pi.image_url, 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),
             '[]'::json
           )
