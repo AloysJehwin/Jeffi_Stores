@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
   const categoryId = searchParams.get('category_id')
   const pct = parseFloat(searchParams.get('percentage') || '0')
   const fields = (searchParams.get('fields') || '').split(',').filter(f => VALID_FIELDS.includes(f))
+  const productIdsParam = searchParams.get('product_ids')
+  const productIds = productIdsParam ? productIdsParam.split(',').filter(Boolean) : null
 
   if (!categoryId) return NextResponse.json({ error: 'category_id required' }, { status: 400 })
   if (!pct || pct <= 0) return NextResponse.json({ error: 'percentage must be > 0' }, { status: 400 })
@@ -42,8 +44,9 @@ export async function GET(request: NextRequest) {
       UNION
       SELECT id FROM categories WHERE parent_category_id = $1
     ) AND p.is_active = true
+    AND ($2::uuid[] IS NULL OR p.id = ANY($2::uuid[]))
     ORDER BY p.name
-  `, [categoryId])
+  `, [categoryId, productIds])
 
   const preview = (products || []).map((p: any) => {
     const current: Record<string, number | null> = {}
@@ -75,12 +78,13 @@ export async function POST(request: NextRequest) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { category_id, category_name, percentage, fields } = body
+  const { category_id, category_name, percentage, fields, product_ids } = body
 
   if (!category_id || !category_name) return NextResponse.json({ error: 'category_id and category_name required' }, { status: 400 })
   if (!percentage || percentage <= 0) return NextResponse.json({ error: 'percentage must be > 0' }, { status: 400 })
   const validFields = (fields || []).filter((f: string) => VALID_FIELDS.includes(f))
   if (validFields.length === 0) return NextResponse.json({ error: 'at least one valid field required' }, { status: 400 })
+  const filteredProductIds: string[] | null = Array.isArray(product_ids) && product_ids.length > 0 ? product_ids : null
 
   const products = await queryMany(
     `SELECT p.id, p.name, p.has_variants, p.base_price, p.mrp, p.sale_price, p.wholesale_price, p.weight_rate, p.length_rate
@@ -90,8 +94,9 @@ export async function POST(request: NextRequest) {
        UNION
        SELECT id FROM categories WHERE parent_category_id = $1
      ) AND p.is_active = true
+     AND ($2::uuid[] IS NULL OR p.id = ANY($2::uuid[]))
      ORDER BY p.name`,
-    [category_id]
+    [category_id, filteredProductIds]
   )
 
   if (!products || products.length === 0) {

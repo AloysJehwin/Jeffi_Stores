@@ -75,6 +75,9 @@ export default function InflationClient({ categories }: { categories: Category[]
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [percentage, setPercentage] = useState('')
   const [selectedFields, setSelectedFields] = useState<string[]>(['base_price', 'mrp'])
+  const [productList, setProductList] = useState<{ id: string; name: string }[]>([])
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
+  const [productListLoading, setProductListLoading] = useState(false)
   const [preview, setPreview] = useState<PreviewProduct[] | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -87,6 +90,39 @@ export default function InflationClient({ categories }: { categories: Category[]
   const [rollingBack, setRollingBack] = useState<string | null>(null)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
   const [confirmRollbackLog, setConfirmRollbackLog] = useState<InflationLog | null>(null)
+
+  async function loadProducts(category: Category) {
+    setProductListLoading(true)
+    setProductList([])
+    setSelectedProductIds(new Set())
+    setPreview(null)
+    try {
+      const res = await fetch(`/api/admin/inflation/products?category_id=${category.id}`)
+      const data = await res.json()
+      const list: { id: string; name: string }[] = data.products || []
+      setProductList(list)
+      setSelectedProductIds(new Set(list.map(p => p.id)))
+    } catch {}
+    finally { setProductListLoading(false) }
+  }
+
+  function toggleProduct(id: string) {
+    setSelectedProductIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+    setPreview(null)
+  }
+
+  function toggleSelectAll() {
+    if (selectedProductIds.size === productList.length) {
+      setSelectedProductIds(new Set())
+    } else {
+      setSelectedProductIds(new Set(productList.map(p => p.id)))
+    }
+    setPreview(null)
+  }
 
   async function handleRollback(log: InflationLog) {
     setRollingBack(log.id)
@@ -136,7 +172,7 @@ export default function InflationClient({ categories }: { categories: Category[]
   }
 
   async function handlePreview() {
-    if (!selectedCategory || !percentage || selectedFields.length === 0) return
+    if (!selectedCategory || !percentage || selectedFields.length === 0 || selectedProductIds.size === 0) return
     setPreviewLoading(true)
     setPreviewError(null)
     setPreview(null)
@@ -145,6 +181,7 @@ export default function InflationClient({ categories }: { categories: Category[]
         category_id: selectedCategory.id,
         percentage,
         fields: selectedFields.join(','),
+        product_ids: [...selectedProductIds].join(','),
       })
       const res = await fetch(`/api/admin/inflation?${params}`)
       const data = await res.json()
@@ -158,7 +195,7 @@ export default function InflationClient({ categories }: { categories: Category[]
   }
 
   async function handleApply() {
-    if (!selectedCategory || !percentage || selectedFields.length === 0 || !preview) return
+    if (!selectedCategory || !percentage || selectedFields.length === 0 || !preview || selectedProductIds.size === 0) return
     setApplying(true)
     setApplyError(null)
     setApplySuccess(null)
@@ -171,6 +208,7 @@ export default function InflationClient({ categories }: { categories: Category[]
           category_name: selectedCategory.name,
           percentage: parseFloat(percentage),
           fields: selectedFields,
+          product_ids: [...selectedProductIds],
         }),
       })
       const data = await res.json()
@@ -179,6 +217,8 @@ export default function InflationClient({ categories }: { categories: Category[]
       setPreview(null)
       setPercentage('')
       setSelectedCategory(null)
+      setProductList([])
+      setSelectedProductIds(new Set())
       fetchLogs()
     } catch (e: any) {
       setApplyError(e.message)
@@ -188,7 +228,7 @@ export default function InflationClient({ categories }: { categories: Category[]
   }
 
   const pct = parseFloat(percentage)
-  const canPreview = !!selectedCategory && !!percentage && pct > 0 && pct <= 100 && selectedFields.length > 0
+  const canPreview = !!selectedCategory && !!percentage && pct > 0 && pct <= 100 && selectedFields.length > 0 && selectedProductIds.size > 0
   const canApply = canPreview && !!preview && preview.length > 0
 
   return (
@@ -212,6 +252,8 @@ export default function InflationClient({ categories }: { categories: Category[]
                 const cat = categories.find(c => c.id === val) || null
                 setSelectedCategory(cat)
                 setPreview(null)
+                if (cat) loadProducts(cat)
+                else { setProductList([]); setSelectedProductIds(new Set()) }
               }}
             />
           </div>
@@ -250,6 +292,42 @@ export default function InflationClient({ categories }: { categories: Category[]
             ))}
           </div>
         </div>
+
+        {(productListLoading || productList.length > 0) && (
+          <div className="border border-border-default rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-surface border-b border-border-default">
+              <p className="text-sm font-medium text-foreground">
+                {productListLoading
+                  ? 'Loading products…'
+                  : `${selectedProductIds.size} of ${productList.length} product${productList.length !== 1 ? 's' : ''} selected`}
+              </p>
+              {!productListLoading && productList.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="text-xs font-medium text-accent-500 hover:text-accent-600 transition-colors"
+                >
+                  {selectedProductIds.size === productList.length ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
+            </div>
+            {!productListLoading && (
+              <div className="max-h-72 overflow-y-auto divide-y divide-border-default">
+                {productList.map(p => (
+                  <label key={p.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-surface transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={selectedProductIds.has(p.id)}
+                      onChange={() => toggleProduct(p.id)}
+                      className="w-4 h-4 accent-accent-500 rounded"
+                    />
+                    <span className="text-sm text-foreground">{p.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-3 items-center">
           <button
