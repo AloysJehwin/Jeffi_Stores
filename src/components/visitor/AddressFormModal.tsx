@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { useAuth } from '@/contexts/AuthContext'
 import CustomSelect from './CustomSelect'
 
 declare global {
@@ -50,6 +51,7 @@ interface AddressFormModalProps {
 
 export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress }: AddressFormModalProps) {
   const { showToast } = useToast()
+  const { user } = useAuth()
   const [isSaving, setIsSaving] = useState(false)
   const [pinLookupState, setPinLookupState] = useState<'idle' | 'loading' | 'found' | 'error'>('idle')
   const [localities, setLocalities] = useState<string[]>([])
@@ -134,9 +136,11 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
       setPinLookupState('found')
       setLocalities([])
     } else {
+      const fullName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') : ''
+      const phone = user?.phone ? user.phone.replace(/^\+91/, '') : ''
       setFormData({
         address_type: 'shipping',
-        full_name: '',
+        full_name: fullName,
         address_line1: '',
         address_line2: '',
         landmark: '',
@@ -144,13 +148,13 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
         state: '',
         postal_code: '',
         country: 'India',
-        phone: '',
+        phone,
         is_default: true,
       })
       setPinLookupState('idle')
       setLocalities([])
     }
-  }, [editAddress, isOpen])
+  }, [editAddress, isOpen, user])
 
   const handlePincodeChange = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 6)

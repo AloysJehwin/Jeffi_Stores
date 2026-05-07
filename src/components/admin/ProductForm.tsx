@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
@@ -152,6 +152,12 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [salePrice, setSalePrice] = useState(product?.sale_price != null ? String(product.sale_price) : '')
   const [wholesalePrice, setWholesalePrice] = useState(product?.wholesale_price != null ? String(product.wholesale_price) : '')
 
+  const draftKey = productId ? `draft_product_${productId}` : 'draft_product_new'
+  const [isActive, setIsActive] = useState<boolean>(product?.is_active ?? true)
+  const [hasDraft, setHasDraft] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const [variants, setVariants] = useState<VariantRow[]>(() => {
     if (product?.product_variants && product.product_variants.length > 0) {
       return product.product_variants.map((v: any) => ({
@@ -198,6 +204,78 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
   const getSubcategories = (parentId: string) => categories.filter(c => c.parent_category_id === parentId)
+
+  useEffect(() => {
+    const saved = localStorage.getItem(draftKey)
+    if (saved) setHasDraft(true)
+  }, [draftKey])
+
+  useEffect(() => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(() => {
+      const form = formRef.current
+      if (!form) return
+      const formData = new FormData(form)
+      const uncontrolled: Record<string, string> = {}
+      for (const [k, v] of formData.entries()) {
+        if (typeof v === 'string') uncontrolled[k] = v
+      }
+      const snapshot = {
+        uncontrolled,
+        hasVariants, variantType, variants, groups,
+        basePrice, mrp, salePrice, wholesalePrice,
+        weightRate, weightUnit, weightEnabled,
+        lengthRate, lengthUnit, lengthEnabled,
+        gstRate, gstMode, isActive,
+      }
+      localStorage.setItem(draftKey, JSON.stringify(snapshot))
+      setHasDraft(true)
+    }, 1000)
+    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
+  }, [
+    hasVariants, variantType, variants, groups,
+    basePrice, mrp, salePrice, wholesalePrice,
+    weightRate, weightUnit, weightEnabled,
+    lengthRate, lengthUnit, lengthEnabled,
+    gstRate, gstMode, isActive, draftKey,
+  ])
+
+  function restoreDraft() {
+    const saved = localStorage.getItem(draftKey)
+    if (!saved) return
+    try {
+      const snap = JSON.parse(saved)
+      const form = formRef.current
+      if (form && snap.uncontrolled) {
+        for (const [k, v] of Object.entries(snap.uncontrolled as Record<string, string>)) {
+          const el = form.elements.namedItem(k) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null
+          if (el && 'value' in el) el.value = v
+        }
+      }
+      if (snap.hasVariants !== undefined) setHasVariants(snap.hasVariants)
+      if (snap.variantType !== undefined) setVariantType(snap.variantType)
+      if (snap.variants) setVariants(snap.variants)
+      if (snap.groups) setGroups(snap.groups)
+      if (snap.basePrice !== undefined) setBasePrice(snap.basePrice)
+      if (snap.mrp !== undefined) setMrp(snap.mrp)
+      if (snap.salePrice !== undefined) setSalePrice(snap.salePrice)
+      if (snap.wholesalePrice !== undefined) setWholesalePrice(snap.wholesalePrice)
+      if (snap.weightRate !== undefined) setWeightRate(snap.weightRate)
+      if (snap.weightUnit !== undefined) setWeightUnit(snap.weightUnit)
+      if (snap.weightEnabled !== undefined) setWeightEnabled(snap.weightEnabled)
+      if (snap.lengthRate !== undefined) setLengthRate(snap.lengthRate)
+      if (snap.lengthUnit !== undefined) setLengthUnit(snap.lengthUnit)
+      if (snap.lengthEnabled !== undefined) setLengthEnabled(snap.lengthEnabled)
+      if (snap.gstRate !== undefined) setGstRate(snap.gstRate)
+      if (snap.gstMode !== undefined) setGstMode(snap.gstMode)
+      if (snap.isActive !== undefined) setIsActive(snap.isActive)
+    } catch {}
+  }
+
+  function discardDraft() {
+    localStorage.removeItem(draftKey)
+    setHasDraft(false)
+  }
 
   function addGroup(pricing_type: 'unit' | 'weight' | 'length') {
     if (groups.find(g => g.pricing_type === pricing_type)) return
@@ -318,6 +396,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       }
 
       await action(formData)
+      localStorage.removeItem(draftKey)
     } catch (err: any) {
       if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
       setError('Failed to save product. Please try again.')
@@ -328,8 +407,17 @@ export default function ProductForm({ categories, brands, action, product, produ
   const inputCls = 'w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
 
   return (
-    <form onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+    <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       <div className="p-4 sm:p-6">
+        {hasDraft && (
+          <div className="mb-4 px-4 py-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+            <span className="text-yellow-800 dark:text-yellow-200">Draft auto-saved. Your unsaved changes will be restored next time you open this page.</span>
+            <div className="flex gap-3 shrink-0">
+              <button type="button" onClick={restoreDraft} className="text-yellow-800 dark:text-yellow-200 font-semibold hover:underline">Restore</button>
+              <button type="button" onClick={discardDraft} className="text-yellow-700 dark:text-yellow-300 font-semibold hover:underline">Discard</button>
+            </div>
+          </div>
+        )}
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">
             {error}
@@ -818,7 +906,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                 id="is_active"
                 name="is_active"
                 value="true"
-                defaultChecked={product?.is_active ?? true}
+                checked={isActive}
+                onChange={e => setIsActive(e.target.checked)}
                 className="h-4 w-4 text-accent-500 focus:ring-accent-500 border-border-secondary rounded"
               />
               <label htmlFor="is_active" className="ml-2 block text-sm text-foreground">
@@ -1329,10 +1418,23 @@ export default function ProductForm({ categories, brands, action, product, produ
         </Link>
         <button
           type="submit"
+          name="intent"
+          value="draft"
           disabled={isSubmitting}
+          onClick={() => setIsActive(false)}
+          className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSubmitting ? 'Saving...' : 'Save as Draft'}
+        </button>
+        <button
+          type="submit"
+          name="intent"
+          value="publish"
+          disabled={isSubmitting}
+          onClick={() => setIsActive(true)}
           className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? 'Saving...' : product ? 'Update Product' : 'Create Product'}
+          {isSubmitting ? 'Saving...' : product ? 'Update & Publish' : 'Save & Publish'}
         </button>
       </div>
     </form>

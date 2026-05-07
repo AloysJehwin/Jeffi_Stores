@@ -22,6 +22,7 @@ interface CartItem {
     is_in_stock: boolean
     product_images: Array<{
       thumbnail_url: string
+      image_url: string
       is_primary: boolean
     }>
   }
