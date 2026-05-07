@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { queryMany, queryOne } from '@/lib/db'
 import SortDropdown from '@/components/visitor/SortDropdown'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
+import { buildSearchClause, buildSearchRank } from '@/lib/search'
 
 const PAGE_SIZE = 21
 
@@ -38,8 +39,10 @@ async function getProducts(searchParams: any) {
   }
 
   if (searchParams.search) {
-    conditions.push(`p.name ILIKE $${paramIndex++}`)
-    params.push(`%${searchParams.search}%`)
+    const sc = buildSearchClause(searchParams.search, ['p.name', 'p.sku'], paramIndex)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    paramIndex = sc.nextIdx
   }
 
   const sortBy = searchParams.sort || 'created_at'
@@ -66,7 +69,9 @@ async function getProducts(searchParams: any) {
 
   const orderBy = hasExplicitSort
     ? `${sortColumn} ${sortOrder}`
-    : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
+    : searchParams.search
+      ? `${buildSearchRank(searchParams.search, 'p.name')}, p.name ASC`
+      : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
 
   const sql = `
     SELECT p.*,
