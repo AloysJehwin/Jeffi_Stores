@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { NextRequest } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -11,7 +13,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Download token required' }, { status: 400 })
     }
 
-    // Look up the certificate by download token
     const cert = await queryOne(
       `SELECT ac.*, a.username
        FROM admin_certificates ac
@@ -32,8 +33,6 @@ export async function GET(request: NextRequest) {
       return new NextResponse('Certificate has been revoked', { status: 410 })
     }
 
-    // Mark as downloaded — the actual p12 was returned inline during creation
-    // This endpoint exists as a backup; the primary download happens via the create response
     await queryOne(
       'UPDATE admin_certificates SET downloaded_at = NOW() WHERE id = $1 RETURNING id',
       [cert.id]
@@ -45,8 +44,7 @@ export async function GET(request: NextRequest) {
       commonName: cert.common_name,
       expiresAt: cert.expires_at,
     })
-  } catch (error) {
-    console.error('Certificate download error:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
