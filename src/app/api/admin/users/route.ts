@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         downloadToken: cert.downloadToken,
       },
     })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }
