@@ -5,6 +5,7 @@ import { generateClientCertificate } from '@/lib/certificates'
 import { sendAdminCertificateEmail } from '@/lib/email'
 import { query } from '@/lib/db'
 import { NextRequest } from 'next/server'
+import { ALL_SCOPE_KEYS } from '@/lib/scopes'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,13 +29,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid role. Must be admin or moderator.' }, { status: 400 })
     }
 
-    const validScopes = ['dashboard', 'products', 'categories', 'brands', 'orders', 'reviews', 'customers', 'settings']
     if (scopes && !Array.isArray(scopes)) {
       return NextResponse.json({ error: 'Scopes must be an array' }, { status: 400 })
     }
     if (scopes) {
       for (const scope of scopes) {
-        if (!validScopes.includes(scope)) {
+        if (!ALL_SCOPE_KEYS.includes(scope)) {
           return NextResponse.json({ error: `Invalid scope: ${scope}` }, { status: 400 })
         }
       }
