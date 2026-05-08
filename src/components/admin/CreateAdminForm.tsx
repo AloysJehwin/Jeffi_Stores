@@ -146,7 +146,7 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
           </div>
         )}
         {certInfo.emailSent && (
-          <p className="text-xs text-green-700 dark:text-green-400 mt-2">Certificate emailed to the admin's address.</p>
+          <p className="text-xs text-green-700 dark:text-green-400 mt-2">Certificate emailed to the admin&apos;s address.</p>
         )}
         <button
           type="button"
