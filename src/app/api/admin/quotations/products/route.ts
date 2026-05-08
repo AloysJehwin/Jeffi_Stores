@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const limitIdx = idx++
     params.push(limit)
 
-    const rank = q ? buildSearchRank(q, 'name') : '0'
+    const rank = q ? buildSearchRank(q, 'name') : '(0+0)'
 
     const rows = await queryMany(
       `SELECT * FROM (
