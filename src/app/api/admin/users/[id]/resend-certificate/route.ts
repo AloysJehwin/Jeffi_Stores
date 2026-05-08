@@ -44,7 +44,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     }
 
     return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }
