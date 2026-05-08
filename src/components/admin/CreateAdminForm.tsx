@@ -13,6 +13,7 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
     username: string
     serialNumber: string
     expiresAt: string
+    emailSent: boolean
   } | null>(null)
 
   const [form, setForm] = useState({
@@ -86,6 +87,7 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
         username: form.username,
         serialNumber: data.certificate.serialNumber,
         expiresAt: data.certificate.expiresAt,
+        emailSent: data.emailSent === true,
       })
 
       setForm({
@@ -133,6 +135,19 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
         <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 px-3 py-2 rounded mt-4">
           The .p12 certificate file has been downloaded. Save the password above — it will not be shown again.
         </p>
+        {!certInfo.emailSent && (
+          <div className="flex items-start gap-2 mt-3 px-3 py-2.5 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+            <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-red-700 dark:text-red-300">
+              Email delivery failed — use the <strong>Resend Email</strong> button in the Admin Users table to retry.
+            </p>
+          </div>
+        )}
+        {certInfo.emailSent && (
+          <p className="text-xs text-green-700 dark:text-green-400 mt-2">Certificate emailed to the admin's address.</p>
+        )}
         <button
           type="button"
           onClick={() => { setCertInfo(null); setIsOpen(false) }}
@@ -253,7 +268,7 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
             </button>
           </div>
         </div>
-        <ScopeGrid selected={form.scopes} onToggle={toggleScope} variant="card" />
+        <ScopeGrid selected={form.scopes} onToggle={toggleScope} variant="button" />
       </div>
 
       <div className="flex gap-3 pt-2">
