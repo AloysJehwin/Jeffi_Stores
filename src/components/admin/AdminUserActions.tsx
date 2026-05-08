@@ -33,6 +33,22 @@ export default function AdminUserActions({
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
+  const [resending, setResending] = useState(false)
+  const [resendMsg, setResendMsg] = useState<string | null>(null)
+
+  async function handleResendEmail() {
+    setResending(true)
+    setResendMsg(null)
+    try {
+      const res = await fetch(`/api/admin/users/${admin.id}/resend-certificate`, { method: 'POST' })
+      const data = await res.json()
+      setResendMsg(res.ok ? 'Email sent!' : (data.error || 'Failed'))
+    } finally {
+      setResending(false)
+      setTimeout(() => setResendMsg(null), 4000)
+    }
+  }
+
   const isSelf = admin.id === currentAdminId
   const isSuperAdmin = admin.role === 'super_admin'
 
@@ -100,12 +116,25 @@ export default function AdminUserActions({
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {!isSuperAdmin && !isSelf && (
           <>
             <button type="button" onClick={openEdit} className="text-accent-500 hover:text-accent-600 text-xs font-medium">
               Edit
             </button>
+            <button
+              type="button"
+              onClick={handleResendEmail}
+              disabled={resending}
+              className="text-blue-500 hover:text-blue-600 text-xs font-medium disabled:opacity-50"
+            >
+              {resending ? 'Sending…' : 'Resend Email'}
+            </button>
+            {resendMsg && (
+              <span className={`text-xs font-medium ${resendMsg === 'Email sent!' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                {resendMsg}
+              </span>
+            )}
             <button
               type="button"
               onClick={handleToggleActive}

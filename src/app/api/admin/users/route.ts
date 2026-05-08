@@ -57,12 +57,12 @@ export async function POST(request: NextRequest) {
     const cert = await generateClientCertificate(username, result.admin!.id)
 
     await query(
-      `INSERT INTO admin_certificates (admin_id, serial_number, common_name, expires_at, download_token)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [result.admin!.id, cert.serialNumber, username, cert.expiresAt, cert.downloadToken]
+      `INSERT INTO admin_certificates (admin_id, serial_number, common_name, expires_at, download_token, p12_data, p12_password)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [result.admin!.id, cert.serialNumber, username, cert.expiresAt, cert.downloadToken, cert.p12Buffer, cert.p12Password]
     )
 
-    sendAdminCertificateEmail(
+    const emailResult = await sendAdminCertificateEmail(
       email,
       username,
       cert.p12Buffer,
@@ -70,10 +70,11 @@ export async function POST(request: NextRequest) {
       cert.serialNumber,
       cert.expiresAt.toISOString(),
       role || 'admin'
-    ).catch(() => {})
+    )
 
     return NextResponse.json({
       success: true,
+      emailSent: emailResult.success,
       admin: {
         id: result.admin!.id,
         username,
