@@ -14,16 +14,31 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     ] = await Promise.all([
       queryCount('SELECT COUNT(*) FROM products'),
       queryCount('SELECT COUNT(*) FROM orders'),
-      queryOne<{ total: string }>('SELECT COALESCE(SUM(total_amount), 0) as total FROM orders WHERE payment_status = $1', ['paid']),
+      queryOne<{ total: string; online: string; offline: string }>(`
+        SELECT
+          COALESCE(SUM(total_amount), 0) AS total,
+          COALESCE(SUM(CASE WHEN source = 'online' THEN total_amount ELSE 0 END), 0) AS online,
+          COALESCE(SUM(CASE WHEN source = 'offline' THEN total_amount ELSE 0 END), 0) AS offline
+        FROM orders WHERE payment_status = $1
+      `, ['paid']),
       queryCount('SELECT COUNT(*) FROM users WHERE is_active = $1 AND is_guest = $2', [true, false]),
       queryCount('SELECT COUNT(*) FROM products WHERE stock_quantity <= low_stock_threshold'),
       queryCount('SELECT COUNT(*) FROM orders WHERE status = $1', ['pending']),
     ])
 
+    const [onlineOrders, offlineOrders] = await Promise.all([
+      queryCount("SELECT COUNT(*) FROM orders WHERE source = 'online'"),
+      queryCount("SELECT COUNT(*) FROM orders WHERE source = 'offline'"),
+    ])
+
     return {
       totalProducts,
       totalOrders,
+      onlineOrders,
+      offlineOrders,
       totalRevenue: parseFloat(revenueResult?.total || '0'),
+      onlineRevenue: parseFloat(revenueResult?.online || '0'),
+      offlineRevenue: parseFloat(revenueResult?.offline || '0'),
       totalCustomers,
       lowStockProducts,
       pendingOrders,
@@ -32,7 +47,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     return {
       totalProducts: 0,
       totalOrders: 0,
+      onlineOrders: 0,
+      offlineOrders: 0,
       totalRevenue: 0,
+      onlineRevenue: 0,
+      offlineRevenue: 0,
       totalCustomers: 0,
       lowStockProducts: 0,
       pendingOrders: 0,
@@ -115,6 +134,7 @@ export async function getAllOrders() {
 export async function getFilteredOrders(filters: {
   status?: string
   payment_status?: string
+  source?: string
   search?: string
   page?: number
   limit?: number
@@ -130,6 +150,10 @@ export async function getFilteredOrders(filters: {
   if (filters.payment_status) {
     conditions.push(`o.payment_status = $${i++}`)
     params.push(filters.payment_status)
+  }
+  if (filters.source) {
+    conditions.push(`o.source = $${i++}`)
+    params.push(filters.source)
   }
   if (filters.search) {
     const sc = buildSearchClause(filters.search, ['o.order_number', 'o.customer_name'], i)

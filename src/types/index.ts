@@ -148,7 +148,11 @@ export interface AdminSession {
 export interface DashboardStats {
   totalProducts: number
   totalOrders: number
+  onlineOrders: number
+  offlineOrders: number
   totalRevenue: number
+  onlineRevenue: number
+  offlineRevenue: number
   totalCustomers: number
   lowStockProducts: number
   pendingOrders: number

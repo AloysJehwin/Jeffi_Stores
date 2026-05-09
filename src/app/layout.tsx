@@ -26,7 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k=location.pathname.startsWith('/admin')?'jeffi-admin-theme':'jeffi-theme';var t=sessionStorage.getItem(k)||localStorage.getItem(k);if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})()`,
+            __html: `(function(){try{var t=sessionStorage.getItem('jeffi-theme')||localStorage.getItem('jeffi-theme')||sessionStorage.getItem('jeffi-admin-theme')||localStorage.getItem('jeffi-admin-theme');if(t==='dark'){document.documentElement.classList.add('dark')}else if(t==='light'){document.documentElement.classList.remove('dark')}}catch(e){}})()`,
           }}
         />
       </head>

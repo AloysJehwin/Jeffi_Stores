@@ -3,6 +3,7 @@ import { query, queryOne, withTransaction } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
 import { isInterState, calculateGST } from '@/lib/gst'
+import { logStockMovement } from '@/lib/inventory'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
@@ -184,6 +185,14 @@ export async function POST(request: NextRequest) {
             [qty, item.productId]
           )
         }
+        await logStockMovement(client, {
+          productId: item.productId,
+          variantId: variant?.id || null,
+          transactionType: 'sale',
+          quantityChange: -qty,
+          referenceType: 'order',
+          referenceId: createdOrder.id,
+        })
       }
 
       if (couponId && appliedDiscount > 0) {

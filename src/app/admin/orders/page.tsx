@@ -15,6 +15,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
     getFilteredOrders({
       status: searchParams.status,
       payment_status: searchParams.payment_status,
+      source: searchParams.source,
       search: searchParams.search,
       page,
       limit: PAGE_SIZE,
@@ -34,6 +35,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
     const params = new URLSearchParams()
     if (searchParams.status) params.set('status', searchParams.status)
     if (searchParams.payment_status) params.set('payment_status', searchParams.payment_status)
+    if (searchParams.source) params.set('source', searchParams.source)
     if (searchParams.search) params.set('search', searchParams.search)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
@@ -42,9 +44,20 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Orders</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Orders</h1>
+          <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
+        </div>
+        <Link
+          href="/admin/orders/new"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          New Offline Order
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
@@ -75,6 +88,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
 
       <AdminFilters
         filters={[
+          {
+            name: 'source',
+            label: 'Source',
+            options: [
+              { value: 'online', label: 'Online' },
+              { value: 'offline', label: 'Offline' },
+            ],
+          },
           {
             name: 'status',
             label: 'Order Status',
@@ -114,9 +135,18 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
               className="block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 active:bg-surface-secondary transition-colors"
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-foreground">
-                  #{order.order_number || order.id.slice(0, 8)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">
+                    #{order.order_number || order.id.slice(0, 8)}
+                  </span>
+                  <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${
+                    order.source === 'offline'
+                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                      : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  }`}>
+                    {order.source === 'offline' ? 'Offline' : 'Online'}
+                  </span>
+                </div>
                 <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                   order.status === 'delivered' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                   : order.status === 'processing' || order.status === 'shipped' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
@@ -164,6 +194,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
             <thead className="bg-surface-secondary">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Order ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Source</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Customer</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Total</th>
@@ -178,6 +209,15 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                   <tr key={order.id} className="hover:bg-surface-secondary">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-foreground">#{order.order_number || order.id.slice(0, 8)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                        order.source === 'offline'
+                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      }`}>
+                        {order.source === 'offline' ? 'Offline' : 'Online'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-foreground">
@@ -222,7 +262,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-foreground-muted">No orders found.</td>
+                  <td colSpan={8} className="px-6 py-12 text-center text-foreground-muted">No orders found.</td>
                 </tr>
               )}
             </tbody>

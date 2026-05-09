@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany, query } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderStatusUpdate } from '@/lib/email'
+import { logStockMovement } from '@/lib/inventory'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 
@@ -44,17 +45,26 @@ export async function POST(
         [orderId]
       )
       for (const item of orderItems) {
+        const qty = parseFloat(item.quantity)
         if (item.variant_id) {
           await query(
             'UPDATE product_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-            [parseFloat(item.quantity), item.variant_id]
+            [qty, item.variant_id]
           )
         } else {
           await query(
             'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-            [parseFloat(item.quantity), item.product_id]
+            [qty, item.product_id]
           )
         }
+        await logStockMovement(null, {
+          productId: item.product_id,
+          variantId: item.variant_id || null,
+          transactionType: 'return',
+          quantityChange: qty,
+          referenceType: 'order',
+          referenceId: orderId,
+        })
       }
 
       if (restoreToCart) {

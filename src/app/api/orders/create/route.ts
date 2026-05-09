@@ -3,6 +3,7 @@ import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
 import { isInterState, calculateGST } from '@/lib/gst'
+import { logStockMovement } from '@/lib/inventory'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
@@ -221,17 +222,26 @@ export async function POST(request: NextRequest) {
 
       for (const item of cartItems) {
         if (item.buy_mode === 'unit' || !item.buy_mode) {
+          const qty = parseFloat(item.quantity)
           if (item.variant) {
             await client.query(
               'UPDATE product_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-              [parseFloat(item.quantity), item.variant.id]
+              [qty, item.variant.id]
             )
           } else {
             await client.query(
               'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-              [parseFloat(item.quantity), item.product_id]
+              [qty, item.product_id]
             )
           }
+          await logStockMovement(client, {
+            productId: item.product_id,
+            variantId: item.variant?.id || null,
+            transactionType: 'sale',
+            quantityChange: -qty,
+            referenceType: 'order',
+            referenceId: createdOrder.id,
+          })
         }
       }
 

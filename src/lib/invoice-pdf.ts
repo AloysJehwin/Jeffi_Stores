@@ -1,5 +1,7 @@
 // eslint-disable-next-line no-eval
 const PDFDocument = eval('require')('pdfkit')
+// eslint-disable-next-line no-eval
+const QRCode = eval('require')('qrcode')
 
 export interface InvoiceBusinessSettings {
   gstin: string
@@ -53,6 +55,12 @@ export interface InvoiceOrder {
   shipped_at?: string
   shipping_method?: string
   destination?: string
+  irn?: string | null
+  irn_ack_no?: string | null
+  irn_ack_dt?: string | null
+  signed_qr_code?: string | null
+  payment_link_url?: string | null
+  eway_bill_no?: string | null
 }
 
 export interface InvoiceBuyerAddress {
@@ -174,7 +182,15 @@ function renderAddressBlock(
   return y
 }
 
-export function generateInvoicePDF(
+async function buildQRBuffer(data: string, size: number): Promise<Buffer | null> {
+  try {
+    return await QRCode.toBuffer(data, { type: 'png', width: size, margin: 1 })
+  } catch {
+    return null
+  }
+}
+
+export async function generateInvoicePDF(
   order: InvoiceOrder,
   items: InvoiceOrderItem[],
   business: InvoiceBusinessSettings,
@@ -183,6 +199,9 @@ export function generateInvoicePDF(
   isCancelled?: boolean,
   voidLabel?: string
 ): Promise<Buffer> {
+  const nicQRBuf = order.signed_qr_code ? await buildQRBuffer(order.signed_qr_code, 80) : null
+  const payQRBuf = order.payment_link_url ? await buildQRBuffer(order.payment_link_url, 80) : null
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 28 })
     const chunks: Buffer[] = []
@@ -264,6 +283,28 @@ export function generateInvoicePDF(
     const sellerEndY = Math.max(sy + 4, my)
     drawRect(doc, LM, topY, sellerW, sellerEndY - topY)
     y = sellerEndY
+
+    if (order.irn) {
+      const irnRowH = 13
+      drawRect(doc, LM, y, pw, irnRowH)
+      doc.font(F).fontSize(6).text('IRN :', LM + 3, y + 3, { continued: true })
+      doc.font(FB).fontSize(6).text(` ${order.irn}`, { continued: false })
+      if (order.irn_ack_no) {
+        doc.font(F).fontSize(6).text(`Ack No: ${order.irn_ack_no}`, LM + pw * 0.55, y + 3, { width: pw * 0.28 })
+      }
+      if (order.irn_ack_dt) {
+        doc.font(F).fontSize(6).text(`Ack Date: ${formatDate(order.irn_ack_dt)}`, LM + pw * 0.83, y + 3, { width: pw * 0.17 })
+      }
+      y += irnRowH
+    }
+
+    if (order.eway_bill_no) {
+      const ewbRowH = 12
+      drawRect(doc, LM, y, pw, ewbRowH)
+      doc.font(F).fontSize(6).text('E-Way Bill No :', LM + 3, y + 3, { continued: true })
+      doc.font(FB).fontSize(6).text(` ${order.eway_bill_no}`)
+      y += ewbRowH
+    }
 
     y = renderAddressBlock(doc, 'Consignee (Ship to)', buyerAddress, order.buyer_gstin, LM, pw, y)
 
@@ -665,6 +706,29 @@ export function generateInvoicePDF(
     doc.font(F).fontSize(7).text('SUBJECT TO RAIPUR JURISDICTION', LM, y, { width: pw, align: 'center' })
     y += 10
     doc.font(F).fontSize(6.5).text('This is a Computer Generated Invoice', LM, y, { width: pw, align: 'center' })
+    y += 10
+
+    if (nicQRBuf || payQRBuf) {
+      ensureSpace(105)
+      const qrSectionY = y
+      const qrSize = 80
+      const labelH = 10
+      const qrBlockH = qrSize + labelH + 8
+      drawRect(doc, LM, qrSectionY, pw, qrBlockH)
+
+      let qrX = LM + 6
+      if (nicQRBuf) {
+        doc.font(F).fontSize(6).text('Scan & Verify (NIC)', qrX, qrSectionY + 3, { width: qrSize, align: 'center' })
+        doc.image(nicQRBuf, qrX, qrSectionY + labelH, { width: qrSize, height: qrSize })
+        qrX += qrSize + 10
+      }
+      if (payQRBuf) {
+        doc.font(F).fontSize(6).text('Pay Now', qrX, qrSectionY + 3, { width: qrSize, align: 'center' })
+        doc.image(payQRBuf, qrX, qrSectionY + labelH, { width: qrSize, height: qrSize })
+      }
+
+      y = qrSectionY + qrBlockH + 4
+    }
 
     if (isCancelled) {
       const pageW = 595.28
