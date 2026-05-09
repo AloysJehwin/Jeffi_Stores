@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         o.sgst_amount,
         o.igst_amount,
         o.total_amount,
-        o.state AS buyer_state,
+        a.state AS buyer_state,
         o.irn,
         o.irn_ack_no,
         o.irn_ack_dt,
@@ -50,11 +50,12 @@ export async function GET(request: NextRequest) {
         ) ORDER BY oi.created_at) AS items
       FROM orders o
       JOIN order_items oi ON oi.order_id = o.id
+      LEFT JOIN addresses a ON a.id = o.shipping_address_id
       WHERE o.invoice_date >= $1
         AND o.invoice_date < ($2::date + interval '1 day')
         AND o.invoice_number IS NOT NULL
         AND o.payment_status = 'paid'
-      GROUP BY o.id
+      GROUP BY o.id, a.state
       ORDER BY o.invoice_date ASC
     `, [from, to])
 

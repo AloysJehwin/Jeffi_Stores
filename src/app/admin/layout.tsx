@@ -60,6 +60,7 @@ export default async function AdminLayout({
     { href: '/admin/labels', label: 'Labels', scope: 'labels', group: 'Operations' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations', group: 'Operations' },
     { href: '/admin/financial', label: 'Financial', scope: 'settings', group: 'Operations' },
+    { href: '/admin/inventory', label: 'Inventory', scope: 'settings', group: 'Operations' },
     { href: '/admin/scan', label: 'QuickScan', scope: 'quick_scan', group: 'Operations', mobileOnly: true },
     { href: '/admin/coupons', label: 'Coupons', scope: 'coupons', group: 'Marketing' },
     { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms', group: 'Marketing' },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, query, withTransaction } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { sendReturnStatusEmail, sendPaymentStatusUpdate } from '@/lib/email'
+import { logStockMovement } from '@/lib/inventory'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 
 export async function POST(
@@ -177,14 +178,30 @@ export async function POST(
                   [returnRequest.id]
                 )
                 const itemsResult = await client.query(
-                  'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
+                  'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
                   [orderId]
                 )
                 for (const item of itemsResult.rows) {
-                  await client.query(
-                    'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-                    [parseFloat(item.quantity), item.product_id]
-                  )
+                  const qty = parseFloat(item.quantity)
+                  if (item.variant_id) {
+                    await client.query(
+                      'UPDATE product_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                      [qty, item.variant_id]
+                    )
+                  } else {
+                    await client.query(
+                      'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                      [qty, item.product_id]
+                    )
+                  }
+                  await logStockMovement(client, {
+                    productId: item.product_id,
+                    variantId: item.variant_id || null,
+                    transactionType: 'return',
+                    quantityChange: qty,
+                    referenceType: 'order',
+                    referenceId: orderId,
+                  })
                 }
               })
 
@@ -212,14 +229,30 @@ export async function POST(
             [returnRequest.id]
           )
           const itemsResult = await client.query(
-            'SELECT product_id, quantity FROM order_items WHERE order_id = $1',
+            'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
             [orderId]
           )
           for (const item of itemsResult.rows) {
-            await client.query(
-              'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
-              [parseFloat(item.quantity), item.product_id]
-            )
+            const qty = parseFloat(item.quantity)
+            if (item.variant_id) {
+              await client.query(
+                'UPDATE product_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                [qty, item.variant_id]
+              )
+            } else {
+              await client.query(
+                'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                [qty, item.product_id]
+              )
+            }
+            await logStockMovement(client, {
+              productId: item.product_id,
+              variantId: item.variant_id || null,
+              transactionType: 'return',
+              quantityChange: qty,
+              referenceType: 'order',
+              referenceId: orderId,
+            })
           }
         })
 
@@ -271,14 +304,30 @@ export async function POST(
 
           for (const item of items) {
             await client.query(
-              `INSERT INTO order_items (order_id, product_id, product_name, variant_name, quantity, unit_price, total_price, buy_mode, buy_unit)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-              [newOrderId, item.product_id, item.product_name, item.variant_name, item.quantity, item.unit_price, item.total_price, item.buy_mode, item.buy_unit]
+              `INSERT INTO order_items (order_id, product_id, variant_id, product_name, variant_name, quantity, unit_price, total_price, buy_mode, buy_unit)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [newOrderId, item.product_id, item.variant_id || null, item.product_name, item.variant_name, item.quantity, item.unit_price, item.total_price, item.buy_mode, item.buy_unit]
             )
-            await client.query(
-              'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-              [parseFloat(item.quantity), item.product_id]
-            )
+            const qty = parseFloat(item.quantity)
+            if (item.variant_id) {
+              await client.query(
+                'UPDATE product_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+                [qty, item.variant_id]
+              )
+            } else {
+              await client.query(
+                'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+                [qty, item.product_id]
+              )
+            }
+            await logStockMovement(client, {
+              productId: item.product_id,
+              variantId: item.variant_id || null,
+              transactionType: 'sale',
+              quantityChange: -qty,
+              referenceType: 'order',
+              referenceId: newOrderId,
+            })
           }
 
           await client.query(
@@ -290,6 +339,33 @@ export async function POST(
             `UPDATE orders SET status = 'returned', updated_at = NOW() WHERE id = $1`,
             [orderId]
           )
+
+          const returnedItemsResult = await client.query(
+            'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
+            [orderId]
+          )
+          for (const item of returnedItemsResult.rows) {
+            const qty = parseFloat(item.quantity)
+            if (item.variant_id) {
+              await client.query(
+                'UPDATE product_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                [qty, item.variant_id]
+              )
+            } else {
+              await client.query(
+                'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                [qty, item.product_id]
+              )
+            }
+            await logStockMovement(client, {
+              productId: item.product_id,
+              variantId: item.variant_id || null,
+              transactionType: 'return',
+              quantityChange: qty,
+              referenceType: 'order',
+              referenceId: orderId,
+            })
+          }
         })
 
         if (userEmail && userName) {
