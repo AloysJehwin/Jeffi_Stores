@@ -16,7 +16,7 @@ interface GoogleTokenPayload {
   family_name?: string
   name?: string
   picture?: string
-  aud?: string
+  aud?: string | string[]
 }
 
 async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload | null> {
@@ -25,7 +25,10 @@ async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload | 
     if (!res.ok) return null
     const data = await res.json()
     if (!data.sub || !data.email) return null
-    if (GOOGLE_CLIENT_ID && data.aud !== GOOGLE_CLIENT_ID) return null
+    if (GOOGLE_CLIENT_ID) {
+      const aud = Array.isArray(data.aud) ? data.aud : [data.aud]
+      if (!aud.includes(GOOGLE_CLIENT_ID)) return null
+    }
     return data as GoogleTokenPayload
   } catch {
     return null
@@ -110,7 +113,7 @@ export async function POST(request: NextRequest) {
         phone: user.phone,
       },
     })
-  } catch {
-    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Authentication failed' }, { status: 500 })
   }
 }
