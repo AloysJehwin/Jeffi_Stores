@@ -57,7 +57,7 @@ interface Category {
   name: string
 }
 
-type View = 'list' | 'create'
+type View = 'list' | 'create' | 'edit'
 type SearchMode = 'name' | 'sku' | 'category'
 
 const PAYMENT_MODES = [
@@ -109,6 +109,7 @@ const SOURCE_COLORS: Record<string, string> = {
 export default function InvoicesClient() {
   const { showToast } = useToast()
   const [view, setView] = useState<View>('list')
+  const [editId, setEditId] = useState<string | null>(null)
 
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [total, setTotal] = useState(0)
@@ -131,11 +132,13 @@ export default function InvoicesClient() {
   const [postalCode, setPostalCode] = useState('')
   const [buyerGstin, setBuyerGstin] = useState('')
   const [paymentMode, setPaymentMode] = useState('cash')
+  const [invoiceDate, setInvoiceDate] = useState('')
   const [notes, setNotes] = useState('')
   const [creditWarning, setCreditWarning] = useState<{ outstanding: number; creditLimit: number } | null>(null)
   const [items, setItems] = useState<LineItem[]>([newItem()])
   const [submitting, setSubmitting] = useState(false)
-  const [createError, setCreateError] = useState('')
+  const [formError, setFormError] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
 
   const [searchMode, setSearchMode] = useState<SearchMode>('name')
   const [skuInput, setSkuInput] = useState('')
@@ -254,22 +257,70 @@ export default function InvoicesClient() {
     setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it))
   }
 
-  function resetCreate() {
+  function resetForm() {
     setCustomerName(''); setCustomerPhone(''); setCustomerEmail('')
     setAddressLine1(''); setAddressLine2(''); setCity(''); setState(''); setPostalCode('')
-    setBuyerGstin(''); setPaymentMode('cash'); setNotes('')
-    setItems([newItem()]); setCreateError('')
+    setBuyerGstin(''); setPaymentMode('cash'); setInvoiceDate(''); setNotes('')
+    setItems([newItem()]); setFormError('')
     setSearchMode('name'); setSkuInput(''); setCategoryId('')
     setSuggestions([]); setActiveItemId(null)
+    setEditId(null)
+  }
+
+  async function openEdit(inv: Invoice) {
+    setEditLoading(true)
+    try {
+      const res = await fetch(`/api/admin/orders/${inv.id}`, { credentials: 'include' })
+      const data = await res.json()
+      const order = data.order || data
+      const orderItems: any[] = data.items || []
+
+      setEditId(inv.id)
+      setCustomerName(order.customer_name || '')
+      setCustomerPhone(order.customer_phone || '')
+      setCustomerEmail(order.customer_email || '')
+      setBuyerGstin(order.buyer_gstin || '')
+      setPaymentMode(order.payment_status === 'paid' ? 'cash' : 'credit')
+      setInvoiceDate(order.invoice_date ? order.invoice_date.slice(0, 10) : '')
+      setNotes(order.notes || '')
+
+      const addr = order.shipping_address || {}
+      setAddressLine1(addr.address_line1 || '')
+      setAddressLine2(addr.address_line2 || '')
+      setCity(addr.city || '')
+      setState(addr.state || '')
+      setPostalCode(addr.postal_code || '')
+
+      setItems(orderItems.length > 0 ? orderItems.map((it: any) => ({
+        id: it.id || Math.random().toString(36).slice(2),
+        product_id: it.product_id || null,
+        product_name: it.product_name || '',
+        product_sku: it.product_sku || '',
+        variant_id: it.variant_id || null,
+        variant_name: it.variant_name || '',
+        hsn_code: it.hsn_code || '',
+        gst_rate: String(it.gst_rate ?? '18'),
+        quantity: String(it.quantity ?? '1'),
+        unit_price: String(it.unit_price ?? ''),
+      })) : [newItem()])
+
+      setFormError('')
+      setSearchMode('name')
+      setView('edit')
+    } catch {
+      showToast('Failed to load invoice for editing', 'error')
+    } finally {
+      setEditLoading(false)
+    }
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    if (!customerName.trim()) { setCreateError('Customer name is required'); return }
+    if (!customerName.trim()) { setFormError('Customer name is required'); return }
     if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
-      setCreateError('All items need a name and price'); return
+      setFormError('All items need a name and price'); return
     }
-    setCreateError(''); setSubmitting(true)
+    setFormError(''); setSubmitting(true)
     try {
       const res = await fetch('/api/admin/orders/create', {
         method: 'POST', credentials: 'include',
@@ -287,14 +338,51 @@ export default function InvoicesClient() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) { setCreateError(data.error || 'Failed'); return }
+      if (!res.ok) { setFormError(data.error || 'Failed'); return }
       showToast(`Invoice ${data.invoiceNumber || ''} created`, 'success')
-      resetCreate()
+      resetForm()
       setView('list')
       fetchInvoices(1)
       if (data.invoiceUrl) window.open(data.invoiceUrl, '_blank')
     } catch (err: any) {
-      setCreateError(err.message || 'Failed')
+      setFormError(err.message || 'Failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editId) return
+    if (!customerName.trim()) { setFormError('Customer name is required'); return }
+    if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
+      setFormError('All items need a name and price'); return
+    }
+    setFormError(''); setSubmitting(true)
+    try {
+      const res = await fetch(`/api/admin/invoices/${editId}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName, customerPhone, customerEmail,
+          addressLine1, addressLine2, city, state, postalCode,
+          buyerGstin, paymentMode, invoiceDate, notes,
+          items: items.map(it => ({
+            product_id: it.product_id, product_name: it.product_name,
+            product_sku: it.product_sku, variant_id: it.variant_id,
+            variant_name: it.variant_name, hsn_code: it.hsn_code,
+            gst_rate: it.gst_rate, quantity: it.quantity, unit_price: it.unit_price,
+          })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setFormError(data.error || 'Failed'); return }
+      showToast('Invoice updated', 'success')
+      resetForm()
+      setView('list')
+      fetchInvoices(1)
+    } catch (err: any) {
+      setFormError(err.message || 'Failed')
     } finally {
       setSubmitting(false)
     }
@@ -303,12 +391,12 @@ export default function InvoicesClient() {
   const subtotal = items.reduce((s, it) => s + calcLine(it), 0)
   const selectedPayment = PAYMENT_MODES.find(m => m.value === paymentMode)
 
-  if (view === 'create') {
+  function renderForm(isEdit: boolean) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => { resetCreate(); setView('list') }}
+            onClick={() => { resetForm(); setView('list') }}
             className="p-2 text-foreground-secondary hover:text-foreground transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -316,20 +404,23 @@ export default function InvoicesClient() {
             </svg>
           </button>
           <div>
-            <h1 className="text-xl font-bold text-foreground">New Offline Invoice</h1>
-            <p className="text-foreground-secondary text-xs mt-0.5">Walk-in, credit sale, B2B or bulk order</p>
+            <h1 className="text-xl font-bold text-foreground">
+              {isEdit ? 'Edit Offline Invoice' : 'New Offline Invoice'}
+            </h1>
+            <p className="text-foreground-secondary text-xs mt-0.5">
+              {isEdit ? 'Update customer details, items and payment mode' : 'Walk-in, credit sale, B2B or bulk order'}
+            </p>
           </div>
         </div>
 
-        {createError && (
+        {formError && (
           <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
-            {createError}
+            {formError}
           </div>
         )}
 
-        <form onSubmit={handleCreate} className="space-y-4">
+        <form onSubmit={isEdit ? handleEdit : handleCreate} className="space-y-4">
 
-          {/* Customer Details */}
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
             <h2 className="text-sm font-semibold text-foreground mb-3">Customer Details</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -363,6 +454,12 @@ export default function InvoicesClient() {
                 <input type="text" value={buyerGstin} onChange={e => setBuyerGstin(e.target.value.toUpperCase())} maxLength={15}
                   className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
               </div>
+              {isEdit && (
+                <div>
+                  <label className={labelCls}>Invoice Date</label>
+                  <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} className={inputCls} />
+                </div>
+              )}
               <div className="sm:col-span-2">
                 <label className={labelCls}>Address Line 1</label>
                 <input type="text" value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
@@ -389,7 +486,6 @@ export default function InvoicesClient() {
             </div>
           </div>
 
-          {/* Line Items */}
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-foreground">Line Items</h2>
@@ -402,7 +498,6 @@ export default function InvoicesClient() {
               </button>
             </div>
 
-            {/* Search Mode Toggle */}
             <div className="flex gap-1 mb-3 p-1 bg-surface-secondary rounded-lg w-fit">
               {(['name', 'sku', 'category'] as SearchMode[]).map(m => (
                 <button key={m} type="button" onClick={() => { setSearchMode(m); setSuggestions([]); setSkuInput(''); setCategoryId('') }}
@@ -423,7 +518,6 @@ export default function InvoicesClient() {
                     )}
                   </div>
 
-                  {/* Product search input — varies by mode */}
                   <div className="relative">
                     {searchMode === 'name' && (
                       <>
@@ -475,7 +569,6 @@ export default function InvoicesClient() {
                       </>
                     )}
 
-                    {/* Shared dropdown for all modes */}
                     {activeItemId === item.id && suggestions.length > 0 && (
                       <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-52 overflow-y-auto">
                         {suggestions.map(s => (
@@ -550,7 +643,6 @@ export default function InvoicesClient() {
             </div>
           </div>
 
-          {/* Payment & Notes */}
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
             <h2 className="text-sm font-semibold text-foreground mb-3">Payment &amp; Notes</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -588,9 +680,9 @@ export default function InvoicesClient() {
           <div className="flex gap-3 pb-6">
             <button type="submit" disabled={submitting}
               className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
-              {submitting ? 'Creating…' : 'Create Invoice'}
+              {submitting ? (isEdit ? 'Saving…' : 'Creating…') : (isEdit ? 'Save Changes' : 'Create Invoice')}
             </button>
-            <button type="button" onClick={() => { resetCreate(); setView('list') }}
+            <button type="button" onClick={() => { resetForm(); setView('list') }}
               className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
               Cancel
             </button>
@@ -666,6 +758,11 @@ export default function InvoicesClient() {
     )
   }
 
+  if (view === 'create') return renderForm(false)
+  if (view === 'edit') return editLoading
+    ? <div className="p-12 text-center text-foreground-muted text-sm">Loading invoice…</div>
+    : renderForm(true)
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
@@ -682,7 +779,6 @@ export default function InvoicesClient() {
         </button>
       </div>
 
-      {/* Filters */}
       <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-48">
@@ -720,7 +816,6 @@ export default function InvoicesClient() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-foreground-muted text-sm">Loading invoices…</div>
@@ -728,7 +823,6 @@ export default function InvoicesClient() {
           <div className="p-12 text-center text-foreground-muted text-sm">No invoices found.</div>
         ) : (
           <>
-            {/* Desktop table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -773,8 +867,15 @@ export default function InvoicesClient() {
                         <div className="flex items-center gap-3">
                           <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
                             className="text-xs text-secondary-500 dark:text-secondary-300 hover:underline font-medium">PDF</a>
-                          <a href={`/admin/orders/${inv.id}`}
-                            className="text-xs text-foreground-secondary hover:text-foreground">Order</a>
+                          {inv.source === 'offline' ? (
+                            <button onClick={() => openEdit(inv)}
+                              className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors">
+                              Edit
+                            </button>
+                          ) : (
+                            <a href={`/admin/orders/${inv.id}`}
+                              className="text-xs text-foreground-secondary hover:text-foreground">Order</a>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -783,7 +884,6 @@ export default function InvoicesClient() {
               </table>
             </div>
 
-            {/* Mobile cards */}
             <div className="md:hidden divide-y divide-border-default">
               {invoices.map(inv => (
                 <div key={inv.id} className="p-4 space-y-2">
@@ -808,7 +908,12 @@ export default function InvoicesClient() {
                   <div className="flex gap-4 pt-1">
                     <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
                       className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline">Download PDF</a>
-                    <a href={`/admin/orders/${inv.id}`} className="text-xs text-foreground-secondary hover:text-foreground">View Order</a>
+                    {inv.source === 'offline' ? (
+                      <button onClick={() => openEdit(inv)}
+                        className="text-xs text-foreground-secondary hover:text-foreground font-medium">Edit</button>
+                    ) : (
+                      <a href={`/admin/orders/${inv.id}`} className="text-xs text-foreground-secondary hover:text-foreground">View Order</a>
+                    )}
                   </div>
                 </div>
               ))}

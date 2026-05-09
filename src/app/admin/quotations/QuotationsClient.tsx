@@ -43,6 +43,7 @@ interface Quotation {
   cgst_amount: number
   sgst_amount: number
   total_amount: number
+  converted_order_id: string | null
   created_at: string
 }
 
@@ -108,6 +109,8 @@ export default function QuotationsClient() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'pending' | 'saving' | 'saved'>('idle')
   const [isFinal, setIsFinal] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [convertingInvoice, setConvertingInvoice] = useState(false)
+  const [convertedOrderId, setConvertedOrderId] = useState<string | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [quoteNumber, setQuoteNumber] = useState('')
@@ -221,11 +224,33 @@ export default function QuotationsClient() {
       }))
       setItems(loadedItems.length ? loadedItems : [emptyItem()])
       setIsFinal(q.status === 'final')
+      setConvertedOrderId(q.converted_order_id || null)
       setAutoSaveStatus('idle')
       isEditorMounted.current = false
       setView('editor')
     } catch {
       setError('Failed to load quotation')
+    }
+  }
+
+  async function convertToInvoice(quoteId: string, paymentMode = 'cash') {
+    setConvertingInvoice(true)
+    try {
+      const res = await fetch(`/api/admin/quotations/${quoteId}/convert-to-invoice`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentMode }),
+      })
+      const data = await res.json()
+      if (!res.ok) { showToast(data.error || 'Conversion failed', 'error'); return }
+      showToast(`Invoice ${data.invoiceNumber} created`, 'success')
+      setConvertedOrderId(data.orderId)
+      loadList()
+      if (data.invoiceUrl) window.open(data.invoiceUrl, '_blank')
+    } catch {
+      showToast('Failed to convert quotation', 'error')
+    } finally {
+      setConvertingInvoice(false)
     }
   }
 
@@ -583,6 +608,17 @@ export default function QuotationsClient() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
                         </a>
+                        {q.status === 'final' && !q.converted_order_id && (
+                          <button onClick={() => convertToInvoice(q.id)} disabled={convertingInvoice} title="Convert to Invoice"
+                            className="px-2 py-1 rounded text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap">
+                            {convertingInvoice ? '…' : '→ Invoice'}
+                          </button>
+                        )}
+                        {q.status === 'final' && q.converted_order_id && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap">
+                            Invoiced
+                          </span>
+                        )}
                         {q.status === 'draft' && (
                           <button onClick={() => deleteQuote(q.id)} title="Delete"
                             className="p-1.5 text-foreground-secondary hover:text-red-500 transition-colors">
@@ -623,11 +659,30 @@ export default function QuotationsClient() {
       </div>
 
       {isFinal && (
-        <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-center gap-2">
-          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          This quotation has been finalised. Download the PDF below.
+        <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {convertedOrderId
+              ? <span>This quotation has been converted to an invoice.</span>
+              : <span>This quotation has been finalised. Download the PDF or convert it to an invoice.</span>
+            }
+          </div>
+          {!convertedOrderId && editId && (
+            <button
+              onClick={() => convertToInvoice(editId)}
+              disabled={convertingInvoice}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap">
+              {convertingInvoice ? 'Converting…' : '→ Convert to Invoice'}
+            </button>
+          )}
+          {convertedOrderId && (
+            <a href={`/admin/orders/${convertedOrderId}`}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap">
+              View Invoice →
+            </a>
+          )}
         </div>
       )}
 
