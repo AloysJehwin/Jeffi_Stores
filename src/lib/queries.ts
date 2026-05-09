@@ -117,6 +117,25 @@ export async function getAllBrands() {
   return queryMany('SELECT * FROM brands WHERE is_active = $1 ORDER BY name ASC', [true])
 }
 
+export async function getCategoriesWithProducts() {
+  return queryMany(`
+    SELECT DISTINCT c.*
+    FROM categories c
+    WHERE EXISTS (SELECT 1 FROM products p WHERE p.category_id = c.id)
+    ORDER BY c.display_order ASC
+  `)
+}
+
+export async function getBrandsWithProducts() {
+  return queryMany(`
+    SELECT DISTINCT b.*
+    FROM brands b
+    WHERE b.is_active = true
+      AND EXISTS (SELECT 1 FROM products p WHERE p.brand_id = b.id)
+    ORDER BY b.name ASC
+  `)
+}
+
 export async function getAllOrders() {
   return queryMany(`
     SELECT
