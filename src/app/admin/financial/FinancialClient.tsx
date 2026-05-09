@@ -276,6 +276,8 @@ function PayablesTab() {
       )}
 
       {data && data.summary && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <SummaryCard label="Total Payable" value={formatINR(data.summary.total_payable)} />
             <SummaryCard label="Due This Week" value={formatINR(data.summary.due_this_week)} />
             <SummaryCard label="Overdue" value={formatINR(data.summary.overdue)} sub="past due date" />
