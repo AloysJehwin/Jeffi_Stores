@@ -162,6 +162,8 @@ async function updateProduct(productId: string, formData: FormData) {
           return false
         }) || keys[0]
 
+        await query('UPDATE product_images SET is_primary = false WHERE product_id = $1', [productId])
+
         for (let i = 0; i < keys.length; i++) {
           const key = keys[i]
           const isPrimary = key === primaryKey
@@ -183,6 +185,7 @@ async function updateProduct(productId: string, formData: FormData) {
       if (imageOrder.length > 0) {
         await applyOrder(imageOrder)
       } else {
+        await query('UPDATE product_images SET is_primary = false WHERE product_id = $1', [productId])
         for (let i = 0; i < existingImagesToKeep.length; i++) {
           const img = existingImagesToKeep[i]
           await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [i, img.is_primary || false, img.id])
