@@ -99,28 +99,28 @@ async function getProducts(searchParams: any) {
 
 async function getCategories() {
   return queryMany(`
-    SELECT id, name, slug, parent_category_id, display_order
-    FROM categories
-    WHERE is_active = true
+    SELECT c.id, c.name, c.slug, c.parent_category_id, c.display_order
+    FROM categories c
+    WHERE c.is_active = true
       AND (
-        EXISTS (SELECT 1 FROM products p WHERE p.category_id = id AND p.is_active = true)
+        EXISTS (SELECT 1 FROM products p WHERE p.category_id = c.id AND p.is_active = true)
         OR EXISTS (
           SELECT 1 FROM products p
           JOIN categories child ON p.category_id = child.id
-          WHERE child.parent_category_id = categories.id AND p.is_active = true
+          WHERE child.parent_category_id = c.id AND p.is_active = true
         )
       )
-    ORDER BY display_order ASC
+    ORDER BY c.display_order ASC
   `)
 }
 
 async function getBrands() {
   return queryMany(`
-    SELECT id, name
-    FROM brands
-    WHERE is_active = true
-      AND EXISTS (SELECT 1 FROM products p WHERE p.brand_id = brands.id AND p.is_active = true)
-    ORDER BY name ASC
+    SELECT b.id, b.name
+    FROM brands b
+    WHERE b.is_active = true
+      AND EXISTS (SELECT 1 FROM products p WHERE p.brand_id = b.id AND p.is_active = true)
+    ORDER BY b.name ASC
   `)
 }
 
