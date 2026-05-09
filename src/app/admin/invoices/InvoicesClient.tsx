@@ -723,33 +723,55 @@ export default function InvoicesClient() {
                   <div className="p-8 text-center text-foreground-muted text-sm">Loading…</div>
                 ) : pickerProducts.length === 0 ? (
                   <div className="p-8 text-center text-foreground-muted text-sm">No products found in this category.</div>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-surface-secondary">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Product</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">SKU</th>
-                        <th className="px-4 py-2 text-right text-xs font-semibold text-foreground-secondary">Price</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pickerProducts.map(s => (
-                        <tr key={s.id}
-                          onClick={() => applyPickerProduct(s)}
-                          className="border-t border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
-                          <td className="px-4 py-2.5">
-                            <span className="font-medium text-foreground">{s.name}</span>
-                            {s.variant_name && <span className="text-foreground-muted ml-1.5 text-xs">— {s.variant_name}</span>}
-                          </td>
-                          <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{s.sku}</td>
-                          <td className="px-4 py-2.5 text-right text-foreground font-medium">
-                            {s.base_price != null ? `₹${s.base_price}` : '—'}
-                          </td>
+                ) : (() => {
+                  const groups: { productId: string; name: string; items: Suggestion[] }[] = []
+                  for (const p of pickerProducts) {
+                    const g = groups.find(g => g.productId === p.product_id)
+                    if (g) g.items.push(p)
+                    else groups.push({ productId: p.product_id, name: p.name, items: [p] })
+                  }
+                  return (
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-surface-secondary">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Product / Variant</th>
+                          <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">SKU</th>
+                          <th className="px-4 py-2 text-right text-xs font-semibold text-foreground-secondary">Price</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                      </thead>
+                      <tbody>
+                        {groups.map(g => (
+                          <>
+                            {g.items.length > 1 && (
+                              <tr key={`${g.productId}-header`}>
+                                <td colSpan={3} className="px-4 pt-2.5 pb-1 text-xs font-semibold text-foreground-muted uppercase tracking-wider bg-surface-secondary">
+                                  {g.name}
+                                </td>
+                              </tr>
+                            )}
+                            {g.items.map(s => (
+                              <tr key={s.id}
+                                onClick={() => applyPickerProduct(s)}
+                                className="border-t border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
+                                <td className="px-4 py-2.5">
+                                  {g.items.length > 1 ? (
+                                    <span className="text-foreground pl-2">{s.variant_name || s.name}</span>
+                                  ) : (
+                                    <span className="font-medium text-foreground">{s.name}</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{s.sku}</td>
+                                <td className="px-4 py-2.5 text-right text-foreground font-medium">
+                                  {s.base_price != null ? `₹${s.base_price}` : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </>
+                        ))}
+                      </tbody>
+                    </table>
+                  )
+                })()}
               </div>
             </div>
           </div>
