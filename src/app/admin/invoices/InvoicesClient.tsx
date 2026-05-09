@@ -99,6 +99,7 @@ const PAYMENT_COLORS: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   refunded: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
 }
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -115,6 +116,7 @@ export default function InvoicesClient() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -311,6 +313,22 @@ export default function InvoicesClient() {
       showToast('Failed to load invoice for editing', 'error')
     } finally {
       setEditLoading(false)
+    }
+  }
+
+  async function cancelInvoice(inv: Invoice) {
+    if (!confirm(`Cancel invoice ${inv.invoice_number}? This will restore stock and cannot be undone.`)) return
+    setCancellingId(inv.id)
+    try {
+      const res = await fetch(`/api/admin/orders/${inv.id}/cancel`, { method: 'POST', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel')
+      showToast(`Invoice ${inv.invoice_number} cancelled`, 'success')
+      fetchInvoices(page)
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setCancellingId(null)
     }
   }
 
@@ -890,10 +908,23 @@ export default function InvoicesClient() {
                           <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
                             className="text-xs text-secondary-500 dark:text-secondary-300 hover:underline font-medium">PDF</a>
                           {inv.source === 'offline' ? (
-                            <button onClick={() => openEdit(inv)}
-                              className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors">
-                              Edit
-                            </button>
+                            <>
+                              {inv.status !== 'cancelled' && (
+                                <button onClick={() => openEdit(inv)}
+                                  className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors">
+                                  Edit
+                                </button>
+                              )}
+                              {inv.status !== 'cancelled' && (
+                                <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
+                                  className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium transition-colors disabled:opacity-50">
+                                  {cancellingId === inv.id ? '…' : 'Cancel'}
+                                </button>
+                              )}
+                              {inv.status === 'cancelled' && (
+                                <span className="text-xs text-foreground-muted italic">Cancelled</span>
+                              )}
+                            </>
                           ) : (
                             <a href={`/admin/orders/${inv.id}`}
                               className="text-xs text-foreground-secondary hover:text-foreground">Order</a>
@@ -931,8 +962,21 @@ export default function InvoicesClient() {
                     <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
                       className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline">Download PDF</a>
                     {inv.source === 'offline' ? (
-                      <button onClick={() => openEdit(inv)}
-                        className="text-xs text-foreground-secondary hover:text-foreground font-medium">Edit</button>
+                      <>
+                        {inv.status !== 'cancelled' && (
+                          <button onClick={() => openEdit(inv)}
+                            className="text-xs text-foreground-secondary hover:text-foreground font-medium">Edit</button>
+                        )}
+                        {inv.status !== 'cancelled' && (
+                          <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
+                            className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 font-medium disabled:opacity-50">
+                            {cancellingId === inv.id ? '…' : 'Cancel'}
+                          </button>
+                        )}
+                        {inv.status === 'cancelled' && (
+                          <span className="text-xs text-foreground-muted italic">Cancelled</span>
+                        )}
+                      </>
                     ) : (
                       <a href={`/admin/orders/${inv.id}`} className="text-xs text-foreground-secondary hover:text-foreground">View Order</a>
                     )}
