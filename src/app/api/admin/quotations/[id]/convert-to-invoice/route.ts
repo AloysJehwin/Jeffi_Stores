@@ -93,8 +93,8 @@ export async function POST(
           quotation.consignee_addr2 || null,
           quotation.consignee_city || '',
           quotation.consignee_state || '',
-          null,
-          null,
+          '',
+          '',
         ]
       )
       const addressId = addrResult.rows[0].id
