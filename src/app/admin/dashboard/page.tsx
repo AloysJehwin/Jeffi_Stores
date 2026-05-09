@@ -44,12 +44,22 @@ export default async function AdminDashboard() {
           </div>
         </div>
 
-        {/* Total Orders */}
+        {/* Total Orders — split */}
         <div className="bg-surface-elevated rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <p className="text-sm text-foreground-secondary">Total Orders</p>
               <p className="text-2xl sm:text-3xl font-bold text-foreground mt-2">{stats.totalOrders}</p>
+              <div className="flex gap-3 mt-2">
+                <span className="text-xs text-blue-600 dark:text-blue-400">
+                  <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1"></span>
+                  Online {stats.onlineOrders}
+                </span>
+                <span className="text-xs text-purple-600 dark:text-purple-400">
+                  <span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1"></span>
+                  Offline {stats.offlineOrders}
+                </span>
+              </div>
               {stats.pendingOrders > 0 && (
                 <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">{stats.pendingOrders} pending</p>
               )}
@@ -62,14 +72,24 @@ export default async function AdminDashboard() {
           </div>
         </div>
 
-        {/* Revenue */}
+        {/* Revenue — split */}
         <div className="bg-surface-elevated rounded-lg shadow p-4 sm:p-6">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <p className="text-sm text-foreground-secondary">Total Revenue</p>
               <p className="text-2xl sm:text-3xl font-bold text-foreground mt-2">
                 Rs {stats.totalRevenue.toLocaleString('en-IN')}
               </p>
+              <div className="flex gap-3 mt-2">
+                <span className="text-xs text-blue-600 dark:text-blue-400">
+                  <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1"></span>
+                  Online Rs {stats.onlineRevenue.toLocaleString('en-IN')}
+                </span>
+                <span className="text-xs text-purple-600 dark:text-purple-400">
+                  <span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1"></span>
+                  Offline Rs {stats.offlineRevenue.toLocaleString('en-IN')}
+                </span>
+              </div>
             </div>
             <div className="hidden sm:block bg-yellow-100 dark:bg-yellow-900/30 p-3 rounded-full">
               <svg className="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,6 +147,16 @@ export default async function AdminDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
             <span className="font-medium text-foreground-secondary">View Orders</span>
+          </a>
+
+          <a
+            href="/admin/orders/new"
+            className="flex items-center gap-3 p-4 border-2 border-dashed border-border-secondary rounded-lg hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+          >
+            <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="font-medium text-foreground-secondary">Create Offline Invoice</span>
           </a>
         </div>
       </div>

@@ -11,9 +11,11 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_link_id VARCHAR(64);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_link_url TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_link_status VARCHAR(20);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_link_expires_at TIMESTAMPTZ;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS source VARCHAR(20) NOT NULL DEFAULT 'online';
 
 CREATE INDEX IF NOT EXISTS idx_orders_irn ON orders (irn) WHERE irn IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_orders_payment_link_id ON orders (payment_link_id) WHERE payment_link_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_orders_source ON orders (source);
 
 ALTER TABLE addresses ADD COLUMN IF NOT EXISTS state_code VARCHAR(3);
 
