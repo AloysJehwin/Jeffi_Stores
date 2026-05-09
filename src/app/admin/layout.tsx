@@ -63,6 +63,7 @@ export default async function AdminLayout({
     { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms', group: 'Marketing' },
     { href: '/admin/mailer', label: 'Mailer', scope: 'mailer', group: 'Marketing' },
     { href: '/admin/inflation', label: 'Inflation', scope: 'inflation', group: 'Settings' },
+    { href: '/admin/gst', label: 'GST Compliance', scope: 'settings', group: 'Settings' },
     { href: '/admin/settings', label: 'Settings', scope: 'settings', group: 'Settings' },
   ]
 

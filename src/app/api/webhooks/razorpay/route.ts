@@ -12,7 +12,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
     }
 
-    // Verify webhook signature
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET
     if (webhookSecret) {
       const expectedSignature = crypto
@@ -21,7 +20,6 @@ export async function POST(request: NextRequest) {
         .digest('hex')
 
       if (expectedSignature !== webhookSignature) {
-        console.error('Webhook signature mismatch')
         return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
       }
     }
@@ -33,13 +31,14 @@ export async function POST(request: NextRequest) {
       await handlePaymentCaptured(event.payload.payment.entity)
     } else if (eventType === 'payment.failed') {
       await handlePaymentFailed(event.payload.payment.entity)
+    } else if (eventType === 'payment_link.paid') {
+      await handlePaymentLinkPaid(event.payload.payment_link.entity)
+    } else if (eventType === 'payment_link.expired') {
+      await handlePaymentLinkExpired(event.payload.payment_link.entity)
     }
 
-    // Always return 200 to prevent retries
     return NextResponse.json({ status: 'ok' })
-  } catch (error) {
-    console.error('Webhook processing error:', error)
-    // Return 200 even on error to prevent Razorpay retries
+  } catch {
     return NextResponse.json({ status: 'ok' })
   }
 }
@@ -48,7 +47,6 @@ async function handlePaymentCaptured(payment: any) {
   const razorpayOrderId = payment.order_id
   const razorpayPaymentId = payment.id
 
-  // Find the order via the payments table
   const paymentRecord = await queryOne(
     `SELECT p.id as payment_id, p.order_id, p.status as payment_record_status,
             o.id as db_order_id, o.payment_status, o.order_number, o.total_amount,
@@ -60,15 +58,8 @@ async function handlePaymentCaptured(payment: any) {
     [razorpayOrderId]
   )
 
-  if (!paymentRecord) {
-    console.error('Webhook: No order found for razorpay_order_id:', razorpayOrderId)
-    return
-  }
-
-  // Idempotency: already paid
-  if (paymentRecord.payment_status === 'paid') {
-    return
-  }
+  if (!paymentRecord) return
+  if (paymentRecord.payment_status === 'paid') return
 
   const orderId = paymentRecord.order_id
 
@@ -91,13 +82,11 @@ async function handlePaymentCaptured(payment: any) {
       ]
     )
 
-    // Clear cart
     if (paymentRecord.user_id) {
       await client.query('DELETE FROM cart_items WHERE user_id = $1', [paymentRecord.user_id])
     }
   })
 
-  // Send emails
   if (paymentRecord.user_id) {
     const user = await queryOne('SELECT * FROM users WHERE id = $1', [paymentRecord.user_id])
     const order = await queryOne('SELECT * FROM orders WHERE id = $1', [orderId])
@@ -105,16 +94,9 @@ async function handlePaymentCaptured(payment: any) {
 
     if (user && order) {
       const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
-
-      sendOrderConfirmationEmail(user.email, order, orderItems || []).catch(err =>
-        console.error('Webhook: Failed to send order confirmation:', err)
-      )
-      sendNewOrderNotification(order, orderItems || [], user).catch(err =>
-        console.error('Webhook: Failed to send admin notification:', err)
-      )
-      sendPaymentStatusUpdate(user.email, userName, order.order_number, orderId, 'paid', parseFloat(order.total_amount)).catch(err =>
-        console.error('Webhook: Failed to send payment update:', err)
-      )
+      sendOrderConfirmationEmail(user.email, order, orderItems || []).catch(() => {})
+      sendNewOrderNotification(order, orderItems || [], user).catch(() => {})
+      sendPaymentStatusUpdate(user.email, userName, order.order_number, orderId, 'paid', parseFloat(order.total_amount)).catch(() => {})
     }
   }
 }
@@ -129,10 +111,7 @@ async function handlePaymentFailed(payment: any) {
     [razorpayOrderId]
   )
 
-  if (!paymentRecord) {
-    console.error('Webhook: No order found for failed payment, razorpay_order_id:', razorpayOrderId)
-    return
-  }
+  if (!paymentRecord) return
 
   await queryOne(
     `UPDATE payments SET status = 'failed', gateway_response = $1, updated_at = NOW()
@@ -144,5 +123,60 @@ async function handlePaymentFailed(payment: any) {
     `UPDATE orders SET payment_status = 'failed', updated_at = NOW()
      WHERE id = $1 AND payment_status = 'unpaid'`,
     [paymentRecord.order_id]
+  )
+}
+
+async function handlePaymentLinkPaid(paymentLink: any) {
+  const linkId = paymentLink.id
+
+  const order = await queryOne(
+    `SELECT id, payment_status, user_id, order_number, total_amount, customer_email, customer_name
+     FROM orders WHERE payment_link_id = $1`,
+    [linkId]
+  )
+
+  if (!order || order.payment_status === 'paid') return
+
+  await withTransaction(async (client) => {
+    await client.query(
+      `UPDATE orders SET
+        payment_status = 'paid',
+        status = 'confirmed',
+        payment_link_status = 'paid',
+        updated_at = NOW()
+       WHERE id = $1 AND payment_status != 'paid'`,
+      [order.id]
+    )
+
+    await client.query(
+      `INSERT INTO payments (order_id, payment_gateway, transaction_id, amount, status, gateway_response)
+       VALUES ($1, 'razorpay_link', $2, $3, 'completed', $4)
+       ON CONFLICT DO NOTHING`,
+      [order.id, paymentLink.payments?.[0]?.payment_id || linkId, parseFloat(order.total_amount), JSON.stringify(paymentLink)]
+    )
+
+    if (order.user_id) {
+      await client.query('DELETE FROM cart_items WHERE user_id = $1', [order.user_id])
+    }
+  })
+
+  if (order.user_id) {
+    const user = await queryOne('SELECT * FROM users WHERE id = $1', [order.user_id])
+    const fullOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [order.id])
+    const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [order.id])
+    if (user && fullOrder) {
+      const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
+      sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
+      sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
+      sendPaymentStatusUpdate(user.email, userName, order.order_number, order.id, 'paid', parseFloat(order.total_amount)).catch(() => {})
+    }
+  }
+}
+
+async function handlePaymentLinkExpired(paymentLink: any) {
+  await queryOne(
+    `UPDATE orders SET payment_link_status = 'expired', updated_at = NOW()
+     WHERE payment_link_id = $1 AND payment_link_status = 'created'`,
+    [paymentLink.id]
   )
 }

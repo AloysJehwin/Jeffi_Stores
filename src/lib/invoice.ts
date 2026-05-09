@@ -150,6 +150,12 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     shipped_at: order.shipped_at || '',
     shipping_method: order.shipping_method || '',
     destination: [order.city, order.state].filter(Boolean).join(', '),
+    irn: order.irn || null,
+    irn_ack_no: order.irn_ack_no || null,
+    irn_ack_dt: order.irn_ack_dt || null,
+    signed_qr_code: order.signed_qr_code || null,
+    payment_link_url: order.payment_link_url || null,
+    eway_bill_no: order.eway_bill_no || null,
   }
 
   const invoiceItems: InvoiceOrderItem[] = (updatedItems || []).map((item: any) => ({
