@@ -50,7 +50,7 @@ function ReceivablesTab() {
     if (search) params.set('search', search)
     const res = await fetch(`/api/admin/financial/receivables?${params}`)
     const json = await res.json()
-    setData(json)
+    setData(json?.error ? null : json)
     setLoading(false)
   }, [from, to, search])
 
@@ -181,7 +181,7 @@ function PayablesTab() {
     if (search) params.set('search', search)
     const res = await fetch(`/api/admin/financial/payables?${params}`)
     const json = await res.json()
-    setData(json)
+    setData(json?.error ? null : json)
     setLoading(false)
   }, [from, to, search])
 
@@ -275,9 +275,7 @@ function PayablesTab() {
         </div>
       )}
 
-      {data && (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {data && data.summary && (
             <SummaryCard label="Total Payable" value={formatINR(data.summary.total_payable)} />
             <SummaryCard label="Due This Week" value={formatINR(data.summary.due_this_week)} />
             <SummaryCard label="Overdue" value={formatINR(data.summary.overdue)} sub="past due date" />
