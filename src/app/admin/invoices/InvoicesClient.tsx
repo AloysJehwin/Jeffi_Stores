@@ -459,14 +459,16 @@ export default function InvoicesClient() {
                     </div>
                     <div>
                       <label className={labelCls}>GST %</label>
-                      <select value={item.gst_rate} onChange={e => updateItem(item.id, 'gst_rate', e.target.value)}
-                        className={inputCls}>
-                        <option value="0">0%</option>
-                        <option value="5">5%</option>
-                        <option value="12">12%</option>
-                        <option value="18">18%</option>
-                        <option value="28">28%</option>
-                      </select>
+                      <AdminSelect
+                        value={item.gst_rate}
+                        onChange={v => updateItem(item.id, 'gst_rate', v)}
+                        className="[&_button]:py-1.5 [&_button]:px-2 [&_button]:text-sm [&_button]:rounded [&_button]:border-border-default"
+                        options={[
+                          { value: '0', label: '0%' }, { value: '5', label: '5%' },
+                          { value: '12', label: '12%' }, { value: '18', label: '18%' },
+                          { value: '28', label: '28%' },
+                        ]}
+                      />
                     </div>
                     <div>
                       <label className={labelCls}>Quantity <span className="text-red-500">*</span></label>
