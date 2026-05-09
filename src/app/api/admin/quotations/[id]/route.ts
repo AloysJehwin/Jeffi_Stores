@@ -69,6 +69,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const textFields = [
       'quote_date', 'status',
       'consignee_name', 'consignee_addr1', 'consignee_addr2', 'consignee_city', 'consignee_state', 'consignee_gstin',
+      'consignee_phone', 'consignee_pincode',
       'buyer_same', 'buyer_name', 'buyer_addr1', 'buyer_addr2', 'buyer_city', 'buyer_state', 'buyer_gstin', 'notes',
     ]
     for (const field of textFields) {

@@ -31,6 +31,8 @@ interface Quotation {
   consignee_city: string
   consignee_state: string
   consignee_gstin: string | null
+  consignee_phone: string | null
+  consignee_pincode: string | null
   buyer_same: boolean
   buyer_name: string | null
   buyer_addr1: string | null
@@ -123,6 +125,8 @@ export default function QuotationsClient() {
   const [cCity, setCCity] = useState('')
   const [cState, setCState] = useState('Chhattisgarh')
   const [cGstin, setCGstin] = useState('')
+  const [cPhone, setCPhone] = useState('')
+  const [cPincode, setCPincode] = useState('')
 
   const [buyerSame, setBuyerSame] = useState(true)
   const [bName, setBName] = useState('')
@@ -183,7 +187,7 @@ export default function QuotationsClient() {
     setQuoteNumber('')
     setQuoteDate(todayISO())
     setNotes('')
-    setCName(''); setCAddr1(''); setCAddr2(''); setCCity(''); setCState('Chhattisgarh'); setCGstin('')
+    setCName(''); setCAddr1(''); setCAddr2(''); setCCity(''); setCState('Chhattisgarh'); setCGstin(''); setCPhone(''); setCPincode('')
     setBuyerSame(true)
     setBName(''); setBAddr1(''); setBAddr2(''); setBCity(''); setBState('Chhattisgarh'); setBGstin('')
     setItems([emptyItem()])
@@ -206,6 +210,7 @@ export default function QuotationsClient() {
       setNotes(q.notes || '')
       setCName(q.consignee_name || ''); setCAddr1(q.consignee_addr1 || ''); setCAddr2(q.consignee_addr2 || '')
       setCCity(q.consignee_city || ''); setCState(q.consignee_state || 'Chhattisgarh'); setCGstin(q.consignee_gstin || '')
+      setCPhone(q.consignee_phone || ''); setCPincode(q.consignee_pincode || '')
       setBuyerSame(q.buyer_same)
       setBName(q.buyer_name || ''); setBAddr1(q.buyer_addr1 || ''); setBAddr2(q.buyer_addr2 || '')
       setBCity(q.buyer_city || ''); setBState(q.buyer_state || 'Chhattisgarh'); setBGstin(q.buyer_gstin || '')
@@ -264,6 +269,7 @@ export default function QuotationsClient() {
         notes,
         consignee_name: cName, consignee_addr1: cAddr1, consignee_addr2: cAddr2 || null,
         consignee_city: cCity, consignee_state: cState, consignee_gstin: cGstin || null,
+        consignee_phone: cPhone || null, consignee_pincode: cPincode || null,
         buyer_same: buyerSame,
         buyer_name: buyerSame ? null : bName, buyer_addr1: buyerSame ? null : bAddr1,
         buyer_addr2: buyerSame ? null : (bAddr2 || null),
@@ -323,7 +329,7 @@ export default function QuotationsClient() {
     if (view !== 'editor') return
     if (!isEditorMounted.current) { isEditorMounted.current = true; return }
     scheduleAutoSave()
-  }, [quoteDate, notes, cName, cAddr1, cAddr2, cCity, cState, cGstin,
+  }, [quoteDate, notes, cName, cAddr1, cAddr2, cCity, cState, cGstin, cPhone, cPincode,
       buyerSame, bName, bAddr1, bAddr2, bCity, bState, bGstin, items])
 
   async function downloadPDF() {
@@ -404,6 +410,8 @@ export default function QuotationsClient() {
     setCCity(c.city || '')
     setCState(c.state || 'Chhattisgarh')
     setCGstin(c.gst_number || '')
+    setCPhone(c.phone || '')
+    setCPincode(c.postal_code || '')
     setCustSearch('')
     setShowCustDrop(false)
   }
@@ -741,6 +749,10 @@ export default function QuotationsClient() {
             <div className="flex gap-2">
               <input value={cCity} onChange={e => setCCity(e.target.value)} placeholder="City" disabled={isFinal} className={inputCls} />
               <input value={cState} onChange={e => setCState(e.target.value)} placeholder="State" disabled={isFinal} className={inputCls} />
+            </div>
+            <div className="flex gap-2">
+              <input value={cPhone} onChange={e => setCPhone(e.target.value)} placeholder="Phone" disabled={isFinal} className={inputCls} />
+              <input value={cPincode} onChange={e => setCPincode(e.target.value)} placeholder="Pincode" disabled={isFinal} className={inputCls + ' font-mono'} />
             </div>
             <input value={cGstin} onChange={e => setCGstin(e.target.value)} placeholder="GSTIN (optional)" disabled={isFinal} className={inputCls + ' font-mono'} />
           </div>
