@@ -144,6 +144,13 @@ export default function InvoicesClient() {
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerItemId, setPickerItemId] = useState<string | null>(null)
+  const [pickerCatId, setPickerCatId] = useState('')
+  const [pickerProducts, setPickerProducts] = useState<Suggestion[]>([])
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const [pickerSearch, setPickerSearch] = useState('')
+
   const totalPages = Math.ceil(total / 25)
 
   useEffect(() => {
@@ -195,9 +202,34 @@ export default function InvoicesClient() {
     }, 250)
   }, [])
 
-  function triggerCategorySearch(itemId: string, catId: string) {
-    setCategoryId(catId)
-    searchProducts('', itemId, catId)
+  function openPicker(itemId: string, catId: string) {
+    setPickerItemId(itemId)
+    setPickerCatId(catId)
+    setPickerSearch('')
+    setPickerProducts([])
+    setPickerOpen(true)
+    loadPickerProducts(catId, '')
+  }
+
+  async function loadPickerProducts(catId: string, q: string) {
+    if (!catId) return
+    setPickerLoading(true)
+    try {
+      const params = new URLSearchParams({ limit: '100' })
+      params.set('category_id', catId)
+      if (q.trim()) params.set('q', q.trim())
+      const res = await fetch(`/api/admin/labels/products?${params}`, { credentials: 'include' })
+      const data = await res.json()
+      setPickerProducts(data.products || [])
+    } catch { setPickerProducts([]) }
+    finally { setPickerLoading(false) }
+  }
+
+  function applyPickerProduct(s: Suggestion) {
+    if (!pickerItemId) return
+    applyProduct(pickerItemId, s)
+    setPickerOpen(false)
+    setPickerItemId(null)
   }
 
   function applyProduct(itemId: string, s: Suggestion) {
@@ -410,13 +442,24 @@ export default function InvoicesClient() {
                     {searchMode === 'category' && (
                       <>
                         <label className={labelCls}>Browse by Category</label>
-                        <select value={categoryId} onChange={e => { triggerCategorySearch(item.id, e.target.value) }}
-                          className={inputCls}>
-                          <option value="">— Select category —</option>
-                          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <AdminSelect
+                              value={categoryId}
+                              onChange={v => setCategoryId(v)}
+                              placeholder="— Select category —"
+                              options={categories.map(c => ({ value: c.id, label: c.name }))}
+                            />
+                          </div>
+                          <button type="button"
+                            disabled={!categoryId}
+                            onClick={() => openPicker(item.id, categoryId)}
+                            className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap">
+                            Select Product
+                          </button>
+                        </div>
                         {item.product_name && (
-                          <p className="text-xs text-foreground-secondary mt-1">Selected: <span className="font-medium text-foreground">{item.product_name}</span></p>
+                          <p className="text-xs text-foreground-secondary mt-1.5">Selected: <span className="font-medium text-foreground">{item.product_name}</span> <span className="text-foreground-muted font-mono">({item.product_sku})</span></p>
                         )}
                       </>
                     )}
@@ -440,16 +483,6 @@ export default function InvoicesClient() {
                       </div>
                     )}
                   </div>
-
-                  {/* Manual description if name mode but no product selected from list */}
-                  {searchMode !== 'name' && (
-                    <div>
-                      <label className={labelCls}>Description on Invoice <span className="text-red-500">*</span></label>
-                      <input type="text" value={item.product_name}
-                        onChange={e => updateItem(item.id, 'product_name', e.target.value)} required
-                        className={inputCls} placeholder="Product name as it appears on invoice" />
-                    </div>
-                  )}
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
@@ -539,6 +572,72 @@ export default function InvoicesClient() {
             </button>
           </div>
         </form>
+
+        {pickerOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+            <div className="bg-surface-elevated border border-border-default rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Select Product</h3>
+                  <p className="text-xs text-foreground-muted mt-0.5">
+                    {categories.find(c => c.id === pickerCatId)?.name || 'All products'}
+                  </p>
+                </div>
+                <button type="button" onClick={() => setPickerOpen(false)}
+                  className="p-1.5 text-foreground-secondary hover:text-foreground transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="px-4 py-3 border-b border-border-default shrink-0">
+                <input
+                  type="text"
+                  value={pickerSearch}
+                  onChange={e => { setPickerSearch(e.target.value); loadPickerProducts(pickerCatId, e.target.value) }}
+                  className={inputCls}
+                  placeholder="Filter by name or SKU…"
+                  autoFocus
+                />
+              </div>
+
+              <div className="overflow-y-auto flex-1">
+                {pickerLoading ? (
+                  <div className="p-8 text-center text-foreground-muted text-sm">Loading…</div>
+                ) : pickerProducts.length === 0 ? (
+                  <div className="p-8 text-center text-foreground-muted text-sm">No products found in this category.</div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-surface-secondary">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Product</th>
+                        <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">SKU</th>
+                        <th className="px-4 py-2 text-right text-xs font-semibold text-foreground-secondary">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pickerProducts.map(s => (
+                        <tr key={s.id}
+                          onClick={() => applyPickerProduct(s)}
+                          className="border-t border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
+                          <td className="px-4 py-2.5">
+                            <span className="font-medium text-foreground">{s.name}</span>
+                            {s.variant_name && <span className="text-foreground-muted ml-1.5 text-xs">— {s.variant_name}</span>}
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{s.sku}</td>
+                          <td className="px-4 py-2.5 text-right text-foreground font-medium">
+                            {s.base_price != null ? `₹${s.base_price}` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
