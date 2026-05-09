@@ -153,7 +153,7 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     irn: order.irn || null,
     irn_ack_no: order.irn_ack_no || null,
     irn_ack_dt: order.irn_ack_dt || null,
-    signed_qr_code: order.signed_qr_code || null,
+    signed_qr_code: order.signed_qr || null,
     payment_link_url: order.payment_link_url || null,
     eway_bill_no: order.eway_bill_no || null,
   }
