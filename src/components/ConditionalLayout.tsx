@@ -19,7 +19,7 @@ export default function ConditionalLayout({ children, isFormsSubdomain }: { chil
 
   if (isAdminPage || isFormsPage) {
     return (
-      <ThemeProvider storageKey={isAdminPage ? 'jeffi-admin-theme' : undefined}>
+      <ThemeProvider>
         <ToastProvider>
           {children}
         </ToastProvider>
