@@ -42,15 +42,30 @@ interface LineItem {
 
 interface Suggestion {
   id: string
+  product_id: string
+  variant_id: string | null
   name: string
+  variant_name: string | null
   sku: string
+  base_price: number | null
+  gst_percentage: number | null
   hsn_code: string | null
-  gst_rate: number | null
-  price: number | null
-  variants: { id: string; variant_name: string; price: number | null; sku: string }[]
+}
+
+interface Category {
+  id: string
+  name: string
 }
 
 type View = 'list' | 'create'
+type SearchMode = 'name' | 'sku' | 'category'
+
+const PAYMENT_MODES = [
+  { value: 'cash',    label: 'Cash',         paid: true },
+  { value: 'upi',     label: 'UPI',          paid: true },
+  { value: 'upi_qr',  label: 'UPI (QR Scan)', paid: true },
+  { value: 'credit',  label: 'Credit',       paid: false },
+]
 
 function newItem(): LineItem {
   return {
@@ -74,6 +89,9 @@ function fmtDate(s: string) {
   const d = new Date(s)
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
+
+const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 disabled:opacity-60 disabled:cursor-not-allowed'
+const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
 const PAYMENT_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
@@ -118,11 +136,22 @@ export default function InvoicesClient() {
   const [submitting, setSubmitting] = useState(false)
   const [createError, setCreateError] = useState('')
 
+  const [searchMode, setSearchMode] = useState<SearchMode>('name')
+  const [skuInput, setSkuInput] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [categories, setCategories] = useState<Category[]>([])
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const totalPages = Math.ceil(total / 25)
+
+  useEffect(() => {
+    fetch('/api/categories', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => setCategories(d.categories || d || []))
+      .catch(() => {})
+  }, [])
 
   const fetchInvoices = useCallback(async (p = 1) => {
     setLoading(true)
@@ -149,34 +178,43 @@ export default function InvoicesClient() {
 
   useEffect(() => { fetchInvoices(1) }, [sourceFilter, paymentFilter, fromDate, toDate, searchQ])
 
-  const searchProducts = useCallback((query: string, itemId: string) => {
+  const searchProducts = useCallback((query: string, itemId: string, catId?: string) => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    if (!query.trim()) { setSuggestions([]); return }
+    if (!query.trim() && !catId) { setSuggestions([]); return }
     searchTimerRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/admin/labels/products?q=${encodeURIComponent(query)}&limit=8`, { credentials: 'include' })
+        const params = new URLSearchParams({ limit: '10' })
+        if (query.trim()) params.set('q', query.trim())
+        if (catId) params.set('category_id', catId)
+        const res = await fetch(`/api/admin/labels/products?${params}`, { credentials: 'include' })
         if (!res.ok) return
         const data = await res.json()
         setSuggestions(data.products || [])
         setActiveItemId(itemId)
       } catch { setSuggestions([]) }
-    }, 300)
+    }, 250)
   }, [])
 
-  function applyProduct(itemId: string, p: Suggestion, v?: Suggestion['variants'][0]) {
+  function triggerCategorySearch(itemId: string, catId: string) {
+    setCategoryId(catId)
+    searchProducts('', itemId, catId)
+  }
+
+  function applyProduct(itemId: string, s: Suggestion) {
     setItems(prev => prev.map(it => it.id !== itemId ? it : {
       ...it,
-      product_id: p.id,
-      product_name: p.name,
-      product_sku: v?.sku || p.sku,
-      variant_id: v?.id || null,
-      variant_name: v?.variant_name || '',
-      hsn_code: p.hsn_code || '',
-      gst_rate: String(p.gst_rate ?? 18),
-      unit_price: String(v?.price ?? p.price ?? ''),
+      product_id: s.product_id,
+      product_name: s.variant_name ? `${s.name} — ${s.variant_name}` : s.name,
+      product_sku: s.sku,
+      variant_id: s.variant_id,
+      variant_name: s.variant_name || '',
+      hsn_code: s.hsn_code || '',
+      gst_rate: String(s.gst_percentage ?? 18),
+      unit_price: String(s.base_price ?? ''),
     }))
     setSuggestions([])
     setActiveItemId(null)
+    setSkuInput('')
   }
 
   function updateItem(id: string, field: keyof LineItem, value: string) {
@@ -188,6 +226,8 @@ export default function InvoicesClient() {
     setAddressLine1(''); setAddressLine2(''); setCity(''); setState(''); setPostalCode('')
     setBuyerGstin(''); setPaymentMode('cash'); setNotes('')
     setItems([newItem()]); setCreateError('')
+    setSearchMode('name'); setSkuInput(''); setCategoryId('')
+    setSuggestions([]); setActiveItemId(null)
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -228,93 +268,110 @@ export default function InvoicesClient() {
   }
 
   const subtotal = items.reduce((s, it) => s + calcLine(it), 0)
+  const selectedPayment = PAYMENT_MODES.find(m => m.value === paymentMode)
 
   if (view === 'create') {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">New Offline Invoice</h1>
-            <p className="text-foreground-secondary text-sm mt-1">Walk-in, credit sale, B2B or bulk order</p>
-          </div>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => { resetCreate(); setView('list') }}
-            className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg text-sm text-foreground hover:bg-surface-secondary"
+            className="p-2 text-foreground-secondary hover:text-foreground transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Back to Invoices
           </button>
+          <div>
+            <h1 className="text-xl font-bold text-foreground">New Offline Invoice</h1>
+            <p className="text-foreground-secondary text-xs mt-0.5">Walk-in, credit sale, B2B or bulk order</p>
+          </div>
         </div>
 
-        <form onSubmit={handleCreate} className="space-y-5">
-          <div className="bg-surface-elevated rounded-lg shadow p-4 sm:p-6 space-y-4">
-            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Customer Details</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {createError && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
+            {createError}
+          </div>
+        )}
+
+        <form onSubmit={handleCreate} className="space-y-4">
+
+          {/* Customer Details */}
+          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
+            <h2 className="text-sm font-semibold text-foreground mb-3">Customer Details</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Customer Name <span className="text-red-500">*</span></label>
+                <label className={labelCls}>Customer Name <span className="text-red-500">*</span></label>
                 <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} required
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="Full name" />
+                  className={inputCls} placeholder="Full name" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Phone</label>
+                <label className={labelCls}>Phone</label>
                 <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="+91 XXXXX XXXXX" />
+                  className={inputCls} placeholder="+91 XXXXX XXXXX" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Email</label>
+                <label className={labelCls}>Email</label>
                 <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="customer@example.com" />
+                  className={inputCls} placeholder="customer@example.com" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Buyer GSTIN</label>
+                <label className={labelCls}>Buyer GSTIN</label>
                 <input type="text" value={buyerGstin} onChange={e => setBuyerGstin(e.target.value.toUpperCase())} maxLength={15}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="29XXXXX..." />
+                  className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Address Line 1</label>
+                <label className={labelCls}>Address Line 1</label>
                 <input type="text" value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="Street address" />
+                  className={inputCls} placeholder="Street address" />
               </div>
               <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Address Line 2</label>
+                <label className={labelCls}>Address Line 2</label>
                 <input type="text" value={addressLine2} onChange={e => setAddressLine2(e.target.value)}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="Apt, area, landmark" />
+                  className={inputCls} placeholder="Apt, area, landmark" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">City</label>
-                <input type="text" value={city} onChange={e => setCity(e.target.value)}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                <label className={labelCls}>City</label>
+                <input type="text" value={city} onChange={e => setCity(e.target.value)} className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">State</label>
+                <label className={labelCls}>State</label>
                 <input type="text" value={state} onChange={e => setState(e.target.value)}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="Tamil Nadu" />
+                  className={inputCls} placeholder="Tamil Nadu" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Postal Code</label>
-                <input type="text" value={postalCode} onChange={e => setPostalCode(e.target.value)}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                <label className={labelCls}>Postal Code</label>
+                <input type="text" value={postalCode} onChange={e => setPostalCode(e.target.value)} className={inputCls} />
               </div>
             </div>
           </div>
 
-          <div className="bg-surface-elevated rounded-lg shadow p-4 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Line Items</h2>
+          {/* Line Items */}
+          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-foreground">Line Items</h2>
               <button type="button" onClick={() => setItems(p => [...p, newItem()])}
-                className="flex items-center gap-1 text-sm text-primary font-medium hover:text-primary/80">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                className="flex items-center gap-1 text-xs text-secondary-500 font-semibold hover:text-secondary-600 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
                 Add Item
               </button>
             </div>
 
+            {/* Search Mode Toggle */}
+            <div className="flex gap-1 mb-3 p-1 bg-surface-secondary rounded-lg w-fit">
+              {(['name', 'sku', 'category'] as SearchMode[]).map(m => (
+                <button key={m} type="button" onClick={() => { setSearchMode(m); setSuggestions([]); setSkuInput(''); setCategoryId('') }}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize ${searchMode === m ? 'bg-secondary-500 text-white shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
+                  {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : 'Category'}
+                </button>
+              ))}
+            </div>
+
             <div className="space-y-3">
               {items.map((item, idx) => (
-                <div key={item.id} className="border border-border-default rounded-lg p-4 space-y-3 bg-background">
+                <div key={item.id} className="border border-border-default rounded-lg p-3 space-y-3 bg-surface-primary">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Item {idx + 1}</span>
                     {items.length > 1 && (
@@ -323,43 +380,82 @@ export default function InvoicesClient() {
                     )}
                   </div>
 
+                  {/* Product search input — varies by mode */}
                   <div className="relative">
-                    <label className="block text-xs font-medium text-foreground-secondary mb-1">Product / Description <span className="text-red-500">*</span></label>
-                    <input type="text" value={item.product_name}
-                      onChange={e => { updateItem(item.id, 'product_name', e.target.value); searchProducts(e.target.value, item.id) }}
-                      onFocus={() => item.product_name && searchProducts(item.product_name, item.id)}
-                      onBlur={() => setTimeout(() => setSuggestions([]), 200)}
-                      required
-                      className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      placeholder="Search or type product name" />
+                    {searchMode === 'name' && (
+                      <>
+                        <label className={labelCls}>Product / Description <span className="text-red-500">*</span></label>
+                        <input type="text" value={item.product_name}
+                          onChange={e => { updateItem(item.id, 'product_name', e.target.value); searchProducts(e.target.value, item.id) }}
+                          onFocus={() => item.product_name && searchProducts(item.product_name, item.id)}
+                          onBlur={() => setTimeout(() => { setSuggestions([]); setActiveItemId(null) }, 200)}
+                          required className={inputCls} placeholder="Search by product name..." />
+                      </>
+                    )}
+
+                    {searchMode === 'sku' && (
+                      <>
+                        <label className={labelCls}>Search by SKU</label>
+                        <input type="text" value={activeItemId === item.id ? skuInput : ''}
+                          onChange={e => { setSkuInput(e.target.value); setActiveItemId(item.id); searchProducts(e.target.value, item.id) }}
+                          onFocus={() => { setActiveItemId(item.id) }}
+                          onBlur={() => setTimeout(() => { setSuggestions([]); setActiveItemId(null) }, 200)}
+                          className={inputCls + ' font-mono'} placeholder="e.g. JFS-1234" />
+                        {item.product_name && (
+                          <p className="text-xs text-foreground-secondary mt-1">Selected: <span className="font-medium text-foreground">{item.product_name}</span> <span className="text-foreground-muted">({item.product_sku})</span></p>
+                        )}
+                      </>
+                    )}
+
+                    {searchMode === 'category' && (
+                      <>
+                        <label className={labelCls}>Browse by Category</label>
+                        <select value={categoryId} onChange={e => { triggerCategorySearch(item.id, e.target.value) }}
+                          className={inputCls}>
+                          <option value="">— Select category —</option>
+                          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                        {item.product_name && (
+                          <p className="text-xs text-foreground-secondary mt-1">Selected: <span className="font-medium text-foreground">{item.product_name}</span></p>
+                        )}
+                      </>
+                    )}
+
+                    {/* Shared dropdown for all modes */}
                     {activeItemId === item.id && suggestions.length > 0 && (
-                      <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-surface-elevated border border-border rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                        {suggestions.map(p => (
-                          <div key={p.id}>
-                            {p.variants?.length > 0 ? p.variants.map(v => (
-                              <button key={v.id} type="button" onMouseDown={() => applyProduct(item.id, p, v)}
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-secondary flex items-center justify-between gap-2">
-                                <span><span className="font-medium text-foreground">{p.name}</span><span className="text-foreground-muted ml-1">— {v.variant_name}</span></span>
-                                {v.price && <span className="text-xs text-foreground-muted shrink-0">Rs {v.price}</span>}
-                              </button>
-                            )) : (
-                              <button type="button" onMouseDown={() => applyProduct(item.id, p)}
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-surface-secondary flex items-center justify-between gap-2">
-                                <span><span className="font-medium text-foreground">{p.name}</span><span className="text-foreground-muted text-xs ml-2">{p.sku}</span></span>
-                                {p.price && <span className="text-xs text-foreground-muted shrink-0">Rs {p.price}</span>}
-                              </button>
+                      <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                        {suggestions.map(s => (
+                          <button key={s.id} type="button" onMouseDown={() => applyProduct(item.id, s)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-surface-secondary flex items-center justify-between gap-2">
+                            <span>
+                              <span className="font-medium text-foreground">{s.name}</span>
+                              {s.variant_name && <span className="text-foreground-muted ml-1">— {s.variant_name}</span>}
+                              <span className="text-foreground-muted text-xs ml-2 font-mono">{s.sku}</span>
+                            </span>
+                            {s.base_price != null && (
+                              <span className="text-xs text-foreground-muted shrink-0">₹{s.base_price}</span>
                             )}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* Manual description if name mode but no product selected from list */}
+                  {searchMode !== 'name' && (
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">HSN Code</label>
+                      <label className={labelCls}>Description on Invoice <span className="text-red-500">*</span></label>
+                      <input type="text" value={item.product_name}
+                        onChange={e => updateItem(item.id, 'product_name', e.target.value)} required
+                        className={inputCls} placeholder="Product name as it appears on invoice" />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <label className={labelCls}>HSN Code</label>
                       <input type="text" value={item.hsn_code} onChange={e => updateItem(item.id, 'hsn_code', e.target.value)}
-                        className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="9999" />
+                        className={inputCls} placeholder="9999" />
                     </div>
                     <div>
                       <AdminSelect
@@ -374,71 +470,70 @@ export default function InvoicesClient() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Quantity <span className="text-red-500">*</span></label>
-                      <input type="number" min="0.001" step="any" value={item.quantity} onChange={e => updateItem(item.id, 'quantity', e.target.value)} required
-                        className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                      <label className={labelCls}>Quantity <span className="text-red-500">*</span></label>
+                      <input type="number" min="0.001" step="any" value={item.quantity}
+                        onChange={e => updateItem(item.id, 'quantity', e.target.value)} required className={inputCls} />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Unit Price (incl. GST) <span className="text-red-500">*</span></label>
-                      <input type="number" min="0" step="0.01" value={item.unit_price} onChange={e => updateItem(item.id, 'unit_price', e.target.value)} required
-                        className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-surface-elevated text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="0.00" />
+                      <label className={labelCls}>Unit Price (incl. GST) <span className="text-red-500">*</span></label>
+                      <input type="number" min="0" step="0.01" value={item.unit_price}
+                        onChange={e => updateItem(item.id, 'unit_price', e.target.value)} required
+                        className={inputCls} placeholder="0.00" />
                     </div>
                   </div>
+
                   {item.unit_price && (
-                    <p className="text-xs text-foreground-secondary text-right">Line total: <span className="font-semibold text-foreground">Rs {fmt(calcLine(item))}</span></p>
+                    <p className="text-xs text-foreground-secondary text-right">
+                      Line total: <span className="font-semibold text-foreground">₹{fmt(calcLine(item))}</span>
+                    </p>
                   )}
                 </div>
               ))}
             </div>
 
-            <div className="flex justify-end border-t border-border pt-3">
+            <div className="flex justify-end border-t border-border-default pt-3 mt-1">
               <div className="text-right">
                 <p className="text-xs text-foreground-secondary">Total (incl. GST)</p>
-                <p className="text-xl font-bold text-foreground">Rs {fmt(subtotal)}</p>
+                <p className="text-xl font-bold text-foreground">₹{fmt(subtotal)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-surface-elevated rounded-lg shadow p-4 sm:p-6">
-            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide mb-4">Payment & Notes</h2>
+          {/* Payment & Notes */}
+          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
+            <h2 className="text-sm font-semibold text-foreground mb-3">Payment &amp; Notes</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-2">Payment Mode</label>
-                <div className="flex gap-4">
-                  {(['cash', 'upi', 'credit'] as const).map(mode => (
-                    <label key={mode} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="paymentMode" value={mode} checked={paymentMode === mode}
-                        onChange={() => setPaymentMode(mode)} className="accent-primary" />
-                      <span className="text-sm text-foreground capitalize">{mode}</span>
+                <label className={labelCls}>Payment Mode</label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  {PAYMENT_MODES.map(m => (
+                    <label key={m.value}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${paymentMode === m.value ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-600 dark:text-secondary-300' : 'border-border-default bg-surface-secondary text-foreground-secondary hover:border-secondary-400'}`}>
+                      <input type="radio" name="paymentMode" value={m.value} checked={paymentMode === m.value}
+                        onChange={() => setPaymentMode(m.value)} className="accent-secondary-500 shrink-0" />
+                      <span className="text-sm font-medium">{m.label}</span>
                     </label>
                   ))}
                 </div>
-                {paymentMode === 'credit' && (
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Payment status will be Unpaid — credit sale</p>
+                {!selectedPayment?.paid && (
+                  <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">Payment status will be <strong>Unpaid</strong> — credit sale</p>
                 )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Notes</label>
-                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="Any additional notes..." />
+                <label className={labelCls}>Notes</label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                  className={inputCls + ' resize-none'} placeholder="Any additional notes..." />
               </div>
             </div>
           </div>
 
-          {createError && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
-              {createError}
-            </div>
-          )}
-
           <div className="flex gap-3 pb-6">
             <button type="submit" disabled={submitting}
-              className="px-6 py-2.5 bg-primary text-white rounded-lg text-sm font-semibold disabled:opacity-50 hover:bg-primary/90 transition-colors">
-              {submitting ? 'Creating...' : 'Create Invoice'}
+              className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
+              {submitting ? 'Creating…' : 'Create Invoice'}
             </button>
             <button type="button" onClick={() => { resetCreate(); setView('list') }}
-              className="px-6 py-2.5 bg-surface border border-border rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
+              className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
               Cancel
             </button>
           </div>
@@ -448,14 +543,14 @@ export default function InvoicesClient() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">Invoices</h1>
-          <p className="text-foreground-secondary text-sm mt-1">All online and offline invoices</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Invoices</h1>
+          <p className="text-foreground-secondary mt-1 text-sm">All online and offline invoices</p>
         </div>
         <button onClick={() => setView('create')}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors">
+          className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -463,20 +558,27 @@ export default function InvoicesClient() {
         </button>
       </div>
 
-      <div className="bg-surface-elevated rounded-lg shadow p-4 space-y-3">
-        <div className="flex flex-wrap gap-3">
-          <input type="text" value={searchInput} onChange={e => setSearchInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && setSearchQ(searchInput)}
-            placeholder="Search invoice, order, customer..."
-            className="flex-1 min-w-48 border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+      {/* Filters */}
+      <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
+        <div className="flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-48">
+            <input type="text" value={searchInput} onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && setSearchQ(searchInput)}
+              placeholder="Search invoice, order, customer…"
+              className={inputCls} />
+          </div>
           <button onClick={() => setSearchQ(searchInput)}
-            className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium">Search</button>
+            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors">
+            Search
+          </button>
           {(searchQ || sourceFilter || paymentFilter || fromDate || toDate) && (
             <button onClick={() => { setSearchQ(''); setSearchInput(''); setSourceFilter(''); setPaymentFilter(''); setFromDate(''); setToDate('') }}
-              className="px-4 py-2 border border-border rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary">Clear</button>
+              className="px-4 py-1.5 border border-border-default rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
+              Clear
+            </button>
           )}
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 items-center">
           <AdminSelect value={sourceFilter} onChange={setSourceFilter} placeholder="All Sources"
             options={[{ value: 'online', label: 'Online' }, { value: 'offline', label: 'Offline' }]} />
           <AdminSelect value={paymentFilter} onChange={setPaymentFilter} placeholder="All Payments"
@@ -486,37 +588,39 @@ export default function InvoicesClient() {
             ]} />
           <div className="flex items-center gap-2">
             <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-              className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground" />
-            <span className="text-foreground-secondary text-sm">to</span>
+              className={inputCls + ' w-36'} />
+            <span className="text-foreground-secondary text-xs">to</span>
             <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-              className="border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground" />
+              className={inputCls + ' w-36'} />
           </div>
         </div>
       </div>
 
-      <div className="bg-surface-elevated rounded-lg shadow overflow-hidden">
+      {/* Table */}
+      <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-foreground-muted text-sm">Loading invoices...</div>
+          <div className="p-12 text-center text-foreground-muted text-sm">Loading invoices…</div>
         ) : invoices.length === 0 ? (
           <div className="p-12 text-center text-foreground-muted text-sm">No invoices found.</div>
         ) : (
           <>
+            {/* Desktop table */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm divide-y divide-border-default">
-                <thead className="bg-surface-secondary">
-                  <tr>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border-default bg-surface-secondary">
                     {['Invoice No', 'Date', 'Customer', 'Source', 'Amount', 'Payment', 'IRN', 'Actions'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">{h}</th>
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border-default">
+                <tbody>
                   {invoices.map(inv => (
-                    <tr key={inv.id} className="hover:bg-surface-secondary">
-                      <td className="px-4 py-3 font-medium text-foreground">{inv.invoice_number}</td>
-                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{fmtDate(inv.invoice_date)}</td>
+                    <tr key={inv.id} className="border-b border-border-default hover:bg-surface-primary transition-colors">
+                      <td className="px-4 py-3 font-mono font-semibold text-foreground text-sm">{inv.invoice_number}</td>
+                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-sm">{fmtDate(inv.invoice_date)}</td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-foreground">{inv.customer_name}</div>
+                        <div className="font-medium text-foreground text-sm">{inv.customer_name}</div>
                         {inv.buyer_gstin && <div className="text-xs text-foreground-muted font-mono">{inv.buyer_gstin}</div>}
                       </td>
                       <td className="px-4 py-3">
@@ -524,8 +628,8 @@ export default function InvoicesClient() {
                           {inv.source === 'offline' ? 'Offline' : 'Online'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
-                        Rs {parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap text-sm">
+                        ₹{parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[inv.payment_status] || ''}`}>
@@ -535,16 +639,16 @@ export default function InvoicesClient() {
                       <td className="px-4 py-3">
                         {inv.irn ? (
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
-                            {inv.irn_status === 'generated' ? 'IRN Generated' : 'Stub'}
+                            {inv.irn_status === 'generated' ? 'IRN ✓' : 'Stub'}
                           </span>
                         ) : (
                           <span className="text-xs text-foreground-muted">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
-                            className="text-xs text-primary hover:underline font-medium">PDF</a>
+                            className="text-xs text-secondary-500 hover:underline font-medium">PDF</a>
                           <a href={`/admin/orders/${inv.id}`}
                             className="text-xs text-foreground-secondary hover:text-foreground">Order</a>
                         </div>
@@ -555,11 +659,12 @@ export default function InvoicesClient() {
               </table>
             </div>
 
+            {/* Mobile cards */}
             <div className="md:hidden divide-y divide-border-default">
               {invoices.map(inv => (
                 <div key={inv.id} className="p-4 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-foreground text-sm">{inv.invoice_number}</span>
+                    <span className="font-mono font-semibold text-foreground text-sm">{inv.invoice_number}</span>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
                       {inv.source === 'offline' ? 'Offline' : 'Online'}
                     </span>
@@ -567,7 +672,7 @@ export default function InvoicesClient() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-foreground">{inv.customer_name}</span>
                     <span className="font-semibold text-foreground text-sm">
-                      Rs {parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹{parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -576,9 +681,9 @@ export default function InvoicesClient() {
                       {inv.payment_status}
                     </span>
                   </div>
-                  <div className="flex gap-3 pt-1">
+                  <div className="flex gap-4 pt-1">
                     <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
-                      className="text-xs text-primary font-medium hover:underline">Download PDF</a>
+                      className="text-xs text-secondary-500 font-medium hover:underline">Download PDF</a>
                     <a href={`/admin/orders/${inv.id}`} className="text-xs text-foreground-secondary hover:text-foreground">View Order</a>
                   </div>
                 </div>
@@ -590,9 +695,9 @@ export default function InvoicesClient() {
                 <p className="text-xs text-foreground-muted">Page {page} of {totalPages} — {total} invoices</p>
                 <div className="flex gap-2">
                   <button disabled={page <= 1} onClick={() => fetchInvoices(page - 1)}
-                    className="px-3 py-1.5 border border-border rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary">Prev</button>
+                    className="px-3 py-1.5 border border-border-default rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary transition-colors">Prev</button>
                   <button disabled={page >= totalPages} onClick={() => fetchInvoices(page + 1)}
-                    className="px-3 py-1.5 border border-border rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary">Next</button>
+                    className="px-3 py-1.5 border border-border-default rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary transition-colors">Next</button>
                 </div>
               </div>
             )}
