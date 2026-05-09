@@ -492,16 +492,22 @@ export default function InvoicesClient() {
                     </div>
                     <div>
                       <label className={labelCls}>GST %</label>
-                      <AdminSelect
-                        value={item.gst_rate}
-                        onChange={v => updateItem(item.id, 'gst_rate', v)}
-                        className="[&_button]:py-1.5 [&_button]:px-2 [&_button]:text-sm [&_button]:rounded [&_button]:border-border-default"
-                        options={[
-                          { value: '0', label: '0%' }, { value: '5', label: '5%' },
-                          { value: '12', label: '12%' }, { value: '18', label: '18%' },
-                          { value: '28', label: '28%' },
-                        ]}
-                      />
+                      {searchMode === 'name' ? (
+                        <AdminSelect
+                          value={item.gst_rate}
+                          onChange={v => updateItem(item.id, 'gst_rate', v)}
+                          className="[&_button]:py-1.5 [&_button]:px-2 [&_button]:text-sm [&_button]:rounded [&_button]:border-border-default"
+                          options={[
+                            { value: '0', label: '0%' }, { value: '5', label: '5%' },
+                            { value: '12', label: '12%' }, { value: '18', label: '18%' },
+                            { value: '28', label: '28%' },
+                          ]}
+                        />
+                      ) : (
+                        <div className={inputCls + ' bg-surface-primary text-foreground-muted cursor-not-allowed select-none'}>
+                          {item.gst_rate}%
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className={labelCls}>Quantity <span className="text-red-500">*</span></label>
