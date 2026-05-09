@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
           orderIsIgst,
           buyerGstin || null,
           paymentMode === 'credit' ? 'unpaid' : 'paid',
-          addressId, addressId,
+          addressId,
           notes || null,
         ]
       )
