@@ -95,7 +95,7 @@ function SortableRow({
               {category.name}
             </div>
             {category.description && (
-              <div className="text-xs text-foreground-muted">{category.description}</div>
+              <div className="text-xs text-foreground-muted max-w-xs truncate">{category.description}</div>
             )}
           </div>
           {!isSubcat && subCount !== undefined && subCount > 0 && (
@@ -236,6 +236,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
       >
         <SortableContext items={flatOrder.map(c => c.id)} strategy={verticalListSortingStrategy}>
           <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border-default">
               <thead className="bg-surface-secondary">
                 <tr>
@@ -280,6 +281,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </SortableContext>
 
