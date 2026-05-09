@@ -42,6 +42,13 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     group: 'Operations',
   },
   {
+    key: 'invoices',
+    label: 'Invoices',
+    description: 'View all invoices, create offline invoices',
+    routes: ['/admin/invoices', '/admin/orders/new'],
+    group: 'Operations',
+  },
+  {
     key: 'packing_slips',
     label: 'Packing Slips',
     description: 'Download and print packing slips',
@@ -134,6 +141,8 @@ export function getScopeForPath(pathname: string): string | null {
 
   if (pathname.startsWith('/api/admin/labels')) return 'labels'
   if (pathname.startsWith('/api/admin/quotations')) return 'quotations'
+  if (pathname.startsWith('/api/admin/invoices')) return 'invoices'
+  if (pathname.startsWith('/api/admin/orders/create')) return 'invoices'
   if (pathname.startsWith('/api/admin/users')) return 'settings'
   if (pathname.startsWith('/api/admin/certificates')) return 'settings'
   if (pathname.startsWith('/api/admin/reviews')) return 'reviews'
