@@ -16,10 +16,8 @@ interface GoogleAccountsId {
   prompt(): void
 }
 
-interface Window {
-  google?: {
-    accounts: {
-      id: GoogleAccountsId
-    }
+interface GoogleIdentityServices {
+  accounts: {
+    id: GoogleAccountsId
   }
 }

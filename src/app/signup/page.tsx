@@ -45,11 +45,12 @@ function SignupPage() {
     script.async = true
     script.defer = true
     script.onload = () => {
-      window.google?.accounts.id.initialize({
+      const gsi = (window as any).google as GoogleIdentityServices | undefined
+      gsi?.accounts.id.initialize({
         client_id: clientId,
         callback: handleGoogleCredential,
       })
-      window.google?.accounts.id.renderButton(
+      gsi?.accounts.id.renderButton(
         document.getElementById('google-signup-btn')!,
         { type: 'standard', theme: 'outline', size: 'large', width: '100%', text: 'signup_with' }
       )
