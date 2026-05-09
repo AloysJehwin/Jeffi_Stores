@@ -15,6 +15,7 @@ interface AuthContextType {
   user: User | null
   isLoading: boolean
   login: (email: string, otp: string) => Promise<void>
+  googleLogin: (idToken: string) => Promise<void>
   signup: (data: SignupData) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -43,8 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null)
       }
-    } catch (error) {
-      console.error('Failed to fetch user:', error)
+    } catch {
       setUser(null)
     } finally {
       setIsLoading(false)
@@ -61,12 +61,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, otp }),
     })
-
     if (!response.ok) {
       const data = await response.json()
       throw new Error(data.error || 'Login failed')
     }
+    const data = await response.json()
+    setUser(data.user)
+  }
 
+  const googleLogin = async (idToken: string) => {
+    const response = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    })
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Google login failed')
+    }
     const data = await response.json()
     setUser(data.user)
   }
@@ -77,12 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(signupData),
     })
-
     if (!response.ok) {
       const data = await response.json()
       throw new Error(data.error || 'Signup failed')
     }
-
     const data = await response.json()
     setUser(data.user)
   }
@@ -102,14 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        login,
-        signup,
-        logout,
-        refreshUser,
-      }}
+      value={{ user, isLoading, login, googleLogin, signup, logout, refreshUser }}
     >
       {children}
     </AuthContext.Provider>
