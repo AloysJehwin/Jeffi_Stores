@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { getFilteredProducts, getCategoriesWithProducts, getBrandsWithProducts } from '@/lib/queries'
+import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
@@ -21,8 +21,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
       page,
       limit: PAGE_SIZE,
     }),
-    getCategoriesWithProducts(),
-    getBrandsWithProducts(),
+    getAllCategories(),
+    getAllBrands(),
     getFilteredProducts({}),
   ])
 
