@@ -90,7 +90,7 @@ function fmtDate(s: string) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 disabled:opacity-60 disabled:cursor-not-allowed'
+const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400 disabled:opacity-60 disabled:cursor-not-allowed'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
 const PAYMENT_COLORS: Record<string, string> = {
@@ -383,7 +383,7 @@ export default function InvoicesClient() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-foreground">Line Items</h2>
               <button type="button" onClick={() => setItems(p => [...p, newItem()])}
-                className="flex items-center gap-1 text-xs text-secondary-500 font-semibold hover:text-secondary-600 transition-colors">
+                className="flex items-center gap-1 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
@@ -395,7 +395,7 @@ export default function InvoicesClient() {
             <div className="flex gap-1 mb-3 p-1 bg-surface-secondary rounded-lg w-fit">
               {(['name', 'sku', 'category'] as SearchMode[]).map(m => (
                 <button key={m} type="button" onClick={() => { setSearchMode(m); setSuggestions([]); setSkuInput(''); setCategoryId('') }}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize ${searchMode === m ? 'bg-secondary-500 text-white shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize ${searchMode === m ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900 shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
                   {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : 'Category'}
                 </button>
               ))}
@@ -403,7 +403,7 @@ export default function InvoicesClient() {
 
             <div className="space-y-3">
               {items.map((item, idx) => (
-                <div key={item.id} className="border border-border-default rounded-lg p-3 space-y-3 bg-surface-primary">
+                <div key={item.id} className="border border-border-default rounded-lg p-3 space-y-3 bg-surface-elevated">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Item {idx + 1}</span>
                     {items.length > 1 && (
@@ -454,7 +454,7 @@ export default function InvoicesClient() {
                           <button type="button"
                             disabled={!categoryId}
                             onClick={() => openPicker(item.id, categoryId)}
-                            className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap">
+                            className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap">
                             Select Product
                           </button>
                         </div>
@@ -504,7 +504,7 @@ export default function InvoicesClient() {
                           ]}
                         />
                       ) : (
-                        <div className={inputCls + ' bg-surface-primary text-foreground-muted cursor-not-allowed select-none'}>
+                        <div className={inputCls + ' bg-surface-elevated text-foreground-muted cursor-not-allowed select-none'}>
                           {item.gst_rate}%
                         </div>
                       )}
@@ -548,7 +548,7 @@ export default function InvoicesClient() {
                 <div className="grid grid-cols-2 gap-2 mt-1">
                   {PAYMENT_MODES.map(m => (
                     <label key={m.value}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${paymentMode === m.value ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-600 dark:text-secondary-300' : 'border-border-default bg-surface-secondary text-foreground-secondary hover:border-secondary-400'}`}>
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${paymentMode === m.value ? 'border-secondary-500 dark:border-secondary-400 bg-secondary-50 dark:bg-secondary-700/30 text-secondary-700 dark:text-secondary-200' : 'border-border-default bg-surface-secondary text-foreground-secondary hover:border-secondary-400 dark:hover:border-secondary-500'}`}>
                       <input type="radio" name="paymentMode" value={m.value} checked={paymentMode === m.value}
                         onChange={() => setPaymentMode(m.value)} className="accent-secondary-500 shrink-0" />
                       <span className="text-sm font-medium">{m.label}</span>
@@ -569,7 +569,7 @@ export default function InvoicesClient() {
 
           <div className="flex gap-3 pb-6">
             <button type="submit" disabled={submitting}
-              className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
+              className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
               {submitting ? 'Creating…' : 'Create Invoice'}
             </button>
             <button type="button" onClick={() => { resetCreate(); setView('list') }}
@@ -656,7 +656,7 @@ export default function InvoicesClient() {
           <p className="text-foreground-secondary mt-1 text-sm">All online and offline invoices</p>
         </div>
         <button onClick={() => setView('create')}
-          className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-colors">
+          className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -674,7 +674,7 @@ export default function InvoicesClient() {
               className={inputCls} />
           </div>
           <button onClick={() => setSearchQ(searchInput)}
-            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors">
+            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-medium transition-colors">
             Search
           </button>
           {(searchQ || sourceFilter || paymentFilter || fromDate || toDate) && (
@@ -722,7 +722,7 @@ export default function InvoicesClient() {
                 </thead>
                 <tbody>
                   {invoices.map(inv => (
-                    <tr key={inv.id} className="border-b border-border-default hover:bg-surface-primary transition-colors">
+                    <tr key={inv.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors">
                       <td className="px-4 py-3 font-mono font-semibold text-foreground text-sm">{inv.invoice_number}</td>
                       <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-sm">{fmtDate(inv.invoice_date)}</td>
                       <td className="px-4 py-3">
@@ -754,7 +754,7 @@ export default function InvoicesClient() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
-                            className="text-xs text-secondary-500 hover:underline font-medium">PDF</a>
+                            className="text-xs text-secondary-500 dark:text-secondary-300 hover:underline font-medium">PDF</a>
                           <a href={`/admin/orders/${inv.id}`}
                             className="text-xs text-foreground-secondary hover:text-foreground">Order</a>
                         </div>
@@ -789,7 +789,7 @@ export default function InvoicesClient() {
                   </div>
                   <div className="flex gap-4 pt-1">
                     <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
-                      className="text-xs text-secondary-500 font-medium hover:underline">Download PDF</a>
+                      className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline">Download PDF</a>
                     <a href={`/admin/orders/${inv.id}`} className="text-xs text-foreground-secondary hover:text-foreground">View Order</a>
                   </div>
                 </div>
