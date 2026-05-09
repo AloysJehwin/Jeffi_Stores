@@ -132,6 +132,7 @@ export default function InvoicesClient() {
   const [buyerGstin, setBuyerGstin] = useState('')
   const [paymentMode, setPaymentMode] = useState('cash')
   const [notes, setNotes] = useState('')
+  const [creditWarning, setCreditWarning] = useState<{ outstanding: number; creditLimit: number } | null>(null)
   const [items, setItems] = useState<LineItem[]>([newItem()])
   const [submitting, setSubmitting] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -340,6 +341,16 @@ export default function InvoicesClient() {
               <div>
                 <label className={labelCls}>Phone</label>
                 <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+                  onBlur={async () => {
+                    if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
+                    const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
+                    const json = await res.json()
+                    if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
+                      setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
+                    } else {
+                      setCreditWarning(null)
+                    }
+                  }}
                   className={inputCls} placeholder="+91 XXXXX XXXXX" />
               </div>
               <div>
@@ -557,6 +568,13 @@ export default function InvoicesClient() {
                 </div>
                 {!selectedPayment?.paid && (
                   <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">Payment status will be <strong>Unpaid</strong> — credit sale</p>
+                )}
+                {paymentMode === 'credit' && creditWarning && (
+                  <div className="mt-2 px-3 py-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-xs text-yellow-700 dark:text-yellow-300">
+                    ⚠ {creditWarning.creditLimit > 0
+                      ? `Credit limit warning: ₹${creditWarning.outstanding.toLocaleString('en-IN')} outstanding of ₹${creditWarning.creditLimit.toLocaleString('en-IN')} limit`
+                      : `₹${creditWarning.outstanding.toLocaleString('en-IN')} already outstanding for this customer`}
+                  </div>
                 )}
               </div>
               <div>

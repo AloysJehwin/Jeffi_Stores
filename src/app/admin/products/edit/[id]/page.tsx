@@ -18,6 +18,7 @@ async function updateProduct(productId: string, formData: FormData) {
   const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
   const salePrice = formData.get('sale_price') ? Math.round(parseFloat(formData.get('sale_price') as string) * 100) / 100 : null
   const wholesalePrice = formData.get('wholesale_price') ? Math.round(parseFloat(formData.get('wholesale_price') as string) * 100) / 100 : null
+  const costPrice = formData.get('cost_price') ? Math.round(parseFloat(formData.get('cost_price') as string) * 100) / 100 : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
   const mpn = formData.get('mpn') as string || null
@@ -58,8 +59,8 @@ async function updateProduct(productId: string, formData: FormData) {
         dimensions = $17, is_active = $18, is_featured = $19, has_variants = $20, variant_type = $21,
         weight_rate = $22, weight_unit = $23, length_rate = $24, length_unit = $25,
         weight_grams = $26, package_type = $27, length_cm = $28, breadth_cm = $29, height_cm = $30,
-        updated_at = $31
-      WHERE id = $32`,
+        cost_price = $31, updated_at = $32
+      WHERE id = $33`,
       [
         name, slug, description, categoryId,
         brandId || null, basePrice, mrp, salePrice, wholesalePrice,
@@ -68,6 +69,7 @@ async function updateProduct(productId: string, formData: FormData) {
         dimensions, isActive, isFeatured, hasVariants, variantType,
         weightRate, weightUnit, lengthRate, lengthUnit,
         weightGrams, packageType, lengthCm, breadthCm, heightCm,
+        costPrice,
         new Date().toISOString(),
         productId,
       ]

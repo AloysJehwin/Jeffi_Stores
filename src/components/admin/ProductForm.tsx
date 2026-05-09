@@ -150,6 +150,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [gstRate, setGstRate] = useState<number>(product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18)
 
   const [basePrice, setBasePrice] = useState(product?.base_price != null ? String(product.base_price) : '')
+  const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '')
   const [mrp, setMrp] = useState(product?.mrp != null ? String(product.mrp) : '')
   const [salePrice, setSalePrice] = useState(product?.sale_price != null ? String(product.sale_price) : '')
   const [wholesalePrice, setWholesalePrice] = useState(product?.wholesale_price != null ? String(product.wholesale_price) : '')
@@ -383,6 +384,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         formData.set('sale_price', toInclusive(salePrice, gstRate, gstMode))
         formData.set('wholesale_price', toInclusive(wholesalePrice, gstRate, gstMode))
       }
+      formData.set('cost_price', costPrice || '0')
 
       if (hasVariants) {
         formData.set('variant_type', variantType)
@@ -590,6 +592,24 @@ export default function ProductForm({ categories, brands, action, product, produ
               }
             </div>
           )}
+
+          <div>
+            <label htmlFor="cost_price" className="block text-sm font-medium text-foreground-secondary mb-2">
+              Cost Price (Rs.)
+            </label>
+            <input
+              type="number"
+              id="cost_price"
+              name="cost_price"
+              step="0.01"
+              min="0"
+              value={costPrice}
+              onChange={e => setCostPrice(e.target.value)}
+              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              placeholder="Your purchase / landed cost"
+            />
+            <p className="text-xs text-foreground-muted mt-1">Used for P&amp;L gross margin — not shown to customers</p>
+          </div>
 
           {/* GST Rate + Entry Mode */}
           <div className="md:col-span-2">

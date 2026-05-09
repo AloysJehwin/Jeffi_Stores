@@ -17,6 +17,7 @@ async function createProduct(formData: FormData) {
   const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
   const salePrice = formData.get('sale_price') ? Math.round(parseFloat(formData.get('sale_price') as string) * 100) / 100 : null
   const wholesalePrice = formData.get('wholesale_price') ? Math.round(parseFloat(formData.get('wholesale_price') as string) * 100) / 100 : null
+  const costPrice = formData.get('cost_price') ? Math.round(parseFloat(formData.get('cost_price') as string) * 100) / 100 : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
   const mpn = formData.get('mpn') as string || null
@@ -59,15 +60,15 @@ async function createProduct(formData: FormData) {
         base_price, mrp, sale_price, wholesale_price, gst_percentage, hsn_code, mpn, gtin,
         stock_quantity, low_stock_threshold, weight, dimensions, is_active, is_featured,
         has_variants, variant_type, weight_rate, weight_unit, length_rate, length_unit,
-        weight_grams, package_type, length_cm, breadth_cm, height_cm
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
+        weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
       RETURNING *`,
       [
         name, slug, sku, description, categoryId, brandId || null,
         basePrice, mrp, salePrice, wholesalePrice, gstPercentage, hsnCode, mpn, gtin,
         stockQuantity, lowStockThreshold, weight, dimensions, isActive, isFeatured,
         hasVariants, variantType, weightRate, weightUnit, lengthRate, lengthUnit,
-        weightGrams, packageType, lengthCm, breadthCm, heightCm,
+        weightGrams, packageType, lengthCm, breadthCm, heightCm, costPrice,
       ]
     )
 
