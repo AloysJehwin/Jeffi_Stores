@@ -37,6 +37,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
       } else {
         params.delete(name)
       }
+      params.delete('page')
       return params.toString()
     },
     [searchParams]
