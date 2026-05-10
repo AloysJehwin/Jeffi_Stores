@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
           $1, $2, $3, $4,
           $5, $6, $7, 0, 0,
           $8, $9, $10, $11, $12,
-          $13, $14, 'confirmed', 'offline',
+          $13, $14, 'delivered', 'offline',
           $15, $15,
           $16
         ) RETURNING id, order_number`,
