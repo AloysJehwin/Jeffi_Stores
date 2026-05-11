@@ -1,6 +1,9 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  experimental: {
+    instrumentationHook: true,
+  },
   serverExternalPackages: ['pdfkit'],
   images: {
     remotePatterns: [
