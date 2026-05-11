@@ -273,6 +273,20 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           )}
 
+          {isReturnStatus && returnRequest?.rvp_awb_number && (
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default flex items-center gap-2">
+              <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+              <h2 className="text-lg font-semibold text-foreground">Return Shipment Tracking</h2>
+            </div>
+            <div className="p-4 sm:p-6">
+              <DelhiveryTracking orderId={order.id} apiBase="/api/admin/orders" variant="admin" trackPath="track-rvp" />
+            </div>
+          </div>
+          )}
+
           {(order.status === 'cancelled' || order.status === 'returned') && order.payment_status === 'paid' && returnRequest?.type !== 'replacement' && (
             <InitiateRefundButton
               orderId={order.id}

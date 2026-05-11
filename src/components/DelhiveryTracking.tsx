@@ -228,10 +228,12 @@ export default function DelhiveryTracking({
   orderId,
   apiBase = '/api/orders',
   variant = 'default',
+  trackPath = 'track',
 }: {
   orderId: string
   apiBase?: string
   variant?: 'default' | 'admin'
+  trackPath?: string
 }) {
   const [tracking, setTracking] = useState<TrackingData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -240,7 +242,7 @@ export default function DelhiveryTracking({
   const [statusSynced, setStatusSynced] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`${apiBase}/${orderId}/track`)
+    fetch(`${apiBase}/${orderId}/${trackPath}`)
       .then(r => r.json())
       .then(d => {
         if (d.error) setError(d.error)
