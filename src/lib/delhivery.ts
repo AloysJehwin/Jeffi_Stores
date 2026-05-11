@@ -64,8 +64,9 @@ export async function createRVPShipment(params: {
       country: 'India',
       phone,
       order: `RVP-${invoiceRef}`,
-      payment_mode: 'Prepaid',
+      payment_mode: 'Pickup',
       order_type: 'reverse',
+      return_name: SELLER_NAME,
       return_pin: ORIGIN_PIN,
       return_city: 'Raipur',
       return_phone: SELLER_PHONE,
@@ -88,6 +89,7 @@ export async function createRVPShipment(params: {
       weight: String(weightKg),
       qc_type: 'non_param',
     }],
+    pickup_location: { name: PICKUP_LOCATION },
   }
 
   const formData = new URLSearchParams()
