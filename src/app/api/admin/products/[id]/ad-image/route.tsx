@@ -60,7 +60,8 @@ export async function GET(
     ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100)
     : null
 
-  const productUrl   = `jeffistores.in/products/${product.slug}`
+  const maxSlugLen   = 32
+  const shortSlug    = product.slug.length > maxSlugLen ? product.slug.slice(0, maxSlugLen) + '…' : product.slug
   const shortName    = product.name.length > 50 ? product.name.slice(0, 48) + '…' : product.name
   const nameFontSize = shortName.length > 40 ? 64 : shortName.length > 25 ? 76 : 92
 
@@ -132,20 +133,20 @@ export async function GET(
           {/* Bottom: URL + branding */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div style={{ height: 3, backgroundColor: '#7cb900', opacity: 0.4, borderRadius: 2, display: 'flex' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontSize: 36, color: '#7cb900', textTransform: 'uppercase', letterSpacing: 4, fontFamily, display: 'flex' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 40 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 34, color: '#7cb900', textTransform: 'uppercase', letterSpacing: 4, fontFamily, display: 'flex' }}>
                   Shop Now
                 </div>
-                <div style={{ fontSize: 36, color: '#888', fontFamily, display: 'flex' }}>
-                  {productUrl}
+                <div style={{ fontSize: 28, color: '#888', fontFamily, display: 'flex', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                  jeffistores.in/products/{shortSlug}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                <div style={{ fontSize: 60, fontWeight: 900, color: '#f59e0b', fontFamily, display: 'flex' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                <div style={{ fontSize: 56, fontWeight: 900, color: '#f59e0b', fontFamily, display: 'flex' }}>
                   Jeffi Stores
                 </div>
-                <div style={{ fontSize: 32, color: '#555', fontFamily, display: 'flex' }}>
+                <div style={{ fontSize: 30, color: '#555', fontFamily, display: 'flex' }}>
                   jeffistores.in
                 </div>
               </div>
