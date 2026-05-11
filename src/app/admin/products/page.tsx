@@ -5,6 +5,7 @@ import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
+import DownloadAdButton from '@/components/admin/DownloadAdButton'
 
 const PAGE_SIZE = 25
 
@@ -147,6 +148,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                   <div className="flex items-center gap-3">
                     <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
                     <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 font-medium">Edit</Link>
+                    <DownloadAdButton productId={product.id} productName={product.name} />
                     <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
                   </div>
                 </div>
@@ -234,6 +236,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                       <div className="flex items-center justify-end gap-3">
                         <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
                         <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 hover:text-accent-600">Edit</Link>
+                        <DownloadAdButton productId={product.id} productName={product.name} />
                         <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
                       </div>
                     </td>
