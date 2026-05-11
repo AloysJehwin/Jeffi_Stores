@@ -65,7 +65,7 @@ export async function createRVPShipment(params: {
   const customQc = [{
     description: productDesc,
     images: [],
-    quantity,
+    quantity: 1,
     questions: QC_QUESTIONS.map(q => ({
       questions_id: q.questions_id,
       options: q.type === 'multi' ? q.options.map(o => ({ value: [o] })) : [],
