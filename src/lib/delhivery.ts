@@ -88,7 +88,6 @@ export async function createRVPShipment(params: {
       weight: String(weightKg),
       qc_type: 'non_param',
     }],
-    pickup_location: { name: PICKUP_LOCATION },
   }
 
   const formData = new URLSearchParams()
