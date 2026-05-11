@@ -88,19 +88,26 @@ export async function POST(request: NextRequest) {
         const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
         let statusType = rawType
         if (EXCEPTION_TYPES.has(rawType)) {
-          const scans: any[] = shipment.Scans ?? []
-          for (let i = scans.length - 1; i >= 0; i--) {
-            const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
-            if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
-            const activity = (scans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
-            if (activity.includes('out for delivery')) { statusType = 'OD'; break }
-            if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
-            if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
-            if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
-            if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
-            if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
-            if (activity.includes('picked up') || activity.includes('shipment picked')) { statusType = 'PU'; break }
-            if (activity.includes('delivered')) { statusType = 'DL'; break }
+          const topStatus = (shipment.Status?.Status ?? '').toLowerCase()
+          if (topStatus === 'delivered') {
+            statusType = 'DL'
+          } else if (topStatus === 'out for delivery') {
+            statusType = 'OD'
+          } else {
+            const scans: any[] = shipment.Scans ?? []
+            for (let i = scans.length - 1; i >= 0; i--) {
+              const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
+              if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
+              const activity = (scans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
+              if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
+              if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
+              if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
+              if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
+              if (activity.includes('out for delivery')) { statusType = 'OD'; break }
+              if (activity.includes('delivered')) { statusType = 'DL'; break }
+              if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
+              if (activity.includes('picked up') || activity.includes('shipment picked')) { statusType = 'PU'; break }
+            }
           }
         }
         const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
