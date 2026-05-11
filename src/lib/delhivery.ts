@@ -50,9 +50,12 @@ export async function createRVPShipment(params: {
   if (!token) throw new Error('DELHIVERY_API_KEY not configured')
 
   const {
-    consigneeName, address, pin, city, state, phone,
+    consigneeName, address, pin, city, state,
     invoiceRef, totalAmount, orderDate, weightKg, productDesc, quantity,
   } = params
+
+  const rawPhone = params.phone.replace(/\D/g, '')
+  const phone = rawPhone.length === 12 && rawPhone.startsWith('91') ? rawPhone.slice(2) : rawPhone.slice(-10)
 
   const shipmentPayload = {
     shipments: [{

@@ -39,7 +39,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const consigneeName = order.full_name || order.customer_name || 'Customer'
-    const consigneePhone = order.consignee_phone || order.customer_phone || '9999999999'
+    const rawPhone = (order.consignee_phone || order.customer_phone || '9999999999').replace(/\D/g, '')
+    const consigneePhone = rawPhone.length === 12 && rawPhone.startsWith('91') ? rawPhone.slice(2) : rawPhone.slice(-10)
     const address = [order.address_line1, order.address_line2, order.landmark].filter(Boolean).join(', ')
 
     const productDesc = 'Hardware / Fasteners'

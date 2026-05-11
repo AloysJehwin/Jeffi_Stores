@@ -51,7 +51,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const consigneeName = order.full_name || 'Customer'
-    const consigneePhone = order.consignee_phone || '9999999999'
+    const rawPhone = (order.consignee_phone || '9999999999').replace(/\D/g, '')
+    const consigneePhone = rawPhone.length === 12 && rawPhone.startsWith('91') ? rawPhone.slice(2) : rawPhone.slice(-10)
     const address = [order.address_line1, order.address_line2, order.landmark].filter(Boolean).join(', ')
     const invoiceRef = order.order_number || order.id.slice(0, 12)
     const totalAmount = String(Math.round(Number(order.total_amount) * 100) / 100)
