@@ -34,9 +34,9 @@ export default function ConditionalLayout({ children, isFormsSubdomain }: { chil
       <AuthProvider>
         <CartProvider>
           <ToastProvider>
-            <div className="flex flex-col min-h-screen bg-surface">
+            <div className="flex flex-col min-h-screen">
               <Header />
-              <main className="flex-1 bg-surface">
+              <main className="flex-1">
                 {children}
               </main>
               {showFooter && <Footer />}

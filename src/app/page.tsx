@@ -40,7 +40,7 @@ export default async function HomePage() {
   const mainCategories = await getMainCategories()
 
   return (
-    <div className="bg-surface">
+    <div>
 
       {/* ── Hero ── */}
       <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden min-h-[calc(100svh-4rem)] flex items-center md:min-h-[calc(100vh-5rem)]">

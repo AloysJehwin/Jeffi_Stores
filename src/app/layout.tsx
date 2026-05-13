@@ -22,7 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const host = headers().get('host') || ''
   const isFormsSubdomain = host.startsWith('forms.')
   return (
-    <html lang="en" className="bg-secondary-800" suppressHydrationWarning>
+    <html lang="en" className="bg-surface-elevated" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -30,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
       </head>
-      <body className="antialiased bg-secondary-800 text-foreground m-0 p-0">
+      <body className="antialiased bg-surface-elevated text-foreground m-0 p-0">
         <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
         <Script id="gtag-init" strategy="afterInteractive"
           dangerouslySetInnerHTML={{
