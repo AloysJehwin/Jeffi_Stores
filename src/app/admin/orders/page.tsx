@@ -160,7 +160,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
               </div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm text-foreground">
-                  {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || 'Guest' : 'Guest'}
+                  {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest' : order.customer_name || 'Guest'}
                 </span>
                 <span className="text-sm font-semibold text-foreground">
                   Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -221,7 +221,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-foreground">
-                        {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || 'Guest' : 'Guest'}
+                        {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest' : order.customer_name || 'Guest'}
                       </div>
                       <div className="text-xs text-foreground-muted">{order.users?.email || order.billing_email}</div>
                     </td>
