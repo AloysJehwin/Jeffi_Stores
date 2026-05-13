@@ -8,6 +8,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressFormModal from '@/components/visitor/AddressFormModal'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
+import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 export default function CheckoutReviewPageWrapper() {
   return (
@@ -358,7 +359,7 @@ function CheckoutReviewPage() {
                   <div className="flex gap-4 pb-4">
                     <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
                       {buyNowItem.imageUrl ? (
-                        <img src={buyNowItem.imageUrl} alt={buyNowItem.productName} className="w-full h-full object-cover rounded-lg" />
+                        <ImgWithSkeleton src={buyNowItem.imageUrl} alt={buyNowItem.productName} className="w-full h-full object-cover rounded-lg" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -390,7 +391,7 @@ function CheckoutReviewPage() {
                       <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
                         <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
                           {primaryImage ? (
-                            <img src={primaryImage.thumbnail_url || primaryImage.image_url} alt={item.products.name} className="w-full h-full object-cover rounded-lg" />
+                            <ImgWithSkeleton src={primaryImage.thumbnail_url || primaryImage.image_url} alt={item.products.name} className="w-full h-full object-cover rounded-lg" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
                               <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">

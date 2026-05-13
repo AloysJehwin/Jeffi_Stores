@@ -6,6 +6,7 @@ import { queryOne, queryMany } from '@/lib/db'
 import ProductImageGallery from '@/components/visitor/ProductImageGallery'
 import ProductActions from '@/components/visitor/ProductActions'
 import ProductReviews from '@/components/visitor/ProductReviews'
+import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 const getProductBySlug = cache(async (slug: string) => {
   return queryOne(`
@@ -370,11 +371,13 @@ export default async function ProductDetailPage({
                               aria-hidden="true"
                               className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
                             />
-                            <img
-                              src={relatedPrimaryImage.image_url}
-                              alt={relatedProduct.name}
-                              className="relative w-full h-full object-contain"
-                            />
+                            <div className="relative w-full h-full">
+                              <ImgWithSkeleton
+                                src={relatedPrimaryImage.image_url}
+                                alt={relatedProduct.name}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
                           </>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">

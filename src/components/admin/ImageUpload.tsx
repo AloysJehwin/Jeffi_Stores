@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import AdminSelect from '@/components/admin/AdminSelect'
+import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 interface LocalImage {
   file?: File
@@ -288,7 +289,7 @@ export default function ImageUpload({
                 onDragOver={e => e.preventDefault()}
               >
                 <div className="aspect-square rounded-lg overflow-hidden border-2 border-border-default hover:border-accent-500 transition-colors select-none">
-                  <img src={image.previewUrl} alt={image.fileName} className="w-full h-full object-cover pointer-events-none" />
+                  <ImgWithSkeleton src={image.previewUrl} alt={image.fileName} className="w-full h-full object-cover pointer-events-none" />
                 </div>
                 {image.isPrimary && (
                   <div className="absolute top-2 left-2 bg-accent-500 text-white text-xs px-2 py-1 rounded">Primary</div>
@@ -403,7 +404,7 @@ export default function ImageUpload({
                           </div>
                         )}
                         <div className="aspect-square">
-                          <img src={gimg.thumbnail_url || gimg.image_url} alt={gimg.custom_name || gimg.file_name} className="w-full h-full object-cover" />
+                          <ImgWithSkeleton src={gimg.thumbnail_url || gimg.image_url} alt={gimg.custom_name || gimg.file_name} className="w-full h-full object-cover" />
                         </div>
                         <div className="px-1.5 py-1 bg-surface-secondary">
                           <p className="text-xs text-foreground-secondary truncate">{gimg.custom_name || gimg.file_name}</p>
