@@ -23,7 +23,7 @@ export default async function SupportPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+      <div className="px-4 sm:px-6 xl:px-10 py-8 md:py-10">
         <div className="mb-8">
           <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-1">Help &amp; Support</p>
           <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">How can we help?</h1>
