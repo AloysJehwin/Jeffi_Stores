@@ -340,7 +340,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 <div>
                   <p className="text-sm text-foreground-secondary">Name</p>
                   <p className="font-medium text-foreground">
-                    {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || 'Guest' : 'Guest'}
+                    {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest' : order.customer_name || 'Guest'}
                   </p>
                 </div>
                 <div>
