@@ -34,7 +34,7 @@ export default function ConditionalLayout({ children, isFormsSubdomain }: { chil
       <AuthProvider>
         <CartProvider>
           <ToastProvider>
-            <div className="flex flex-col min-h-screen bg-secondary-800">
+            <div className="flex flex-col min-h-screen">
               <Header />
               <main className="flex-1">
                 {children}
