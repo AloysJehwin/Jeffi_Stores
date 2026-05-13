@@ -28,7 +28,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
             >
               <td className="px-4 py-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="flex-shrink-0 h-8 w-8">
+                  <div className="flex-shrink-0 h-10 w-10">
                     <ProductImage
                       thumbnailUrl={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
                       altText={product.name}
