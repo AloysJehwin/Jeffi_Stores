@@ -9,7 +9,7 @@ import { ToastProvider } from '@/contexts/ToastContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 
 function shouldShowFooter(pathname: string | null): boolean {
-  return pathname === '/'
+  return false
 }
 
 export default function ConditionalLayout({ children, isFormsSubdomain }: { children: React.ReactNode; isFormsSubdomain?: boolean }) {
