@@ -117,6 +117,7 @@ export default function InvoicesClient() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -317,7 +318,8 @@ export default function InvoicesClient() {
   }
 
   async function cancelInvoice(inv: Invoice) {
-    if (!confirm(`Cancel invoice ${inv.invoice_number}? This will restore stock and cannot be undone.`)) return
+    if (confirmCancelId !== inv.id) { setConfirmCancelId(inv.id); return }
+    setConfirmCancelId(null)
     setCancellingId(inv.id)
     try {
       const res = await fetch(`/api/admin/orders/${inv.id}/cancel`, { method: 'POST', credentials: 'include' })
@@ -916,10 +918,24 @@ export default function InvoicesClient() {
                                 </button>
                               )}
                               {inv.status !== 'cancelled' && (
-                                <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
-                                  className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium transition-colors disabled:opacity-50">
-                                  {cancellingId === inv.id ? '…' : 'Cancel'}
-                                </button>
+                                confirmCancelId === inv.id ? (
+                                  <>
+                                    <span className="text-xs text-foreground-secondary">Cancel {inv.invoice_number}?</span>
+                                    <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
+                                      className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50">
+                                      {cancellingId === inv.id ? '…' : 'Confirm'}
+                                    </button>
+                                    <button onClick={() => setConfirmCancelId(null)}
+                                      className="text-xs text-foreground-muted hover:text-foreground font-medium">
+                                      No
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
+                                    className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium transition-colors disabled:opacity-50">
+                                    Cancel
+                                  </button>
+                                )
                               )}
                               {inv.status === 'cancelled' && (
                                 <span className="text-xs text-foreground-muted italic">Cancelled</span>
@@ -968,10 +984,24 @@ export default function InvoicesClient() {
                             className="text-xs text-foreground-secondary hover:text-foreground font-medium">Edit</button>
                         )}
                         {inv.status !== 'cancelled' && (
-                          <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
-                            className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 font-medium disabled:opacity-50">
-                            {cancellingId === inv.id ? '…' : 'Cancel'}
-                          </button>
+                          confirmCancelId === inv.id ? (
+                            <>
+                              <span className="text-xs text-foreground-secondary">Cancel {inv.invoice_number}?</span>
+                              <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
+                                className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50">
+                                {cancellingId === inv.id ? '…' : 'Confirm'}
+                              </button>
+                              <button onClick={() => setConfirmCancelId(null)}
+                                className="text-xs text-foreground-muted hover:text-foreground font-medium">
+                                No
+                              </button>
+                            </>
+                          ) : (
+                            <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
+                              className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 font-medium disabled:opacity-50">
+                              Cancel
+                            </button>
+                          )
                         )}
                         {inv.status === 'cancelled' && (
                           <span className="text-xs text-foreground-muted italic">Cancelled</span>

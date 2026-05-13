@@ -114,7 +114,7 @@ export const policies: Policy[] = [
     slug: 'return-refund-policy',
     title: 'Return & Refund Policy',
     description: 'Our policy on returns, refunds, and defective product claims.',
-    lastUpdated: '1 May 2025',
+    lastUpdated: '14 May 2026',
     sections: [
       {
         heading: '1. Returns — Defective Products Only',
@@ -126,11 +126,21 @@ export const policies: Policy[] = [
         ],
       },
       {
-        heading: '2. No Exchange Policy',
-        body: 'We do not offer product exchanges. Please review product specifications carefully before ordering. Defective items will be refunded, not exchanged.',
+        heading: '2. Monthly Return & Replacement Limit',
+        body: [
+          'Each customer is allowed a maximum of 1 return or replacement request per calendar month.',
+          'This limit applies across all orders — regardless of the reason or the type of request (refund or replacement).',
+          'The limit resets on the 1st of each month.',
+          'Requests that are rejected by our team do not count toward this limit.',
+          'This policy exists because every return pickup (RVP) incurs a logistics cost that we bear on your behalf, and we want to keep prices fair for all customers.',
+        ],
       },
       {
-        heading: '3. Non-Returnable Items',
+        heading: '3. No Exchange Policy',
+        body: 'We do not offer product exchanges. Please review product specifications carefully before ordering. Defective items will be refunded or replaced subject to the monthly limit above.',
+      },
+      {
+        heading: '4. Non-Returnable Items',
         body: [
           'Products that have been used, installed, or altered in any way.',
           'Products returned without original packaging.',
@@ -140,7 +150,7 @@ export const policies: Policy[] = [
         ],
       },
       {
-        heading: '4. Return Process',
+        heading: '5. Return Process',
         body: [
           'Step 1: Contact us via email or phone with your order number and defect details.',
           'Step 2: Submit photographic or video evidence of the defect.',
@@ -150,7 +160,7 @@ export const policies: Policy[] = [
         ],
       },
       {
-        heading: '5. Refunds',
+        heading: '6. Refunds',
         body: [
           'Refunds are credited to the original payment method only.',
           'Processing takes 7–10 business days after we receive and inspect the return.',

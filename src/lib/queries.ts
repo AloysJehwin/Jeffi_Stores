@@ -361,11 +361,13 @@ export async function getCustomers(filters: {
         u.is_active, u.is_flagged, u.flag_reason, u.created_at,
         cp.customer_type,
         COALESCE(o.order_count, 0) AS order_count,
+        COALESCE(o.lifetime_value, 0) AS lifetime_value,
         o.last_order_at
       FROM users u
       LEFT JOIN customer_profiles cp ON u.id = cp.user_id
       LEFT JOIN (
-        SELECT user_id, COUNT(*) AS order_count, MAX(created_at) AS last_order_at
+        SELECT user_id, COUNT(*) AS order_count, MAX(created_at) AS last_order_at,
+               SUM(total_amount) AS lifetime_value
         FROM orders GROUP BY user_id
       ) o ON u.id = o.user_id
       ${where}
@@ -396,10 +398,18 @@ export async function getCustomerById(id: string) {
     FROM orders
     WHERE user_id = $1
     ORDER BY created_at DESC
-    LIMIT 5
+    LIMIT 10
   `, [id])
 
-  return { ...customer, recent_orders: recentOrders }
+  const stats = await queryOne(`
+    SELECT
+      COUNT(*) AS total_orders,
+      COALESCE(SUM(total_amount), 0) AS lifetime_value
+    FROM orders
+    WHERE user_id = $1
+  `, [id])
+
+  return { ...customer, recent_orders: recentOrders, total_orders: stats?.total_orders ?? 0, lifetime_value: stats?.lifetime_value ?? 0 }
 }
 
 export async function getRecentOrders(limit: number = 10) {

@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')?.trim() || ''
     const categoryId = searchParams.get('category_id')?.trim() || ''
+    const productId = searchParams.get('product_id')?.trim() || ''
     const limit = Math.min(parseInt(searchParams.get('limit') || '40'), 100)
 
     let idx = 1
@@ -18,6 +19,9 @@ export async function GET(request: NextRequest) {
 
     const catClause = categoryId ? `p.category_id = $${idx++}::uuid` : 'TRUE'
     if (categoryId) params.push(categoryId)
+
+    const productClause = productId ? `p.id = $${idx++}::uuid` : 'TRUE'
+    if (productId) params.push(productId)
 
     let searchWhere = 'TRUE'
     let searchWherePv = 'TRUE'
@@ -57,7 +61,7 @@ export async function GET(request: NextRequest) {
            p.gtin
          FROM products p
          LEFT JOIN brands b ON b.id = p.brand_id
-         WHERE p.is_active = true AND p.has_variants = false AND ${catClause} AND ${searchWhere}
+         WHERE p.is_active = true AND p.has_variants = false AND ${catClause} AND ${productClause} AND ${searchWhere}
 
          UNION ALL
 
@@ -79,7 +83,7 @@ export async function GET(request: NextRequest) {
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id
-         WHERE pv.is_active = true AND p.is_active = true AND ${catClause} AND ${searchWherePv}
+         WHERE pv.is_active = true AND p.is_active = true AND ${catClause} AND ${productClause} AND ${searchWherePv}
        ) results
        ORDER BY ${rank}, name ASC, variant_name ASC NULLS FIRST
        LIMIT $${limitIdx}`,

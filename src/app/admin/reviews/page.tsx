@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 interface Review {
   id: string
@@ -25,6 +26,8 @@ export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('pending')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   useEffect(() => {
     fetchReviews()
@@ -55,15 +58,15 @@ export default function AdminReviewsPage() {
       if (response.ok) {
         fetchReviews()
       } else {
-        alert('Failed to approve review')
+        showToast('Failed to approve review', 'error')
       }
     } catch (error) {
-      alert('Failed to approve review')
+      showToast('Failed to approve review', 'error')
     }
   }
 
   const handleReject = async (reviewId: string) => {
-    if (!confirm('Are you sure you want to delete this review?')) return
+    setConfirmDeleteId(null)
 
     try {
       const response = await fetch('/api/admin/reviews', {
@@ -75,10 +78,10 @@ export default function AdminReviewsPage() {
       if (response.ok) {
         fetchReviews()
       } else {
-        alert('Failed to delete review')
+        showToast('Failed to delete review', 'error')
       }
     } catch (error) {
-      alert('Failed to delete review')
+      showToast('Failed to delete review', 'error')
     }
   }
 
@@ -227,13 +230,32 @@ export default function AdminReviewsPage() {
                   >
                     Approve
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleReject(review.id)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
-                  >
-                    Delete
-                  </button>
+                  {confirmDeleteId === review.id ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleReject(review.id)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                      >
+                        Confirm Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-4 py-2 text-sm text-foreground-secondary hover:text-foreground transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(review.id)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               )}
             </div>
