@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { queryMany } from '@/lib/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
+import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 export const dynamic = 'force-dynamic'
 
@@ -199,11 +200,13 @@ export default async function HomePage() {
                               aria-hidden="true"
                               className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
                             />
-                            <img
-                              src={primaryImage.image_url}
-                              alt={product.name}
-                              className="relative w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                            />
+                            <div className="relative w-full h-full group-hover:scale-105 transition-transform duration-300">
+                              <ImgWithSkeleton
+                                src={primaryImage.image_url}
+                                alt={product.name}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
                           </>
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-surface-secondary">

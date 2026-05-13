@@ -148,17 +148,17 @@ export default function WishlistPage() {
 
   if (wishlistItems.length === 0) {
     return (
-      <div className="bg-surface min-h-screen">
+      <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
         <MobileHeader />
-        <div className="container mx-auto px-4 py-4 pb-16 lg:py-8 lg:pb-8">
-          <div className="hidden lg:block mb-6">
+        <div className="container mx-auto px-4 h-full">
+          <div className="hidden lg:block py-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Wishlist</h1>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-            <div className="hidden lg:block lg:col-span-1 lg:self-start lg:sticky lg:top-20">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:h-[calc(100%-5rem)]">
+            <div className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto pt-8 pb-8">
               <AccountSidebar />
             </div>
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:pt-8 lg:pb-8">
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -180,19 +180,19 @@ export default function WishlistPage() {
   }
 
   return (
-    <div className="bg-surface min-h-screen">
+    <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
       <MobileHeader />
-      <div className="container mx-auto px-4 py-4 pb-16 lg:py-8 lg:pb-8">
-        <div className="hidden lg:block mb-6">
+      <div className="container mx-auto px-4 h-full">
+        <div className="hidden lg:block py-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Wishlist</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="hidden lg:block lg:col-span-1 lg:self-start lg:sticky lg:top-20">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:h-[calc(100%-5rem)]">
+          <div className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto pt-8 pb-8">
             <AccountSidebar />
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:pt-8 lg:pb-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {wishlistItems.map((item) => {
             const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]

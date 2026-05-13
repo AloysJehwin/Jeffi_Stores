@@ -3,6 +3,7 @@ import { queryMany, queryOne } from '@/lib/db'
 import SortDropdown from '@/components/visitor/SortDropdown'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
+import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 const PAGE_SIZE = 21
 
@@ -398,11 +399,13 @@ export default async function ProductsPage({
                                   aria-hidden="true"
                                   className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
                                 />
-                                <img
-                                  src={primaryImage.image_url}
-                                  alt={product.name}
-                                  className="relative w-full h-full object-contain"
-                                />
+                                <div className="relative w-full h-full">
+                                  <ImgWithSkeleton
+                                    src={primaryImage.image_url}
+                                    alt={product.name}
+                                    className="w-full h-full object-contain"
+                                  />
+                                </div>
                               </>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">

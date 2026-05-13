@@ -62,13 +62,11 @@
 
   html {
     @apply bg-surface;
-    overflow-x: hidden;
   }
 
   body {
     @apply antialiased font-sans bg-surface text-foreground;
     min-height: 100vh;
-    overflow-x: hidden;
     margin: 0;
     padding: 0;
   }

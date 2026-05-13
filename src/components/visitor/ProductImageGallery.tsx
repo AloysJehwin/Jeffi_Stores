@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
+import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 interface ProductImage {
   id: string
@@ -72,20 +72,14 @@ export default function ProductImageGallery({ images, productName }: ProductImag
               aria-hidden="true"
               className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
             />
-            <img
-              src={currentImage.image_url}
-              alt={`${productName} - Image ${selectedImageIndex + 1}`}
-              className={`relative w-full h-full object-contain transition-transform duration-300 ${
-                isZoomed ? 'scale-150' : 'scale-100'
-              }`}
-              style={
-                isZoomed
-                  ? {
-                      transformOrigin: `${mousePosition.x}% ${mousePosition.y}%`,
-                    }
-                  : {}
-              }
-            />
+            <div className={`relative w-full h-full transition-transform duration-300 ${isZoomed ? 'scale-150' : 'scale-100'}`}
+              style={isZoomed ? { transformOrigin: `${mousePosition.x}% ${mousePosition.y}%` } : {}}>
+              <ImgWithSkeleton
+                src={currentImage.image_url}
+                alt={`${productName} - Image ${selectedImageIndex + 1}`}
+                className="w-full h-full object-contain"
+              />
+            </div>
           </div>
 
           {/* Hover Overlay */}
@@ -113,11 +107,13 @@ export default function ProductImageGallery({ images, productName }: ProductImag
                     : 'border-border-default hover:border-gray-400'
                 }`}
               >
-                <img
-                  src={image.thumbnail_url}
-                  alt={`${productName} - Thumbnail ${index + 1}`}
-                  className="w-full h-20 object-contain bg-surface-secondary rounded-md"
-                />
+                <div className="w-full h-20">
+                  <ImgWithSkeleton
+                    src={image.thumbnail_url}
+                    alt={`${productName} - Thumbnail ${index + 1}`}
+                    className="w-full h-full object-contain bg-surface-secondary rounded-md"
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -147,11 +143,13 @@ export default function ProductImageGallery({ images, productName }: ProductImag
 
           {/* Main Image in Lightbox */}
           <div className="relative flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={currentImage.image_url}
-              alt={`${productName} - Image ${selectedImageIndex + 1}`}
-              className="max-w-full max-h-[85vh] w-auto h-auto object-contain"
-            />
+            <div className="max-w-full max-h-[85vh] w-auto h-auto">
+              <ImgWithSkeleton
+                src={currentImage.image_url}
+                alt={`${productName} - Image ${selectedImageIndex + 1}`}
+                className="max-w-full max-h-[85vh] w-auto h-auto object-contain"
+              />
+            </div>
 
             {/* Navigation Arrows */}
             {images.length > 1 && (
@@ -195,7 +193,7 @@ export default function ProductImageGallery({ images, productName }: ProductImag
                       : 'border-transparent hover:border-gray-400'
                   }`}
                 >
-                  <img
+                  <ImgWithSkeleton
                     src={image.thumbnail_url}
                     alt={`Thumbnail ${index + 1}`}
                     className="w-full h-full object-contain bg-surface-secondary"

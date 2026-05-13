@@ -23,33 +23,6 @@ type TrackingData = {
 
 const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
 
-const SUPPRESSED_INSTRUCTIONS = new Set([
-  'added to bag',
-  'bag added to trip',
-  'vehicle departed',
-  'trip arrived',
-  'bag received at facility',
-  'shipment received at facility',
-])
-
-function filterScansForCustomer(scans: Scan[]): Scan[] {
-  return scans
-    .map(scan => {
-      const instr = (scan.instructions ?? '').toLowerCase().trim()
-      if (instr === 'manifest uploaded') {
-        return { ...scan, activity: 'Shipment Created', instructions: 'Your order has been handed over to the courier' }
-      }
-      if (instr === 'shipment received at origin center') {
-        return { ...scan, activity: 'In Transit', instructions: 'Shipment is on its way' }
-      }
-      return scan
-    })
-    .filter(scan => {
-      const instr = (scan.instructions ?? '').toLowerCase().trim()
-      return !SUPPRESSED_INSTRUCTIONS.has(instr)
-    })
-}
-
 function resolveDisplayType(statusType: string | null, scans: Scan[]): string | null {
   const type = statusType?.toUpperCase() ?? ''
   if (!EXCEPTION_TYPES.has(type)) return statusType
@@ -355,7 +328,7 @@ export default function DelhiveryTracking({
 
   return (
     <div className="space-y-4">
-      {showHistory && <ScanHistoryModal scans={filterScansForCustomer(tracking.scans)} onClose={() => setShowHistory(false)} />}
+      {showHistory && <ScanHistoryModal scans={tracking.scans} onClose={() => setShowHistory(false)} />}
 
       <HorizontalTimeline tracking={tracking} />
 
@@ -401,8 +374,7 @@ export default function DelhiveryTracking({
       </div>
 
       {tracking.scans?.length > 0 && (() => {
-        const filtered = filterScansForCustomer(tracking.scans)
-        const latest = filtered[0]
+        const latest = tracking.scans[0]
         return (
           <div className="flex items-center justify-between border-t border-border-default pt-3">
             <p className="text-xs text-foreground-secondary">
@@ -413,7 +385,7 @@ export default function DelhiveryTracking({
               onClick={() => setShowHistory(true)}
               className="text-sm text-accent-500 hover:text-accent-600 flex items-center gap-1 shrink-0"
             >
-              View history ({filtered.length})
+              View history ({tracking.scans.length})
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>

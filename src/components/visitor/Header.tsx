@@ -14,7 +14,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default sticky top-0 z-40 w-full">
+      <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default fixed top-0 left-0 right-0 z-40 w-full">
         <div className="container mx-auto px-3 sm:px-4">
           <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20">
             {/* Logo */}

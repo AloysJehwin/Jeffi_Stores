@@ -6,6 +6,7 @@ import ProductImage from '@/components/admin/ProductImage'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
+import ProductsTableClient from '@/components/admin/ProductsTableClient'
 
 const PAGE_SIZE = 25
 
@@ -164,92 +165,21 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
       </div>
 
       <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border-default">
+        <div>
+          <table className="w-full divide-y divide-border-default table-fixed">
             <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Product</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">SKU</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Brand</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Price</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Stock</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[28%]">Product</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[12%]">SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[12%]">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Brand</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[12%]">Price</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[9%]">Stock</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[8%]">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[9%]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border-default">
-              {products && products.length > 0 ? (
-                products.map((product: any) => (
-                  <tr key={product.id} className={`hover:bg-surface-secondary ${product.is_featured ? 'bg-yellow-50/40 dark:bg-yellow-900/5' : ''}`}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <ProductImage
-                            thumbnailUrl={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
-                            altText={product.name}
-                          />
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-foreground">{product.name}</div>
-                          {product.is_featured && (
-                            <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">★ Featured</div>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">{product.sku}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">{product.categories?.name || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">{product.brands?.name || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-primary-500">
-                        {product.has_variants
-                          ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                          : `Rs. ${Number(product.sale_price || product.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                        }
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {(() => {
-                        const stock = product.has_variants ? Number(product.variant_stock_total) : product.stock_quantity
-                        const isLow = stock > 0 && stock <= product.low_stock_threshold
-                        return (
-                          <div className="text-sm text-foreground">
-                            {stock}
-                            {product.has_variants && <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">(variants)</span>}
-                            {isLow && <span className="ml-2 text-xs text-red-600 dark:text-red-400 font-semibold">Low Stock</span>}
-                            {stock === 0 && <span className="ml-2 text-xs text-red-600 dark:text-red-400 font-semibold">Out of Stock</span>}
-                          </div>
-                        )
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        product.is_active
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                          : 'bg-surface-secondary text-foreground'
-                      }`}>
-                        {product.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-3">
-                        <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
-                        <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 hover:text-accent-600">Edit</Link>
-                        <DownloadAdButton productId={product.id} productName={product.name} />
-                        <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-foreground-muted">
-                    No products found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
+            <ProductsTableClient products={products || []} featuredCount={featuredCount} />
           </table>
         </div>
         <div className="px-6 py-3 border-t border-border-default">

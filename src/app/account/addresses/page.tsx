@@ -203,7 +203,7 @@ export default function AddressesPage() {
   }
 
   return (
-    <div className="bg-surface min-h-screen">
+    <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
 
       <div className="lg:hidden bg-accent-500 pt-8 pb-16 px-4">
         <h1 className="text-lg font-semibold text-white/80 mb-4">My Account</h1>
@@ -242,17 +242,17 @@ export default function AddressesPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-4 pb-16 lg:py-8 lg:pb-8">
-        <div className="hidden lg:block mb-6">
+      <div className="container mx-auto px-4 h-full">
+        <div className="hidden lg:block py-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Addresses</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="hidden lg:block lg:col-span-1 lg:self-start lg:sticky lg:top-24">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:h-[calc(100%-5rem)]">
+          <div className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto pt-8 pb-8">
             <AccountSidebar />
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:pt-8 lg:pb-8">
             <div className="mb-6">
               <button
                 type="button"
