@@ -36,7 +36,7 @@ export default function ConditionalLayout({ children, isFormsSubdomain }: { chil
           <ToastProvider>
             <div className="flex flex-col min-h-screen bg-surface">
               <Header />
-              <main className="flex-1 bg-surface">
+              <main className="flex-1 bg-surface pt-16 lg:pt-20">
                 {children}
               </main>
               {showFooter && <Footer />}
