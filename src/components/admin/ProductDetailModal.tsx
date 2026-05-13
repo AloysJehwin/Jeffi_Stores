@@ -3,6 +3,24 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 
+function ImgWithSkeleton({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [loaded, setLoaded] = useState(false)
+  useEffect(() => { setLoaded(false) }, [src])
+  return (
+    <div className="relative w-full h-full">
+      {!loaded && (
+        <div className="absolute inset-0 bg-surface-secondary animate-pulse" />
+      )}
+      <img
+        src={src}
+        alt={alt}
+        className={`${className} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        onLoad={() => setLoaded(true)}
+      />
+    </div>
+  )
+}
+
 interface Props {
   product: any | null
   onClose: () => void
@@ -97,7 +115,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
               <div>
                 <div className="aspect-square rounded-lg overflow-hidden bg-surface-secondary border border-border-default mb-2">
                   {activeImg?.image_url ? (
-                    <img
+                    <ImgWithSkeleton
                       src={activeImg.image_url}
                       alt={p.name}
                       className="w-full h-full object-contain"
@@ -114,7 +132,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                         onClick={() => setImgIdx(idx)}
                         className={`w-12 h-12 rounded border-2 overflow-hidden flex-shrink-0 transition-colors ${idx === imgIdx ? 'border-accent-500' : 'border-border-default'}`}
                       >
-                        <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover" />
+                        <ImgWithSkeleton src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>
