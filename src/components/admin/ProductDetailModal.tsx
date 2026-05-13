@@ -5,11 +5,26 @@ import Link from 'next/link'
 
 function ImgWithSkeleton({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const [loaded, setLoaded] = useState(false)
-  useEffect(() => { setLoaded(false) }, [src])
+  const [key, setKey] = useState(src)
+
+  if (key !== src) {
+    setKey(src)
+    setLoaded(false)
+  }
+
   return (
     <div className="relative w-full h-full">
       {!loaded && (
-        <div className="absolute inset-0 bg-surface-secondary animate-pulse" />
+        <div className="absolute inset-0 overflow-hidden rounded-inherit bg-gray-200 dark:bg-gray-700">
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
+              animation: 'shimmer 1.4s infinite',
+              backgroundSize: '200% 100%',
+            }}
+          />
+        </div>
       )}
       <img
         src={src}
@@ -74,6 +89,12 @@ export default function ProductDetailModal({ product, onClose }: Props) {
         className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-3xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
+        <style>{`
+          @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+          }
+        `}</style>
         {/* Loading overlay — covers stale content while fetching */}
         {loading && (
           <div className="absolute inset-0 z-10 bg-surface-elevated/80 rounded-xl flex items-center justify-center">
