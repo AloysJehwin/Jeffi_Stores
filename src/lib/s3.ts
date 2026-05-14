@@ -4,6 +4,7 @@ import sharp from 'sharp'
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1'
 const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'
 const KEY_PREFIX = process.env.S3_KEY_PREFIX ? `${process.env.S3_KEY_PREFIX}/` : ''
+const CLOUDFRONT_URL = process.env.CLOUDFRONT_URL?.replace(/\/$/, '') ?? ''
 
 const s3Client = new S3Client({
   region: AWS_REGION,
@@ -17,6 +18,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 export function getS3Url(s3Key: string, bucketName: string = BUCKET_NAME, region: string = AWS_REGION): string {
+  if (CLOUDFRONT_URL) return `${CLOUDFRONT_URL}/${s3Key}`
   return `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`
 }
 
