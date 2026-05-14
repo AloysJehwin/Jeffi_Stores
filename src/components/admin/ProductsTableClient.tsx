@@ -49,12 +49,13 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                       width="280px"
                     >
                       <div className="p-3 space-y-2.5">
-                        <div className="flex gap-3">
+                        <div className="flex gap-3 items-start">
                           {product.product_images?.[0] && (
-                            <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-border-default bg-surface-secondary">
-                              <ProductImage
-                                thumbnailUrl={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
-                                altText={product.name}
+                            <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-border-default bg-surface-secondary">
+                              <img
+                                src={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
+                                alt={product.name}
+                                className="w-full h-full object-cover"
                               />
                             </div>
                           )}
