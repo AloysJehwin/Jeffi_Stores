@@ -19,16 +19,18 @@ function PctBadge({ value }: { value: number | null }) {
   )
 }
 
-function StatCard({ label, value, sub, pct, icon, color }: {
+function StatCard({ label, value, sub, pct, icon, color, href, subHref }: {
   label: string
   value: string
   sub?: string
   pct?: number | null
   icon: React.ReactNode
   color: string
+  href?: string
+  subHref?: string
 }) {
-  return (
-    <div className="bg-surface-elevated rounded-xl border border-border-default p-5 flex flex-col gap-3">
+  const inner = (
+    <>
       <div className="flex items-start justify-between">
         <div className={`p-2.5 rounded-lg ${color}`}>{icon}</div>
         {pct !== undefined && <PctBadge value={pct ?? null} />}
@@ -38,6 +40,37 @@ function StatCard({ label, value, sub, pct, icon, color }: {
         <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1 leading-none">{value}</p>
         {sub && <p className="text-xs text-foreground-muted mt-1">{sub}</p>}
       </div>
+    </>
+  )
+
+  if (href && subHref && sub) {
+    return (
+      <div className="relative bg-surface-elevated rounded-xl border border-border-default p-5 flex flex-col gap-3 hover:border-accent-400 transition-colors">
+        <Link href={href} className="absolute inset-0 rounded-xl" aria-label={label} />
+        <div className="flex items-start justify-between">
+          <div className={`p-2.5 rounded-lg ${color}`}>{icon}</div>
+          {pct !== undefined && <PctBadge value={pct ?? null} />}
+        </div>
+        <div>
+          <p className="text-xs text-foreground-muted uppercase tracking-wide font-medium">{label}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1 leading-none">{value}</p>
+          <Link href={subHref} className="relative z-10 text-xs text-accent-500 hover:text-accent-600 underline mt-1 inline-block">{sub}</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (href) {
+    return (
+      <Link href={href} className="block bg-surface-elevated rounded-xl border border-border-default p-5 flex flex-col gap-3 hover:border-accent-400 transition-colors">
+        {inner}
+      </Link>
+    )
+  }
+
+  return (
+    <div className="bg-surface-elevated rounded-xl border border-border-default p-5 flex flex-col gap-3">
+      {inner}
     </div>
   )
 }
@@ -73,12 +106,12 @@ export default async function AdminDashboard() {
 
   const funnelTotal = metrics.funnel.pending + metrics.funnel.processing + metrics.funnel.shipped + metrics.funnel.outForDelivery + metrics.funnel.delivered + metrics.funnel.cancelled
   const funnelSteps = [
-    { label: 'Pending', value: metrics.funnel.pending, color: 'bg-yellow-400 dark:bg-yellow-500' },
-    { label: 'Processing', value: metrics.funnel.processing, color: 'bg-blue-400 dark:bg-blue-500' },
-    { label: 'Shipped', value: metrics.funnel.shipped, color: 'bg-indigo-400 dark:bg-indigo-500' },
-    { label: 'Out for Delivery', value: metrics.funnel.outForDelivery, color: 'bg-violet-400 dark:bg-violet-500' },
-    { label: 'Delivered', value: metrics.funnel.delivered, color: 'bg-green-400 dark:bg-green-500' },
-    { label: 'Cancelled', value: metrics.funnel.cancelled, color: 'bg-red-400 dark:bg-red-500' },
+    { label: 'Pending', value: metrics.funnel.pending, color: 'bg-yellow-400 dark:bg-yellow-500', status: 'pending' },
+    { label: 'Processing', value: metrics.funnel.processing, color: 'bg-blue-400 dark:bg-blue-500', status: 'processing' },
+    { label: 'Shipped', value: metrics.funnel.shipped, color: 'bg-indigo-400 dark:bg-indigo-500', status: 'shipped' },
+    { label: 'Out for Delivery', value: metrics.funnel.outForDelivery, color: 'bg-violet-400 dark:bg-violet-500', status: 'out_for_delivery' },
+    { label: 'Delivered', value: metrics.funnel.delivered, color: 'bg-green-400 dark:bg-green-500', status: 'delivered' },
+    { label: 'Cancelled', value: metrics.funnel.cancelled, color: 'bg-red-400 dark:bg-red-500', status: 'cancelled' },
   ]
 
   const topProductsMax = metrics.topProducts.reduce((m, p) => Math.max(m, p.qty), 1)
@@ -106,6 +139,7 @@ export default async function AdminDashboard() {
           value={`Rs ${metrics.revenue.thisMonth.toLocaleString('en-IN')}`}
           sub={`Last month: Rs ${metrics.revenue.lastMonth.toLocaleString('en-IN')}`}
           pct={metrics.revenue.pctChange}
+          href="/admin/financial"
           color="bg-emerald-100 dark:bg-emerald-900/30"
           icon={
             <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -118,6 +152,7 @@ export default async function AdminDashboard() {
           value={`Rs ${metrics.revenue.today.toLocaleString('en-IN')}`}
           sub={`Yesterday: Rs ${metrics.revenue.yesterday.toLocaleString('en-IN')}`}
           pct={metrics.revenue.todayPct}
+          href="/admin/financial"
           color="bg-blue-100 dark:bg-blue-900/30"
           icon={
             <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -130,6 +165,7 @@ export default async function AdminDashboard() {
           value={metrics.orders.thisMonth.toString()}
           sub={`Last month: ${metrics.orders.lastMonth}`}
           pct={metrics.orders.pctChange}
+          href="/admin/orders"
           color="bg-violet-100 dark:bg-violet-900/30"
           icon={
             <svg className="w-5 h-5 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -141,6 +177,8 @@ export default async function AdminDashboard() {
           label="Total Customers"
           value={stats.totalCustomers.toString()}
           sub={stats.lowStockProducts > 0 ? `${stats.lowStockProducts} products low stock` : `${stats.totalProducts} products active`}
+          subHref={stats.lowStockProducts > 0 ? '/admin/products?stock=low' : '/admin/products'}
+          href="/admin/customers"
           color="bg-orange-100 dark:bg-orange-900/30"
           icon={
             <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -163,16 +201,16 @@ export default async function AdminDashboard() {
               <div className="bg-purple-500 rounded-r-full transition-all" style={{ width: `${offlinePct}%` }} />
             </div>
             <div className="flex justify-between mt-2">
-              <div>
+              <Link href="/admin/orders?source=online" className="group">
                 <p className="text-xs text-foreground-muted">Online</p>
-                <p className="text-base font-bold text-foreground">Rs {metrics.revenue.online.toLocaleString('en-IN')}</p>
+                <p className="text-base font-bold text-foreground group-hover:text-accent-500 transition-colors">Rs {metrics.revenue.online.toLocaleString('en-IN')}</p>
                 <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">{onlinePct}%</p>
-              </div>
-              <div className="text-right">
+              </Link>
+              <Link href="/admin/orders?source=offline" className="group text-right">
                 <p className="text-xs text-foreground-muted">Offline</p>
-                <p className="text-base font-bold text-foreground">Rs {metrics.revenue.offline.toLocaleString('en-IN')}</p>
+                <p className="text-base font-bold text-foreground group-hover:text-accent-500 transition-colors">Rs {metrics.revenue.offline.toLocaleString('en-IN')}</p>
                 <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">{offlinePct}%</p>
-              </div>
+              </Link>
             </div>
           </div>
           <div className="pt-3 border-t border-border-default">
@@ -192,13 +230,17 @@ export default async function AdminDashboard() {
             {funnelSteps.map(step => {
               const pct = funnelTotal > 0 ? Math.max(4, Math.round((step.value / funnelTotal) * 100)) : 4
               return (
-                <div key={step.label} className="flex items-center gap-3">
-                  <span className="text-xs text-foreground-muted w-28 shrink-0">{step.label}</span>
+                <Link
+                  key={step.label}
+                  href={`/admin/orders?status=${step.status}`}
+                  className="flex items-center gap-3 group rounded-md px-1 -mx-1 hover:bg-surface-secondary transition-colors"
+                >
+                  <span className="text-xs text-foreground-muted w-28 shrink-0 group-hover:text-foreground transition-colors">{step.label}</span>
                   <div className="flex-1 h-2 bg-surface-secondary rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${step.color}`} style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="text-xs font-semibold text-foreground w-7 text-right">{step.value}</span>
-                </div>
+                  <span className="text-xs font-semibold text-foreground w-7 text-right group-hover:text-accent-500 transition-colors">{step.value}</span>
+                </Link>
               )
             })}
           </div>
@@ -214,15 +256,15 @@ export default async function AdminDashboard() {
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Top Products</h2>
-            <span className="text-xs text-foreground-muted">This month</span>
+            <Link href="/admin/products" className="text-xs text-accent-500 font-medium hover:text-accent-600">View all →</Link>
           </div>
           {metrics.topProducts.length > 0 ? (
             <div className="space-y-3">
               {metrics.topProducts.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3">
+                <Link key={p.id} href={`/admin/products/edit/${p.id}`} className="flex items-center gap-3 group rounded-md px-1 -mx-1 hover:bg-surface-secondary transition-colors">
                   <span className="text-xs font-bold text-foreground-muted w-4 shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate">{p.name}</p>
+                    <p className="text-xs font-medium text-foreground truncate group-hover:text-accent-500 transition-colors">{p.name}</p>
                     <div className="mt-1 h-1.5 bg-surface-secondary rounded-full overflow-hidden">
                       <div
                         className="h-full bg-accent-500 rounded-full"
@@ -234,7 +276,7 @@ export default async function AdminDashboard() {
                     <p className="text-xs font-semibold text-foreground">{p.qty} units</p>
                     <p className="text-xs text-foreground-muted">Rs {p.revenue.toLocaleString('en-IN')}</p>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
