@@ -416,6 +416,119 @@ export async function getRecentOrders(limit: number = 10) {
   return queryMany('SELECT * FROM orders ORDER BY created_at DESC LIMIT $1', [limit])
 }
 
+export async function getDashboardMetrics() {
+  const [
+    periodRevenue,
+    orderFunnel,
+    topProducts,
+    recentOrders,
+  ] = await Promise.all([
+    queryOne<{
+      this_month_revenue: string; last_month_revenue: string
+      this_month_orders: string; last_month_orders: string
+      this_month_customers: string; last_month_customers: string
+      today_revenue: string; yesterday_revenue: string
+      online_revenue: string; offline_revenue: string
+    }>(`
+      SELECT
+        COALESCE(SUM(CASE WHEN created_at >= date_trunc('month', NOW()) AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS this_month_revenue,
+        COALESCE(SUM(CASE WHEN created_at >= date_trunc('month', NOW() - INTERVAL '1 month') AND created_at < date_trunc('month', NOW()) AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS last_month_revenue,
+        COUNT(CASE WHEN created_at >= date_trunc('month', NOW()) THEN 1 END) AS this_month_orders,
+        COUNT(CASE WHEN created_at >= date_trunc('month', NOW() - INTERVAL '1 month') AND created_at < date_trunc('month', NOW()) THEN 1 END) AS last_month_orders,
+        COALESCE(SUM(CASE WHEN created_at >= date_trunc('day', NOW()) AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS today_revenue,
+        COALESCE(SUM(CASE WHEN created_at >= date_trunc('day', NOW() - INTERVAL '1 day') AND created_at < date_trunc('day', NOW()) AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS yesterday_revenue,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' AND source = 'online' THEN total_amount ELSE 0 END), 0) AS online_revenue,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' AND source = 'offline' THEN total_amount ELSE 0 END), 0) AS offline_revenue
+      FROM orders
+    `),
+    queryOne<{
+      pending: string; processing: string; shipped: string
+      out_for_delivery: string; delivered: string; cancelled: string
+    }>(`
+      SELECT
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
+        COUNT(CASE WHEN status IN ('confirmed','processing') THEN 1 END) AS processing,
+        COUNT(CASE WHEN status = 'shipped' THEN 1 END) AS shipped,
+        COUNT(CASE WHEN status = 'out_for_delivery' THEN 1 END) AS out_for_delivery,
+        COUNT(CASE WHEN status = 'delivered' THEN 1 END) AS delivered,
+        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) AS cancelled
+      FROM orders
+    `),
+    queryMany<{ product_id: string; name: string; total_qty: string; total_revenue: string }>(`
+      SELECT
+        oi.product_id,
+        p.name,
+        SUM(oi.quantity) AS total_qty,
+        SUM(oi.total_price) AS total_revenue
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.created_at >= date_trunc('month', NOW())
+      GROUP BY oi.product_id, p.name
+      ORDER BY total_qty DESC
+      LIMIT 5
+    `),
+    queryMany(`
+      SELECT
+        o.id, o.order_number, o.customer_name, o.total_amount,
+        o.status, o.payment_status, o.source, o.created_at,
+        json_build_object(
+          'id', u.id, 'email', u.email,
+          'first_name', u.first_name, 'last_name', u.last_name
+        ) AS users
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      ORDER BY o.created_at DESC
+      LIMIT 5
+    `),
+  ])
+
+  const pct = (a: number, b: number) => b === 0 ? null : Math.round(((a - b) / b) * 100)
+
+  const thisRevenue = parseFloat(periodRevenue?.this_month_revenue || '0')
+  const lastRevenue = parseFloat(periodRevenue?.last_month_revenue || '0')
+  const thisOrders = parseInt(periodRevenue?.this_month_orders || '0')
+  const lastOrders = parseInt(periodRevenue?.last_month_orders || '0')
+  const todayRevenue = parseFloat(periodRevenue?.today_revenue || '0')
+  const yesterdayRevenue = parseFloat(periodRevenue?.yesterday_revenue || '0')
+  const onlineRevenue = parseFloat(periodRevenue?.online_revenue || '0')
+  const offlineRevenue = parseFloat(periodRevenue?.offline_revenue || '0')
+
+  return {
+    revenue: {
+      thisMonth: thisRevenue,
+      lastMonth: lastRevenue,
+      pctChange: pct(thisRevenue, lastRevenue),
+      today: todayRevenue,
+      yesterday: yesterdayRevenue,
+      todayPct: pct(todayRevenue, yesterdayRevenue),
+      online: onlineRevenue,
+      offline: offlineRevenue,
+      total: onlineRevenue + offlineRevenue,
+    },
+    orders: {
+      thisMonth: thisOrders,
+      lastMonth: lastOrders,
+      pctChange: pct(thisOrders, lastOrders),
+    },
+    funnel: {
+      pending: parseInt(orderFunnel?.pending || '0'),
+      processing: parseInt(orderFunnel?.processing || '0'),
+      shipped: parseInt(orderFunnel?.shipped || '0'),
+      outForDelivery: parseInt(orderFunnel?.out_for_delivery || '0'),
+      delivered: parseInt(orderFunnel?.delivered || '0'),
+      cancelled: parseInt(orderFunnel?.cancelled || '0'),
+    },
+    topProducts: topProducts.map(p => ({
+      id: p.product_id,
+      name: p.name,
+      qty: parseInt(p.total_qty),
+      revenue: parseFloat(p.total_revenue),
+    })),
+    recentOrders,
+  }
+}
+
 export async function getOrder(id: string) {
   const order = await queryOne(`
     SELECT
