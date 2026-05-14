@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface ImgWithSkeletonProps {
   src: string
@@ -10,10 +10,17 @@ interface ImgWithSkeletonProps {
 
 export default function ImgWithSkeleton({ src, alt, className }: ImgWithSkeletonProps) {
   const [loaded, setLoaded] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
     setLoaded(false)
   }, [src])
+
+  useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setLoaded(true)
+    }
+  })
 
   return (
     <div className="relative w-full h-full">
@@ -29,6 +36,7 @@ export default function ImgWithSkeleton({ src, alt, className }: ImgWithSkeleton
         </div>
       )}
       <img
+        ref={imgRef}
         src={src}
         alt={alt}
         className={`${className ?? ''} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
