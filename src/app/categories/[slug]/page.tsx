@@ -96,7 +96,7 @@ export default async function CategoryDetailPage({
                 >
                   <div className="text-center">
                     <div className="w-12 h-12 bg-accent-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:bg-accent-200 transition-colors">
-                      <CategoryIcon categoryName={subcategory.name} className="w-6 h-6 text-accent-600 group-hover:text-accent-700" />
+                      <CategoryIcon iconName={subcategory.icon_name} categoryName={subcategory.name} className="w-6 h-6 text-accent-600 group-hover:text-accent-700" />
                     </div>
                     <h3 className="text-sm font-semibold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
                       {subcategory.name}
