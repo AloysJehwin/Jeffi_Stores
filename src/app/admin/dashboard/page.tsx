@@ -29,8 +29,8 @@ function StatCard({ label, value, sub, pct, icon, color, href, subHref }: {
   href?: string
   subHref?: string
 }) {
-  const content = (
-    <div className={`bg-surface-elevated rounded-xl border border-border-default p-5 flex flex-col gap-3 ${href ? 'hover:border-accent-400 transition-colors' : ''}`}>
+  const inner = (
+    <>
       <div className="flex items-start justify-between">
         <div className={`p-2.5 rounded-lg ${color}`}>{icon}</div>
         {pct !== undefined && <PctBadge value={pct ?? null} />}
@@ -38,15 +38,41 @@ function StatCard({ label, value, sub, pct, icon, color, href, subHref }: {
       <div>
         <p className="text-xs text-foreground-muted uppercase tracking-wide font-medium">{label}</p>
         <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1 leading-none">{value}</p>
-        {sub && (
-          subHref
-            ? <Link href={subHref} onClick={e => e.stopPropagation()} className="text-xs text-accent-500 hover:text-accent-600 underline mt-1 inline-block">{sub}</Link>
-            : <p className="text-xs text-foreground-muted mt-1">{sub}</p>
-        )}
+        {sub && <p className="text-xs text-foreground-muted mt-1">{sub}</p>}
       </div>
+    </>
+  )
+
+  if (href && subHref && sub) {
+    return (
+      <div className="relative bg-surface-elevated rounded-xl border border-border-default p-5 flex flex-col gap-3 hover:border-accent-400 transition-colors">
+        <Link href={href} className="absolute inset-0 rounded-xl" aria-label={label} />
+        <div className="flex items-start justify-between">
+          <div className={`p-2.5 rounded-lg ${color}`}>{icon}</div>
+          {pct !== undefined && <PctBadge value={pct ?? null} />}
+        </div>
+        <div>
+          <p className="text-xs text-foreground-muted uppercase tracking-wide font-medium">{label}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1 leading-none">{value}</p>
+          <Link href={subHref} className="relative z-10 text-xs text-accent-500 hover:text-accent-600 underline mt-1 inline-block">{sub}</Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (href) {
+    return (
+      <Link href={href} className="block bg-surface-elevated rounded-xl border border-border-default p-5 flex flex-col gap-3 hover:border-accent-400 transition-colors">
+        {inner}
+      </Link>
+    )
+  }
+
+  return (
+    <div className="bg-surface-elevated rounded-xl border border-border-default p-5 flex flex-col gap-3">
+      {inner}
     </div>
   )
-  return href ? <Link href={href}>{content}</Link> : content
 }
 
 function statusBadgeClass(status: string) {
