@@ -4,9 +4,16 @@ on:
   push:
     branches: [main]
 
+# Only one deploy runs at a time — queue rather than cancel
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    name: Deploy to Production
     runs-on: ubuntu-latest
+
     steps:
       - name: Get EC2 public IP
         id: ec2
@@ -32,8 +39,8 @@ jobs:
             set -e
             cd /opt/jeffi-stores
             git fetch origin
-            git checkout ${{ github.ref_name }}
-            git reset --hard origin/${{ github.ref_name }}
+            git checkout main
+            git reset --hard origin/main
             docker compose -f docker-compose.prod.yml down --remove-orphans --volumes || true
             docker rm -f jeffi-redis jeffi-app jeffi-nginx 2>/dev/null || true
             docker network rm jeffi-stores_internal 2>/dev/null || true

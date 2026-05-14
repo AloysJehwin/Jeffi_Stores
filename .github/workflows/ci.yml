@@ -1,16 +1,21 @@
-name: CI
+name: PR Checks
 
 on:
   pull_request:
     branches: [main]
-  push:
-    branches-ignore: [main]
+
+# Cancel any in-progress run for the same PR when a new commit is pushed
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  lint-typecheck-build:
+    name: Lint, Type Check & Build
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -33,4 +38,5 @@ jobs:
         env:
           DATABASE_URL: postgresql://localhost:5432/dummy
           JWT_SECRET: ci-test-secret
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
           SKIP_DB_CHECK: true
