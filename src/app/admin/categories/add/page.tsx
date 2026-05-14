@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { getAllCategories } from '@/lib/queries'
 import { query } from '@/lib/db'
 import CategoryForm from '@/components/admin/CategoryForm'
+import { suggestIcon } from '@/lib/iconSuggest'
 
 async function createCategory(formData: FormData) {
   'use server'
@@ -16,11 +17,12 @@ async function createCategory(formData: FormData) {
   const googleProductCategory = formData.get('google_product_category') as string || null
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const iconName = await suggestIcon(name)
 
   await query(
-    `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, google_product_category)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory]
+    `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, google_product_category, icon_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, iconName]
   )
 
   revalidatePath('/admin/categories')

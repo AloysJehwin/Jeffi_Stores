@@ -60,6 +60,7 @@ export default async function CategoriesPage() {
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 bg-accent-100 rounded-lg flex items-center justify-center group-hover:bg-accent-200 transition-colors">
                         <CategoryIcon
+                          iconName={category.icon_name}
                           categoryName={category.name}
                           className="w-8 h-8 text-accent-600 group-hover:text-accent-700"
                         />

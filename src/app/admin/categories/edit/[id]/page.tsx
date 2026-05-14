@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { getAllCategories } from '@/lib/queries'
 import { query, queryOne } from '@/lib/db'
 import CategoryForm from '@/components/admin/CategoryForm'
+import { suggestIcon } from '@/lib/iconSuggest'
 
 async function getCategory(id: string) {
   const data = await queryOne('SELECT * FROM categories WHERE id = $1', [id])
@@ -22,13 +23,15 @@ async function updateCategory(categoryId: string, formData: FormData) {
   const googleProductCategory = formData.get('google_product_category') as string || null
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const iconName = await suggestIcon(name)
 
   await query(
     `UPDATE categories SET
       name = $1, slug = $2, description = $3, parent_category_id = $4,
-      sku_prefix = $5, display_order = $6, is_active = $7, google_product_category = $8, updated_at = $9
-    WHERE id = $10`,
-    [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, new Date().toISOString(), categoryId]
+      sku_prefix = $5, display_order = $6, is_active = $7, google_product_category = $8,
+      icon_name = $9, updated_at = $10
+    WHERE id = $11`,
+    [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, iconName, new Date().toISOString(), categoryId]
   )
 
   revalidatePath('/admin/categories')
