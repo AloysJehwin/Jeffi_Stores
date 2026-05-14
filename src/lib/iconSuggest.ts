@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 
-const ICON_OPTIONS = [
+export const ICON_OPTIONS = [
   'Wrench', 'Bolt', 'Drill', 'Hammer', 'Nut', 'Scissors', 'Anchor', 'Link',
   'Zap', 'Cog', 'Settings', 'Layers', 'Box', 'Package', 'Shield', 'Flame',
   'Gauge', 'Ruler', 'Pipette', 'Plug', 'PlugZap', 'Cable', 'CircuitBoard',
@@ -8,18 +8,15 @@ const ICON_OPTIONS = [
   'Paintbrush', 'PaintRoller', 'SprayCan', 'FlaskConical', 'Magnet',
   'Battery', 'Thermometer', 'Wind', 'Waves', 'Satellite', 'Flashlight',
   'Microchip', 'Toolbox', 'ToolCase', 'Hexagon', 'Boxes', 'PencilRuler',
-  'ScanLine', 'Antenna', 'Aperture', 'Archive', 'Cylinder', 'Factory',
-  'Forklift', 'HardHat', 'InspectionPanel', 'Milestone', 'Mountain',
-  'Radar', 'RadioTower', 'Server', 'Sparkles', 'TestTube', 'Timer',
-  'TowerControl', 'Tractor', 'Unplug', 'Warehouse', 'Weight',
+  'ScanLine', 'Antenna', 'Aperture', 'Archive', 'Factory',
+  'Forklift', 'HardHat', 'TestTube', 'Timer',
+  'Tractor', 'Unplug', 'Warehouse', 'Weight',
 ]
 
 let client: OpenAI | null = null
 
 function getClient(): OpenAI {
-  if (!client) {
-    client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  }
+  if (!client) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   return client
 }
 
@@ -32,20 +29,21 @@ export async function suggestIcon(categoryName: string): Promise<string> {
       messages: [
         {
           role: 'system',
-          content: `You are an icon selector for an industrial hardware store.
-Given a product category name, pick the single most appropriate icon from this list: ${ICON_OPTIONS.join(', ')}.
-Respond with ONLY the icon name — no explanation, no punctuation, just the name.`,
+          content: `You are an icon selector for an industrial hardware store. Given a product category name, pick the single most appropriate icon from this exact list: ${ICON_OPTIONS.join(', ')}. You MUST respond with valid JSON in this exact format: {"iconName":"<chosen icon>"}. No other text.`,
         },
         {
           role: 'user',
           content: categoryName,
         },
       ],
-      max_tokens: 20,
+      response_format: { type: 'json_object' },
+      max_tokens: 30,
       temperature: 0,
     })
 
-    const suggested = response.choices[0]?.message?.content?.trim() ?? ''
+    const raw = response.choices[0]?.message?.content ?? '{}'
+    const parsed = JSON.parse(raw) as { iconName?: string }
+    const suggested = parsed.iconName?.trim() ?? ''
     return ICON_OPTIONS.includes(suggested) ? suggested : 'Package'
   } catch {
     return 'Package'
