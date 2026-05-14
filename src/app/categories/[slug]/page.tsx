@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
+import CategoryIcon from '@/components/visitor/CategoryIcon'
 
 async function getCategoryBySlug(slug: string) {
   return queryOne(
@@ -94,10 +95,8 @@ export default async function CategoryDetailPage({
                   className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 hover:shadow-md hover:border-accent-500 transition-all group"
                 >
                   <div className="text-center">
-                    <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:bg-accent-100 transition-colors">
-                      <svg className="w-6 h-6 text-primary-600 group-hover:text-accent-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                      </svg>
+                    <div className="w-12 h-12 bg-accent-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:bg-accent-200 transition-colors">
+                      <CategoryIcon categoryName={subcategory.name} className="w-6 h-6 text-accent-600 group-hover:text-accent-700" />
                     </div>
                     <h3 className="text-sm font-semibold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
                       {subcategory.name}
