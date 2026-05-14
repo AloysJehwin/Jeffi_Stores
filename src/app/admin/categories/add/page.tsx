@@ -17,7 +17,8 @@ async function createCategory(formData: FormData) {
   const googleProductCategory = formData.get('google_product_category') as string || null
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-  const iconName = await suggestIcon(name)
+  const manualIcon = (formData.get('icon_name') as string || '').trim()
+  const iconName = manualIcon || await suggestIcon(name)
 
   await query(
     `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, google_product_category, icon_name)

@@ -23,7 +23,8 @@ async function updateCategory(categoryId: string, formData: FormData) {
   const googleProductCategory = formData.get('google_product_category') as string || null
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-  const iconName = await suggestIcon(name)
+  const manualIcon = (formData.get('icon_name') as string || '').trim()
+  const iconName = manualIcon || await suggestIcon(name)
 
   await query(
     `UPDATE categories SET
