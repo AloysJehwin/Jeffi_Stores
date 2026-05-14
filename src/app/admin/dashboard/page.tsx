@@ -73,12 +73,12 @@ export default async function AdminDashboard() {
 
   const funnelTotal = metrics.funnel.pending + metrics.funnel.processing + metrics.funnel.shipped + metrics.funnel.outForDelivery + metrics.funnel.delivered + metrics.funnel.cancelled
   const funnelSteps = [
-    { label: 'Pending', value: metrics.funnel.pending, color: 'bg-yellow-400 dark:bg-yellow-500' },
-    { label: 'Processing', value: metrics.funnel.processing, color: 'bg-blue-400 dark:bg-blue-500' },
-    { label: 'Shipped', value: metrics.funnel.shipped, color: 'bg-indigo-400 dark:bg-indigo-500' },
-    { label: 'Out for Delivery', value: metrics.funnel.outForDelivery, color: 'bg-violet-400 dark:bg-violet-500' },
-    { label: 'Delivered', value: metrics.funnel.delivered, color: 'bg-green-400 dark:bg-green-500' },
-    { label: 'Cancelled', value: metrics.funnel.cancelled, color: 'bg-red-400 dark:bg-red-500' },
+    { label: 'Pending', value: metrics.funnel.pending, color: 'bg-yellow-400 dark:bg-yellow-500', status: 'pending' },
+    { label: 'Processing', value: metrics.funnel.processing, color: 'bg-blue-400 dark:bg-blue-500', status: 'processing' },
+    { label: 'Shipped', value: metrics.funnel.shipped, color: 'bg-indigo-400 dark:bg-indigo-500', status: 'shipped' },
+    { label: 'Out for Delivery', value: metrics.funnel.outForDelivery, color: 'bg-violet-400 dark:bg-violet-500', status: 'out_for_delivery' },
+    { label: 'Delivered', value: metrics.funnel.delivered, color: 'bg-green-400 dark:bg-green-500', status: 'delivered' },
+    { label: 'Cancelled', value: metrics.funnel.cancelled, color: 'bg-red-400 dark:bg-red-500', status: 'cancelled' },
   ]
 
   const topProductsMax = metrics.topProducts.reduce((m, p) => Math.max(m, p.qty), 1)
@@ -192,13 +192,17 @@ export default async function AdminDashboard() {
             {funnelSteps.map(step => {
               const pct = funnelTotal > 0 ? Math.max(4, Math.round((step.value / funnelTotal) * 100)) : 4
               return (
-                <div key={step.label} className="flex items-center gap-3">
-                  <span className="text-xs text-foreground-muted w-28 shrink-0">{step.label}</span>
+                <Link
+                  key={step.label}
+                  href={`/admin/orders?status=${step.status}`}
+                  className="flex items-center gap-3 group rounded-md px-1 -mx-1 hover:bg-surface-secondary transition-colors"
+                >
+                  <span className="text-xs text-foreground-muted w-28 shrink-0 group-hover:text-foreground transition-colors">{step.label}</span>
                   <div className="flex-1 h-2 bg-surface-secondary rounded-full overflow-hidden">
                     <div className={`h-full rounded-full transition-all ${step.color}`} style={{ width: `${pct}%` }} />
                   </div>
-                  <span className="text-xs font-semibold text-foreground w-7 text-right">{step.value}</span>
-                </div>
+                  <span className="text-xs font-semibold text-foreground w-7 text-right group-hover:text-accent-500 transition-colors">{step.value}</span>
+                </Link>
               )
             })}
           </div>
