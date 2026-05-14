@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import dynamic from 'next/dynamic'
 import AdminSelect from './AdminSelect'
 import * as Icons from 'lucide-react'
 
@@ -43,6 +42,8 @@ export default function CategoryForm({ categories, action, category }: CategoryF
   const [selectedIcon, setSelectedIcon] = useState<string>(category?.icon_name || 'Package')
   const [iconSearch, setIconSearch] = useState('')
   const [showPicker, setShowPicker] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const nameRef = useRef<HTMLInputElement>(null)
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
 
@@ -50,6 +51,23 @@ export default function CategoryForm({ categories, action, category }: CategoryF
     ICON_OPTIONS.filter(n => n.toLowerCase().includes(iconSearch.toLowerCase())),
     [iconSearch]
   )
+
+  async function handleGenerate() {
+    const name = nameRef.current?.value?.trim()
+    if (!name) return
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/admin/categories/suggest-icon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json() as { iconName?: string }
+      if (data.iconName) setSelectedIcon(data.iconName)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -80,6 +98,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
               Category Name *
             </label>
             <input
+              ref={nameRef}
               type="text"
               id="name"
               name="name"
@@ -93,9 +112,6 @@ export default function CategoryForm({ categories, action, category }: CategoryF
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-foreground-secondary mb-2">
               Category Icon
-              {!category?.icon_name && (
-                <span className="ml-2 text-xs text-foreground-muted font-normal">AI will auto-select on save</span>
-              )}
             </label>
 
             <input type="hidden" name="icon_name" value={selectedIcon} />
@@ -104,15 +120,36 @@ export default function CategoryForm({ categories, action, category }: CategoryF
               <div className="w-14 h-14 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center border-2 border-accent-300 dark:border-accent-700 shrink-0">
                 <IconPreview name={selectedIcon} className="w-7 h-7 text-accent-600 dark:text-accent-400" />
               </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">{selectedIcon}</p>
-                <button
-                  type="button"
-                  onClick={() => setShowPicker(v => !v)}
-                  className="mt-1 text-xs text-accent-500 hover:text-accent-600 underline"
-                >
-                  {showPicker ? 'Close picker' : 'Change icon'}
-                </button>
+              <div className="flex flex-col gap-1.5">
+                <p className="text-sm font-semibold text-foreground">{selectedIcon}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={generating}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {generating ? (
+                      <>
+                        <Icons.Loader2 className="w-3 h-3 animate-spin" />
+                        Generating…
+                      </>
+                    ) : (
+                      <>
+                        <Icons.Sparkles className="w-3 h-3" />
+                        Generate with AI
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPicker(v => !v)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-border-secondary text-foreground-secondary hover:bg-surface-secondary rounded-md transition-colors"
+                  >
+                    <Icons.Grid2x2 className="w-3 h-3" />
+                    {showPicker ? 'Close' : 'Browse'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -120,12 +157,12 @@ export default function CategoryForm({ categories, action, category }: CategoryF
               <div className="mt-3 border border-border-secondary rounded-lg bg-surface p-3">
                 <input
                   type="text"
-                  placeholder="Search icons..."
+                  placeholder="Search icons…"
                   value={iconSearch}
                   onChange={e => setIconSearch(e.target.value)}
                   className="w-full px-3 py-1.5 text-sm border border-border-secondary rounded-md bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent mb-3"
                 />
-                <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5 max-h-52 overflow-y-auto">
                   {filteredIcons.map(name => (
                     <button
                       key={name}
@@ -264,7 +301,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
           disabled={isSubmitting}
           className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? 'Saving...' : category ? 'Update Category' : 'Create Category'}
+          {isSubmitting ? 'Saving…' : category ? 'Update Category' : 'Create Category'}
         </button>
       </div>
     </form>
