@@ -1,18 +1,63 @@
-name: Deploy to EC2
+name: Deploy to Production
 
 on:
   push:
     branches: [main]
 
-# Only one deploy runs at a time — queue rather than cancel
+# Queue deploys — never run two at once
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy to Production
+  # ─────────────────────────────────────────────
+  # Stage 1 — Build & push Docker image
+  # ─────────────────────────────────────────────
+  build-image:
+    name: Build Docker Image
     runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=main-,format=short
+            type=raw,value=latest
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────────────────────
+  # Stage 2 — Deploy to EC2  (gate: image built)
+  # ─────────────────────────────────────────────
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: [build-image]
 
     steps:
       - name: Get EC2 public IP
@@ -28,28 +73,61 @@ jobs:
             --output text)
           echo "host=$IP" >> $GITHUB_OUTPUT
 
-      - name: Deploy via SSH
+      - name: Pull & restart containers
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ steps.ec2.outputs.host }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 30m
+          command_timeout: 15m
           script: |
             set -e
             cd /opt/jeffi-stores
+
+            echo "── Pulling latest code ──────────────────"
             git fetch origin
             git checkout main
             git reset --hard origin/main
-            docker compose -f docker-compose.prod.yml down --remove-orphans --volumes || true
-            docker rm -f jeffi-redis jeffi-app jeffi-nginx 2>/dev/null || true
-            docker network rm jeffi-stores_internal 2>/dev/null || true
-            docker system prune -af 2>&1 | grep -v "prune operation is already running" || true
-            docker compose -f docker-compose.prod.yml build --no-cache app
+
+            echo "── Pulling new image ────────────────────"
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ github.repository }}:latest
+
+            echo "── Stopping old containers ──────────────"
+            docker compose -f docker-compose.prod.yml down --remove-orphans || true
+
+            echo "── Starting updated containers ──────────"
             docker compose -f docker-compose.prod.yml up -d
+
+            echo "── Pruning old images ───────────────────"
             docker image prune -f
 
-      - name: Run DB migrations
+            echo "── Container health ─────────────────────"
+            docker compose -f docker-compose.prod.yml ps
+
+  # ─────────────────────────────────────────────
+  # Stage 3 — Run DB migrations  (gate: deploy)
+  # ─────────────────────────────────────────────
+  migrate:
+    name: Run DB Migrations
+    runs-on: ubuntu-latest
+    needs: [deploy]
+
+    steps:
+      - name: Get EC2 public IP
+        id: ec2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "host=$IP" >> $GITHUB_OUTPUT
+
+      - name: Execute migration
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ steps.ec2.outputs.host }}
@@ -70,12 +148,58 @@ jobs:
                   await pool.query(sql);
                   process.stdout.write(' done\n');
                 } else {
-                  process.stdout.write('No pending migration.\n');
+                  process.stdout.write('No pending migrations.\n');
                 }
                 await pool.end();
               })().catch(e => { process.stderr.write(e.message + '\n'); process.exit(1); });
             "
 
+  # ─────────────────────────────────────────────
+  # Stage 4 — Smoke test  (gate: migrate)
+  # ─────────────────────────────────────────────
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: [deploy]
+
+    steps:
+      - name: Get EC2 public IP
+        id: ec2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "host=$IP" >> $GITHUB_OUTPUT
+
+      - name: Health check
+        run: |
+          echo "Waiting for app to be ready..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 http://${{ steps.ec2.outputs.host }} || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [[ "$STATUS" == "200" || "$STATUS" == "301" || "$STATUS" == "302" ]]; then
+              echo "App is up."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Smoke test failed — app did not respond after 2 minutes."
+          exit 1
+
+  # ─────────────────────────────────────────────
+  # Stage 5 — Invalidate CDN  (gate: smoke test)
+  # ─────────────────────────────────────────────
+  invalidate-cdn:
+    name: Invalidate CloudFront
+    runs-on: ubuntu-latest
+    needs: [smoke-test, migrate]
+
+    steps:
       - name: Invalidate CloudFront cache
         uses: chetan/invalidate-cloudfront-action@v2
         env:
@@ -84,3 +208,41 @@ jobs:
           AWS_REGION: us-east-1
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  # ─────────────────────────────────────────────
+  # Stage 6 — Deployment summary
+  # ─────────────────────────────────────────────
+  summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [build-image, deploy, migrate, smoke-test, invalidate-cdn]
+    if: always()
+
+    steps:
+      - name: Print result
+        run: |
+          echo "╔══════════════════════════════════════════╗"
+          echo "║        DEPLOYMENT SUMMARY                ║"
+          echo "╠══════════════════════════════════════════╣"
+          echo "║  Build Image:        ${{ needs.build-image.result }}"
+          echo "║  Deploy to EC2:      ${{ needs.deploy.result }}"
+          echo "║  DB Migrations:      ${{ needs.migrate.result }}"
+          echo "║  Smoke Test:         ${{ needs.smoke-test.result }}"
+          echo "║  Invalidate CDN:     ${{ needs.invalidate-cdn.result }}"
+          echo "╚══════════════════════════════════════════╝"
+          echo ""
+          echo "Commit:  ${{ github.sha }}"
+          echo "Author:  ${{ github.actor }}"
+          echo "Branch:  ${{ github.ref_name }}"
+
+          if [[ "${{ needs.deploy.result }}"        != "success" ||
+                "${{ needs.migrate.result }}"       != "success" ||
+                "${{ needs.smoke-test.result }}"    != "success" ||
+                "${{ needs.invalidate-cdn.result }}" != "success" ]]; then
+            echo ""
+            echo "DEPLOYMENT FAILED — check the stages above."
+            exit 1
+          fi
+
+          echo ""
+          echo "DEPLOYMENT SUCCESSFUL"
