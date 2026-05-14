@@ -175,7 +175,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                 })()}
               </td>
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                <div className="flex flex-col gap-1.5 items-start">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     product.is_active
                       ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'

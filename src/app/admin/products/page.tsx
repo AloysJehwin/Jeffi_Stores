@@ -175,8 +175,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[9%]">Brand</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[11%]">Price</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[8%]">Stock</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Status</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[15%]">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[14%]">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[11%]">Actions</th>
               </tr>
             </thead>
             <ProductsTableClient products={products || []} featuredCount={featuredCount} />
