@@ -173,14 +173,14 @@ export default function NewOfflineOrderPage() {
                 href={success.invoiceUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="px-4 py-2 bg-primary text-white rounded text-sm font-medium"
+                className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded text-sm font-medium"
               >
                 Download Invoice PDF
               </a>
             )}
             <a
               href={`/admin/orders/${success.orderId}`}
-              className="px-4 py-2 bg-surface border border-border rounded text-sm font-medium text-foreground"
+              className="px-4 py-2 bg-surface border border-border-default rounded text-sm font-medium text-foreground"
             >
               View Order
             </a>
@@ -192,7 +192,7 @@ export default function NewOfflineOrderPage() {
                 setBuyerGstin(''); setPaymentMode('cash'); setNotes('')
                 setItems([newItem()])
               }}
-              className="px-4 py-2 bg-surface border border-border rounded text-sm font-medium text-foreground"
+              className="px-4 py-2 bg-surface border border-border-default rounded text-sm font-medium text-foreground"
             >
               Create Another
             </button>
@@ -220,7 +220,7 @@ export default function NewOfflineOrderPage() {
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
                 required
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                 placeholder="Full name"
               />
             </div>
@@ -230,7 +230,7 @@ export default function NewOfflineOrderPage() {
                 type="tel"
                 value={customerPhone}
                 onChange={e => setCustomerPhone(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                 placeholder="+91 XXXXX XXXXX"
               />
             </div>
@@ -240,7 +240,7 @@ export default function NewOfflineOrderPage() {
                 type="email"
                 value={customerEmail}
                 onChange={e => setCustomerEmail(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                 placeholder="customer@example.com"
               />
             </div>
@@ -251,7 +251,7 @@ export default function NewOfflineOrderPage() {
                 value={buyerGstin}
                 onChange={e => setBuyerGstin(e.target.value.toUpperCase())}
                 maxLength={15}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground font-mono"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground font-mono"
                 placeholder="29XXXXX..."
               />
             </div>
@@ -264,7 +264,7 @@ export default function NewOfflineOrderPage() {
                 type="text"
                 value={addressLine1}
                 onChange={e => setAddressLine1(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                 placeholder="Street address"
               />
             </div>
@@ -274,7 +274,7 @@ export default function NewOfflineOrderPage() {
                 type="text"
                 value={addressLine2}
                 onChange={e => setAddressLine2(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                 placeholder="Apt, suite, etc."
               />
             </div>
@@ -284,7 +284,7 @@ export default function NewOfflineOrderPage() {
                 type="text"
                 value={city}
                 onChange={e => setCity(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
               />
             </div>
             <div>
@@ -293,7 +293,7 @@ export default function NewOfflineOrderPage() {
                 type="text"
                 value={state}
                 onChange={e => setState(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                 placeholder="Tamil Nadu"
               />
             </div>
@@ -303,7 +303,7 @@ export default function NewOfflineOrderPage() {
                 type="text"
                 value={postalCode}
                 onChange={e => setPostalCode(e.target.value)}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
               />
             </div>
           </div>
@@ -315,7 +315,7 @@ export default function NewOfflineOrderPage() {
             <button
               type="button"
               onClick={() => setItems(prev => [...prev, newItem()])}
-              className="text-sm text-primary font-medium"
+              className="text-sm text-accent-500 hover:text-accent-600 font-medium"
             >
               + Add Item
             </button>
@@ -323,7 +323,7 @@ export default function NewOfflineOrderPage() {
 
           <div className="space-y-3">
             {items.map((item, idx) => (
-              <div key={item.id} className="border border-border rounded-lg p-3 space-y-3 relative">
+              <div key={item.id} className="border border-border-default rounded-lg p-3 space-y-3 relative">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-foreground-secondary">Item {idx + 1}</span>
                   {items.length > 1 && (
@@ -343,11 +343,11 @@ export default function NewOfflineOrderPage() {
                     onFocus={() => item.product_name && searchProducts(item.product_name, item.id)}
                     onBlur={() => setTimeout(() => setSuggestions([]), 200)}
                     required
-                    className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                    className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                     placeholder="Search or type product name"
                   />
                   {activeItemId === item.id && suggestions.length > 0 && (
-                    <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface-elevated border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
                       {suggestions.map(p => (
                         <div key={p.id}>
                           {p.variants?.length > 0 ? (
@@ -387,7 +387,7 @@ export default function NewOfflineOrderPage() {
                       type="text"
                       value={item.hsn_code}
                       onChange={e => updateItem(item.id, 'hsn_code', e.target.value)}
-                      className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                      className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                       placeholder="9999"
                     />
                   </div>
@@ -396,7 +396,7 @@ export default function NewOfflineOrderPage() {
                     <select
                       value={item.gst_rate}
                       onChange={e => updateItem(item.id, 'gst_rate', e.target.value)}
-                      className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                      className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                     >
                       {['0', '5', '12', '18', '28'].map(r => (
                         <option key={r} value={r}>{r}%</option>
@@ -412,7 +412,7 @@ export default function NewOfflineOrderPage() {
                       value={item.quantity}
                       onChange={e => updateItem(item.id, 'quantity', e.target.value)}
                       required
-                      className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                      className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                     />
                   </div>
                   <div>
@@ -424,7 +424,7 @@ export default function NewOfflineOrderPage() {
                       value={item.unit_price}
                       onChange={e => updateItem(item.id, 'unit_price', e.target.value)}
                       required
-                      className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                      className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                       placeholder="0.00"
                     />
                   </div>
@@ -439,7 +439,7 @@ export default function NewOfflineOrderPage() {
             ))}
           </div>
 
-          <div className="border-t border-border pt-3 text-right">
+          <div className="border-t border-border-default pt-3 text-right">
             <p className="text-sm text-foreground-secondary">Subtotal (incl. GST): <span className="font-bold text-foreground text-base">Rs {fmt(subtotal)}</span></p>
           </div>
         </div>
@@ -458,7 +458,7 @@ export default function NewOfflineOrderPage() {
                       value={mode}
                       checked={paymentMode === mode}
                       onChange={() => setPaymentMode(mode)}
-                      className="accent-primary"
+                      className="accent-accent-500"
                     />
                     <span className="text-sm text-foreground capitalize">{mode}</span>
                   </label>
@@ -474,7 +474,7 @@ export default function NewOfflineOrderPage() {
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 rows={2}
-                className="w-full border border-border rounded px-3 py-2 text-sm bg-background text-foreground"
+                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
                 placeholder="Any additional notes..."
               />
             </div>
@@ -491,14 +491,14 @@ export default function NewOfflineOrderPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 bg-primary text-white rounded-lg text-sm font-medium disabled:opacity-50"
+            className="px-6 py-2.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
           >
             {submitting ? 'Creating...' : 'Create Order & Generate Invoice'}
           </button>
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-6 py-2.5 bg-surface border border-border rounded-lg text-sm font-medium text-foreground"
+            className="px-6 py-2.5 bg-surface border border-border-default rounded-lg text-sm font-medium text-foreground"
           >
             Cancel
           </button>
