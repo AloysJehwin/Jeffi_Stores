@@ -21,12 +21,14 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import DeleteCategoryButton from './DeleteCategoryButton'
+import CategoryIcon from '@/components/visitor/CategoryIcon'
 
 interface Category {
   id: string
   name: string
   slug: string
   description: string | null
+  icon_name: string | null
   display_order: number
   is_active: boolean
   parent_category_id: string | null
@@ -90,6 +92,13 @@ function SortableRow({
             </button>
           )}
           {isSubcat && <span className="text-foreground-muted text-sm mr-1">└</span>}
+          <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${isSubcat ? 'bg-surface-secondary' : 'bg-accent-100 dark:bg-accent-900/30'}`}>
+            <CategoryIcon
+              iconName={category.icon_name}
+              categoryName={category.name}
+              className={`w-4 h-4 ${isSubcat ? 'text-foreground-muted' : 'text-accent-600 dark:text-accent-400'}`}
+            />
+          </div>
           <div>
             <div className={`text-sm ${isSubcat ? 'text-foreground' : 'font-semibold text-foreground'}`}>
               {category.name}
@@ -310,6 +319,9 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                         </svg>
                       </button>
                     )}
+                    <div className="w-7 h-7 rounded-md bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
+                      <CategoryIcon iconName={cat.icon_name} categoryName={cat.name} className="w-4 h-4 text-accent-600 dark:text-accent-400" />
+                    </div>
                     <div className="text-sm font-semibold text-foreground">{cat.name}</div>
                     {subcats.length > 0 && (
                       <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">{subcats.length}</span>
@@ -332,7 +344,10 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
               {!isCollapsed && subcats.map(sub => (
                 <div key={sub.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 ml-6 mt-2">
                   <div className="flex items-start justify-between mb-2">
-                    <div className="text-sm text-foreground">
+                    <div className="text-sm text-foreground flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-surface-secondary flex items-center justify-center shrink-0">
+                        <CategoryIcon iconName={sub.icon_name} categoryName={sub.name} className="w-3.5 h-3.5 text-foreground-muted" />
+                      </div>
                       <span className="text-foreground-muted mr-1">└</span>{sub.name}
                     </div>
                     <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
