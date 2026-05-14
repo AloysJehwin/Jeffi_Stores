@@ -174,18 +174,20 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                   )
                 })()}
               </td>
-              <td className="px-4 py-3">
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                  product.is_active
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                    : 'bg-surface-secondary text-foreground'
-                }`}>
-                  {product.is_active ? 'Active' : 'Inactive'}
-                </span>
+              <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                <div className="flex flex-col gap-1.5 items-start">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    product.is_active
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                      : 'bg-surface-secondary text-foreground'
+                  }`}>
+                    {product.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                  <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
+                </div>
               </td>
               <td className="px-4 py-3 text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-end gap-2">
-                  <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
                   <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 hover:text-accent-600">Edit</Link>
                   <button
                     onClick={() => setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })}
