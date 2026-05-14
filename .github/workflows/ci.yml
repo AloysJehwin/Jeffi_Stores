@@ -139,7 +139,7 @@ jobs:
             --output text)
           echo "host=$IP" >> $GITHUB_OUTPUT
 
-      - name: Pull image & restart
+      - name: Rolling deploy (zero downtime)
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ steps.ec2.outputs.host }}
@@ -155,13 +155,28 @@ jobs:
             git checkout main
             git reset --hard origin/main
 
-            echo "── Pulling Docker image ──"
+            echo "── Pulling new Docker image ──"
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${{ github.repository }}:latest
 
-            echo "── Restarting containers ──"
-            docker compose -f docker-compose.prod.yml down --remove-orphans || true
-            docker compose -f docker-compose.prod.yml up -d
+            echo "── Rolling restart app (nginx + redis stay up) ──"
+            docker compose -f docker-compose.prod.yml up -d --no-deps --pull never app
+
+            echo "── Waiting for app healthcheck to pass ──"
+            for i in $(seq 1 18); do
+              HEALTH=$(docker inspect --format='{{.State.Health.Status}}' jeffi-app 2>/dev/null || echo "unknown")
+              echo "Attempt $i: $HEALTH"
+              if [[ "$HEALTH" == "healthy" ]]; then
+                echo "App is healthy."
+                break
+              fi
+              if [[ $i -eq 18 ]]; then
+                echo "App failed to become healthy after 3 minutes — rolling back."
+                docker compose -f docker-compose.prod.yml up -d --no-deps app
+                exit 1
+              fi
+              sleep 10
+            done
 
             echo "── Pruning old images ──"
             docker image prune -f
