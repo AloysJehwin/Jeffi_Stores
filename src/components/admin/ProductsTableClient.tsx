@@ -187,7 +187,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                 </div>
               </td>
               <td className="px-4 py-3 text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-1.5">
                   <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 hover:text-accent-600">Edit</Link>
                   <button
                     onClick={() => setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })}
