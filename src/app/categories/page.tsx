@@ -58,10 +58,10 @@ export default async function CategoriesPage() {
                 <Link href={`/categories/${category.slug}`} className="block p-4 sm:p-6 group">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 bg-primary-100 rounded-lg flex items-center justify-center group-hover:bg-accent-100 transition-colors">
+                      <div className="w-16 h-16 bg-accent-100 rounded-lg flex items-center justify-center group-hover:bg-accent-200 transition-colors">
                         <CategoryIcon
                           categoryName={category.name}
-                          className="w-8 h-8 text-primary-600 group-hover:text-accent-600"
+                          className="w-8 h-8 text-accent-600 group-hover:text-accent-700"
                         />
                       </div>
                       <div>
