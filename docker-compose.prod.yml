@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: jeffi-app
     env_file: .env.production
     environment:
       - REDIS_URL=redis://redis:6379
@@ -15,6 +14,8 @@ services:
     restart: always
     networks:
       - internal
+    deploy:
+      replicas: 2
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 10s

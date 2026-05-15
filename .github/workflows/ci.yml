@@ -173,9 +173,9 @@ jobs:
 
             echo "── Waiting for app healthcheck to pass ──"
             for i in $(seq 1 18); do
-              HEALTH=$(docker inspect --format='{{.State.Health.Status}}' jeffi-app 2>/dev/null || echo "unknown")
-              echo "Attempt $i: $HEALTH"
-              if [[ "$HEALTH" == "healthy" ]]; then
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost/api/health || echo "000")
+              echo "Attempt $i: HTTP $STATUS"
+              if [[ "$STATUS" == "200" ]]; then
                 echo "App is healthy."
                 break
               fi
