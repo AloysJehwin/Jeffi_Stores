@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany } from '@/lib/db'
+import { buildSearchClause } from '@/lib/search'
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
     const q = new URL(request.url).searchParams.get('q')?.trim() || ''
     if (q.length < 2) return NextResponse.json({ results: [] })
 
-    const pattern = `%${q}%`
+    const sc = buildSearchClause(q, ['u.first_name || \' \' || u.last_name', 'u.email', 'u.phone', 'cp.company_name'], 1)
 
     const rows = await queryMany<any>(
       `SELECT DISTINCT ON (u.id)
@@ -20,16 +21,10 @@ export async function GET(request: NextRequest) {
        FROM users u
        LEFT JOIN customer_profiles cp ON cp.user_id = u.id
        LEFT JOIN addresses a ON a.user_id = u.id AND a.is_default = true
-       WHERE u.is_guest = false
-         AND (
-           (u.first_name || ' ' || u.last_name) ILIKE $1
-           OR u.email ILIKE $1
-           OR u.phone ILIKE $1
-           OR cp.company_name ILIKE $1
-         )
+       WHERE u.is_guest = false AND ${sc.clause}
        ORDER BY u.id ASC
        LIMIT 10`,
-      [pattern]
+      sc.params
     )
 
     return NextResponse.json({ results: rows || [] })

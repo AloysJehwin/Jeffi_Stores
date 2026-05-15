@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, queryOne } from '@/lib/db'
-import { buildSearchClause, buildSearchRank } from '@/lib/search'
+import { buildProductSearchClause, buildProductSearchRank, buildSearchRank } from '@/lib/search'
 
 const PAGE_SIZE = 21
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     let idx = 1
 
     if (search) {
-      const sc = buildSearchClause(search, ['p.name', 'p.sku'], idx)
+      const sc = buildProductSearchClause(search, 'p.name', 'p.sku', 'p.search_vector', idx)
       conditions.push(sc.clause)
       params.push(...sc.params)
       idx = sc.nextIdx
@@ -51,7 +51,12 @@ export async function GET(request: NextRequest) {
     const orderBy = sortCol
       ? `${sortCol} ${order}`
       : search
-        ? `${buildSearchRank(search, 'p.name')}, p.name ASC`
+        ? (() => {
+            const { rank, params: rp, nextIdx: ni } = buildProductSearchRank(search, 'p.name', 'p.search_vector', idx)
+            params.push(...rp)
+            idx = ni
+            return `${rank}, p.name ASC`
+          })()
         : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
 
     const whereClause = conditions.join(' AND ')

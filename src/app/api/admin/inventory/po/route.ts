@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany, queryOne, query } from '@/lib/db'
+import { buildSearchClause } from '@/lib/search'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +22,10 @@ export async function GET(request: NextRequest) {
     if (status) { conditions.push(`po.status = $${i++}`); params.push(status) }
     if (supplierId) { conditions.push(`po.supplier_id = $${i++}`); params.push(supplierId) }
     if (search) {
-      conditions.push(`(po.po_number ILIKE $${i} OR s.name ILIKE $${i})`)
-      params.push(`%${search}%`)
-      i++
+      const sc = buildSearchClause(search, ['po.po_number', 's.name'], i)
+      conditions.push(sc.clause)
+      params.push(...sc.params)
+      i = sc.nextIdx
     }
 
     const rows = await queryMany<any>(

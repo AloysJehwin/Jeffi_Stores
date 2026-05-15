@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { query, queryMany, queryOne } from '@/lib/db'
+import { buildVectorSearchClause } from '@/lib/search'
 
 function calcTotals(items: any[]) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
@@ -37,7 +38,12 @@ export async function GET(request: NextRequest) {
     let i = 1
 
     if (status) { conditions.push(`status = $${i++}`); params.push(status) }
-    if (q) { conditions.push(`(consignee_name ILIKE $${i} OR quote_number ILIKE $${i})`); params.push(`%${q}%`); i++ }
+    if (q) {
+      const sc = buildVectorSearchClause(q, 'search_vector', ['consignee_name'], ['quote_number'], i, 'simple')
+      conditions.push(sc.clause)
+      params.push(...sc.params)
+      i = sc.nextIdx
+    }
     if (from) { conditions.push(`quote_date >= $${i++}`); params.push(from) }
     if (to) { conditions.push(`quote_date <= $${i++}`); params.push(to) }
 
