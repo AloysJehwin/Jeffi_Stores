@@ -1091,20 +1091,20 @@ export default function InvoicesClient() {
               ))}
             </div>
 
-            {totalPages > 1 && (
-              <div className="px-4 py-3 border-t border-border-default flex items-center justify-between">
-                <p className="text-xs text-foreground-muted">Page {page} of {totalPages} — {total} invoices</p>
-                <div className="flex gap-2">
-                  <button disabled={page <= 1} onClick={() => fetchInvoices(page - 1)}
-                    className="px-3 py-1.5 border border-border-default rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary transition-colors">Prev</button>
-                  <button disabled={page >= totalPages} onClick={() => fetchInvoices(page + 1)}
-                    className="px-3 py-1.5 border border-border-default rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary transition-colors">Next</button>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
+      {totalPages > 1 && (
+        <div className="px-4 py-3 border border-border-default border-t-0 rounded-b-xl bg-surface-elevated flex items-center justify-between">
+          <p className="text-xs text-foreground-muted">Page {page} of {totalPages} — {total} invoices</p>
+          <div className="flex gap-2">
+            <button disabled={page <= 1} onClick={() => fetchInvoices(page - 1)}
+              className="px-3 py-1.5 border border-border-default rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary transition-colors">Prev</button>
+            <button disabled={page >= totalPages} onClick={() => fetchInvoices(page + 1)}
+              className="px-3 py-1.5 border border-border-default rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary transition-colors">Next</button>
+          </div>
+        </div>
+      )}
       {selectedInvoice && <InvoiceDetailModal inv={selectedInvoice} onClose={() => setSelectedInvoice(null)} />}
     </div>
   )

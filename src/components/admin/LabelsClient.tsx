@@ -558,7 +558,8 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
             )}
             {!searching && searchResults.map(p => {
               const isSelected = selectedProducts.some(sp => sp.id === p.id)
-              const displayPrice = fmtPrice(p.sale_price ?? p.base_price)
+              const exGst = p.sale_price ?? p.base_price
+              const displayPrice = exGst ? fmtPrice(Number((exGst * (1 + (p.gst_percentage || 0) / 100)).toFixed(2))) : null
               return (
                 <label
                   key={p.id}

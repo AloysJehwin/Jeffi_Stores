@@ -462,7 +462,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                         <div className="text-xs text-foreground-muted">{e.sku}</div>
                       </div>
                       <div className="text-xs font-semibold text-primary-500 shrink-0">
-                        Rs. {Number(((e.sale_price ?? e.base_price) * (1 + (e.gst_percentage || 0) / 100))).toFixed(0)}
+                        Rs. {Number(((e.sale_price ?? e.base_price) * (1 + (e.gst_percentage || 0) / 100))).toFixed(2)}
                       </div>
                     </label>
                   ))}
