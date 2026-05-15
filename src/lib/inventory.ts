@@ -1,5 +1,6 @@
 import { query, queryOne, queryMany, getClient } from './db'
 import { PoolClient } from 'pg'
+import { buildProductSearchClause } from './search'
 
 export type TransactionType = 'purchase' | 'sale' | 'return' | 'adjustment'
 export type ReferenceType = 'order' | 'grn' | 'manual'
@@ -95,9 +96,10 @@ export async function getStockLedger(filters: {
   if (filters.from) { conditions.push(`it.created_at >= $${i++}`); params.push(filters.from) }
   if (filters.to) { conditions.push(`it.created_at <= $${i++}`); params.push(filters.to + ' 23:59:59') }
   if (filters.search) {
-    conditions.push(`(p.name ILIKE $${i} OR p.sku ILIKE $${i} OR pv.variant_name ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildProductSearchClause(filters.search, 'p.name', 'p.sku', 'p.search_vector', i)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const limit = filters.limit || 200

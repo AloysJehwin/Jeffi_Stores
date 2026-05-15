@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { queryMany, queryOne } from '@/lib/db'
 import SortDropdown from '@/components/visitor/SortDropdown'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
+import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
@@ -13,30 +14,36 @@ async function getProducts(searchParams: any) {
   let paramIndex = 1
 
   if (searchParams.category) {
-    const catIds = String(searchParams.category).split(',').filter(Boolean)
-    if (catIds.length === 1) {
+    const catVals = String(searchParams.category).split(',').filter(Boolean)
+    if (catVals.length === 1) {
       conditions.push(`p.category_id IN (
         WITH RECURSIVE cat_tree AS (
-          SELECT id FROM categories WHERE id = $${paramIndex}
+          SELECT id FROM categories WHERE id::text = $${paramIndex} OR slug = $${paramIndex}
           UNION ALL
           SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id
         )
         SELECT id FROM cat_tree
       )`)
-      params.push(catIds[0])
+      params.push(catVals[0])
       paramIndex++
     } else {
-      const placeholders = catIds.map(() => `$${paramIndex++}`).join(', ')
-      conditions.push(`p.category_id IN (${placeholders})`)
-      params.push(...catIds)
+      const parts = catVals.map(() => {
+        const p = paramIndex++
+        return `(id::text = $${p} OR slug = $${p})`
+      })
+      conditions.push(`p.category_id IN (SELECT id FROM categories WHERE ${parts.join(' OR ')})`)
+      params.push(...catVals)
     }
   }
 
   if (searchParams.brand) {
-    const brandIds = String(searchParams.brand).split(',').filter(Boolean)
-    const placeholders = brandIds.map(() => `$${paramIndex++}`).join(', ')
-    conditions.push(`p.brand_id IN (${placeholders})`)
-    params.push(...brandIds)
+    const brandVals = String(searchParams.brand).split(',').filter(Boolean)
+    const parts = brandVals.map(() => {
+      const p = paramIndex++
+      return `(id::text = $${p} OR slug = $${p})`
+    })
+    conditions.push(`p.brand_id IN (SELECT id FROM brands WHERE ${parts.join(' OR ')})`)
+    params.push(...brandVals)
   }
 
   if (searchParams.search) {
@@ -171,21 +178,7 @@ export default async function ProductsPage({
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Search
                   </label>
-                  <form action="/products" method="get">
-                    <input
-                      type="text"
-                      name="search"
-                      defaultValue={searchParams.search}
-                      placeholder="Search products..."
-                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    />
-                    <button
-                      type="submit"
-                      className="mt-2 w-full bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                    >
-                      Search
-                    </button>
-                  </form>
+                  <ProductsSearch defaultValue={searchParams.search} />
                 </div>
 
                 {/* Categories Filter */}
@@ -196,8 +189,15 @@ export default async function ProductsPage({
                       const activeCats = searchParams.category ? searchParams.category.split(',') : []
                       const activeBrands = searchParams.brand ? searchParams.brand.split(',') : []
 
-                      function toggleCatUrl(id: string) {
-                        const next = activeCats.includes(id) ? activeCats.filter(c => c !== id) : [...activeCats, id]
+                      function catIsActive(cat: any) {
+                        return activeCats.includes(cat.id) || activeCats.includes(cat.slug)
+                      }
+
+                      function toggleCatUrl(cat: any) {
+                        const active = catIsActive(cat)
+                        const next = active
+                          ? activeCats.filter(v => v !== cat.id && v !== cat.slug)
+                          : [...activeCats.filter(v => v !== cat.id && v !== cat.slug), cat.id]
                         const p = new URLSearchParams()
                         if (next.length) p.set('category', next.join(','))
                         if (activeBrands.length) p.set('brand', activeBrands.join(','))
@@ -221,11 +221,11 @@ export default async function ProductsPage({
                           </Link>
                           {mainCats.map((cat: any) => {
                             const subs = subCats.filter((s: any) => s.parent_category_id === cat.id)
-                            const isActive = activeCats.includes(cat.id)
+                            const isActive = catIsActive(cat)
                             return (
                               <div key={cat.id}>
                                 <Link
-                                  href={toggleCatUrl(cat.id)}
+                                  href={toggleCatUrl(cat)}
                                   className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors font-medium ${
                                     isActive
                                       ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400'
@@ -240,11 +240,11 @@ export default async function ProductsPage({
                                   )}
                                 </Link>
                                 {subs.map((sub: any) => {
-                                  const isSubActive = activeCats.includes(sub.id)
+                                  const isSubActive = catIsActive(sub)
                                   return (
                                     <Link
                                       key={sub.id}
-                                      href={toggleCatUrl(sub.id)}
+                                      href={toggleCatUrl(sub)}
                                       className={`flex items-center justify-between pl-6 pr-3 py-1.5 rounded-lg text-sm transition-colors ${
                                         isSubActive
                                           ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
@@ -277,8 +277,15 @@ export default async function ProductsPage({
                       const activeCats = searchParams.category ? searchParams.category.split(',') : []
                       const activeBrands = searchParams.brand ? searchParams.brand.split(',') : []
 
-                      function toggleBrandUrl(id: string) {
-                        const next = activeBrands.includes(id) ? activeBrands.filter(b => b !== id) : [...activeBrands, id]
+                      function brandIsActive(brand: any) {
+                        return activeBrands.includes(brand.id) || activeBrands.includes(brand.slug)
+                      }
+
+                      function toggleBrandUrl(brand: any) {
+                        const active = brandIsActive(brand)
+                        const next = active
+                          ? activeBrands.filter(v => v !== brand.id && v !== brand.slug)
+                          : [...activeBrands.filter(v => v !== brand.id && v !== brand.slug), brand.id]
                         const p = new URLSearchParams()
                         if (activeCats.length) p.set('category', activeCats.join(','))
                         if (next.length) p.set('brand', next.join(','))
@@ -310,11 +317,11 @@ export default async function ProductsPage({
                             All Brands
                           </Link>
                           {brands.map((brand: any) => {
-                            const isActive = activeBrands.includes(brand.id)
+                            const isActive = brandIsActive(brand)
                             return (
                               <Link
                                 key={brand.id}
-                                href={toggleBrandUrl(brand.id)}
+                                href={toggleBrandUrl(brand)}
                                 className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
                                   isActive
                                     ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'

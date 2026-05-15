@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import AdminTypeahead from '@/components/admin/AdminTypeahead'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -112,7 +113,12 @@ function SuppliersTab() {
       <div className="flex flex-wrap gap-2 items-end">
         <div className="flex-1 min-w-[180px]">
           <label className={labelCls}>Search</label>
-          <input className={inputCls} placeholder="Name, GSTIN, contact..." value={search} onChange={e => setSearch(e.target.value)} />
+          <AdminTypeahead
+            type="suppliers"
+            value={search}
+            onChange={setSearch}
+            placeholder="Name, GSTIN, contact..."
+          />
         </div>
         <label className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer pb-0.5">
           <input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} className="accent-secondary-500" />
@@ -435,7 +441,12 @@ function POTab() {
       <div className="flex flex-wrap gap-2 items-end">
         <div className="flex-1 min-w-[180px]">
           <label className={labelCls}>Search</label>
-          <input className={inputCls} placeholder="PO number, supplier..." value={search} onChange={e => setSearch(e.target.value)} />
+          <AdminTypeahead
+            type="purchase_orders"
+            value={search}
+            onChange={setSearch}
+            placeholder="PO number, supplier..."
+          />
         </div>
         <div>
           <label className={labelCls}>Status</label>
@@ -643,7 +654,12 @@ function StockTab() {
             <div className="flex flex-wrap gap-2 items-end">
               <div className="flex-1 min-w-[180px]">
                 <label className={labelCls}>Search product</label>
-                <input className={inputCls} placeholder="Name, SKU..." value={search} onChange={e => setSearch(e.target.value)} />
+                <AdminTypeahead
+                  type="products"
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Name, SKU..."
+                />
               </div>
               <div>
                 <label className={labelCls}>From</label>

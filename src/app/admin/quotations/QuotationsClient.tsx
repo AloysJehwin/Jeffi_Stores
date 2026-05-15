@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import HoverCard from '@/components/ui/HoverCard'
 
 interface QuoteItem {
@@ -562,11 +563,12 @@ export default function QuotationsClient() {
               </div>
             </div>
             <div className="flex-1 min-w-[160px]">
-              <input
-                type="text" placeholder="Search quote # or consignee..." value={searchQ}
-                onChange={e => setSearchQ(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && loadList()}
-                className={inputCls}
+              <AdminTypeahead
+                type="quotations"
+                value={searchQ}
+                onChange={setSearchQ}
+                onEnter={() => loadList()}
+                placeholder="Search quote # or consignee..."
               />
             </div>
             <div className="flex gap-2 items-center">

@@ -100,6 +100,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
           },
         ]}
         searchPlaceholder="Search by name..."
+        suggestType="brands"
         searchParam="search"
       />
 

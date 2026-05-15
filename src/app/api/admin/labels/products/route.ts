@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany } from '@/lib/db'
-import { buildSearchClause, buildSearchRank } from '@/lib/search'
+import { buildProductSearchClause, buildProductSearchRank } from '@/lib/search'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,22 +25,26 @@ export async function GET(request: NextRequest) {
 
     let searchWhere = 'TRUE'
     let searchWherePv = 'TRUE'
+    let rank = '(0+0)'
     if (q) {
-      const sc = buildSearchClause(q, ['p.name', 'p.sku'], idx)
+      const sc = buildProductSearchClause(q, 'p.name', 'p.sku', 'p.search_vector', idx)
       searchWhere = sc.clause
       params.push(...sc.params)
       idx = sc.nextIdx
 
-      const sc2 = buildSearchClause(q, ['p.name', 'pv.variant_name', 'pv.sku'], idx)
+      const sc2 = buildProductSearchClause(q, 'p.name', 'pv.sku', 'p.search_vector', idx)
       searchWherePv = sc2.clause
       params.push(...sc2.params)
       idx = sc2.nextIdx
+
+      const rk = buildProductSearchRank(q, 'name', 'p.search_vector', idx)
+      rank = rk.rank
+      params.push(...rk.params)
+      idx = rk.nextIdx
     }
 
     const limitIdx = idx++
     params.push(limit)
-
-    const rank = q ? buildSearchRank(q, 'name') : '(0+0)'
 
     const rows = await queryMany(
       `SELECT * FROM (

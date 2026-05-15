@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import AdminTypeahead from '@/components/admin/AdminTypeahead'
 
 type Tab = 'receivables' | 'payables' | 'pl' | 'cashflow'
 
@@ -92,7 +93,13 @@ function ReceivablesTab() {
         </div>
         <div className="flex-1 min-w-[180px]">
           <label className={labelCls}>Search customer / invoice</label>
-          <input className={inputCls} placeholder="Name, invoice #..." value={search} onChange={e => setSearch(e.target.value)} />
+          <AdminTypeahead
+            type="receivables"
+            value={search}
+            onChange={setSearch}
+            onEnter={load}
+            placeholder="Name, invoice #..."
+          />
         </div>
         <button className={btnPrimary} onClick={load}>{loading ? 'Loading...' : 'Load'}</button>
         {data?.rows?.length > 0 && <button className={btnSecondary} onClick={exportCSV}>Export CSV</button>}
@@ -225,7 +232,13 @@ function PayablesTab() {
         </div>
         <div className="flex-1 min-w-[180px]">
           <label className={labelCls}>Search supplier / bill #</label>
-          <input className={inputCls} placeholder="Supplier name, bill #..." value={search} onChange={e => setSearch(e.target.value)} />
+          <AdminTypeahead
+            type="payables"
+            value={search}
+            onChange={setSearch}
+            onEnter={load}
+            placeholder="Supplier name, bill #..."
+          />
         </div>
         <button className={btnPrimary} onClick={load}>{loading ? 'Loading...' : 'Load'}</button>
         <button className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>+ Add Bill</button>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany, queryOne } from '@/lib/db'
+import { buildVectorSearchClause } from '@/lib/search'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,9 +29,10 @@ export async function GET(request: NextRequest) {
     if (from) { conditions.push(`o.invoice_date >= $${i++}`); params.push(from) }
     if (to) { conditions.push(`o.invoice_date < ($${i++}::date + interval '1 day')`); params.push(to) }
     if (search) {
-      conditions.push(`(o.invoice_number ILIKE $${i} OR o.customer_name ILIKE $${i} OR o.order_number ILIKE $${i})`)
-      params.push(`%${search}%`)
-      i++
+      const sc = buildVectorSearchClause(search, 'o.search_vector', ['o.customer_name'], ['o.invoice_number', 'o.order_number'], i, 'simple')
+      conditions.push(sc.clause)
+      params.push(...sc.params)
+      i = sc.nextIdx
     }
 
     const where = `WHERE ${conditions.join(' AND ')}`

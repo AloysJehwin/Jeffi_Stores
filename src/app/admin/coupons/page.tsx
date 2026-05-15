@@ -88,6 +88,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
       <AdminFilters
         filters={[{ name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] }]}
         searchPlaceholder="Search by code or description..."
+        suggestType="coupons"
         />
 
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mt-4">
