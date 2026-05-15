@@ -232,7 +232,17 @@ jobs:
               const { Pool } = require('pg');
               const fs = require('fs');
               const path = require('path');
-              const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+              const connStr = process.env.DATABASE_URL;
+              const config = { connectionString: connStr };
+              if (connStr && connStr.includes('rds.amazonaws.com')) {
+                const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem');
+                if (fs.existsSync(certPath)) {
+                  config.ssl = { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() };
+                } else {
+                  config.ssl = { rejectUnauthorized: false };
+                }
+              }
+              const pool = new Pool(config);
               (async () => {
                 const dir = '/app/database/migrations';
                 const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
