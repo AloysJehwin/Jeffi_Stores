@@ -30,7 +30,7 @@ export function buildProductSearchClause(
   const i = startIdx
   const clause = `(
     ${vectorCol} @@ to_tsquery('english', $${i})
-    OR similarity(${nameCol}, $${i + 1}) > 0.12
+    OR similarity(${nameCol}, $${i + 1}::text) > 0.12
     OR ${skuCol} ILIKE $${i + 2}
   )`
   return { clause, params: [tsq, q, `${q}%`], nextIdx: i + 3 }
@@ -82,7 +82,7 @@ export function buildVectorSearchClause(
   }
 
   for (const col of trgmCols) {
-    parts.push(`similarity(${col}, $${i}) > 0.12`)
+    parts.push(`similarity(${col}, $${i}::text) > 0.12`)
     params.push(q)
     i++
   }
@@ -118,7 +118,7 @@ export function buildSearchClause(
     return `(${wordClauses.join(' AND ')})`
   })
 
-  const trgmClauses = columns.map(col => `similarity(${col}, $${idx}) > 0.12`)
+  const trgmClauses = columns.map(col => `similarity(${col}, $${idx}::text) > 0.12`)
   params.push(raw.trim())
   idx++
 
