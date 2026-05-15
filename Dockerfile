@@ -10,9 +10,8 @@ RUN npm ci --omit=dev
 FROM base AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
-# Remove platform-specific SWC binaries — Next.js falls back to WASM compiler on Alpine
-RUN find node_modules/@next -name "*.node" -delete 2>/dev/null || true
+# --omit=optional skips platform-specific SWC native binaries; Next.js uses WASM fallback
+RUN npm ci --omit=optional
 COPY . .
 
 # Build the Next.js app in standalone mode
