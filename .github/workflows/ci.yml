@@ -218,29 +218,33 @@ jobs:
             --output text)
           echo "host=$IP" >> $GITHUB_OUTPUT
 
-      - name: Run migration.sql
+      - name: Run migrations
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ steps.ec2.outputs.host }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 5m
+          command_timeout: 10m
           script: |
             set -e
             cd /opt/jeffi-stores
             docker compose -f docker-compose.prod.yml exec -T app node -e "
               const { Pool } = require('pg');
               const fs = require('fs');
+              const path = require('path');
               const pool = new Pool({ connectionString: process.env.DATABASE_URL });
               (async () => {
-                const sql = fs.readFileSync('/app/database/migration.sql', 'utf8').trim();
-                if (sql && !sql.startsWith('--')) {
-                  process.stdout.write('Running migration.sql...');
-                  await pool.query(sql);
-                  process.stdout.write(' done\n');
-                } else {
-                  process.stdout.write('No pending migrations.\n');
+                const dir = '/app/database/migrations';
+                const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
+                for (const file of files) {
+                  const sql = fs.readFileSync(path.join(dir, file), 'utf8').trim();
+                  if (sql) {
+                    process.stdout.write('Running ' + file + '...');
+                    await pool.query(sql);
+                    process.stdout.write(' done\n');
+                  }
                 }
+                if (files.length === 0) process.stdout.write('No migration files found.\n');
                 await pool.end();
               })().catch(e => { process.stderr.write(e.message + '\n'); process.exit(1); });
             "
