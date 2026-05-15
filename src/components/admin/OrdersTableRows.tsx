@@ -34,7 +34,7 @@ function OrderPopover({ order }: { order: any }) {
   return (
     <HoverCard
       trigger={
-        <span className="cursor-default underline decoration-dotted underline-offset-2 text-foreground font-medium hover:text-accent-500 transition-colors">
+        <span className="cursor-default underline decoration-dotted underline-offset-2 text-foreground font-medium hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
           #{orderNum}
         </span>
       }
@@ -108,7 +108,7 @@ function CustomerPopover({ order }: { order: any }) {
   return (
     <HoverCard
       trigger={
-        <span className="cursor-default underline decoration-dotted underline-offset-2 text-foreground hover:text-accent-500 transition-colors">
+        <span className="cursor-default underline decoration-dotted underline-offset-2 text-foreground hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
           {name}
         </span>
       }
@@ -166,7 +166,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
           className="hover:bg-surface-secondary cursor-pointer"
           onClick={() => setSelected(order)}
         >
-          <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+          <td className="px-6 py-4 whitespace-nowrap">
             <OrderPopover order={order} />
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
@@ -178,7 +178,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
               {order.source === 'offline' ? 'Offline' : 'Online'}
             </span>
           </td>
-          <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+          <td className="px-6 py-4 whitespace-nowrap">
             <div>
               <CustomerPopover order={order} />
               <div className="text-xs text-foreground-muted mt-0.5">{order.users?.email || order.billing_email}</div>

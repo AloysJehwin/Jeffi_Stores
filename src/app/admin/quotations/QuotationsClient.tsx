@@ -600,10 +600,10 @@ export default function QuotationsClient() {
                   <tr><td colSpan={6} className="px-4 py-12 text-center text-foreground-secondary">No quotations found. Create your first one.</td></tr>
                 ) : quotations.map(q => (
                   <tr key={q.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer" onClick={() => setSelectedQuote(q)}>
-                    <td className="px-4 py-3 font-mono font-semibold text-foreground" onClick={e => e.stopPropagation()}>
+                    <td className="px-4 py-3 font-mono font-semibold text-foreground">
                       <HoverCard
                         trigger={
-                          <span className="cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors">
+                          <span className="cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
                             {q.quote_number}
                           </span>
                         }

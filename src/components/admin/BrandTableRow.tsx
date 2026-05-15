@@ -79,10 +79,10 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
         document.body
       )}
       <tr className="hover:bg-surface-secondary cursor-pointer" onClick={() => setOpen(true)}>
-        <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+        <td className="px-6 py-4 whitespace-nowrap">
           <HoverCard
             trigger={
-              <span className="text-sm font-semibold text-foreground cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors">
+              <span className="text-sm font-semibold text-foreground cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
                 {brand.name}
               </span>
             }

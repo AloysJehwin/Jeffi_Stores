@@ -104,10 +104,10 @@ export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
         document.body
       )}
       <tr className="hover:bg-surface-secondary/50 transition-colors cursor-pointer" onClick={() => setOpen(true)}>
-        <td className="px-4 py-3 font-mono font-bold" onClick={e => e.stopPropagation()}>
+        <td className="px-4 py-3 font-mono font-bold">
           <HoverCard
             trigger={
-              <span className="text-accent-500 cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-600 transition-colors">
+              <span className="text-accent-500 cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-600 transition-colors" onClick={e => e.stopPropagation()}>
                 {c.code}
               </span>
             }

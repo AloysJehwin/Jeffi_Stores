@@ -887,10 +887,10 @@ export default function InvoicesClient() {
                 <tbody>
                   {invoices.map(inv => (
                     <tr key={inv.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer" onClick={() => setSelectedInvoice(inv)}>
-                      <td className="px-4 py-3 font-mono font-semibold text-foreground text-sm" onClick={e => e.stopPropagation()}>
+                      <td className="px-4 py-3 font-mono font-semibold text-foreground text-sm">
                         <HoverCard
                           trigger={
-                            <span className="cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors">
+                            <span className="cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
                               {inv.invoice_number}
                             </span>
                           }
