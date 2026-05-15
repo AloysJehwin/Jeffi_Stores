@@ -1,36 +1,343 @@
-name: CI
+name: Jeffi Stores Pipeline
 
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
   push:
-    branches-ignore: [main]
+    branches: [main]
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  # ────────────────────────────────────────────────────────
+  # Stage 1 — Lint  (PR + main)
+  # ────────────────────────────────────────────────────────
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Lint
+      - name: ESLint
         run: npm run lint
 
-      - name: Type check
+  # ────────────────────────────────────────────────────────
+  # Stage 1 — Type Check  (PR + main, parallel with lint)
+  # ────────────────────────────────────────────────────────
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: TypeScript
         run: npx tsc --noEmit
 
-      - name: Build
+  # ────────────────────────────────────────────────────────
+  # Stage 2 — Build  (PR + main, gate: lint + typecheck)
+  # ────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Next.js build
         run: npm run build
         env:
           DATABASE_URL: postgresql://localhost:5432/dummy
           JWT_SECRET: ci-test-secret
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
           SKIP_DB_CHECK: true
+
+  # ────────────────────────────────────────────────────────
+  # Stage 3 — Docker build & push  (main only, gate: build)
+  # ────────────────────────────────────────────────────────
+  docker:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=main-,format=short
+            type=raw,value=latest
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ────────────────────────────────────────────────────────
+  # Stage 4 — Deploy to EC2  (main only, gate: docker)
+  # ────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: [docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Get EC2 public IP
+        id: ec2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "host=$IP" >> $GITHUB_OUTPUT
+
+      - name: Rolling deploy (zero downtime)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ steps.ec2.outputs.host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -e
+            cd /opt/jeffi-stores
+
+            echo "── Pulling latest code ──"
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
+
+            echo "── Pulling new Docker image ──"
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/${{ github.repository }}:latest
+
+            echo "── Rolling restart app (nginx + redis stay up) ──"
+            docker compose -f docker-compose.prod.yml up -d --no-deps --pull never app
+
+            echo "── Waiting for app healthcheck to pass ──"
+            for i in $(seq 1 18); do
+              HEALTH=$(docker inspect --format='{{.State.Health.Status}}' jeffi-app 2>/dev/null || echo "unknown")
+              echo "Attempt $i: $HEALTH"
+              if [[ "$HEALTH" == "healthy" ]]; then
+                echo "App is healthy."
+                break
+              fi
+              if [[ $i -eq 18 ]]; then
+                echo "App failed to become healthy after 3 minutes — rolling back."
+                docker compose -f docker-compose.prod.yml up -d --no-deps app
+                exit 1
+              fi
+              sleep 10
+            done
+
+            echo "── Pruning old images ──"
+            docker image prune -f
+
+            echo "── Status ──"
+            docker compose -f docker-compose.prod.yml ps
+
+  # ────────────────────────────────────────────────────────
+  # Stage 5 — DB migrations  (main only, gate: deploy)
+  # ────────────────────────────────────────────────────────
+  migrate:
+    name: DB Migrations
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Get EC2 public IP
+        id: ec2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "host=$IP" >> $GITHUB_OUTPUT
+
+      - name: Run migration.sql
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ steps.ec2.outputs.host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            cd /opt/jeffi-stores
+            docker compose -f docker-compose.prod.yml exec -T app node -e "
+              const { Pool } = require('pg');
+              const fs = require('fs');
+              const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+              (async () => {
+                const sql = fs.readFileSync('/app/database/migration.sql', 'utf8').trim();
+                if (sql && !sql.startsWith('--')) {
+                  process.stdout.write('Running migration.sql...');
+                  await pool.query(sql);
+                  process.stdout.write(' done\n');
+                } else {
+                  process.stdout.write('No pending migrations.\n');
+                }
+                await pool.end();
+              })().catch(e => { process.stderr.write(e.message + '\n'); process.exit(1); });
+            "
+
+  # ────────────────────────────────────────────────────────
+  # Stage 6 — Smoke test  (main only, gate: deploy)
+  # ────────────────────────────────────────────────────────
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Get EC2 public IP
+        id: ec2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "host=$IP" >> $GITHUB_OUTPUT
+
+      - name: Health check
+        run: |
+          echo "Waiting for app to be ready..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 http://${{ steps.ec2.outputs.host }} || echo "000")
+            echo "Attempt $i: HTTP $STATUS"
+            if [[ "$STATUS" == "200" || "$STATUS" == "301" || "$STATUS" == "302" ]]; then
+              echo "App is up."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "App did not respond after 2 minutes."
+          exit 1
+
+  # ────────────────────────────────────────────────────────
+  # Stage 7 — Invalidate CDN  (main only, gate: smoke-test + migrate)
+  # ────────────────────────────────────────────────────────
+  invalidate-cdn:
+    name: Invalidate CloudFront
+    runs-on: ubuntu-latest
+    needs: [smoke-test, migrate]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Invalidate cache
+        uses: chetan/invalidate-cloudfront-action@v2
+        env:
+          DISTRIBUTION: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+          PATHS: "/*"
+          AWS_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  # ────────────────────────────────────────────────────────
+  # Final — Summary  (always runs)
+  # ────────────────────────────────────────────────────────
+  summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, build, docker, deploy, migrate, smoke-test, invalidate-cdn]
+    if: always()
+    steps:
+      - name: Result
+        run: |
+          IS_MAIN="${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
+
+          echo "╔══════════════════════════════════════════╗"
+          echo "║          PIPELINE SUMMARY                ║"
+          echo "╠══════════════════════════════════════════╣"
+          echo "║  Lint:               ${{ needs.lint.result }}"
+          echo "║  Type Check:         ${{ needs.typecheck.result }}"
+          echo "║  Build:              ${{ needs.build.result }}"
+          if [[ "$IS_MAIN" == "true" ]]; then
+          echo "║  Docker Push:        ${{ needs.docker.result }}"
+          echo "║  Deploy to EC2:      ${{ needs.deploy.result }}"
+          echo "║  DB Migrations:      ${{ needs.migrate.result }}"
+          echo "║  Smoke Test:         ${{ needs.smoke-test.result }}"
+          echo "║  Invalidate CDN:     ${{ needs.invalidate-cdn.result }}"
+          fi
+          echo "╠══════════════════════════════════════════╣"
+          echo "║  Trigger: ${{ github.event_name }} → ${{ github.ref_name }}"
+          echo "║  Commit:  ${{ github.sha }}"
+          echo "║  Author:  ${{ github.actor }}"
+          echo "╚══════════════════════════════════════════╝"
+
+          # Fail if any active stage failed
+          if [[ "${{ needs.lint.result }}"      == "failure" ||
+                "${{ needs.typecheck.result }}" == "failure" ||
+                "${{ needs.build.result }}"     == "failure" ]]; then
+            echo "PIPELINE FAILED at checks stage."
+            exit 1
+          fi
+
+          if [[ "$IS_MAIN" == "true" ]]; then
+            if [[ "${{ needs.docker.result }}"       == "failure" ||
+                  "${{ needs.deploy.result }}"       == "failure" ||
+                  "${{ needs.migrate.result }}"      == "failure" ||
+                  "${{ needs.smoke-test.result }}"   == "failure" ||
+                  "${{ needs.invalidate-cdn.result }}" == "failure" ]]; then
+              echo "PIPELINE FAILED at deployment stage."
+              exit 1
+            fi
+            echo "DEPLOYMENT SUCCESSFUL"
+          else
+            echo "PR CHECKS PASSED — ready to merge"
+          fi
