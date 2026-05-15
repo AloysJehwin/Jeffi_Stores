@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import HoverCard from '@/components/ui/HoverCard'
+import OrderDetailModal from '@/components/admin/OrderDetailModal'
 
 function statusBadgeClass(status: string) {
   if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
@@ -38,11 +40,11 @@ function OrderPopover({ order }: { order: any }) {
       }
       align="left"
       side="bottom"
-      width="280px"
+      width="380px"
     >
       <div className="p-3 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <p className="font-semibold text-foreground text-sm">Order #{orderNum}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="font-semibold text-foreground text-sm font-mono break-all">#{orderNum}</p>
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
             order.source === 'offline'
               ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
@@ -145,6 +147,8 @@ function CustomerPopover({ order }: { order: any }) {
 }
 
 export default function OrdersTableRows({ orders }: { orders: any[] }) {
+  const [selected, setSelected] = useState<any>(null)
+
   if (!orders.length) {
     return (
       <tr>
@@ -155,9 +159,14 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
 
   return (
     <>
+      <OrderDetailModal order={selected} onClose={() => setSelected(null)} />
       {orders.map((order: any) => (
-        <tr key={order.id} className="hover:bg-surface-secondary">
-          <td className="px-6 py-4 whitespace-nowrap">
+        <tr
+          key={order.id}
+          className="hover:bg-surface-secondary cursor-pointer"
+          onClick={() => setSelected(order)}
+        >
+          <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
             <OrderPopover order={order} />
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
@@ -169,7 +178,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
               {order.source === 'offline' ? 'Offline' : 'Online'}
             </span>
           </td>
-          <td className="px-6 py-4 whitespace-nowrap">
+          <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
             <div>
               <CustomerPopover order={order} />
               <div className="text-xs text-foreground-muted mt-0.5">{order.users?.email || order.billing_email}</div>
@@ -196,7 +205,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
               {statusLabel(order.status)}
             </span>
           </td>
-          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
             <Link href={`/admin/orders/${order.id}`} className="text-accent-500 hover:text-accent-600">View Details</Link>
           </td>
         </tr>

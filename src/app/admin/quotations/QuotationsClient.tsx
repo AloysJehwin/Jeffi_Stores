@@ -99,6 +99,7 @@ export default function QuotationsClient() {
   const { showToast, showConfirm } = useToast()
   const [view, setView] = useState<View>('list')
   const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [selectedQuote, setSelectedQuote] = useState<Quotation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -332,6 +333,12 @@ export default function QuotationsClient() {
     scheduleAutoSave()
   }, [quoteDate, notes, cName, cAddr1, cAddr2, cCity, cState, cGstin, cPhone, cPincode,
       buyerSame, bName, bAddr1, bAddr2, bCity, bState, bGstin, items])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedQuote(null) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   async function downloadPDF() {
     if (!editId) { await save(); }
@@ -591,8 +598,8 @@ export default function QuotationsClient() {
                 ) : quotations.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-12 text-center text-foreground-secondary">No quotations found. Create your first one.</td></tr>
                 ) : quotations.map(q => (
-                  <tr key={q.id} className="border-b border-border-default hover:bg-surface-primary transition-colors">
-                    <td className="px-4 py-3 font-mono font-semibold text-foreground">
+                  <tr key={q.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer" onClick={() => setSelectedQuote(q)}>
+                    <td className="px-4 py-3 font-mono font-semibold text-foreground" onClick={e => e.stopPropagation()}>
                       <HoverCard
                         trigger={
                           <span className="cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors">
@@ -670,7 +677,7 @@ export default function QuotationsClient() {
                         {q.status === 'final' ? 'Final' : 'Draft'}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-2">
                         {q.status === 'draft' && (
                           <button onClick={() => openEdit(q.id)} title="Edit"
@@ -713,6 +720,7 @@ export default function QuotationsClient() {
             </table>
           </div>
         </div>
+        {selectedQuote && <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />}
       </div>
     )
   }
@@ -1107,6 +1115,112 @@ export default function QuotationsClient() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div
+        className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 border-b border-border-default">
+          <div className="min-w-0 pr-4">
+            <h2 className="text-lg font-bold text-foreground leading-tight font-mono">{q.quote_number}</h2>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              {new Date(q.quote_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${STATUS_COLORS[q.status] || 'bg-gray-100 text-gray-700'}`}>
+              {q.status === 'final' ? 'Final' : 'Draft'}
+            </span>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Consignee */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Consignee</p>
+              <p className="text-sm font-semibold text-foreground">{q.consignee_name}</p>
+              {q.consignee_phone && <p className="text-xs text-foreground-secondary mt-0.5">{q.consignee_phone}</p>}
+              {[q.consignee_addr1, q.consignee_addr2, q.consignee_city, q.consignee_state, q.consignee_pincode].filter(Boolean).length > 0 && (
+                <p className="text-xs text-foreground-secondary mt-0.5">
+                  {[q.consignee_addr1, q.consignee_addr2, q.consignee_city, q.consignee_state, q.consignee_pincode].filter(Boolean).join(', ')}
+                </p>
+              )}
+              {q.consignee_gstin && <p className="text-xs text-foreground-secondary font-mono mt-0.5">{q.consignee_gstin}</p>}
+            </div>
+            {!q.buyer_same && q.buyer_name && (
+              <div>
+                <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Buyer</p>
+                <p className="text-sm font-semibold text-foreground">{q.buyer_name}</p>
+                {[q.buyer_addr1, q.buyer_addr2, q.buyer_city, q.buyer_state].filter(Boolean).length > 0 && (
+                  <p className="text-xs text-foreground-secondary mt-0.5">
+                    {[q.buyer_addr1, q.buyer_addr2, q.buyer_city, q.buyer_state].filter(Boolean).join(', ')}
+                  </p>
+                )}
+                {q.buyer_gstin && <p className="text-xs text-foreground-secondary font-mono mt-0.5">{q.buyer_gstin}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Tax breakdown */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-surface-secondary">
+            <div>
+              <p className="text-xs text-foreground-muted">Subtotal</p>
+              <p className="text-sm font-semibold text-foreground">₹{Number(q.subtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+            </div>
+            {Number(q.cgst_amount) > 0 && (
+              <div>
+                <p className="text-xs text-foreground-muted">CGST + SGST</p>
+                <p className="text-sm font-semibold text-foreground">
+                  ₹{Number(q.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹{Number(q.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-foreground-muted">Total</p>
+              <p className="text-sm font-bold text-foreground">₹{Number(q.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+
+          {/* Converted status */}
+          {q.converted_order_id && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Converted to Invoice</span>
+            </div>
+          )}
+
+          {/* Downloads */}
+          <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
+            <a
+              href={`/api/admin/quotations/${q.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Quotation PDF
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
