@@ -125,6 +125,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
         ]}
         searchPlaceholder="Search by order number or customer..."
         searchParam="search"
+        suggestType="orders"
       />
 
       <div className="md:hidden space-y-3">

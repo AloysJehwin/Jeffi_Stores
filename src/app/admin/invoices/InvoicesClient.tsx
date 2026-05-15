@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import AdminSelect from '@/components/admin/AdminSelect'
+import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
 import HoverCard from '@/components/ui/HoverCard'
 
@@ -834,10 +835,14 @@ export default function InvoicesClient() {
       <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-48">
-            <input type="text" value={searchInput} onChange={e => setSearchInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && setSearchQ(searchInput)}
+            <AdminTypeahead
+              type="invoices"
+              value={searchInput}
+              onChange={setSearchInput}
+              onSelect={item => { setSearchInput(item.label); setSearchQ(item.label) }}
+              onEnter={val => setSearchQ(val)}
               placeholder="Search invoice, order, customer…"
-              className={inputCls} />
+            />
           </div>
           <button onClick={() => setSearchQ(searchInput)}
             className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-medium transition-colors">

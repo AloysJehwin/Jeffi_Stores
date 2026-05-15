@@ -73,6 +73,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
           },
         ]}
         searchPlaceholder="Search by name..."
+        suggestType="categories"
         searchParam="search"
       />
 

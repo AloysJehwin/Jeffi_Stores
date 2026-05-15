@@ -100,6 +100,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
         ]}
         searchPlaceholder="Search by name or SKU..."
         searchParam="search"
+        suggestType="products"
       />
 
       <div className="md:hidden space-y-3">

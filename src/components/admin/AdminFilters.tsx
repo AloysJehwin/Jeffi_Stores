@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useCallback, useState } from 'react'
 import AdminSelect from './AdminSelect'
+import AdminTypeahead from './AdminTypeahead'
 
 interface FilterOption {
   value: string
@@ -21,13 +22,15 @@ interface AdminFiltersProps {
   filters: FilterConfig[]
   searchPlaceholder?: string
   searchParam?: string
+  suggestType?: string
 }
 
-export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search' }: AdminFiltersProps) {
+export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search', suggestType }: AdminFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [searchValue, setSearchValue] = useState(searchParams.get(searchParam) || '')
 
   const createQueryString = useCallback(
     (name: string, value: string) => {
@@ -115,32 +118,51 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
           ))}
 
           {searchPlaceholder && (
-            <form onSubmit={handleSearchSubmit} className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[300px]">
+            <div className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[300px]">
               <label
                 htmlFor={`filter-${searchParam}`}
                 className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider"
               >
                 Search
               </label>
-              <div className="relative">
-                <input
-                  id={`filter-${searchParam}`}
-                  type="text"
-                  name={searchParam}
-                  defaultValue={searchParams.get(searchParam) || ''}
+              {suggestType ? (
+                <AdminTypeahead
+                  type={suggestType}
+                  value={searchValue}
+                  onChange={setSearchValue}
+                  onSelect={item => {
+                    const qs = createQueryString(searchParam, item.label)
+                    router.push(`${pathname}${qs ? `?${qs}` : ''}`)
+                  }}
+                  onEnter={val => {
+                    const qs = createQueryString(searchParam, val.trim())
+                    router.push(`${pathname}${qs ? `?${qs}` : ''}`)
+                  }}
                   placeholder={searchPlaceholder}
-                  className="w-full px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
                 />
-                <button
-                  type="submit"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-accent-500 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
-              </div>
-            </form>
+              ) : (
+                <form onSubmit={handleSearchSubmit}>
+                  <div className="relative">
+                    <input
+                      id={`filter-${searchParam}`}
+                      type="text"
+                      name={searchParam}
+                      defaultValue={searchParams.get(searchParam) || ''}
+                      placeholder={searchPlaceholder}
+                      className="w-full px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+                    />
+                    <button
+                      type="submit"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-accent-500 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           )}
 
           {hasActiveFilters && (

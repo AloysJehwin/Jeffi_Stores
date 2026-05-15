@@ -69,6 +69,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
           },
         ]}
         searchPlaceholder="Search by name, email or phone..."
+        suggestType="customers"
         searchParam="search"
       />
 

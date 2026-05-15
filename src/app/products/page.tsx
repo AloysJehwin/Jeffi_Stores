@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { queryMany, queryOne } from '@/lib/db'
 import SortDropdown from '@/components/visitor/SortDropdown'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
+import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
@@ -171,21 +172,7 @@ export default async function ProductsPage({
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Search
                   </label>
-                  <form action="/products" method="get">
-                    <input
-                      type="text"
-                      name="search"
-                      defaultValue={searchParams.search}
-                      placeholder="Search products..."
-                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                    />
-                    <button
-                      type="submit"
-                      className="mt-2 w-full bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                    >
-                      Search
-                    </button>
-                  </form>
+                  <ProductsSearch defaultValue={searchParams.search} />
                 </div>
 
                 {/* Categories Filter */}
