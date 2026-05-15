@@ -170,6 +170,7 @@ jobs:
             docker pull ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]'):latest
 
             echo "── Rolling restart app (nginx + redis stay up) ──"
+            docker rm -f jeffi-app 2>/dev/null || true
             docker compose -f docker-compose.prod.yml up -d --no-deps --pull never --force-recreate app
 
             echo "── Waiting for app healthcheck to pass ──"
