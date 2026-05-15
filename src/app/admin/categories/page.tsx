@@ -1,14 +1,23 @@
 import Link from 'next/link'
 import { getFilteredCategories } from '@/lib/queries'
+import { queryMany } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import CategoriesClient from '@/components/admin/CategoriesClient'
 
 export default async function CategoriesPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
-  const categories = await getFilteredCategories({
-    is_active: searchParams.is_active,
-    type: searchParams.type,
-    search: searchParams.search,
-  })
+  const [categories, productCountRows] = await Promise.all([
+    getFilteredCategories({
+      is_active: searchParams.is_active,
+      type: searchParams.type,
+      search: searchParams.search,
+    }),
+    queryMany<{ category_id: string; count: string }>(
+      'SELECT category_id, COUNT(*) as count FROM products WHERE is_active = true GROUP BY category_id'
+    ),
+  ])
+
+  const productCounts: Record<string, number> = {}
+  productCountRows.forEach(r => { productCounts[r.category_id] = parseInt(r.count, 10) })
 
   const mainCategoriesCount = categories?.filter(c => !c.parent_category_id).length || 0
   const totalCategories = categories?.length || 0
@@ -67,7 +76,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
         searchParam="search"
       />
 
-      <CategoriesClient initialCategories={categories || []} />
+      <CategoriesClient initialCategories={categories || []} productCounts={productCounts} />
     </div>
   )
 }

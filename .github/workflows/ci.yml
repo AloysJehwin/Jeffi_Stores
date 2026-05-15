@@ -84,7 +84,7 @@ jobs:
   # ────────────────────────────────────────────────────────
   docker:
     name: Build & Push Docker Image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     needs: [build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     outputs:
@@ -116,6 +116,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -169,7 +170,8 @@ jobs:
             docker pull ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]'):latest
 
             echo "── Rolling restart app (nginx + redis stay up) ──"
-            docker compose -f docker-compose.prod.yml up -d --no-deps --pull never app
+            docker rm -f jeffi-app 2>/dev/null || true
+            docker compose -f docker-compose.prod.yml up -d --no-deps --pull never --force-recreate app
 
             echo "── Waiting for app healthcheck to pass ──"
             for i in $(seq 1 18); do
