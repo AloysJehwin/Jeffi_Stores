@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 
 interface OrderDetails {
   id: string
@@ -205,6 +206,8 @@ function OrderConfirmationPage() {
             Continue Shopping
           </Link>
         </div>
+
+        <RecommendedProducts title="Shop More Products" limit={4} />
       </div>
     </div>
   )
