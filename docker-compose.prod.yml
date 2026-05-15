@@ -1,7 +1,6 @@
 services:
   app:
     image: ghcr.io/aloysjehwin/jeffi_storess_site:latest
-    container_name: jeffi-app
     env_file: .env.production
     environment:
       - REDIS_URL=redis://redis:6379
