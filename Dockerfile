@@ -10,8 +10,7 @@ RUN npm ci --omit=dev
 FROM base AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
-# --omit=optional skips platform-specific SWC native binaries; Next.js uses WASM fallback
-RUN npm ci --omit=optional
+RUN npm ci
 COPY . .
 
 # Build the Next.js app in standalone mode
