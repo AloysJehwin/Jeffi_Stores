@@ -229,6 +229,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               </svg>
               Packing Slip
             </a>
+            {o.awb_number && (
             <a
               href={`/api/admin/orders/${order.id}/shipping-label?size=4R&inline=1`}
               target="_blank"
@@ -240,6 +241,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               </svg>
               Shipping Label
             </a>
+            )}
             <a
               href={`/api/orders/${order.id}/invoice`}
               target="_blank"

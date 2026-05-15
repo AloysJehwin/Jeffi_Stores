@@ -81,6 +81,7 @@ function OrderPopover({ order }: { order: any }) {
             </svg>
             Packing Slip
           </a>
+          {order.awb_number && (
           <a
             href={`/api/admin/orders/${order.id}/shipping-label?size=4R&inline=1`}
             target="_blank"
@@ -92,6 +93,7 @@ function OrderPopover({ order }: { order: any }) {
             </svg>
             Shipping Label
           </a>
+          )}
         </div>
       </div>
     </HoverCard>
