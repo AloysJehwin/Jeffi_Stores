@@ -13,6 +13,8 @@ services:
     restart: always
     networks:
       - internal
+    deploy:
+      replicas: 2
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
       interval: 10s
