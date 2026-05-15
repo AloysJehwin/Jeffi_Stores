@@ -1,4 +1,5 @@
 import { queryOne, queryMany } from './db'
+import { buildSearchClause, buildVectorSearchClause } from './search'
 
 export interface ReceivableRow {
   order_id: string
@@ -92,9 +93,10 @@ export async function getReceivablesAging(filters: {
   if (filters.to) { conditions.push(`o.created_at <= $${i++}`); params.push(filters.to + ' 23:59:59') }
   if (filters.customerPhone) { conditions.push(`o.customer_phone = $${i++}`); params.push(filters.customerPhone) }
   if (filters.search) {
-    conditions.push(`(o.customer_name ILIKE $${i} OR o.invoice_number ILIKE $${i} OR o.order_number ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildVectorSearchClause(filters.search, 'o.search_vector', ['o.customer_name'], ['o.invoice_number', 'o.order_number'], i, 'simple')
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const where = conditions.join(' AND ')
@@ -160,9 +162,10 @@ export async function getPayables(filters: {
   if (filters.from) { conditions.push(`e.expense_date >= $${i++}`); params.push(filters.from) }
   if (filters.to) { conditions.push(`e.expense_date <= $${i++}`); params.push(filters.to) }
   if (filters.search) {
-    conditions.push(`(e.supplier_name ILIKE $${i} OR e.expense_number ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildSearchClause(filters.search, ['e.supplier_name', 'e.expense_number'], i)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const rows = await queryMany<PayableRow>(`

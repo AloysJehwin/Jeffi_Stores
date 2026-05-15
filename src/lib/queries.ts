@@ -1,6 +1,6 @@
 import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
-import { buildSearchClause } from './search'
+import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
@@ -184,7 +184,7 @@ export async function getFilteredOrders(filters: {
     params.push(filters.source)
   }
   if (filters.search) {
-    const sc = buildSearchClause(filters.search, ['o.order_number', 'o.customer_name'], i)
+    const sc = buildVectorSearchClause(filters.search, 'o.search_vector', ['o.customer_name'], ['o.order_number'], i, 'simple')
     conditions.push(sc.clause)
     params.push(...sc.params)
     i = sc.nextIdx
@@ -259,11 +259,16 @@ export async function getFilteredProducts(filters: {
       OR (p.has_variants = true AND COALESCE((SELECT SUM(pv2.stock_quantity) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true), 0) = 0)
     )`)
   }
+  let rankExpr = '(0)'
   if (filters.search) {
-    const sc = buildSearchClause(filters.search, ['p.name', 'p.sku'], i)
+    const sc = buildProductSearchClause(filters.search, 'p.name', 'p.sku', 'p.search_vector', i)
     conditions.push(sc.clause)
     params.push(...sc.params)
     i = sc.nextIdx
+    const rk = buildProductSearchRank(filters.search, 'p.name', 'p.search_vector', i)
+    rankExpr = rk.rank
+    params.push(...rk.params)
+    i = rk.nextIdx
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -291,7 +296,7 @@ export async function getFilteredProducts(filters: {
       LEFT JOIN categories pc ON c.parent_category_id = pc.id
       LEFT JOIN brands b ON p.brand_id = b.id
       ${where}
-      ORDER BY p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC
+      ORDER BY ${rankExpr}, p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC
       LIMIT $${i} OFFSET $${i + 1}
     `, [...params, limit, offset]),
     queryCount(`SELECT COUNT(*) FROM products p ${where}`, params),
@@ -319,9 +324,10 @@ export async function getFilteredCategories(filters: {
     conditions.push(`parent_category_id IS NOT NULL`)
   }
   if (filters.search) {
-    conditions.push(`name ILIKE $${i}`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildSearchClause(filters.search, ['name'], i)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
