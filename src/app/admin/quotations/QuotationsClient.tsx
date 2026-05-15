@@ -149,6 +149,8 @@ export default function QuotationsClient() {
 
   const isEditorMounted = useRef(false)
 
+  type ModalSearchMode = 'name' | 'sku' | 'category'
+
   const [productModalOpen, setProductModalOpen] = useState(false)
   const [productModalRow, setProductModalRow] = useState<number | null>(null)
   const [prodSearch, setProdSearch] = useState('')
@@ -158,6 +160,8 @@ export default function QuotationsClient() {
   const prodTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [prodCategory, setProdCategory] = useState('')
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const [modalSearchMode, setModalSearchMode] = useState<ModalSearchMode>('name')
+  const [modalSkuInput, setModalSkuInput] = useState('')
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
   const cgst = items.reduce((s, i) => s + i.amount * i.gst_rate / 200, 0)
@@ -431,6 +435,8 @@ export default function QuotationsClient() {
     setProdSearch('')
     setProdResults([])
     setProdCategory('')
+    setModalSearchMode('name')
+    setModalSkuInput('')
     setProductModalOpen(true)
     if (categories.length === 0) {
       fetch('/api/categories')
@@ -1047,7 +1053,36 @@ export default function QuotationsClient() {
               </button>
             </div>
             <div className="p-4 border-b border-border-default space-y-2">
-              {categories.length > 0 && (
+              <div className="flex gap-1 p-1 bg-surface-secondary rounded-lg w-fit">
+                {(['name', 'sku', 'category'] as ModalSearchMode[]).map(m => (
+                  <button key={m} type="button"
+                    onClick={() => {
+                      setModalSearchMode(m)
+                      setProdSearch('')
+                      setModalSkuInput('')
+                      setProdCategory('')
+                      loadProducts('', '')
+                    }}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize ${modalSearchMode === m ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900 shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
+                    {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : 'Category'}
+                  </button>
+                ))}
+              </div>
+              {modalSearchMode === 'name' && (
+                <input
+                  autoFocus type="text" value={prodSearch}
+                  onChange={e => searchProducts(e.target.value)}
+                  placeholder="Search by name…" className={inputCls}
+                />
+              )}
+              {modalSearchMode === 'sku' && (
+                <input
+                  autoFocus type="text" value={modalSkuInput}
+                  onChange={e => { setModalSkuInput(e.target.value); loadProducts(e.target.value, '') }}
+                  placeholder="e.g. JFS-1234" className={inputCls + ' font-mono'}
+                />
+              )}
+              {modalSearchMode === 'category' && categories.length > 0 && (
                 <AdminSelect
                   value={prodCategory}
                   placeholder="All Categories"
@@ -1055,11 +1090,6 @@ export default function QuotationsClient() {
                   onChange={val => { setProdCategory(val); loadProducts(prodSearch, val) }}
                 />
               )}
-              <input
-                autoFocus type="text" value={prodSearch}
-                onChange={e => searchProducts(e.target.value)}
-                placeholder="Search by name or SKU…" className={inputCls}
-              />
             </div>
             <div className="flex-1 overflow-y-auto">
               {prodLoading && <p className="p-4 text-center text-foreground-secondary text-sm">Searching…</p>}
