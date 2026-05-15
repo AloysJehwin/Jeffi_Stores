@@ -176,8 +176,7 @@ export default async function AdminDashboard() {
         <StatCard
           label="Total Customers"
           value={stats.totalCustomers.toString()}
-          sub={stats.lowStockProducts > 0 ? `${stats.lowStockProducts} products low stock` : `${stats.totalProducts} products active`}
-          subHref={stats.lowStockProducts > 0 ? '/admin/products?stock=low' : '/admin/products'}
+          sub={stats.newCustomersThisMonth > 0 ? `+${stats.newCustomersThisMonth} this month` : 'No new customers this month'}
           href="/admin/customers"
           color="bg-orange-100 dark:bg-orange-900/30"
           icon={
