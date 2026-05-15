@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { cookies, headers } from 'next/headers'
 import { logoutAction } from './logout-action'
 import { verifyToken } from '@/lib/jwt'
