@@ -259,7 +259,7 @@ export async function getFilteredProducts(filters: {
       OR (p.has_variants = true AND COALESCE((SELECT SUM(pv2.stock_quantity) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true), 0) = 0)
     )`)
   }
-  let rankExpr = '(0)'
+  let rankExpr = '0::int'
   if (filters.search) {
     const sc = buildProductSearchClause(filters.search, 'p.name', 'p.sku', 'p.search_vector', i)
     conditions.push(sc.clause)
