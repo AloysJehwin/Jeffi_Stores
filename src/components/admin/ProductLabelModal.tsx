@@ -88,8 +88,8 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
   const mrp = entry?.mrp ?? null
   const gstPct = entry?.gst_percentage ?? 0
   const gstFactor = 1 + (gstPct || 0) / 100
-  const incGst = exGst ? Number(exGst.toFixed(2)) : null
-  const mrpInc = mrp && mrp > 0 ? Number(mrp.toFixed(2)) : null
+  const incGst = exGst ? Number(Number(exGst).toFixed(2)) : null
+  const mrpInc = mrp && mrp > 0 ? Number(Number(mrp).toFixed(2)) : null
   const exGstDisplay = incGst && gstPct > 0 ? Number((incGst / gstFactor).toFixed(2)) : null
   const showMrp = mrpInc && incGst && mrpInc !== incGst
 
