@@ -265,13 +265,18 @@ export async function getFilteredProducts(filters: {
     conditions.push(sc.clause)
     params.push(...sc.params)
     i = sc.nextIdx
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const countParams = [...params]
+
+  if (filters.search) {
     const rk = buildProductSearchRank(filters.search, 'p.name', 'p.search_vector', i)
     rankExpr = rk.rank
     params.push(...rk.params)
     i = rk.nextIdx
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
   const limit = filters.limit || 25
   const offset = ((filters.page || 1) - 1) * limit
 
@@ -299,7 +304,7 @@ export async function getFilteredProducts(filters: {
       ORDER BY ${rankExpr}, p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC
       LIMIT $${i} OFFSET $${i + 1}
     `, [...params, limit, offset]),
-    queryCount(`SELECT COUNT(*) FROM products p ${where}`, params),
+    queryCount(`SELECT COUNT(*) FROM products p ${where}`, countParams),
   ])
 
   return { products, total }
