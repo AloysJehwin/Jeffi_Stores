@@ -3,6 +3,7 @@ import { queryMany, queryCount } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
+import CouponTableRow from '@/components/admin/CouponTableRow'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -101,7 +102,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
             </thead>
             <tbody className="divide-y divide-border-default">
               {(coupons as CouponRow[]).map(c => (
-                <CouponRow key={c.id} coupon={c} />
+                <CouponTableRow key={c.id} coupon={c} />
               ))}
               {coupons.length === 0 && (
                 <tr><td colSpan={8} className="px-4 py-8 text-center text-foreground-muted">No coupons found</td></tr>
@@ -151,33 +152,4 @@ interface CouponRow {
   times_used: number
   valid_until: string | null
   is_active: boolean
-}
-
-function CouponRow({ coupon: c }: { coupon: CouponRow }) {
-  const isExpired = c.valid_until && new Date(c.valid_until) < new Date()
-  return (
-    <tr className="hover:bg-surface-secondary/50 transition-colors">
-      <td className="px-4 py-3 font-mono font-bold text-accent-500">{c.code}</td>
-      <td className="px-4 py-3 capitalize text-foreground-secondary">{c.discount_type}</td>
-      <td className="px-4 py-3 font-medium">{c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`}</td>
-      <td className="px-4 py-3 text-foreground-secondary">{c.min_purchase_amount ? `₹${c.min_purchase_amount}` : '—'}</td>
-      <td className="px-4 py-3 text-foreground-secondary">{c.times_used}{c.usage_limit ? `/${c.usage_limit}` : ''}</td>
-      <td className="px-4 py-3 text-foreground-secondary">
-        {c.valid_until ? (
-          <span className={isExpired ? 'text-red-500' : ''}>{new Date(c.valid_until).toLocaleDateString('en-IN')}</span>
-        ) : '—'}
-      </td>
-      <td className="px-4 py-3">
-        <span className={`text-xs px-2 py-1 rounded-full font-medium ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-          {c.is_active ? 'Active' : 'Inactive'}
-        </span>
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-3">
-          <Link href={`/admin/coupons/edit/${c.id}`} className="text-accent-500 hover:underline text-sm">Edit</Link>
-          <DeleteCouponButton id={c.id} code={c.code} />
-        </div>
-      </td>
-    </tr>
-  )
 }
