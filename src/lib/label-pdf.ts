@@ -79,18 +79,18 @@ function drawPrice(
   mainSize: number,
   subSize: number
 ): number {
-  const exGst = p.sale_price ?? p.base_price
-  if (!exGst || exGst === 0) return py
+  const incGst = Number((p.sale_price ?? p.base_price).toFixed(2))
+  if (!incGst || incGst === 0) return py
 
-  const gstFactor = 1 + (p.gst_percentage || 0) / 100
-  const incGst = Number((exGst * gstFactor).toFixed(2))
-  const showExGst = p.gst_percentage > 0
+  const gstRate = p.gst_percentage || 0
+  const exGst = gstRate > 0 ? Number((incGst / (1 + gstRate / 100)).toFixed(2)) : incGst
+  const showExGst = gstRate > 0
 
   if (p.mrp && p.mrp > 0) {
-    const mrpIncGst = Number((p.mrp * gstFactor).toFixed(2))
-    if (mrpIncGst !== incGst) {
+    const mrpInc = Number(p.mrp.toFixed(2))
+    if (mrpInc !== incGst) {
       doc.font('Helvetica').fontSize(subSize).fillColor('#888888')
-      const mrpText = `Rs. ${mrpIncGst.toFixed(2)}`
+      const mrpText = `Rs. ${mrpInc.toFixed(2)}`
       const mrpW = doc.widthOfString(mrpText)
       doc.text(mrpText, px, py, { lineBreak: false })
       doc.moveTo(px, py + subSize * 0.38).lineTo(px + mrpW, py + subSize * 0.38).lineWidth(0.5).stroke('#888888')
@@ -104,7 +104,7 @@ function drawPrice(
 
   if (showExGst) {
     doc.font('Helvetica').fontSize(subSize - 0.5).fillColor('#777777')
-    doc.text(`ex. GST Rs. ${Number(exGst).toFixed(2)}`, px, py, { width: availW, lineBreak: false })
+    doc.text(`ex. GST Rs. ${exGst.toFixed(2)}`, px, py, { width: availW, lineBreak: false })
     py += subSize + 1
   }
 
