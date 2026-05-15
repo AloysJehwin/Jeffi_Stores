@@ -166,7 +166,7 @@ jobs:
 
             echo "── Pulling new Docker image ──"
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/${{ github.repository }}:latest
+            docker pull ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]'):latest
 
             echo "── Rolling restart app (nginx + redis stay up) ──"
             docker compose -f docker-compose.prod.yml up -d --no-deps --pull never app
