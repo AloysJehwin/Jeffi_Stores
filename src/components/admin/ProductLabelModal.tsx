@@ -88,8 +88,9 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
   const mrp = entry?.mrp ?? null
   const gstPct = entry?.gst_percentage ?? 0
   const gstFactor = 1 + (gstPct || 0) / 100
-  const incGst = exGst ? Number((exGst * gstFactor).toFixed(2)) : null
-  const mrpInc = mrp && mrp > 0 ? Number((mrp * gstFactor).toFixed(2)) : null
+  const incGst = exGst ? Number(Number(exGst).toFixed(2)) : null
+  const mrpInc = mrp && mrp > 0 ? Number(Number(mrp).toFixed(2)) : null
+  const exGstDisplay = incGst && gstPct > 0 ? Number((incGst / gstFactor).toFixed(2)) : null
   const showMrp = mrpInc && incGst && mrpInc !== incGst
 
   const nameFs = Math.round(8 * scale)
@@ -133,7 +134,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
             <div style={{ display:'flex', alignItems:'baseline', gap:Math.round(3*scale), flexWrap:'wrap' }}>
               {showMrp && <span style={{ fontSize:efs, color:'#aaa', textDecoration:'line-through' }}>Rs. {mrpInc!.toFixed(2)}</span>}
               <span style={{ fontSize:pfs, fontWeight:700, color:'#c0392b' }}>Rs. {incGst.toFixed(2)}</span>
-              {gstPct > 0 && <span style={{ fontSize:efs, color:'#888' }}>ex.GST Rs. {Number(exGst).toFixed(2)}</span>}
+              {gstPct > 0 && <span style={{ fontSize:efs, color:'#888' }}>ex.GST Rs. {exGstDisplay!.toFixed(2)}</span>}
             </div>
           )}
         </div>
@@ -154,7 +155,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
             <div style={{ marginTop:2 }}>
               {showMrp && <div style={{ fontSize:smallFs*0.85, color:'#aaa', textDecoration:'line-through', lineHeight:1 }}>Rs. {mrpInc!.toFixed(2)}</div>}
               <div style={{ fontSize:priceFs*0.9, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>
-              {gstPct > 0 && <div style={{ fontSize:smallFs*0.85-1, color:'#888', lineHeight:1 }}>ex. GST Rs. {Number(exGst).toFixed(2)}</div>}
+              {gstPct > 0 && <div style={{ fontSize:smallFs*0.85-1, color:'#888', lineHeight:1 }}>ex. GST Rs. {exGstDisplay!.toFixed(2)}</div>}
             </div>
           )}
         </div>
@@ -179,7 +180,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
             <div style={{ marginTop:3 }}>
               {showMrp && <div style={{ fontSize:smallFs*0.85, color:'#aaa', textDecoration:'line-through', lineHeight:1 }}>Rs. {mrpInc!.toFixed(2)}</div>}
               <div style={{ fontSize:priceFs*0.9, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>
-              {gstPct > 0 && <div style={{ fontSize:smallFs*0.85-1, color:'#888', lineHeight:1 }}>ex. GST Rs. {Number(exGst).toFixed(2)}</div>}
+              {gstPct > 0 && <div style={{ fontSize:smallFs*0.85-1, color:'#888', lineHeight:1 }}>ex. GST Rs. {exGstDisplay!.toFixed(2)}</div>}
             </div>
           )}
         </div>
@@ -209,7 +210,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
             <div style={{ marginTop:3 }}>
               {showMrp && <div style={{ fontSize:smallFs*0.9, color:'#aaa', textDecoration:'line-through', lineHeight:1 }}>Rs. {mrpInc!.toFixed(2)}</div>}
               <div style={{ fontSize:priceFs, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>
-              {gstPct > 0 && <div style={{ fontSize:smallFs*0.9, color:'#888', lineHeight:1 }}>ex. GST Rs. {Number(exGst).toFixed(2)}</div>}
+              {gstPct > 0 && <div style={{ fontSize:smallFs*0.9, color:'#888', lineHeight:1 }}>ex. GST Rs. {exGstDisplay!.toFixed(2)}</div>}
             </div>
           )}
         </div>
@@ -462,7 +463,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                         <div className="text-xs text-foreground-muted">{e.sku}</div>
                       </div>
                       <div className="text-xs font-semibold text-primary-500 shrink-0">
-                        Rs. {Number(((e.sale_price ?? e.base_price) * (1 + (e.gst_percentage || 0) / 100))).toFixed(2)}
+                        Rs. {Number(e.sale_price ?? e.base_price).toFixed(2)}
                       </div>
                     </label>
                   ))}
