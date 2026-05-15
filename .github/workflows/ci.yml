@@ -116,6 +116,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            DATABASE_URL=postgresql://localhost:5432/dummy
+            JWT_SECRET=ci-build-secret
+            NEXT_PUBLIC_APP_URL=http://localhost:3000
+            SKIP_DB_CHECK=true
 
   # ────────────────────────────────────────────────────────
   # Stage 4 — Deploy to EC2  (main only, gate: docker)
