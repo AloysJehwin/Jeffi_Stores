@@ -11,6 +11,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       totalCustomers,
       lowStockProducts,
       pendingOrders,
+      newCustomersThisMonth,
     ] = await Promise.all([
       queryCount('SELECT COUNT(*) FROM products'),
       queryCount('SELECT COUNT(*) FROM orders'),
@@ -24,6 +25,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       queryCount('SELECT COUNT(*) FROM users WHERE is_active = $1 AND is_guest = $2', [true, false]),
       queryCount('SELECT COUNT(*) FROM products WHERE stock_quantity <= low_stock_threshold'),
       queryCount('SELECT COUNT(*) FROM orders WHERE status = $1', ['pending']),
+      queryCount("SELECT COUNT(*) FROM users WHERE is_active = TRUE AND is_guest = FALSE AND created_at >= date_trunc('month', NOW())"),
     ])
 
     const [onlineOrders, offlineOrders] = await Promise.all([
@@ -40,6 +42,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       onlineRevenue: parseFloat(revenueResult?.online || '0'),
       offlineRevenue: parseFloat(revenueResult?.offline || '0'),
       totalCustomers,
+      newCustomersThisMonth,
       lowStockProducts,
       pendingOrders,
     }
@@ -53,6 +56,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       onlineRevenue: 0,
       offlineRevenue: 0,
       totalCustomers: 0,
+      newCustomersThisMonth: 0,
       lowStockProducts: 0,
       pendingOrders: 0,
     }

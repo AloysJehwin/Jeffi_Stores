@@ -154,6 +154,7 @@ export interface DashboardStats {
   onlineRevenue: number
   offlineRevenue: number
   totalCustomers: number
+  newCustomersThisMonth: number
   lowStockProducts: number
   pendingOrders: number
 }
