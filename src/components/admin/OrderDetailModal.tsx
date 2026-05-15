@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useCallback, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 
 interface Props {
@@ -33,7 +34,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  if (!order) return null
+  if (!order || typeof document === 'undefined') return null
 
   const o = detail?.order || order
   const items: any[] = detail?.items || []
@@ -65,7 +66,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
 
   const addr = o.shipping_address || o.billing_address
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
 
@@ -255,6 +256,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
 
         {loading && !detail && <div className="h-64" />}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import HoverCard from '@/components/ui/HoverCard'
@@ -1031,7 +1032,7 @@ export default function QuotationsClient() {
         </button>
       </div>
 
-      {productModalOpen && (
+      {productModalOpen && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-surface-elevated border border-border-default rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-xl">
             <div className="flex items-center justify-between p-4 border-b border-border-default">
@@ -1113,14 +1114,16 @@ export default function QuotationsClient() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
 }
 
 function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => void }) {
-  return (
+  if (typeof document === 'undefined') return null
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
@@ -1221,6 +1224,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

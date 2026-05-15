@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import HoverCard from '@/components/ui/HoverCard'
 import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
@@ -24,7 +25,7 @@ export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
 
   return (
     <>
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
           <div className="absolute inset-0 bg-black/50" />
           <div
@@ -99,7 +100,8 @@ export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       <tr className="hover:bg-surface-secondary/50 transition-colors cursor-pointer" onClick={() => setOpen(true)}>
         <td className="px-4 py-3 font-mono font-bold" onClick={e => e.stopPropagation()}>

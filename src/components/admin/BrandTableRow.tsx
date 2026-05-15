@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import HoverCard from '@/components/ui/HoverCard'
 import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
@@ -19,7 +20,7 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
 
   return (
     <>
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
           <div className="absolute inset-0 bg-black/50" />
           <div
@@ -74,7 +75,8 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       <tr className="hover:bg-surface-secondary cursor-pointer" onClick={() => setOpen(true)}>
         <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>

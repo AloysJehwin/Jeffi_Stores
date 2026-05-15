@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useToast } from '@/contexts/ToastContext'
 import HoverCard from '@/components/ui/HoverCard'
@@ -711,7 +712,7 @@ export default function InvoicesClient() {
           </div>
         </form>
 
-        {pickerOpen && (
+        {pickerOpen && typeof document !== 'undefined' && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
             <div className="bg-surface-elevated border border-border-default rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
@@ -796,7 +797,8 @@ export default function InvoicesClient() {
                 })()}
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     )
@@ -1109,7 +1111,8 @@ export default function InvoicesClient() {
 }
 
 function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
-  return (
+  if (typeof document === 'undefined') return null
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
@@ -1207,6 +1210,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
