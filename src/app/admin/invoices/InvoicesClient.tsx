@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useToast } from '@/contexts/ToastContext'
+import HoverCard from '@/components/ui/HoverCard'
 
 interface Invoice {
   id: string
@@ -877,7 +878,73 @@ export default function InvoicesClient() {
                 <tbody>
                   {invoices.map(inv => (
                     <tr key={inv.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors">
-                      <td className="px-4 py-3 font-mono font-semibold text-foreground text-sm">{inv.invoice_number}</td>
+                      <td className="px-4 py-3 font-mono font-semibold text-foreground text-sm">
+                        <HoverCard
+                          trigger={
+                            <span className="cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors">
+                              {inv.invoice_number}
+                            </span>
+                          }
+                          align="left"
+                          side="bottom"
+                          width="280px"
+                        >
+                          <div className="p-3 space-y-2">
+                            <p className="font-semibold text-foreground text-sm">{inv.invoice_number}</p>
+                            <div className="text-xs text-foreground-secondary space-y-1">
+                              <div className="flex justify-between gap-4">
+                                <span>Customer</span>
+                                <span className="text-foreground font-medium">{inv.customer_name}</span>
+                              </div>
+                              {inv.buyer_gstin && (
+                                <div className="flex justify-between gap-4">
+                                  <span>GSTIN</span>
+                                  <span className="font-mono text-foreground">{inv.buyer_gstin}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between gap-4">
+                                <span>Taxable</span>
+                                <span className="text-foreground">₹{parseFloat(inv.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                              {parseFloat(inv.cgst_amount) > 0 && (
+                                <div className="flex justify-between gap-4">
+                                  <span>CGST + SGST</span>
+                                  <span className="text-foreground">
+                                    ₹{parseFloat(inv.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹{parseFloat(inv.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              )}
+                              {parseFloat(inv.igst_amount) > 0 && (
+                                <div className="flex justify-between gap-4">
+                                  <span>IGST</span>
+                                  <span className="text-foreground">₹{parseFloat(inv.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                              )}
+                              {inv.irn && (
+                                <div className="flex justify-between gap-4">
+                                  <span>IRN</span>
+                                  <span className={`font-medium ${inv.irn_status === 'generated' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                    {inv.irn_status === 'generated' ? 'Generated ✓' : 'Stub'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="pt-1 border-t border-border-default">
+                              <a
+                                href={`/api/orders/${inv.id}/invoice`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-xs text-accent-500 hover:text-accent-600 font-medium"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                Download PDF
+                              </a>
+                            </div>
+                          </div>
+                        </HoverCard>
+                      </td>
                       <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-sm">{fmtDate(inv.invoice_date)}</td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-foreground text-sm">{inv.customer_name}</div>

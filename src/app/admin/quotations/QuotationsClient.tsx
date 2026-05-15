@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import HoverCard from '@/components/ui/HoverCard'
 
 interface QuoteItem {
   id?: string
@@ -591,7 +592,76 @@ export default function QuotationsClient() {
                   <tr><td colSpan={6} className="px-4 py-12 text-center text-foreground-secondary">No quotations found. Create your first one.</td></tr>
                 ) : quotations.map(q => (
                   <tr key={q.id} className="border-b border-border-default hover:bg-surface-primary transition-colors">
-                    <td className="px-4 py-3 font-mono font-semibold text-foreground">{q.quote_number}</td>
+                    <td className="px-4 py-3 font-mono font-semibold text-foreground">
+                      <HoverCard
+                        trigger={
+                          <span className="cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors">
+                            {q.quote_number}
+                          </span>
+                        }
+                        align="left"
+                        side="bottom"
+                        width="270px"
+                      >
+                        <div className="p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="font-semibold text-foreground text-sm">{q.quote_number}</p>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[q.status] || 'bg-gray-100 text-gray-700'}`}>
+                              {q.status === 'final' ? 'Final' : 'Draft'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-foreground-secondary space-y-1">
+                            <div className="flex justify-between gap-4">
+                              <span>Consignee</span>
+                              <span className="text-foreground font-medium">{q.consignee_name || '—'}</span>
+                            </div>
+                            {q.consignee_city && (
+                              <div className="flex justify-between gap-4">
+                                <span>City</span>
+                                <span className="text-foreground">{q.consignee_city}</span>
+                              </div>
+                            )}
+                            {q.consignee_gstin && (
+                              <div className="flex justify-between gap-4">
+                                <span>GSTIN</span>
+                                <span className="font-mono text-foreground">{q.consignee_gstin}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between gap-4">
+                              <span>Total</span>
+                              <span className="font-semibold text-foreground">₹{fmt2(Number(q.total_amount))}</span>
+                            </div>
+                            {(Number(q.cgst_amount) > 0 || Number(q.sgst_amount) > 0) && (
+                              <div className="flex justify-between gap-4">
+                                <span>CGST + SGST</span>
+                                <span className="text-foreground">
+                                  ₹{fmt2(Number(q.cgst_amount))} + ₹{fmt2(Number(q.sgst_amount))}
+                                </span>
+                              </div>
+                            )}
+                            {q.converted_order_id && (
+                              <div className="flex justify-between gap-4">
+                                <span>Converted</span>
+                                <span className="font-medium text-blue-600 dark:text-blue-400">Invoiced</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="pt-1 border-t border-border-default">
+                            <a
+                              href={`/api/admin/quotations/${q.id}/pdf`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-xs text-accent-500 hover:text-accent-600 font-medium"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              Download PDF
+                            </a>
+                          </div>
+                        </div>
+                      </HoverCard>
+                    </td>
                     <td className="px-4 py-3 text-foreground-secondary">{fmtDate(q.quote_date)}</td>
                     <td className="px-4 py-3 text-foreground">{q.consignee_name || '—'}</td>
                     <td className="px-4 py-3 text-right font-semibold text-foreground">₹{fmt2(Number(q.total_amount))}</td>

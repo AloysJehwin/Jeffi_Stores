@@ -3,6 +3,7 @@ import { queryMany, queryCount } from '@/lib/db'
 import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
+import BrandTableRow from '@/components/admin/BrandTableRow'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -160,49 +161,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
             <tbody className="divide-y divide-border-default">
               {brands && brands.length > 0 ? (
                 brands.map((brand: any) => (
-                  <tr key={brand.id} className="hover:bg-surface-secondary">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-foreground">{brand.name}</div>
-                      {brand.description && (
-                        <div className="text-xs text-foreground-muted mt-1 max-w-xs truncate">{brand.description}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground-secondary">{brand.slug}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {brand.website ? (
-                        <a
-                          href={brand.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-accent-500 hover:underline"
-                        >
-                          {brand.website.replace(/^https?:\/\//, '')}
-                        </a>
-                      ) : (
-                        <span className="text-sm text-foreground-muted">—</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        brand.is_active
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                          : 'bg-surface-secondary text-foreground'
-                      }`}>
-                        {brand.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link
-                        href={`/admin/brands/edit/${brand.id}`}
-                        className="text-accent-500 hover:text-accent-600 mr-4"
-                      >
-                        Edit
-                      </Link>
-                      <DeleteBrandButton brandId={brand.id} brandName={brand.name} />
-                    </td>
-                  </tr>
+                  <BrandTableRow key={brand.id} brand={brand} />
                 ))
               ) : (
                 <tr>
