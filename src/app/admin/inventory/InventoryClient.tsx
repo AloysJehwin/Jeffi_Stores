@@ -487,12 +487,19 @@ function POTab() {
         </div>
         <div>
           <label className={labelCls}>Status</label>
-          <select className={inputCls + ' w-36'} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="">All</option>
-            {['draft', 'sent', 'partial', 'received', 'cancelled'].map(s => (
-              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-            ))}
-          </select>
+          <AdminSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            placeholder="All"
+            options={[
+              { value: '', label: 'All' },
+              { value: 'draft', label: 'Draft' },
+              { value: 'sent', label: 'Sent' },
+              { value: 'partial', label: 'Partial' },
+              { value: 'received', label: 'Received' },
+              { value: 'cancelled', label: 'Cancelled' },
+            ]}
+          />
         </div>
         <button className={btnSecondary} onClick={() => setShowCreate(v => !v)}>+ Create PO</button>
       </div>
@@ -520,10 +527,15 @@ function POTab() {
             </div>
             <div>
               <label className={labelCls}>Status</label>
-              <select className={inputCls} value={newPO.status} onChange={e => setNewPO(p => ({ ...p, status: e.target.value }))}>
-                <option value="draft">Draft</option>
-                <option value="sent">Sent to Supplier</option>
-              </select>
+              <AdminSelect
+                value={newPO.status}
+                onChange={v => setNewPO(p => ({ ...p, status: v }))}
+                placeholder="Select status"
+                options={[
+                  { value: 'draft', label: 'Draft' },
+                  { value: 'sent', label: 'Sent to Supplier' },
+                ]}
+              />
             </div>
             <div className="sm:col-span-2">
               <label className={labelCls}>Notes</label>
