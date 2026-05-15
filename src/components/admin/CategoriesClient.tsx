@@ -136,7 +136,7 @@ function SortableRow({
                 <span className="text-sm font-semibold text-foreground">{category.name}</span>
               </div>
               {category.description && (
-                <p className="text-xs text-foreground-secondary">{category.description}</p>
+                <p className="text-xs text-foreground-secondary line-clamp-2">{category.description}</p>
               )}
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                 <span className="text-foreground-muted">Slug</span>

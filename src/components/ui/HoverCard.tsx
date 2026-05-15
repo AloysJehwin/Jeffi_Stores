@@ -46,7 +46,7 @@ export default function HoverCard({ trigger, children, delay = 150, align = 'lef
           onMouseEnter={cancelHide}
           onMouseLeave={hide}
         >
-          <span className="block bg-surface-elevated dark:bg-zinc-800 border border-border-default rounded-xl shadow-2xl overflow-hidden text-sm">
+          <span className="block bg-surface-elevated dark:bg-zinc-800 border border-border-default rounded-xl shadow-2xl overflow-hidden text-sm w-full">
             {children}
           </span>
         </span>
