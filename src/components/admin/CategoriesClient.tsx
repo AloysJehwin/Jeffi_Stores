@@ -122,7 +122,7 @@ function SortableRow({
             }
             side="bottom"
             align="left"
-            width="270px"
+            width="320px"
           >
             <div className="p-3 space-y-2">
               <div className="flex items-center gap-2 pb-2 border-b border-border-default">
@@ -140,7 +140,7 @@ function SortableRow({
               )}
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                 <span className="text-foreground-muted">Slug</span>
-                <span className="text-foreground font-mono">{category.slug}</span>
+                <span className="text-foreground font-mono break-all">{category.slug}</span>
                 <span className="text-foreground-muted">Status</span>
                 <span className={category.is_active ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}>
                   {category.is_active ? 'Active' : 'Inactive'}
@@ -311,8 +311,8 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={flatOrder.map(c => c.id)} strategy={verticalListSortingStrategy}>
-          <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="overflow-x-auto overflow-y-visible">
             <table className="min-w-full divide-y divide-border-default">
               <thead className="bg-surface-secondary">
                 <tr>
