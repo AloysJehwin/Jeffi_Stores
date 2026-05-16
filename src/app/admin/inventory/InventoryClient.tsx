@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -450,12 +451,19 @@ function POTab() {
         </div>
         <div>
           <label className={labelCls}>Status</label>
-          <select className={inputCls + ' w-36'} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="">All</option>
-            {['draft', 'sent', 'partial', 'received', 'cancelled'].map(s => (
-              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-            ))}
-          </select>
+          <AdminSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            placeholder="All"
+            options={[
+              { value: '', label: 'All' },
+              { value: 'draft', label: 'Draft' },
+              { value: 'sent', label: 'Sent' },
+              { value: 'partial', label: 'Partial' },
+              { value: 'received', label: 'Received' },
+              { value: 'cancelled', label: 'Cancelled' },
+            ]}
+          />
         </div>
         <div>
           <div className={labelCls}>&nbsp;</div>
