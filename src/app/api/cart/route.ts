@@ -74,17 +74,16 @@ export async function POST(request: NextRequest) {
     const { userId } = await resolveUserId(cookieStore)
 
     const product = await queryOne(
-      'SELECT id, base_price, sale_price, stock_quantity, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
+      'SELECT id, base_price, sale_price, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
       [productId]
     )
     if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
 
     let priceAtAddition: number
-    let stockToCheck: number
 
     if (variantId) {
       const variant = await queryOne(
-        'SELECT id, price, sale_price, stock_quantity, weight_rate, weight_unit, length_rate, length_unit FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
+        'SELECT id, price, sale_price, weight_rate, weight_unit, length_rate, length_unit FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
         [variantId, productId]
       )
       if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
@@ -95,7 +94,6 @@ export async function POST(request: NextRequest) {
       } else {
         priceAtAddition = variant.sale_price ?? variant.price ?? product.sale_price ?? product.base_price
       }
-      stockToCheck = variant.stock_quantity
     } else {
       if (buyMode === 'weight') {
         priceAtAddition = product.weight_rate ?? 0
@@ -104,7 +102,6 @@ export async function POST(request: NextRequest) {
       } else {
         priceAtAddition = product.sale_price || product.base_price
       }
-      stockToCheck = product.stock_quantity
     }
 
     const existingItem = await queryOne(
@@ -114,12 +111,9 @@ export async function POST(request: NextRequest) {
 
     if (existingItem) {
       const newQuantity = Number(existingItem.quantity) + Number(quantity)
-      if (buyMode === 'unit' && stockToCheck < newQuantity) return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
       await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [newQuantity, existingItem.id])
       return NextResponse.json({ message: 'Cart updated', quantity: newQuantity })
     }
-
-    if (buyMode === 'unit' && stockToCheck < quantity) return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
 
     await query(
       'INSERT INTO cart_items (user_id, product_id, variant_id, quantity, price_at_addition, buy_mode, buy_unit) VALUES ($1, $2, $3, $4, $5, $6, $7)',
@@ -141,17 +135,12 @@ export async function PATCH(request: NextRequest) {
     if (!sessionId && !authUserId) return NextResponse.json({ error: 'Session not found' }, { status: 401 })
 
     const cartItem = await queryOne(`
-      SELECT ci.*, p.stock_quantity AS product_stock, pv.stock_quantity AS variant_stock
+      SELECT ci.*
       FROM cart_items ci
-      LEFT JOIN products p ON ci.product_id = p.id
-      LEFT JOIN product_variants pv ON ci.variant_id = pv.id
       WHERE ci.id = $1 AND ci.user_id = $2
     `, [cartItemId, userId])
 
     if (!cartItem) return NextResponse.json({ error: 'Cart item not found' }, { status: 404 })
-
-    const availableStock = cartItem.variant_id ? cartItem.variant_stock : cartItem.product_stock
-    if (availableStock < quantity) return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
 
     await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [quantity, cartItemId])
     return NextResponse.json({ message: 'Cart updated' })

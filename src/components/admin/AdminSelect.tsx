@@ -192,7 +192,7 @@ export default function AdminSelect({
         {isOpen && (
           <div
             ref={dropdownRef}
-            className={`absolute z-50 left-0 right-0 bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden
+            className={`absolute z-50 left-0 min-w-full w-max bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden
               ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'}
             `}
             style={{ animation: 'adminSelectFadeIn 0.15s ease-out' }}

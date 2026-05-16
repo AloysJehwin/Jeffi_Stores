@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
     const supplierId = searchParams.get('supplier_id') || ''
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const offset = (page - 1) * limit
 
     const conditions = ['1=1']
     const params: any[] = []
@@ -28,6 +31,16 @@ export async function GET(request: NextRequest) {
       i = sc.nextIdx
     }
 
+    const where = conditions.join(' AND ')
+    const countRow = await queryOne<{ total: number }>(
+      `SELECT COUNT(DISTINCT po.id)::int AS total
+       FROM purchase_orders po
+       JOIN suppliers s ON s.id = po.supplier_id
+       WHERE ${where}`,
+      params
+    )
+    const total = countRow?.total || 0
+
     const rows = await queryMany<any>(
       `SELECT
          po.id, po.po_number, po.status, po.order_date, po.expected_date,
@@ -37,13 +50,14 @@ export async function GET(request: NextRequest) {
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        LEFT JOIN purchase_order_items poi ON poi.po_id = po.id
-       WHERE ${conditions.join(' AND ')}
+       WHERE ${where}
        GROUP BY po.id, s.id
-       ORDER BY po.created_at DESC`,
-      params
+       ORDER BY po.created_at DESC
+       LIMIT $${i} OFFSET $${i + 1}`,
+      [...params, limit, offset]
     )
 
-    return NextResponse.json({ purchase_orders: rows || [] })
+    return NextResponse.json({ purchase_orders: rows || [], total, page, limit })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

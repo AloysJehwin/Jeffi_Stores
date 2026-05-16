@@ -3,6 +3,7 @@ import { queryMany, queryCount } from '@/lib/db'
 import Pagination from '@/components/admin/Pagination'
 import DeleteCampaignButton from '@/components/admin/DeleteCampaignButton'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
+import AdminFilters from '@/components/admin/AdminFilters'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -38,9 +39,22 @@ interface Campaign {
   created_at: string
 }
 
-export default async function MailerPage({ searchParams }: { searchParams: { page?: string } }) {
+export default async function MailerPage({ searchParams }: { searchParams: { page?: string; search?: string } }) {
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const search = searchParams.search?.trim() || ''
   const offset = (page - 1) * PAGE_SIZE
+
+  const conditions: string[] = []
+  const params: unknown[] = []
+  let i = 1
+
+  if (search) {
+    conditions.push(`(title ILIKE $${i} OR subject ILIKE $${i})`)
+    params.push(`%${search}%`)
+    i++
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
   let campaigns: Campaign[] = []
   let total = 0
@@ -50,16 +64,22 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
     ;[campaigns, total] = await Promise.all([
       queryMany<Campaign>(
         `SELECT id, title, template_key, subject, audience_type, recipient_count, status, scheduled_at, sent_at, created_at
-         FROM email_campaigns ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
-        [PAGE_SIZE, offset]
+         FROM email_campaigns ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+        [...params, PAGE_SIZE, offset]
       ),
-      queryCount('SELECT COUNT(*) FROM email_campaigns', []),
+      queryCount(`SELECT COUNT(*) FROM email_campaigns ${where}`, params),
     ])
   } catch {
     migrationPending = true
   }
 
-  const buildUrl = (p: number) => `/admin/mailer${p > 1 ? `?page=${p}` : ''}`
+  const buildUrl = (p: number) => {
+    const qs = new URLSearchParams()
+    if (search) qs.set('search', search)
+    if (p > 1) qs.set('page', String(p))
+    const s = qs.toString()
+    return `/admin/mailer${s ? `?${s}` : ''}`
+  }
 
   if (migrationPending) {
     return (
@@ -94,6 +114,8 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
           New Campaign
         </Link>
       </div>
+
+      <AdminFilters filters={[]} searchPlaceholder="Search by title or subject..." />
 
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
         <div className="hidden md:block overflow-x-auto">

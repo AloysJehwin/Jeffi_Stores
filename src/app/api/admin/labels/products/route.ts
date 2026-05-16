@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get('q')?.trim() || ''
     const categoryId = searchParams.get('category_id')?.trim() || ''
     const productId = searchParams.get('product_id')?.trim() || ''
-    const limit = Math.min(parseInt(searchParams.get('limit') || '40'), 100)
+    const limit = parseInt(searchParams.get('limit') || '40') || 10000
 
     let idx = 1
     const params: unknown[] = []
@@ -62,7 +62,8 @@ export async function GET(request: NextRequest) {
            COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
            p.hsn_code,
            b.name AS brand_name,
-           p.gtin
+           p.gtin,
+           COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity
          FROM products p
          LEFT JOIN brands b ON b.id = p.brand_id
          WHERE p.is_active = true AND p.has_variants = false AND ${catClause} AND ${productClause} AND ${searchWhere}
@@ -83,7 +84,8 @@ export async function GET(request: NextRequest) {
            COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
            p.hsn_code,
            b.name AS brand_name,
-           COALESCE(pv.gtin, p.gtin) AS gtin
+           COALESCE(pv.gtin, p.gtin) AS gtin,
+           COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id

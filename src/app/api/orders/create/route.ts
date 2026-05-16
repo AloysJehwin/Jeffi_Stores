@@ -3,7 +3,6 @@ import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
 import { isInterState, calculateGST } from '@/lib/gst'
-import { logStockMovement } from '@/lib/inventory'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
@@ -53,13 +52,13 @@ export async function POST(request: NextRequest) {
           'id', p.id, 'name', p.name, 'sku', p.sku,
           'base_price', p.base_price, 'sale_price', p.sale_price,
           'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
-          'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock
+          'stock_quantity', p.stock_quantity, 'inventory_quantity', p.inventory_quantity, 'is_in_stock', p.is_in_stock
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'sale_price', pv.sale_price,
-            'stock_quantity', pv.stock_quantity
+            'stock_quantity', pv.stock_quantity, 'inventory_quantity', pv.inventory_quantity
           )
         ELSE NULL END AS variant
       FROM cart_items ci
@@ -84,19 +83,6 @@ export async function POST(request: NextRequest) {
     const minOrderAmount = minOrderSetting ? parseFloat(minOrderSetting.value) || 0 : 0
     if (minOrderAmount > 0 && subtotal < minOrderAmount) {
       return NextResponse.json({ error: `Minimum order value is ₹${minOrderAmount}` }, { status: 400 })
-    }
-
-    for (const item of cartItems) {
-      const stockQty = item.variant ? item.variant.stock_quantity : item.products.stock_quantity
-      const itemName = item.variant
-        ? `${item.products.name} (${item.variant.variant_name})`
-        : item.products.name
-      if ((item.buy_mode === 'unit' || !item.buy_mode) && stockQty < item.quantity) {
-        return NextResponse.json(
-          { error: `${itemName} is out of stock or has insufficient quantity` },
-          { status: 400 }
-        )
-      }
     }
 
     const taxAmount = cartItems.reduce((sum: number, item: any) => {
@@ -218,31 +204,6 @@ export async function POST(request: NextRequest) {
            item.buy_mode || 'unit',
            item.buy_unit || null]
         )
-      }
-
-      for (const item of cartItems) {
-        if (item.buy_mode === 'unit' || !item.buy_mode) {
-          const qty = parseFloat(item.quantity)
-          if (item.variant) {
-            await client.query(
-              'UPDATE product_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-              [qty, item.variant.id]
-            )
-          } else {
-            await client.query(
-              'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-              [qty, item.product_id]
-            )
-          }
-          await logStockMovement(client, {
-            productId: item.product_id,
-            variantId: item.variant?.id || null,
-            transactionType: 'sale',
-            quantityChange: -qty,
-            referenceType: 'order',
-            referenceId: createdOrder.id,
-          })
-        }
       }
 
       if (!isRazorpayPayment) {
