@@ -106,16 +106,7 @@ export default function InvoicesClient() {
   const [formError, setFormError] = useState('')
   const [editLoading, setEditLoading] = useState(false)
 
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
-
   const totalPages = Math.ceil(total / 25)
-
-  useEffect(() => {
-    fetch('/api/categories', { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => setCategories(d.categories || d || []))
-      .catch(() => {})
-  }, [])
 
   const fetchInvoices = useCallback(async (p = 1) => {
     setLoading(true)
@@ -184,7 +175,11 @@ export default function InvoicesClient() {
         hsn_code: it.hsn_code || '',
         gst_rate: String(it.gst_rate ?? '18'),
         quantity: String(it.quantity ?? '1'),
+        unit: it.unit || 'pcs',
         unit_price: String(it.unit_price ?? ''),
+        discount_pct: it.discount_pct ?? 0,
+        mrp: it.mrp ?? 0,
+        inventory_quantity: it.inventory_quantity ?? null,
       })) : [newLineItem()])
 
       setFormError('')
@@ -385,7 +380,7 @@ export default function InvoicesClient() {
           </div>
 
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <LineItemsSection items={items} onChange={setItems} categories={categories} />
+            <LineItemsSection items={items} onChange={setItems} />
           </div>
 
 
