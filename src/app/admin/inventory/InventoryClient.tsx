@@ -455,6 +455,7 @@ function POTab() {
             value={statusFilter}
             onChange={setStatusFilter}
             placeholder="All"
+            sm
             options={[
               { value: '', label: 'All' },
               { value: 'draft', label: 'Draft' },

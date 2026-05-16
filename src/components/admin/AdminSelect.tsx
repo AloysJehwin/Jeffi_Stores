@@ -24,6 +24,7 @@ interface AdminSelectProps {
   onChange?: (value: string) => void
   className?: string
   compact?: boolean
+  sm?: boolean
 }
 
 export default function AdminSelect({
@@ -41,6 +42,7 @@ export default function AdminSelect({
   onChange,
   className = '',
   compact = false,
+  sm = false,
 }: AdminSelectProps) {
   const [internalValue, setInternalValue] = useState(defaultValue)
   const [isOpen, setIsOpen] = useState(false)
@@ -167,7 +169,7 @@ export default function AdminSelect({
           }}
           onKeyDown={handleKeyDown}
           className={`w-full bg-surface border rounded-lg text-left transition-all cursor-pointer flex items-center justify-between
-            ${compact ? 'px-2 py-0.5 text-xs gap-1' : 'px-4 py-2.5 text-sm gap-2'}
+            ${compact ? 'px-2 py-0.5 text-xs gap-1' : sm ? 'px-2 py-1.5 text-sm gap-2' : 'px-4 py-2.5 text-sm gap-2'}
             ${isOpen ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-secondary hover:border-border-default'}
             ${error ? 'border-red-400 ring-red-500' : ''}
             ${disabled ? 'opacity-50 cursor-not-allowed bg-surface-secondary' : ''}
