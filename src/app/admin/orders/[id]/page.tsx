@@ -221,6 +221,50 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           </div>
 
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="px-6 py-4 border-b border-border-default">
+              <h2 className="text-lg font-semibold text-foreground">Inventory Status</h2>
+            </div>
+            <div className="divide-y divide-border-default">
+              {order.order_items && order.order_items.length > 0 ? (
+                order.order_items.map((item: any) => {
+                  const inv = item.variant?.inventory_quantity ?? item.products?.inventory_quantity ?? 0
+                  const qty = Math.round(Number(item.quantity))
+                  const isOut = inv <= 0
+                  const isLow = inv > 0 && inv <= 5
+                  return (
+                    <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
+                        <p className="text-xs text-foreground-muted mt-0.5">
+                          SKU: {item.variant?.sku || item.product_sku}
+                          {item.variant_name && ` · ${item.variant_name}`}
+                          {' · '}Ordered: {qty}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`text-sm font-semibold ${isOut ? 'text-red-500' : isLow ? 'text-yellow-500' : 'text-green-600 dark:text-green-400'}`}>
+                          {inv} in stock
+                        </p>
+                        <span className={`inline-block mt-0.5 px-2 py-0.5 text-xs font-medium rounded-full ${
+                          isOut
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                            : isLow
+                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                            : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                        }`}>
+                          {isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <p className="px-6 py-4 text-sm text-foreground-muted">No items</p>
+              )}
+            </div>
+          </div>
+
           {order.status === 'cancel_requested' && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-orange-300 dark:border-orange-800">
               <div className="px-6 py-4 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30">
@@ -307,7 +351,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
           </div>
           )}
 
-          {order.payment_status === 'paid' && (order.status === 'processing' || order.awb_number) && !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) && (
+          {order.status === 'processing' && !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) && (
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Delhivery Shipment</h2>

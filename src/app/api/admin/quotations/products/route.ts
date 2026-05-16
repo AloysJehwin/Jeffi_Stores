@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')?.trim() || ''
     const categoryId = searchParams.get('category_id')?.trim() || ''
-    const limit = Math.min(parseInt(searchParams.get('limit') || '40'), 100)
+    const limit = parseInt(searchParams.get('limit') || '40') || 10000
 
     let idx = 1
     const params: unknown[] = []
@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
            p.base_price,
            COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
            p.hsn_code,
-           p.is_active
+           p.is_active,
+           COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity
          FROM products p
          WHERE p.has_variants = false AND ${catClause} AND ${searchWhere}
 
@@ -72,7 +73,8 @@ export async function GET(request: NextRequest) {
            COALESCE(pv.price, p.base_price) AS base_price,
            COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
            p.hsn_code,
-           p.is_active AND pv.is_active AS is_active
+           p.is_active AND pv.is_active AS is_active,
+           COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          WHERE ${catClause} AND ${searchWherePv}

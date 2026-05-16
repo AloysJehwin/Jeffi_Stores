@@ -64,6 +64,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
       <AdminFilters
         filters={[]}
         searchPlaceholder="Search by title or slug..."
+        suggestType="review_forms"
       />
 
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mt-4">

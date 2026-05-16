@@ -17,15 +17,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data)
     }
 
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = parseInt(searchParams.get('limit') || '50')
     const ledger = await getStockLedger({
       productId: searchParams.get('product_id') || undefined,
       search: searchParams.get('search') || undefined,
       from: searchParams.get('from') || undefined,
       to: searchParams.get('to') || undefined,
-      limit: parseInt(searchParams.get('limit') || '200'),
+      limit,
+      offset: (page - 1) * limit,
     })
 
-    return NextResponse.json({ transactions: ledger || [] })
+    return NextResponse.json({ transactions: ledger.rows, total: ledger.total, page, limit })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
