@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getCustomers } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
+import CustomersTableRows from '@/components/admin/CustomersTableRows'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -68,6 +69,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
           },
         ]}
         searchPlaceholder="Search by name, email or phone..."
+        suggestType="customers"
         searchParam="search"
       />
 
@@ -121,51 +123,13 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {customers && customers.length > 0 ? (
-                customers.map((customer: any) => (
-                  <tr key={customer.id} className="hover:bg-surface-secondary">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-foreground">
-                        {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || '—'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">{customer.email}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">{customer.phone || '—'}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">{new Date(customer.created_at).toLocaleDateString('en-IN')}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">{Number(customer.order_count)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        customer.is_flagged ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                        : customer.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                        : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-                      }`}>
-                        {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link href={`/admin/customers/${customer.id}`} className="text-accent-500 hover:text-accent-600">View</Link>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-foreground-muted">No customers found.</td>
-                </tr>
-              )}
+              <CustomersTableRows customers={customers ?? []} />
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-3 border-t border-border-default">
-          <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-        </div>
+      </div>
+      <div className="px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
+        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
     </div>
   )

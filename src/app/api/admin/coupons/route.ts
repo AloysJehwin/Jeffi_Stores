@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany, queryCount } from '@/lib/db'
+import { buildSearchClause } from '@/lib/search'
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -22,9 +23,10 @@ export async function GET(request: NextRequest) {
     params.push(isActive === 'true')
   }
   if (search) {
-    conditions.push(`(code ILIKE $${i} OR description ILIKE $${i})`)
-    params.push(`%${search}%`)
-    i++
+    const sc = buildSearchClause(search, ['code', 'description'], i)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''

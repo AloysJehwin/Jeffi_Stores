@@ -1,6 +1,6 @@
 import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
-import { buildSearchClause } from './search'
+import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
@@ -11,6 +11,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       totalCustomers,
       lowStockProducts,
       pendingOrders,
+      newCustomersThisMonth,
     ] = await Promise.all([
       queryCount('SELECT COUNT(*) FROM products'),
       queryCount('SELECT COUNT(*) FROM orders'),
@@ -24,6 +25,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       queryCount('SELECT COUNT(*) FROM users WHERE is_active = $1 AND is_guest = $2', [true, false]),
       queryCount('SELECT COUNT(*) FROM products WHERE stock_quantity <= low_stock_threshold'),
       queryCount('SELECT COUNT(*) FROM orders WHERE status = $1', ['pending']),
+      queryCount("SELECT COUNT(*) FROM users WHERE is_active = TRUE AND is_guest = FALSE AND created_at >= date_trunc('month', NOW())"),
     ])
 
     const [onlineOrders, offlineOrders] = await Promise.all([
@@ -40,6 +42,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       onlineRevenue: parseFloat(revenueResult?.online || '0'),
       offlineRevenue: parseFloat(revenueResult?.offline || '0'),
       totalCustomers,
+      newCustomersThisMonth,
       lowStockProducts,
       pendingOrders,
     }
@@ -53,6 +56,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       onlineRevenue: 0,
       offlineRevenue: 0,
       totalCustomers: 0,
+      newCustomersThisMonth: 0,
       lowStockProducts: 0,
       pendingOrders: 0,
     }
@@ -180,7 +184,7 @@ export async function getFilteredOrders(filters: {
     params.push(filters.source)
   }
   if (filters.search) {
-    const sc = buildSearchClause(filters.search, ['o.order_number', 'o.customer_name'], i)
+    const sc = buildVectorSearchClause(filters.search, 'o.search_vector', ['o.customer_name'], ['o.order_number'], i, 'simple')
     conditions.push(sc.clause)
     params.push(...sc.params)
     i = sc.nextIdx
@@ -255,14 +259,24 @@ export async function getFilteredProducts(filters: {
       OR (p.has_variants = true AND COALESCE((SELECT SUM(pv2.stock_quantity) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true), 0) = 0)
     )`)
   }
+  let rankExpr = '0::int'
   if (filters.search) {
-    const sc = buildSearchClause(filters.search, ['p.name', 'p.sku'], i)
+    const sc = buildProductSearchClause(filters.search, 'p.name', 'p.sku', 'p.search_vector', i)
     conditions.push(sc.clause)
     params.push(...sc.params)
     i = sc.nextIdx
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+  const countParams = [...params]
+
+  if (filters.search) {
+    const rk = buildProductSearchRank(filters.search, 'p.name', 'p.search_vector', i)
+    rankExpr = rk.rank
+    params.push(...rk.params)
+    i = rk.nextIdx
+  }
+
   const limit = filters.limit || 25
   const offset = ((filters.page || 1) - 1) * limit
 
@@ -287,10 +301,10 @@ export async function getFilteredProducts(filters: {
       LEFT JOIN categories pc ON c.parent_category_id = pc.id
       LEFT JOIN brands b ON p.brand_id = b.id
       ${where}
-      ORDER BY p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC
+      ORDER BY ${rankExpr}, p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC
       LIMIT $${i} OFFSET $${i + 1}
     `, [...params, limit, offset]),
-    queryCount(`SELECT COUNT(*) FROM products p ${where}`, params),
+    queryCount(`SELECT COUNT(*) FROM products p ${where}`, countParams),
   ])
 
   return { products, total }
@@ -315,9 +329,10 @@ export async function getFilteredCategories(filters: {
     conditions.push(`parent_category_id IS NOT NULL`)
   }
   if (filters.search) {
-    conditions.push(`name ILIKE $${i}`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildSearchClause(filters.search, ['name'], i)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -361,11 +376,13 @@ export async function getCustomers(filters: {
         u.is_active, u.is_flagged, u.flag_reason, u.created_at,
         cp.customer_type,
         COALESCE(o.order_count, 0) AS order_count,
+        COALESCE(o.lifetime_value, 0) AS lifetime_value,
         o.last_order_at
       FROM users u
       LEFT JOIN customer_profiles cp ON u.id = cp.user_id
       LEFT JOIN (
-        SELECT user_id, COUNT(*) AS order_count, MAX(created_at) AS last_order_at
+        SELECT user_id, COUNT(*) AS order_count, MAX(created_at) AS last_order_at,
+               SUM(total_amount) AS lifetime_value
         FROM orders GROUP BY user_id
       ) o ON u.id = o.user_id
       ${where}
@@ -396,14 +413,135 @@ export async function getCustomerById(id: string) {
     FROM orders
     WHERE user_id = $1
     ORDER BY created_at DESC
-    LIMIT 5
+    LIMIT 10
   `, [id])
 
-  return { ...customer, recent_orders: recentOrders }
+  const stats = await queryOne(`
+    SELECT
+      COUNT(*) AS total_orders,
+      COALESCE(SUM(total_amount), 0) AS lifetime_value
+    FROM orders
+    WHERE user_id = $1
+  `, [id])
+
+  return { ...customer, recent_orders: recentOrders, total_orders: stats?.total_orders ?? 0, lifetime_value: stats?.lifetime_value ?? 0 }
 }
 
 export async function getRecentOrders(limit: number = 10) {
   return queryMany('SELECT * FROM orders ORDER BY created_at DESC LIMIT $1', [limit])
+}
+
+export async function getDashboardMetrics() {
+  const [
+    periodRevenue,
+    orderFunnel,
+    topProducts,
+    recentOrders,
+  ] = await Promise.all([
+    queryOne<{
+      this_month_revenue: string; last_month_revenue: string
+      this_month_orders: string; last_month_orders: string
+      this_month_customers: string; last_month_customers: string
+      today_revenue: string; yesterday_revenue: string
+      online_revenue: string; offline_revenue: string
+    }>(`
+      SELECT
+        COALESCE(SUM(CASE WHEN created_at >= date_trunc('month', NOW()) AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS this_month_revenue,
+        COALESCE(SUM(CASE WHEN created_at >= date_trunc('month', NOW() - INTERVAL '1 month') AND created_at < date_trunc('month', NOW()) AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS last_month_revenue,
+        COUNT(CASE WHEN created_at >= date_trunc('month', NOW()) THEN 1 END) AS this_month_orders,
+        COUNT(CASE WHEN created_at >= date_trunc('month', NOW() - INTERVAL '1 month') AND created_at < date_trunc('month', NOW()) THEN 1 END) AS last_month_orders,
+        COALESCE(SUM(CASE WHEN created_at >= date_trunc('day', NOW()) AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS today_revenue,
+        COALESCE(SUM(CASE WHEN created_at >= date_trunc('day', NOW() - INTERVAL '1 day') AND created_at < date_trunc('day', NOW()) AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0) AS yesterday_revenue,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' AND source = 'online' THEN total_amount ELSE 0 END), 0) AS online_revenue,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' AND source = 'offline' THEN total_amount ELSE 0 END), 0) AS offline_revenue
+      FROM orders
+    `),
+    queryOne<{
+      pending: string; processing: string; shipped: string
+      out_for_delivery: string; delivered: string; cancelled: string
+    }>(`
+      SELECT
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending,
+        COUNT(CASE WHEN status IN ('confirmed','processing') THEN 1 END) AS processing,
+        COUNT(CASE WHEN status = 'shipped' THEN 1 END) AS shipped,
+        COUNT(CASE WHEN status = 'out_for_delivery' THEN 1 END) AS out_for_delivery,
+        COUNT(CASE WHEN status = 'delivered' THEN 1 END) AS delivered,
+        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) AS cancelled
+      FROM orders
+    `),
+    queryMany<{ product_id: string; name: string; total_qty: string; total_revenue: string }>(`
+      SELECT
+        oi.product_id,
+        p.name,
+        SUM(oi.quantity) AS total_qty,
+        SUM(oi.total_price) AS total_revenue
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.created_at >= date_trunc('month', NOW())
+      GROUP BY oi.product_id, p.name
+      ORDER BY total_qty DESC
+      LIMIT 5
+    `),
+    queryMany(`
+      SELECT
+        o.id, o.order_number, o.customer_name, o.total_amount,
+        o.status, o.payment_status, o.source, o.created_at,
+        json_build_object(
+          'id', u.id, 'email', u.email,
+          'first_name', u.first_name, 'last_name', u.last_name
+        ) AS users
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      ORDER BY o.created_at DESC
+      LIMIT 5
+    `),
+  ])
+
+  const pct = (a: number, b: number) => b === 0 ? null : Math.round(((a - b) / b) * 100)
+
+  const thisRevenue = parseFloat(periodRevenue?.this_month_revenue || '0')
+  const lastRevenue = parseFloat(periodRevenue?.last_month_revenue || '0')
+  const thisOrders = parseInt(periodRevenue?.this_month_orders || '0')
+  const lastOrders = parseInt(periodRevenue?.last_month_orders || '0')
+  const todayRevenue = parseFloat(periodRevenue?.today_revenue || '0')
+  const yesterdayRevenue = parseFloat(periodRevenue?.yesterday_revenue || '0')
+  const onlineRevenue = parseFloat(periodRevenue?.online_revenue || '0')
+  const offlineRevenue = parseFloat(periodRevenue?.offline_revenue || '0')
+
+  return {
+    revenue: {
+      thisMonth: thisRevenue,
+      lastMonth: lastRevenue,
+      pctChange: pct(thisRevenue, lastRevenue),
+      today: todayRevenue,
+      yesterday: yesterdayRevenue,
+      todayPct: pct(todayRevenue, yesterdayRevenue),
+      online: onlineRevenue,
+      offline: offlineRevenue,
+      total: onlineRevenue + offlineRevenue,
+    },
+    orders: {
+      thisMonth: thisOrders,
+      lastMonth: lastOrders,
+      pctChange: pct(thisOrders, lastOrders),
+    },
+    funnel: {
+      pending: parseInt(orderFunnel?.pending || '0'),
+      processing: parseInt(orderFunnel?.processing || '0'),
+      shipped: parseInt(orderFunnel?.shipped || '0'),
+      outForDelivery: parseInt(orderFunnel?.out_for_delivery || '0'),
+      delivered: parseInt(orderFunnel?.delivered || '0'),
+      cancelled: parseInt(orderFunnel?.cancelled || '0'),
+    },
+    topProducts: topProducts.map(p => ({
+      id: p.product_id,
+      name: p.name,
+      qty: parseInt(p.total_qty),
+      revenue: parseFloat(p.total_revenue),
+    })),
+    recentOrders,
+  }
 }
 
 export async function getOrder(id: string) {
@@ -424,11 +562,19 @@ export async function getOrder(id: string) {
             'tax_amount', oi.tax_amount, 'total_price', oi.total_price,
             'buy_mode', oi.buy_mode, 'buy_unit', oi.buy_unit,
             'created_at', oi.created_at,
-            'products', json_build_object('id', pr.id, 'name', pr.name, 'sku', pr.sku)
+            'variant_id', oi.variant_id,
+            'products', json_build_object(
+              'id', pr.id, 'name', pr.name, 'sku', pr.sku,
+              'inventory_quantity', pr.inventory_quantity
+            ),
+            'variant', CASE WHEN oi.variant_id IS NOT NULL THEN
+              json_build_object('id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku, 'inventory_quantity', pv.inventory_quantity)
+            ELSE NULL END
           )
         )
         FROM order_items oi
         LEFT JOIN products pr ON oi.product_id = pr.id
+        LEFT JOIN product_variants pv ON oi.variant_id = pv.id
         WHERE oi.order_id = o.id),
         '[]'::json
       ) AS order_items,

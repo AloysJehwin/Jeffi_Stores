@@ -5,12 +5,24 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import Link from 'next/link'
 import { useState } from 'react'
+import RecommendedProducts from '@/components/visitor/RecommendedProducts'
+
+interface AppliedCoupon {
+  couponId: string
+  code: string
+  description: string | null
+  discountAmount: number
+}
 
 export default function CartPage() {
   const { cartItems, cartCount, isLoading, removeFromCart, updateQuantity, getCartTotal, getCartTax } = useCart()
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
+  const [couponCode, setCouponCode] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState('')
 
   const handleQuantityChange = async (cartItemId: string, newQuantity: number) => {
     if (newQuantity < 1) return
@@ -80,8 +92,38 @@ export default function CartPage() {
 
   const total = getCartTotal()
   const tax = getCartTax()
-  const discount = 0 // You can implement discount logic here
-  const finalTotal = total - discount
+  const discount = appliedCoupon?.discountAmount ?? 0
+  const finalTotal = Math.max(0, total - discount)
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return
+    setCouponLoading(true)
+    setCouponError('')
+    try {
+      const res = await fetch('/api/coupons/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: couponCode.trim(), subtotal: total }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setCouponError(data.error || 'Invalid coupon')
+      } else {
+        setAppliedCoupon({ couponId: data.couponId, code: data.code, description: data.description, discountAmount: data.discountAmount })
+        setCouponCode('')
+        showToast(`Coupon "${data.code}" applied — saving ₹${data.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 'success')
+      }
+    } catch {
+      setCouponError('Failed to apply coupon')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponError('')
+  }
 
   return (
     <div className="bg-surface min-h-screen py-4 sm:py-6 lg:py-8">
@@ -226,12 +268,50 @@ export default function CartPage() {
                 )
               })}
             </div>
+
+            <RecommendedProducts title="You Might Also Like" limit={4} />
           </div>
 
           {/* Order Summary */}
           <div className="lg:col-span-1 lg:self-start lg:sticky lg:top-20">
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
+
+              {/* Coupon Input */}
+              <div className="mb-5">
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
+                    <div>
+                      <p className="text-sm font-semibold text-green-700 dark:text-green-400">{appliedCoupon.code} applied</p>
+                      {appliedCoupon.description && (
+                        <p className="text-xs text-green-600 dark:text-green-500">{appliedCoupon.description}</p>
+                      )}
+                    </div>
+                    <button onClick={handleRemoveCoupon} className="text-xs text-red-500 hover:text-red-600 font-medium ml-3">Remove</button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={couponCode}
+                        onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponError('') }}
+                        onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                        placeholder="Coupon code"
+                        className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder-foreground-muted focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500"
+                      />
+                      <button
+                        onClick={handleApplyCoupon}
+                        disabled={couponLoading || !couponCode.trim()}
+                        className="px-4 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {couponLoading ? '...' : 'Apply'}
+                      </button>
+                    </div>
+                    {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
+                  </div>
+                )}
+              </div>
 
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-foreground-secondary">
@@ -243,8 +323,8 @@ export default function CartPage() {
                   <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
                 {discount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
+                  <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
+                    <span>Coupon ({appliedCoupon!.code})</span>
                     <span>-₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
@@ -253,13 +333,16 @@ export default function CartPage() {
                     <span>Total</span>
                     <span>₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
+                  {discount > 0 && (
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">You save ₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} with this coupon</p>
+                  )}
                   <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>
                 </div>
               </div>
 
               {user ? (
                 <Link
-                  href="/checkout"
+                  href={`/checkout${appliedCoupon ? `?couponCode=${appliedCoupon.code}` : ''}`}
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                 >
                   Proceed to Checkout

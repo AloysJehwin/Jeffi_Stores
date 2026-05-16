@@ -11,17 +11,13 @@ export async function GET(request: NextRequest) {
     const q = new URL(request.url).searchParams.get('q')?.trim() || ''
     if (q.length < 2) return NextResponse.json({ results: [] })
 
-    const sc = buildSearchClause(q, [
-      "u.first_name || ' ' || u.last_name",
-      'u.email',
-      'cp.company_name',
-    ], 1)
+    const sc = buildSearchClause(q, ['u.first_name || \' \' || u.last_name', 'u.email', 'u.phone', 'cp.company_name'], 1)
 
     const rows = await queryMany<any>(
       `SELECT DISTINCT ON (u.id)
-         u.id, (u.first_name || ' ' || u.last_name) AS full_name, u.email,
+         u.id, (u.first_name || ' ' || u.last_name) AS full_name, u.email, u.phone,
          cp.company_name, cp.gst_number,
-         a.full_name AS addr_name, a.address_line1, a.address_line2, a.city, a.state
+         a.full_name AS addr_name, a.address_line1, a.address_line2, a.city, a.state, a.postal_code
        FROM users u
        LEFT JOIN customer_profiles cp ON cp.user_id = u.id
        LEFT JOIN addresses a ON a.user_id = u.id AND a.is_default = true

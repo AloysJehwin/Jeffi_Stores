@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 
 export default function DeleteCouponButton({ id, code }: { id: string; code: string }) {
   const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const { showToast } = useToast()
 
   const handleDelete = async () => {
     setLoading(true)
@@ -15,7 +17,7 @@ export default function DeleteCouponButton({ id, code }: { id: string; code: str
       router.refresh()
     } else {
       const data = await res.json()
-      alert(data.error || 'Failed to delete coupon')
+      showToast(data.error || 'Failed to delete coupon', 'error')
     }
     setLoading(false)
     setConfirming(false)

@@ -1,4 +1,5 @@
 import { queryOne, queryMany } from './db'
+import { buildSearchClause, buildVectorSearchClause } from './search'
 
 export interface ReceivableRow {
   order_id: string
@@ -36,6 +37,11 @@ export interface PayableRow {
   status: string
   days_overdue: number | null
   paid_amount: number
+  po_id: string | null
+  supplier_bank_name: string | null
+  supplier_account_number: string | null
+  supplier_ifsc: string | null
+  supplier_upi_id: string | null
 }
 
 export interface PayablesSummary {
@@ -84,7 +90,7 @@ export async function getReceivablesAging(filters: {
   customerPhone?: string
   search?: string
 }): Promise<{ rows: ReceivableRow[]; summary: ReceivablesSummary }> {
-  const conditions: string[] = ["o.payment_status IN ('unpaid', 'partial')"]
+  const conditions: string[] = ["o.payment_status IN ('unpaid', 'partial')", "o.status != 'draft'"]
   const params: any[] = []
   let i = 1
 
@@ -92,9 +98,10 @@ export async function getReceivablesAging(filters: {
   if (filters.to) { conditions.push(`o.created_at <= $${i++}`); params.push(filters.to + ' 23:59:59') }
   if (filters.customerPhone) { conditions.push(`o.customer_phone = $${i++}`); params.push(filters.customerPhone) }
   if (filters.search) {
-    conditions.push(`(o.customer_name ILIKE $${i} OR o.invoice_number ILIKE $${i} OR o.order_number ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildVectorSearchClause(filters.search, 'o.search_vector', ['o.customer_name'], ['o.invoice_number', 'o.order_number'], i, 'simple')
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const where = conditions.join(' AND ')
@@ -160,19 +167,26 @@ export async function getPayables(filters: {
   if (filters.from) { conditions.push(`e.expense_date >= $${i++}`); params.push(filters.from) }
   if (filters.to) { conditions.push(`e.expense_date <= $${i++}`); params.push(filters.to) }
   if (filters.search) {
-    conditions.push(`(e.supplier_name ILIKE $${i} OR e.expense_number ILIKE $${i})`)
-    params.push(`%${filters.search}%`)
-    i++
+    const sc = buildSearchClause(filters.search, ['e.supplier_name', 'e.expense_number'], i)
+    conditions.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
 
   const rows = await queryMany<PayableRow>(`
     SELECT
       e.id, e.expense_number, e.supplier_name, e.supplier_gstin,
       e.description, e.amount, e.tax_amount, e.total_amount,
-      e.expense_date::text, e.due_date::text, e.status,
+      e.expense_date::text, e.due_date::text, e.status, e.po_id,
       CASE WHEN e.due_date < CURRENT_DATE THEN EXTRACT(DAY FROM NOW() - e.due_date)::int ELSE NULL END AS days_overdue,
-      COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0) AS paid_amount
+      COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0) AS paid_amount,
+      s.bank_name AS supplier_bank_name,
+      s.account_number AS supplier_account_number,
+      s.ifsc AS supplier_ifsc,
+      s.upi_id AS supplier_upi_id
     FROM expenses e
+    LEFT JOIN purchase_orders po ON po.id = e.po_id
+    LEFT JOIN suppliers s ON s.id = po.supplier_id
     WHERE ${conditions.join(' AND ')}
     ORDER BY e.due_date ASC NULLS LAST, e.expense_date DESC
   `, params)

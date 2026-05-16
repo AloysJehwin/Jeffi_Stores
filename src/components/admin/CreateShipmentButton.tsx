@@ -6,9 +6,10 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
   const [loading, setLoading] = useState(false)
   const [awb, setAwb] = useState<string | null>(awbNumber || null)
   const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   const handleCreate = async () => {
-    if (!confirm('Register this order with Delhivery and generate an AWB number?')) return
+    setConfirming(false)
     setLoading(true)
     setError(null)
     try {
@@ -42,28 +43,49 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>
       )}
-      <button
-        onClick={handleCreate}
-        disabled={loading}
-        className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
-      >
-        {loading ? (
-          <>
-            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Creating shipment…
-          </>
-        ) : (
-          <>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-            Create Delhivery Shipment
-          </>
-        )}
-      </button>
+      {confirming ? (
+        <div className="flex items-center gap-3 px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+          <p className="text-sm text-yellow-800 dark:text-yellow-300 flex-1">Register with Delhivery and generate an AWB number?</p>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={handleCreate}
+              disabled={loading}
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
+            >
+              Confirm
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg text-foreground-secondary hover:text-foreground transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setConfirming(true)}
+          disabled={loading}
+          className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Creating shipment…
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              Create Delhivery Shipment
+            </>
+          )}
+        </button>
+      )}
     </div>
   )
 }

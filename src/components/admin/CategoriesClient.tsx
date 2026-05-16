@@ -21,15 +21,19 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import DeleteCategoryButton from './DeleteCategoryButton'
+import CategoryIcon from '@/components/visitor/CategoryIcon'
+import HoverCard from '@/components/ui/HoverCard'
 
 interface Category {
   id: string
   name: string
   slug: string
   description: string | null
+  icon_name: string | null
   display_order: number
   is_active: boolean
   parent_category_id: string | null
+  subCount?: number
 }
 
 function SortableRow({
@@ -38,6 +42,7 @@ function SortableRow({
   collapsed,
   onToggleCollapse,
   subCount,
+  productCount,
   onDeleted,
 }: {
   category: Category
@@ -45,6 +50,7 @@ function SortableRow({
   collapsed?: boolean
   onToggleCollapse?: () => void
   subCount?: number
+  productCount?: number
   onDeleted?: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -90,14 +96,84 @@ function SortableRow({
             </button>
           )}
           {isSubcat && <span className="text-foreground-muted text-sm mr-1">└</span>}
-          <div>
-            <div className={`text-sm ${isSubcat ? 'text-foreground' : 'font-semibold text-foreground'}`}>
-              {category.name}
-            </div>
-            {category.description && (
-              <div className="text-xs text-foreground-muted max-w-xs truncate">{category.description}</div>
-            )}
+          <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${isSubcat ? 'bg-surface-secondary' : 'bg-accent-100 dark:bg-accent-900/30'}`}>
+            <CategoryIcon
+              iconName={category.icon_name}
+              categoryName={category.name}
+              className={`w-4 h-4 ${isSubcat ? 'text-foreground-muted' : 'text-accent-600 dark:text-accent-400'}`}
+            />
           </div>
+          <HoverCard
+            trigger={
+              <div>
+                <a
+                  href={`/categories/${category.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`text-sm hover:text-accent-500 hover:underline cursor-pointer ${isSubcat ? 'text-foreground' : 'font-semibold text-foreground'}`}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {category.name}
+                </a>
+                {category.description && (
+                  <div className="text-xs text-foreground-muted max-w-xs truncate">{category.description}</div>
+                )}
+              </div>
+            }
+            side="bottom"
+            align="left"
+            width="320px"
+          >
+            <div className="p-3 space-y-2">
+              <div className="flex items-center gap-2 pb-2 border-b border-border-default">
+                <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${isSubcat ? 'bg-surface-secondary' : 'bg-accent-100 dark:bg-accent-900/30'}`}>
+                  <CategoryIcon
+                    iconName={category.icon_name}
+                    categoryName={category.name}
+                    className={`w-4 h-4 ${isSubcat ? 'text-foreground-muted' : 'text-accent-600 dark:text-accent-400'}`}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-foreground">{category.name}</span>
+              </div>
+              {category.description && (
+                <p className="text-xs text-foreground-secondary line-clamp-2">{category.description}</p>
+              )}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                <span className="text-foreground-muted">Slug</span>
+                <span className="text-foreground font-mono break-all">{category.slug}</span>
+                <span className="text-foreground-muted">Status</span>
+                <span className={category.is_active ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}>
+                  {category.is_active ? 'Active' : 'Inactive'}
+                </span>
+                <span className="text-foreground-muted">Order</span>
+                <span className="text-foreground">{category.display_order}</span>
+                {!isSubcat && subCount !== undefined && (
+                  <>
+                    <span className="text-foreground-muted">Subcategories</span>
+                    <span className="text-foreground">{subCount}</span>
+                  </>
+                )}
+                {productCount !== undefined && (
+                  <>
+                    <span className="text-foreground-muted">Products</span>
+                    <span className="text-foreground">{productCount}</span>
+                  </>
+                )}
+              </div>
+              <a
+                href={`/categories/${category.slug}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-xs text-accent-500 hover:text-accent-600 pt-1"
+                onClick={e => e.stopPropagation()}
+              >
+                View on store
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          </HoverCard>
           {!isSubcat && subCount !== undefined && subCount > 0 && (
             <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">
               {subCount}
@@ -126,7 +202,7 @@ function SortableRow({
   )
 }
 
-export default function CategoriesClient({ initialCategories }: { initialCategories: Category[] }) {
+export default function CategoriesClient({ initialCategories, productCounts = {} }: { initialCategories: Category[], productCounts?: Record<string, number> }) {
   const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -235,8 +311,8 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={flatOrder.map(c => c.id)} strategy={verticalListSortingStrategy}>
-          <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+            <div className="overflow-x-auto overflow-y-visible">
             <table className="min-w-full divide-y divide-border-default">
               <thead className="bg-surface-secondary">
                 <tr>
@@ -260,6 +336,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                         collapsed={isCollapsed}
                         onToggleCollapse={() => toggleCollapse(cat.id)}
                         subCount={subcats.length}
+                        productCount={subcats.reduce((sum, s) => sum + (productCounts[s.id] || 0), productCounts[cat.id] || 0)}
                         onDeleted={() => handleCategoryDeleted(cat.id)}
                       />
                       {!isCollapsed && subcats.map(sub => (
@@ -267,6 +344,7 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                           key={sub.id}
                           category={sub}
                           isSubcat={true}
+                          productCount={productCounts[sub.id] || 0}
                           onDeleted={() => handleCategoryDeleted(sub.id)}
                         />
                       ))}
@@ -310,6 +388,9 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
                         </svg>
                       </button>
                     )}
+                    <div className="w-7 h-7 rounded-md bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
+                      <CategoryIcon iconName={cat.icon_name} categoryName={cat.name} className="w-4 h-4 text-accent-600 dark:text-accent-400" />
+                    </div>
                     <div className="text-sm font-semibold text-foreground">{cat.name}</div>
                     {subcats.length > 0 && (
                       <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">{subcats.length}</span>
@@ -332,7 +413,10 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
               {!isCollapsed && subcats.map(sub => (
                 <div key={sub.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 ml-6 mt-2">
                   <div className="flex items-start justify-between mb-2">
-                    <div className="text-sm text-foreground">
+                    <div className="text-sm text-foreground flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-surface-secondary flex items-center justify-center shrink-0">
+                        <CategoryIcon iconName={sub.icon_name} categoryName={sub.name} className="w-3.5 h-3.5 text-foreground-muted" />
+                      </div>
                       <span className="text-foreground-muted mr-1">└</span>{sub.name}
                     </div>
                     <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>

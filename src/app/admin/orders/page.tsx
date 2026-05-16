@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getFilteredOrders } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
+import OrdersTableRows from '@/components/admin/OrdersTableRows'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -124,6 +125,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
         ]}
         searchPlaceholder="Search by order number or customer..."
         searchParam="search"
+        suggestType="orders"
       />
 
       <div className="md:hidden space-y-3">
@@ -204,73 +206,13 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {orders && orders.length > 0 ? (
-                orders.map((order: any) => (
-                  <tr key={order.id} className="hover:bg-surface-secondary">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-foreground">#{order.order_number || order.id.slice(0, 8)}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                        order.source === 'offline'
-                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                          : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                      }`}>
-                        {order.source === 'offline' ? 'Offline' : 'Online'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">
-                        {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest' : order.customer_name || 'Guest'}
-                      </div>
-                      <div className="text-xs text-foreground-muted">{order.users?.email || order.billing_email}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-foreground">{new Date(order.created_at).toLocaleDateString('en-IN')}</div>
-                      <div className="text-xs text-foreground-muted">{new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-foreground">
-                        Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        order.payment_status === 'paid' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                        : order.payment_status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                        : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                      }`}>
-                        {order.payment_status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        order.status === 'delivered' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                        : order.status === 'processing' || order.status === 'shipped' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-                        : order.status === 'out_for_delivery' ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
-                        : order.status === 'cancelled' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                        : order.status === 'cancel_requested' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-                        : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                      }`}>
-                        {order.status === 'cancel_requested' ? 'Cancel Requested' : order.status === 'out_for_delivery' ? 'Out for Delivery' : order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link href={`/admin/orders/${order.id}`} className="text-accent-500 hover:text-accent-600">View Details</Link>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-foreground-muted">No orders found.</td>
-                </tr>
-              )}
+              <OrdersTableRows orders={orders ?? []} />
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-3 border-t border-border-default">
-          <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-        </div>
+      </div>
+      <div className="px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
+        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
     </div>
   )

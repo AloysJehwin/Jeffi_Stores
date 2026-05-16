@@ -73,6 +73,21 @@ const deliveredAt = new Date(order.delivered_at || order.updated_at)
       return NextResponse.json({ error: 'A return request already exists for this order.' }, { status: 400 })
     }
 
+    const monthlyCount = await queryOne(
+      `SELECT COUNT(*) AS cnt
+       FROM return_requests rr
+       JOIN orders o ON o.id = rr.order_id
+       WHERE o.user_id = $1
+         AND rr.status NOT IN ('rejected')
+         AND DATE_TRUNC('month', rr.created_at) = DATE_TRUNC('month', NOW())`,
+      [authUser.userId]
+    )
+    if (parseInt(monthlyCount?.cnt || '0', 10) >= 1) {
+      return NextResponse.json({
+        error: 'You have already used your return or replacement for this month. Only 1 is allowed per month.',
+      }, { status: 400 })
+    }
+
     const returnRequest = await queryOne(
       `INSERT INTO return_requests (order_id, user_id, type, reason, description)
        VALUES ($1, $2, $3, $4, $5)

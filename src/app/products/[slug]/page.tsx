@@ -7,6 +7,8 @@ import ProductImageGallery from '@/components/visitor/ProductImageGallery'
 import ProductActions from '@/components/visitor/ProductActions'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
+import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 
 const getProductBySlug = cache(async (slug: string) => {
   return queryOne(`
@@ -164,15 +166,22 @@ export default async function ProductDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <TrackRecentlyViewed
+        id={product.id}
+        name={product.name}
+        slug={product.slug}
+        price={Number(displayPrice)}
+        image={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
+      />
       {/* Breadcrumb */}
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center gap-2 text-sm">
-            <Link href="/" className="text-foreground-muted hover:text-accent-500">
+            <Link href="/" className="text-foreground-muted hover:text-accent-500 whitespace-nowrap">
               Home
             </Link>
             <span className="text-foreground-muted">/</span>
-            <Link href="/products" className="text-foreground-muted hover:text-accent-500">
+            <Link href="/products" className="text-foreground-muted hover:text-accent-500 whitespace-nowrap">
               Products
             </Link>
             {product.categories && (
@@ -180,14 +189,15 @@ export default async function ProductDetailPage({
                 <span className="text-foreground-muted">/</span>
                 <Link
                   href={`/categories/${product.categories.slug}`}
-                  className="text-foreground-muted hover:text-accent-500"
+                  className="text-foreground-muted hover:text-accent-500 whitespace-nowrap hidden sm:inline"
                 >
                   {product.categories.name}
                 </Link>
+                <span className="text-foreground-muted sm:hidden">...</span>
               </>
             )}
-            <span className="text-foreground-muted">/</span>
-            <span className="text-foreground font-medium">{product.name}</span>
+            <span className="text-foreground-muted hidden sm:inline">/</span>
+            <span className="text-foreground font-medium truncate hidden sm:inline">{product.name}</span>
           </nav>
         </div>
       </div>
@@ -195,17 +205,61 @@ export default async function ProductDetailPage({
       <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         {/* Product Details */}
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8">
-            {/* Product Images */}
-            <div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 lg:items-start">
+            {/* Product Images — order-1 on mobile, natural on desktop */}
+            <div className="order-1 lg:order-none">
               <ProductImageGallery
                 images={product.product_images || []}
                 productName={product.name}
               />
+
+              {/* Delivery & Returns — hidden on mobile (shown after product info via order-3 div below) */}
+              <div className="hidden lg:block mt-4 bg-surface rounded-lg border border-border-default p-4">
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8M10 12v4m4-4v4" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Free Delivery</p>
+                      <p className="text-xs text-foreground-secondary">On orders above ₹500</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Easy Returns</p>
+                      <p className="text-xs text-foreground-secondary">7-day hassle-free return policy</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">100% Genuine</p>
+                      <p className="text-xs text-foreground-secondary">Authentic products guaranteed</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="hidden lg:block mt-3 bg-surface rounded-lg border border-border-default px-4 py-3">
+                <p className="text-xs text-foreground-secondary text-center mb-2">Secure Payment Options</p>
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  {['UPI', 'Cards', 'Net Banking', 'Wallets'].map((method) => (
+                    <span key={method} className="text-xs font-medium bg-surface-elevated border border-border-default text-foreground-secondary px-2 py-1 rounded">
+                      {method}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Product Info */}
-            <div>
+            {/* Product Info — order-2 on mobile, natural on desktop */}
+            <div className="order-2 lg:order-none">
+
               <h1 className="text-3xl font-bold text-foreground mb-4">
                 {product.name}
               </h1>
@@ -320,7 +374,58 @@ export default async function ProductDetailPage({
                       <dd className="font-medium text-foreground">{product.categories.name}</dd>
                     </>
                   )}
+                  {product.brands && (
+                    <>
+                      <dt className="text-foreground-secondary">Brand:</dt>
+                      <dd className="font-medium text-foreground">{product.brands.name}</dd>
+                    </>
+                  )}
                 </dl>
+              </div>
+            </div>
+
+            {/* Delivery & Returns + Secure Payment — mobile only (desktop version is inside image column above) */}
+            <div className="order-3 lg:hidden">
+              <div className="bg-surface rounded-lg border border-border-default p-4">
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8M10 12v4m4-4v4" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Free Delivery</p>
+                      <p className="text-xs text-foreground-secondary">On orders above ₹500</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Easy Returns</p>
+                      <p className="text-xs text-foreground-secondary">7-day hassle-free return policy</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">100% Genuine</p>
+                      <p className="text-xs text-foreground-secondary">Authentic products guaranteed</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 bg-surface rounded-lg border border-border-default px-4 py-3">
+                <p className="text-xs text-foreground-secondary text-center mb-2">Secure Payment Options</p>
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  {['UPI', 'Cards', 'Net Banking', 'Wallets'].map((method) => (
+                    <span key={method} className="text-xs font-medium bg-surface-elevated border border-border-default text-foreground-secondary px-2 py-1 rounded">
+                      {method}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -338,6 +443,9 @@ export default async function ProductDetailPage({
 
         {/* Product Reviews */}
         <ProductReviews productId={product.id} productName={product.name} />
+
+        {/* Recently Viewed */}
+        <RecentlyViewed excludeId={product.id} />
 
         {/* Related Products */}
         {relatedProducts.length > 0 && (

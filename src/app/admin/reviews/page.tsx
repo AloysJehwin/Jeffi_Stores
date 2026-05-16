@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useToast } from '@/contexts/ToastContext'
 
 interface Review {
   id: string
@@ -25,15 +26,21 @@ export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('pending')
+  const [search, setSearch] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const { showToast } = useToast()
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     fetchReviews()
   }, [filter])
 
-  const fetchReviews = async () => {
+  const fetchReviews = async (q = search) => {
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/admin/reviews?filter=${filter}`)
+      const params = new URLSearchParams({ filter })
+      if (q.trim()) params.set('q', q.trim())
+      const response = await fetch(`/api/admin/reviews?${params}`)
       if (response.ok) {
         const data = await response.json()
         setReviews(data.reviews || [])
@@ -42,6 +49,12 @@ export default function AdminReviewsPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  function handleSearchChange(val: string) {
+    setSearch(val)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => fetchReviews(val), 300)
   }
 
   const handleApprove = async (reviewId: string) => {
@@ -55,15 +68,15 @@ export default function AdminReviewsPage() {
       if (response.ok) {
         fetchReviews()
       } else {
-        alert('Failed to approve review')
+        showToast('Failed to approve review', 'error')
       }
     } catch (error) {
-      alert('Failed to approve review')
+      showToast('Failed to approve review', 'error')
     }
   }
 
   const handleReject = async (reviewId: string) => {
-    if (!confirm('Are you sure you want to delete this review?')) return
+    setConfirmDeleteId(null)
 
     try {
       const response = await fetch('/api/admin/reviews', {
@@ -75,10 +88,10 @@ export default function AdminReviewsPage() {
       if (response.ok) {
         fetchReviews()
       } else {
-        alert('Failed to delete review')
+        showToast('Failed to delete review', 'error')
       }
     } catch (error) {
-      alert('Failed to delete review')
+      showToast('Failed to delete review', 'error')
     }
   }
 
@@ -144,6 +157,15 @@ export default function AdminReviewsPage() {
           >
             All Reviews
           </button>
+        </div>
+        <div className="px-4 py-3">
+          <input
+            type="text"
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            placeholder="Search by product name or reviewer..."
+            className="w-full sm:max-w-sm px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
+          />
         </div>
       </div>
 
@@ -227,13 +249,32 @@ export default function AdminReviewsPage() {
                   >
                     Approve
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleReject(review.id)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
-                  >
-                    Delete
-                  </button>
+                  {confirmDeleteId === review.id ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleReject(review.id)}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                      >
+                        Confirm Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-4 py-2 text-sm text-foreground-secondary hover:text-foreground transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(review.id)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               )}
             </div>

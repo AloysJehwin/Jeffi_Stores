@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany, queryOne, query } from '@/lib/db'
+import { buildSearchClause } from '@/lib/search'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,9 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || ''
     const supplierId = searchParams.get('supplier_id') || ''
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const offset = (page - 1) * limit
 
     const conditions = ['1=1']
     const params: any[] = []
@@ -21,10 +25,21 @@ export async function GET(request: NextRequest) {
     if (status) { conditions.push(`po.status = $${i++}`); params.push(status) }
     if (supplierId) { conditions.push(`po.supplier_id = $${i++}`); params.push(supplierId) }
     if (search) {
-      conditions.push(`(po.po_number ILIKE $${i} OR s.name ILIKE $${i})`)
-      params.push(`%${search}%`)
-      i++
+      const sc = buildSearchClause(search, ['po.po_number', 's.name'], i)
+      conditions.push(sc.clause)
+      params.push(...sc.params)
+      i = sc.nextIdx
     }
+
+    const where = conditions.join(' AND ')
+    const countRow = await queryOne<{ total: number }>(
+      `SELECT COUNT(DISTINCT po.id)::int AS total
+       FROM purchase_orders po
+       JOIN suppliers s ON s.id = po.supplier_id
+       WHERE ${where}`,
+      params
+    )
+    const total = countRow?.total || 0
 
     const rows = await queryMany<any>(
       `SELECT
@@ -35,13 +50,14 @@ export async function GET(request: NextRequest) {
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        LEFT JOIN purchase_order_items poi ON poi.po_id = po.id
-       WHERE ${conditions.join(' AND ')}
+       WHERE ${where}
        GROUP BY po.id, s.id
-       ORDER BY po.created_at DESC`,
-      params
+       ORDER BY po.created_at DESC
+       LIMIT $${i} OFFSET $${i + 1}`,
+      [...params, limit, offset]
     )
 
-    return NextResponse.json({ purchase_orders: rows || [] })
+    return NextResponse.json({ purchase_orders: rows || [], total, page, limit })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

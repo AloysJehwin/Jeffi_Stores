@@ -100,6 +100,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
         ]}
         searchPlaceholder="Search by name or SKU..."
         searchParam="search"
+        suggestType="products"
       />
 
       <div className="md:hidden space-y-3">
@@ -169,22 +170,22 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
           <table className="w-full divide-y divide-border-default table-fixed">
             <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[28%]">Product</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[12%]">SKU</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[12%]">Category</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Brand</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[12%]">Price</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[9%]">Stock</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[8%]">Status</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[9%]">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[25%]">Product</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[8%]">Brand</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Price</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[7%]">Stock</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[18%]">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[12%]">Actions</th>
               </tr>
             </thead>
             <ProductsTableClient products={products || []} featuredCount={featuredCount} />
           </table>
         </div>
-        <div className="px-6 py-3 border-t border-border-default">
-          <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-        </div>
+      </div>
+      <div className="px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
+        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
     </div>
   )

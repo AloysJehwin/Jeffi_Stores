@@ -33,6 +33,8 @@ export default function AdminUserActions({
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
+  const [confirmAction, setConfirmAction] = useState<'toggle' | 'delete' | null>(null)
+
   const [resending, setResending] = useState(false)
   const [resendMsg, setResendMsg] = useState<string | null>(null)
 
@@ -85,7 +87,8 @@ export default function AdminUserActions({
   }
 
   async function handleToggleActive() {
-    if (!confirm(`${admin.is_active ? 'Deactivate' : 'Activate'} ${admin.username}?`)) return
+    if (confirmAction !== 'toggle') { setConfirmAction('toggle'); return }
+    setConfirmAction(null)
     setLoading(true)
     try {
       const res = await fetch(`/api/admin/users/${admin.id}`, {
@@ -100,7 +103,8 @@ export default function AdminUserActions({
   }
 
   async function handleDelete() {
-    if (!confirm(`Are you sure you want to delete ${admin.username}? This will revoke their certificates and permanently remove their account.`)) return
+    if (confirmAction !== 'delete') { setConfirmAction('delete'); return }
+    setConfirmAction(null)
     setLoading(true)
     try {
       const res = await fetch(`/api/admin/users/${admin.id}`, {
@@ -119,33 +123,53 @@ export default function AdminUserActions({
       <div className="flex items-center gap-2 flex-wrap">
         {!isSuperAdmin && !isSelf && (
           <>
-            <button type="button" onClick={openEdit} className="text-accent-500 hover:text-accent-600 text-xs font-medium">
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={handleResendEmail}
-              disabled={resending}
-              className="text-blue-500 hover:text-blue-600 text-xs font-medium disabled:opacity-50"
-            >
-              {resending ? 'Sending…' : 'Resend Email'}
-            </button>
-            {resendMsg && (
-              <span className={`text-xs font-medium ${resendMsg === 'Email sent!' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
-                {resendMsg}
-              </span>
+            {confirmAction === 'toggle' ? (
+              <>
+                <span className="text-xs text-foreground-secondary">{admin.is_active ? 'Deactivate' : 'Activate'} {admin.username}?</span>
+                <button type="button" onClick={handleToggleActive} disabled={loading} className={`text-xs font-medium ${admin.is_active ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}`}>
+                  {loading ? 'Working…' : 'Confirm'}
+                </button>
+                <button type="button" onClick={() => setConfirmAction(null)} className="text-xs text-foreground-muted hover:text-foreground">Cancel</button>
+              </>
+            ) : confirmAction === 'delete' ? (
+              <>
+                <span className="text-xs text-foreground-secondary">Delete {admin.username}?</span>
+                <button type="button" onClick={handleDelete} disabled={loading} className="text-xs font-medium text-red-600 hover:text-red-700">
+                  {loading ? 'Deleting…' : 'Confirm'}
+                </button>
+                <button type="button" onClick={() => setConfirmAction(null)} className="text-xs text-foreground-muted hover:text-foreground">Cancel</button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={openEdit} className="text-accent-500 hover:text-accent-600 text-xs font-medium">
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResendEmail}
+                  disabled={resending}
+                  className="text-blue-500 hover:text-blue-600 text-xs font-medium disabled:opacity-50"
+                >
+                  {resending ? 'Sending…' : 'Resend Email'}
+                </button>
+                {resendMsg && (
+                  <span className={`text-xs font-medium ${resendMsg === 'Email sent!' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                    {resendMsg}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleToggleActive}
+                  disabled={loading}
+                  className={`text-xs font-medium ${admin.is_active ? 'text-red-500 hover:text-red-600' : 'text-green-500 hover:text-green-600'}`}
+                >
+                  {admin.is_active ? 'Deactivate' : 'Activate'}
+                </button>
+                <button type="button" onClick={handleDelete} disabled={loading} className="text-red-600 hover:text-red-700 text-xs font-medium">
+                  Delete
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              onClick={handleToggleActive}
-              disabled={loading}
-              className={`text-xs font-medium ${admin.is_active ? 'text-red-500 hover:text-red-600' : 'text-green-500 hover:text-green-600'}`}
-            >
-              {admin.is_active ? 'Deactivate' : 'Activate'}
-            </button>
-            <button type="button" onClick={handleDelete} disabled={loading} className="text-red-600 hover:text-red-700 text-xs font-medium">
-              Delete
-            </button>
           </>
         )}
         {isSelf && <span className="text-xs text-foreground-muted">Current session</span>}

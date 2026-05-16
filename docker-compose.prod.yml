@@ -1,9 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: jeffi-app
+    image: ghcr.io/aloysjehwin/jeffi_storess_site:latest
     env_file: .env.production
     environment:
       - REDIS_URL=redis://redis:6379
@@ -15,6 +12,14 @@ services:
     restart: always
     networks:
       - internal
+    deploy:
+      replicas: 2
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   nginx:
     image: nginx:alpine

@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { cookies, headers } from 'next/headers'
 import { logoutAction } from './logout-action'
 import { verifyToken } from '@/lib/jwt'
@@ -62,6 +64,7 @@ export default async function AdminLayout({
     { href: '/admin/financial', label: 'Financial', scope: 'settings', group: 'Finance' },
     { href: '/admin/inventory', label: 'Inventory', scope: 'settings', group: 'Finance' },
     { href: '/admin/gst', label: 'GST Compliance', scope: 'settings', group: 'Finance' },
+    { href: '/admin/traffic', label: 'Traffic', scope: 'dashboard', group: 'Marketing' },
     { href: '/admin/coupons', label: 'Coupons', scope: 'coupons', group: 'Marketing' },
     { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms', group: 'Marketing' },
     { href: '/admin/mailer', label: 'Mailer', scope: 'mailer', group: 'Marketing' },

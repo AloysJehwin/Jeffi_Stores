@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import AdminSelect from '@/components/admin/AdminSelect'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
@@ -331,7 +332,7 @@ export default function ImageUpload({
         </div>
       )}
 
-      {showGallery && (
+      {showGallery && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/50 p-4">
           <div className="bg-surface-elevated rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
@@ -437,7 +438,8 @@ export default function ImageUpload({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

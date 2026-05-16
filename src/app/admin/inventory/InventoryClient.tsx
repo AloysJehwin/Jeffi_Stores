@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import AdminTypeahead from '@/components/admin/AdminTypeahead'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -112,7 +114,12 @@ function SuppliersTab() {
       <div className="flex flex-wrap gap-2 items-end">
         <div className="flex-1 min-w-[180px]">
           <label className={labelCls}>Search</label>
-          <input className={inputCls} placeholder="Name, GSTIN, contact..." value={search} onChange={e => setSearch(e.target.value)} />
+          <AdminTypeahead
+            type="suppliers"
+            value={search}
+            onChange={setSearch}
+            placeholder="Name, GSTIN, contact..."
+          />
         </div>
         <label className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer pb-0.5">
           <input type="checkbox" checked={showAll} onChange={e => setShowAll(e.target.checked)} className="accent-secondary-500" />
@@ -211,7 +218,19 @@ type POItem = {
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
 }
 
-type Product = { id: string; name: string; sku: string | null; has_variants: boolean; stock_quantity: number }
+type POSearchMode = 'name' | 'sku' | 'category'
+
+type POSuggestion = {
+  id: string
+  product_id: string
+  variant_id: string | null
+  name: string
+  variant_name: string | null
+  sku: string
+  base_price: number | null
+  gst_percentage: number | null
+  hsn_code: string | null
+}
 
 function POTab() {
   const [pos, setPOs] = useState<PO[]>([])
@@ -224,8 +243,13 @@ function POTab() {
   const [receiveMode, setReceiveMode] = useState<{ po: any } | null>(null)
   const [newPO, setNewPO] = useState({ supplier_id: '', order_date: '', expected_date: '', notes: '', status: 'draft' })
   const [lineItems, setLineItems] = useState<any[]>([{ product_id: '', variant_id: '', product_name: '', sku: '', quantity: '1', unit_cost: '', tax_rate: '0' }])
-  const [productSearch, setProductSearch] = useState<Record<number, string>>({})
-  const [productResults, setProductResults] = useState<Record<number, Product[]>>({})
+  const [poSearchMode, setPoSearchMode] = useState<POSearchMode>('name')
+  const [poSuggestions, setPoSuggestions] = useState<POSuggestion[]>([])
+  const [activeLineIdx, setActiveLineIdx] = useState<number | null>(null)
+  const [poSkuInput, setPoSkuInput] = useState('')
+  const [poCategoryId, setPoCategoryId] = useState('')
+  const [poCategories, setPoCategories] = useState<{ id: string; name: string }[]>([])
+  const poSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [saving, setSaving] = useState(false)
   const [receiveItems, setReceiveItems] = useState<any[]>([])
   const [receiveNotes, setReceiveNotes] = useState('')
@@ -248,20 +272,39 @@ function POTab() {
     if (showCreate && suppliers.length === 0) {
       fetch('/api/admin/inventory/suppliers').then(r => r.json()).then(j => setSuppliers(j?.suppliers || []))
     }
-  }, [showCreate, suppliers.length])
+    if (showCreate && poCategories.length === 0) {
+      fetch('/api/categories').then(r => r.json()).then(d => setPoCategories((d.categories || d || []).map((c: any) => ({ id: c.id, name: c.name }))))
+    }
+  }, [showCreate, suppliers.length, poCategories.length])
 
-  async function searchProducts(idx: number, term: string) {
-    setProductSearch(p => ({ ...p, [idx]: term }))
-    if (term.length < 2) { setProductResults(p => ({ ...p, [idx]: [] })); return }
-    const res = await fetch(`/api/admin/products?search=${encodeURIComponent(term)}&limit=10`)
-    const json = await res.json()
-    setProductResults(p => ({ ...p, [idx]: json?.products || [] }))
+  function searchPoProducts(query: string, idx: number, catId?: string) {
+    if (poSearchTimerRef.current) clearTimeout(poSearchTimerRef.current)
+    if (!query.trim() && !catId) { setPoSuggestions([]); return }
+    poSearchTimerRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ limit: '10' })
+        if (query.trim()) params.set('q', query.trim())
+        if (catId) params.set('category_id', catId)
+        const res = await fetch(`/api/admin/labels/products?${params}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setPoSuggestions(data.products || [])
+        setActiveLineIdx(idx)
+      } catch { setPoSuggestions([]) }
+    }, 250)
   }
 
-  function selectProduct(idx: number, product: Product) {
-    setLineItems(items => items.map((it, i) => i === idx ? { ...it, product_id: product.id, product_name: product.name, sku: product.sku || '', variant_id: '' } : it))
-    setProductSearch(p => ({ ...p, [idx]: product.name }))
-    setProductResults(p => ({ ...p, [idx]: [] }))
+  function applyPoProduct(idx: number, s: POSuggestion) {
+    setLineItems(items => items.map((it, i) => i !== idx ? it : {
+      ...it,
+      product_id: s.product_id,
+      variant_id: s.variant_id || '',
+      product_name: s.variant_name ? `${s.name} — ${s.variant_name}` : s.name,
+      sku: s.sku,
+    }))
+    setPoSuggestions([])
+    setActiveLineIdx(null)
+    setPoSkuInput('')
   }
 
   async function createPO() {
@@ -435,16 +478,28 @@ function POTab() {
       <div className="flex flex-wrap gap-2 items-end">
         <div className="flex-1 min-w-[180px]">
           <label className={labelCls}>Search</label>
-          <input className={inputCls} placeholder="PO number, supplier..." value={search} onChange={e => setSearch(e.target.value)} />
+          <AdminTypeahead
+            type="purchase_orders"
+            value={search}
+            onChange={setSearch}
+            placeholder="PO number, supplier..."
+          />
         </div>
         <div>
           <label className={labelCls}>Status</label>
-          <select className={inputCls + ' w-36'} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-            <option value="">All</option>
-            {['draft', 'sent', 'partial', 'received', 'cancelled'].map(s => (
-              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-            ))}
-          </select>
+          <AdminSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            placeholder="All"
+            options={[
+              { value: '', label: 'All' },
+              { value: 'draft', label: 'Draft' },
+              { value: 'sent', label: 'Sent' },
+              { value: 'partial', label: 'Partial' },
+              { value: 'received', label: 'Received' },
+              { value: 'cancelled', label: 'Cancelled' },
+            ]}
+          />
         </div>
         <button className={btnSecondary} onClick={() => setShowCreate(v => !v)}>+ Create PO</button>
       </div>
@@ -455,10 +510,12 @@ function POTab() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div>
               <label className={labelCls}>Supplier *</label>
-              <select className={inputCls} value={newPO.supplier_id} onChange={e => setNewPO(p => ({ ...p, supplier_id: e.target.value }))}>
-                <option value="">Select supplier</option>
-                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <AdminSelect
+                value={newPO.supplier_id}
+                onChange={v => setNewPO(p => ({ ...p, supplier_id: v }))}
+                placeholder="Select supplier"
+                options={suppliers.map(s => ({ value: s.id, label: s.name }))}
+              />
             </div>
             <div>
               <label className={labelCls}>Order Date</label>
@@ -470,10 +527,15 @@ function POTab() {
             </div>
             <div>
               <label className={labelCls}>Status</label>
-              <select className={inputCls} value={newPO.status} onChange={e => setNewPO(p => ({ ...p, status: e.target.value }))}>
-                <option value="draft">Draft</option>
-                <option value="sent">Sent to Supplier</option>
-              </select>
+              <AdminSelect
+                value={newPO.status}
+                onChange={v => setNewPO(p => ({ ...p, status: v }))}
+                placeholder="Select status"
+                options={[
+                  { value: 'draft', label: 'Draft' },
+                  { value: 'sent', label: 'Sent to Supplier' },
+                ]}
+              />
             </div>
             <div className="sm:col-span-2">
               <label className={labelCls}>Notes</label>
@@ -483,17 +545,91 @@ function POTab() {
 
           <div className="space-y-2">
             <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Line Items</p>
+
+            <div className="flex gap-1 p-1 bg-surface-secondary rounded-lg w-fit">
+              {(['name', 'sku', 'category'] as POSearchMode[]).map(m => (
+                <button key={m} type="button" onClick={() => { setPoSearchMode(m); setPoSuggestions([]); setPoSkuInput(''); setPoCategoryId('') }}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize ${poSearchMode === m ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900 shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
+                  {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : 'Category'}
+                </button>
+              ))}
+            </div>
+
+            {poSearchMode === 'category' && (
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className={labelCls}>Category</label>
+                  <AdminSelect
+                    value={poCategoryId}
+                    onChange={v => setPoCategoryId(v)}
+                    placeholder="— Select category —"
+                    options={poCategories.map(c => ({ value: c.id, label: c.name }))}
+                  />
+                </div>
+              </div>
+            )}
+
             {lineItems.map((it, idx) => (
               <div key={idx} className="grid grid-cols-[1fr_80px_110px_80px_auto_auto] gap-2 items-end bg-surface-secondary rounded p-2">
                 <div className="relative">
-                  <label className={labelCls}>Product</label>
-                  <input className={inputCls} placeholder="Search product..." value={productSearch[idx] ?? it.product_name}
-                    onChange={e => searchProducts(idx, e.target.value)} />
-                  {(productResults[idx] || []).length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-surface-elevated border border-border-default rounded shadow-lg max-h-40 overflow-y-auto">
-                      {(productResults[idx] || []).map(p => (
-                        <button key={p.id} className="w-full text-left px-3 py-2 text-sm hover:bg-surface-secondary text-foreground" onClick={() => selectProduct(idx, p)}>
-                          {p.name}{p.sku ? ` (${p.sku})` : ''}
+                  {poSearchMode === 'name' && (
+                    <>
+                      <label className={labelCls}>Product</label>
+                      <input className={inputCls} placeholder="Search by name..."
+                        value={activeLineIdx === idx ? it.product_name : it.product_name}
+                        onChange={e => {
+                          setLineItems(items => items.map((r, i) => i === idx ? { ...r, product_name: e.target.value } : r))
+                          searchPoProducts(e.target.value, idx)
+                        }}
+                        onFocus={() => it.product_name && searchPoProducts(it.product_name, idx)}
+                        onBlur={() => setTimeout(() => { setPoSuggestions([]); setActiveLineIdx(null) }, 200)}
+                      />
+                    </>
+                  )}
+                  {poSearchMode === 'sku' && (
+                    <>
+                      <label className={labelCls}>SKU</label>
+                      <input className={inputCls + ' font-mono'} placeholder="e.g. JFS-1234"
+                        value={activeLineIdx === idx ? poSkuInput : ''}
+                        onChange={e => { setPoSkuInput(e.target.value); setActiveLineIdx(idx); searchPoProducts(e.target.value, idx) }}
+                        onFocus={() => setActiveLineIdx(idx)}
+                        onBlur={() => setTimeout(() => { setPoSuggestions([]); setActiveLineIdx(null) }, 200)}
+                      />
+                      {it.product_name && (
+                        <p className="text-xs text-foreground-secondary mt-1">Selected: <span className="font-medium text-foreground">{it.product_name}</span></p>
+                      )}
+                    </>
+                  )}
+                  {poSearchMode === 'category' && (
+                    <>
+                      <label className={labelCls}>Product</label>
+                      <input className={inputCls} placeholder="Search in category..."
+                        value={activeLineIdx === idx ? it.product_name : it.product_name}
+                        onChange={e => {
+                          setLineItems(items => items.map((r, i) => i === idx ? { ...r, product_name: e.target.value } : r))
+                          searchPoProducts(e.target.value, idx, poCategoryId || undefined)
+                        }}
+                        onFocus={() => { setActiveLineIdx(idx); if (poCategoryId) searchPoProducts(it.product_name || '', idx, poCategoryId) }}
+                        onBlur={() => setTimeout(() => { setPoSuggestions([]); setActiveLineIdx(null) }, 200)}
+                      />
+                      {it.product_name && (
+                        <p className="text-xs text-foreground-secondary mt-1">Selected: <span className="font-medium text-foreground">{it.product_name}</span></p>
+                      )}
+                    </>
+                  )}
+                  {activeLineIdx === idx && poSuggestions.length > 0 && (
+                    <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                      {poSuggestions.map(s => (
+                        <button key={s.id} type="button" onMouseDown={() => applyPoProduct(idx, s)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-surface-secondary flex items-center justify-between gap-2">
+                          <span>
+                            <span className="font-medium text-foreground">{s.name}</span>
+                            {s.variant_name && <span className="text-foreground-muted ml-1">— {s.variant_name}</span>}
+                            <span className="text-foreground-muted text-xs ml-2 font-mono">{s.sku}</span>
+                          </span>
+                          {s.base_price != null && (
+                            <span className="text-xs text-foreground-muted shrink-0">₹{s.base_price}</span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -643,7 +779,12 @@ function StockTab() {
             <div className="flex flex-wrap gap-2 items-end">
               <div className="flex-1 min-w-[180px]">
                 <label className={labelCls}>Search product</label>
-                <input className={inputCls} placeholder="Name, SKU..." value={search} onChange={e => setSearch(e.target.value)} />
+                <AdminTypeahead
+                  type="products"
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Name, SKU..."
+                />
               </div>
               <div>
                 <label className={labelCls}>From</label>

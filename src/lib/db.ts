@@ -8,7 +8,7 @@ function getPool(): Pool {
   if (!pool) {
     const config: any = {
       connectionString: process.env.DATABASE_URL,
-      max: 10,
+      max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
     }

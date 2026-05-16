@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface ImgWithSkeletonProps {
   src: string
@@ -10,21 +10,20 @@ interface ImgWithSkeletonProps {
 
 export default function ImgWithSkeleton({ src, alt, className }: ImgWithSkeletonProps) {
   const [loaded, setLoaded] = useState(false)
-  const [currentSrc, setCurrentSrc] = useState(src)
+  const imgRef = useRef<HTMLImageElement>(null)
 
-  if (currentSrc !== src) {
-    setCurrentSrc(src)
+  useEffect(() => {
     setLoaded(false)
-  }
+  }, [src])
+
+  useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setLoaded(true)
+    }
+  })
 
   return (
     <div className="relative w-full h-full">
-      <style>{`
-        @keyframes img-shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
       {!loaded && (
         <div className="absolute inset-0 overflow-hidden bg-gray-200 dark:bg-gray-700">
           <div
@@ -32,16 +31,17 @@ export default function ImgWithSkeleton({ src, alt, className }: ImgWithSkeleton
             style={{
               background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)',
               animation: 'img-shimmer 1.4s infinite',
-              backgroundSize: '200% 100%',
             }}
           />
         </div>
       )}
       <img
+        ref={imgRef}
         src={src}
         alt={alt}
         className={`${className ?? ''} transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(true)}
       />
     </div>
   )
