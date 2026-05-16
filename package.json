@@ -8,7 +8,8 @@
     "dev:https": "node server.js",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.1038.0",

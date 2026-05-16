@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice } from '@/lib/invoice'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
+import { logStockMovement } from '@/lib/inventory'
 
 export async function GET(
   request: NextRequest,
@@ -191,6 +192,49 @@ export async function PATCH(
       `UPDATE orders SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
       values
     )
+
+    if (statusChanged && status === 'processing') {
+      const items = await queryMany<any>(
+        `SELECT oi.product_id, oi.variant_id, oi.quantity,
+          CASE WHEN oi.variant_id IS NOT NULL
+            THEN (SELECT inventory_quantity FROM product_variants WHERE id = oi.variant_id)
+            ELSE (SELECT inventory_quantity FROM products WHERE id = oi.product_id)
+          END AS inventory_quantity
+         FROM order_items oi WHERE oi.order_id = $1`,
+        [orderId]
+      )
+      const insufficient = items.filter((item: any) => Number(item.inventory_quantity) < parseFloat(item.quantity))
+      if (insufficient.length > 0) {
+        return NextResponse.json(
+          { error: 'Insufficient stock for one or more items. Update inventory before marking as processing.' },
+          { status: 400 }
+        )
+      }
+      await withTransaction(async (client) => {
+        for (const item of items) {
+          const qty = parseFloat(item.quantity)
+          if (item.variant_id) {
+            await client.query(
+              'UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
+              [qty, item.variant_id]
+            )
+          } else {
+            await client.query(
+              'UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
+              [qty, item.product_id]
+            )
+          }
+          await logStockMovement(client, {
+            productId: item.product_id,
+            variantId: item.variant_id || null,
+            transactionType: 'sale',
+            quantityChange: -qty,
+            referenceType: 'order',
+            referenceId: orderId,
+          })
+        }
+      })
+    }
 
     const response = NextResponse.json({ success: true })
 

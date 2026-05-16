@@ -562,11 +562,19 @@ export async function getOrder(id: string) {
             'tax_amount', oi.tax_amount, 'total_price', oi.total_price,
             'buy_mode', oi.buy_mode, 'buy_unit', oi.buy_unit,
             'created_at', oi.created_at,
-            'products', json_build_object('id', pr.id, 'name', pr.name, 'sku', pr.sku)
+            'variant_id', oi.variant_id,
+            'products', json_build_object(
+              'id', pr.id, 'name', pr.name, 'sku', pr.sku,
+              'inventory_quantity', pr.inventory_quantity
+            ),
+            'variant', CASE WHEN oi.variant_id IS NOT NULL THEN
+              json_build_object('id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku, 'inventory_quantity', pv.inventory_quantity)
+            ELSE NULL END
           )
         )
         FROM order_items oi
         LEFT JOIN products pr ON oi.product_id = pr.id
+        LEFT JOIN product_variants pv ON oi.variant_id = pv.id
         WHERE oi.order_id = o.id),
         '[]'::json
       ) AS order_items,

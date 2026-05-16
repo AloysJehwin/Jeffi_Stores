@@ -3,7 +3,7 @@ import { query, queryOne, withTransaction } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
 import { isInterState, calculateGST } from '@/lib/gst'
-import { logStockMovement } from '@/lib/inventory'
+
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
@@ -58,13 +58,6 @@ export async function POST(request: NextRequest) {
     const variant = item.variantId
       ? await queryOne<any>('SELECT * FROM product_variants WHERE id = $1', [item.variantId])
       : null
-
-    if (item.buyMode === 'unit' || !item.buyMode) {
-      const stockQty = variant ? variant.stock_quantity : product.stock_quantity
-      if (stockQty < item.qty) {
-        return NextResponse.json({ error: 'Insufficient stock' }, { status: 400 })
-      }
-    }
 
     const unitPrice = parseFloat(item.price)
     const qty = parseFloat(item.qty)
@@ -172,28 +165,6 @@ export async function POST(request: NextRequest) {
          item.buyMode || 'unit',
          item.buyUnit || null]
       )
-
-      if (item.buyMode === 'unit' || !item.buyMode) {
-        if (variant) {
-          await client.query(
-            'UPDATE product_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-            [qty, variant.id]
-          )
-        } else {
-          await client.query(
-            'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
-            [qty, item.productId]
-          )
-        }
-        await logStockMovement(client, {
-          productId: item.productId,
-          variantId: variant?.id || null,
-          transactionType: 'sale',
-          quantityChange: -qty,
-          referenceType: 'order',
-          referenceId: createdOrder.id,
-        })
-      }
 
       if (couponId && appliedDiscount > 0) {
         await client.query(

@@ -20,12 +20,12 @@ export async function logStockMovement(
   const { productId, variantId, transactionType, quantityChange, referenceType, referenceId, notes } = params
 
   const currentStock = variantId
-    ? await queryOne<{ stock_quantity: number }>(
-        'SELECT stock_quantity FROM product_variants WHERE id = $1', [variantId])
-    : await queryOne<{ stock_quantity: number }>(
-        'SELECT stock_quantity FROM products WHERE id = $1', [productId])
+    ? await queryOne<{ inventory_quantity: number }>(
+        'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variantId])
+    : await queryOne<{ inventory_quantity: number }>(
+        'SELECT inventory_quantity FROM products WHERE id = $1', [productId])
 
-  const quantityAfter = (currentStock?.stock_quantity || 0) + quantityChange
+  const quantityAfter = (currentStock?.inventory_quantity || 0) + quantityChange
 
   const sql = `INSERT INTO inventory_transactions
     (product_id, variant_id, transaction_type, quantity_change, quantity_after,
@@ -53,10 +53,10 @@ export async function updateWeightedAvgCost(
   const { productId, variantId, qtyReceived, unitCost } = params
 
   if (variantId) {
-    const row = await client.query<{ stock_quantity: number; cost_price: number }>(
-      'SELECT stock_quantity, cost_price FROM product_variants WHERE id = $1 FOR UPDATE', [variantId])
+    const row = await client.query<{ inventory_quantity: number; cost_price: number }>(
+      'SELECT inventory_quantity, cost_price FROM product_variants WHERE id = $1 FOR UPDATE', [variantId])
     const cur = row.rows[0]
-    const curStock = parseFloat(cur?.stock_quantity as any) || 0
+    const curStock = parseFloat(cur?.inventory_quantity as any) || 0
     const curCost = parseFloat(cur?.cost_price as any) || 0
     const newCost = curStock + qtyReceived > 0
       ? (curStock * curCost + qtyReceived * unitCost) / (curStock + qtyReceived)
@@ -66,10 +66,10 @@ export async function updateWeightedAvgCost(
       [Math.round(newCost * 100) / 100, variantId]
     )
   } else {
-    const row = await client.query<{ stock_quantity: number; cost_price: number }>(
-      'SELECT stock_quantity, cost_price FROM products WHERE id = $1 FOR UPDATE', [productId])
+    const row = await client.query<{ inventory_quantity: number; cost_price: number }>(
+      'SELECT inventory_quantity, cost_price FROM products WHERE id = $1 FOR UPDATE', [productId])
     const cur = row.rows[0]
-    const curStock = parseFloat(cur?.stock_quantity as any) || 0
+    const curStock = parseFloat(cur?.inventory_quantity as any) || 0
     const curCost = parseFloat(cur?.cost_price as any) || 0
     const newCost = curStock + qtyReceived > 0
       ? (curStock * curCost + qtyReceived * unitCost) / (curStock + qtyReceived)
@@ -87,6 +87,7 @@ export async function getStockLedger(filters: {
   from?: string
   to?: string
   limit?: number
+  offset?: number
 }) {
   const conditions: string[] = ['1=1']
   const params: any[] = []
@@ -102,10 +103,22 @@ export async function getStockLedger(filters: {
     i = sc.nextIdx
   }
 
-  const limit = filters.limit || 200
-  params.push(limit)
+  const where = conditions.join(' AND ')
+  const countRow = await queryOne<{ total: number }>(
+    `SELECT COUNT(it.id)::int AS total
+     FROM inventory_transactions it
+     JOIN products p ON p.id = it.product_id
+     LEFT JOIN product_variants pv ON pv.id = it.variant_id
+     WHERE ${where}`,
+    params
+  )
+  const total = countRow?.total || 0
 
-  return queryMany<any>(`
+  const limit = filters.limit || 50
+  const offset = filters.offset || 0
+  params.push(limit, offset)
+
+  const rows = await queryMany<any>(`
     SELECT
       it.id,
       it.created_at,
@@ -125,17 +138,22 @@ export async function getStockLedger(filters: {
     FROM inventory_transactions it
     JOIN products p ON p.id = it.product_id
     LEFT JOIN product_variants pv ON pv.id = it.variant_id
-    WHERE ${conditions.join(' AND ')}
+    WHERE ${where}
     ORDER BY it.created_at DESC
-    LIMIT $${i}
+    LIMIT $${i} OFFSET $${i + 1}
   `, params)
+
+  return { rows: rows || [], total }
 }
 
 export async function getStockValuation() {
   const products = await queryMany<any>(`
     SELECT
-      p.id, p.name, p.sku, p.stock_quantity, p.cost_price,
-      COALESCE(p.stock_quantity, 0) * COALESCE(p.cost_price, 0) AS stock_value,
+      p.id, p.name, p.sku, p.inventory_quantity,
+      COALESCE(p.gst_percentage, 0) AS gst_percentage,
+      COALESCE(p.sale_price, p.base_price, 0) AS selling_price,
+      ROUND(COALESCE(p.sale_price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS cost_price,
+      COALESCE(p.inventory_quantity, 0) * ROUND(COALESCE(p.sale_price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS stock_value,
       NULL::uuid AS variant_id,
       NULL AS variant_name,
       FALSE AS has_variants
@@ -143,8 +161,11 @@ export async function getStockValuation() {
     WHERE p.has_variants = FALSE AND p.is_active = TRUE
     UNION ALL
     SELECT
-      p.id, p.name, p.sku, pv.stock_quantity, pv.cost_price,
-      COALESCE(pv.stock_quantity, 0) * COALESCE(pv.cost_price, 0) AS stock_value,
+      p.id, p.name, p.sku, pv.inventory_quantity,
+      COALESCE(p.gst_percentage, 0) AS gst_percentage,
+      COALESCE(pv.sale_price, pv.price, p.sale_price, p.base_price, 0) AS selling_price,
+      ROUND(COALESCE(pv.sale_price, pv.price, p.sale_price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS cost_price,
+      COALESCE(pv.inventory_quantity, 0) * ROUND(COALESCE(pv.sale_price, pv.price, p.sale_price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS stock_value,
       pv.id AS variant_id,
       pv.variant_name,
       TRUE AS has_variants

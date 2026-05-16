@@ -37,6 +37,11 @@ export interface PayableRow {
   status: string
   days_overdue: number | null
   paid_amount: number
+  po_id: string | null
+  supplier_bank_name: string | null
+  supplier_account_number: string | null
+  supplier_ifsc: string | null
+  supplier_upi_id: string | null
 }
 
 export interface PayablesSummary {
@@ -85,7 +90,7 @@ export async function getReceivablesAging(filters: {
   customerPhone?: string
   search?: string
 }): Promise<{ rows: ReceivableRow[]; summary: ReceivablesSummary }> {
-  const conditions: string[] = ["o.payment_status IN ('unpaid', 'partial')"]
+  const conditions: string[] = ["o.payment_status IN ('unpaid', 'partial')", "o.status != 'draft'"]
   const params: any[] = []
   let i = 1
 
@@ -172,10 +177,16 @@ export async function getPayables(filters: {
     SELECT
       e.id, e.expense_number, e.supplier_name, e.supplier_gstin,
       e.description, e.amount, e.tax_amount, e.total_amount,
-      e.expense_date::text, e.due_date::text, e.status,
+      e.expense_date::text, e.due_date::text, e.status, e.po_id,
       CASE WHEN e.due_date < CURRENT_DATE THEN EXTRACT(DAY FROM NOW() - e.due_date)::int ELSE NULL END AS days_overdue,
-      COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0) AS paid_amount
+      COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0) AS paid_amount,
+      s.bank_name AS supplier_bank_name,
+      s.account_number AS supplier_account_number,
+      s.ifsc AS supplier_ifsc,
+      s.upi_id AS supplier_upi_id
     FROM expenses e
+    LEFT JOIN purchase_orders po ON po.id = e.po_id
+    LEFT JOIN suppliers s ON s.id = po.supplier_id
     WHERE ${conditions.join(' AND ')}
     ORDER BY e.due_date ASC NULLS LAST, e.expense_date DESC
   `, params)

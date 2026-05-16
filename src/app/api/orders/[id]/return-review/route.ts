@@ -185,12 +185,12 @@ export async function POST(
                   const qty = parseFloat(item.quantity)
                   if (item.variant_id) {
                     await client.query(
-                      'UPDATE product_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                      'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
                       [qty, item.variant_id]
                     )
                   } else {
                     await client.query(
-                      'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                      'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
                       [qty, item.product_id]
                     )
                   }
@@ -236,12 +236,12 @@ export async function POST(
             const qty = parseFloat(item.quantity)
             if (item.variant_id) {
               await client.query(
-                'UPDATE product_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
                 [qty, item.variant_id]
               )
             } else {
               await client.query(
-                'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
                 [qty, item.product_id]
               )
             }
@@ -311,12 +311,12 @@ export async function POST(
             const qty = parseFloat(item.quantity)
             if (item.variant_id) {
               await client.query(
-                'UPDATE product_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+                'UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
                 [qty, item.variant_id]
               )
             } else {
               await client.query(
-                'UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+                'UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
                 [qty, item.product_id]
               )
             }
@@ -348,12 +348,12 @@ export async function POST(
             const qty = parseFloat(item.quantity)
             if (item.variant_id) {
               await client.query(
-                'UPDATE product_variants SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
                 [qty, item.variant_id]
               )
             } else {
               await client.query(
-                'UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2',
+                'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
                 [qty, item.product_id]
               )
             }
