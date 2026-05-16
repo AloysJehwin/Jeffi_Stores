@@ -2,7 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
+import LineItemsSection, { newLineItem, type LineItem } from '@/components/admin/LineItemsSection'
+
+function fmt(n: number) {
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 export default function NewOfflineOrderPage() {
   const router = useRouter()
@@ -46,17 +50,16 @@ export default function NewOfflineOrderPage() {
             variant_name: it.variant_name,
             hsn_code: it.hsn_code,
             gst_rate: it.gst_rate,
-            quantity: parseFloat(String(it.quantity)) || 0,
-            unit: it.unit,
-            unit_price: parseFloat(String(it.unit_price)) || 0,
+            quantity: it.quantity,
+            unit_price: it.unit_price,
           })),
         }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Failed'); return }
       setSuccess(data)
-    } catch (err: any) {
-      setError(err.message || 'Failed')
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Failed')
     } finally {
       setSubmitting(false)
     }
@@ -218,10 +221,12 @@ export default function NewOfflineOrderPage() {
           </div>
         </div>
 
-        <LineItemsSection items={items} onChange={setItems} />
+        <div className="bg-surface-elevated rounded-lg shadow p-4 sm:p-6">
+          <LineItemsSection items={items} onChange={setItems} />
+        </div>
 
         <div className="bg-surface-elevated rounded-lg shadow p-4 sm:p-6 space-y-4">
-          <h2 className="font-semibold text-foreground">Payment & Notes</h2>
+          <h2 className="font-semibold text-foreground">Payment &amp; Notes</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs text-foreground-secondary mb-2">Payment Mode</label>

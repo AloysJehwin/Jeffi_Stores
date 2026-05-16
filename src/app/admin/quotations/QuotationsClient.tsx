@@ -12,16 +12,15 @@ interface QuoteItem {
   description: string
   hsn_code: string
   gst_rate: number
-  quantity: string | number
+  quantity: number
   unit: string
-  rate: string | number
+  rate: number
   discount_pct: number
   amount: number
   product_id?: string | null
   variant_id?: string | null
   is_draft_product?: boolean
   is_active_product?: boolean
-  inventory_quantity?: number | null
 }
 
 interface Quotation {
@@ -65,7 +64,6 @@ interface ProductResult {
   gst_percentage: number
   hsn_code: string | null
   is_active: boolean
-  inventory_quantity?: number | null
 }
 
 type View = 'list' | 'editor'
@@ -82,7 +80,7 @@ function emptyItem(): QuoteItem {
 }
 
 function calcItemAmount(item: QuoteItem): number {
-  return Number(item.quantity) * Number(item.rate)
+  return Number(item.quantity) * Number(item.rate) * (1 - (Number(item.discount_pct) || 0) / 100)
 }
 
 function fmt2(n: number) {
@@ -151,6 +149,8 @@ export default function QuotationsClient() {
 
   const isEditorMounted = useRef(false)
 
+  type ModalSearchMode = 'name' | 'sku' | 'category'
+
   const [productModalOpen, setProductModalOpen] = useState(false)
   const [productModalRow, setProductModalRow] = useState<number | null>(null)
   const [prodSearch, setProdSearch] = useState('')
@@ -160,24 +160,13 @@ export default function QuotationsClient() {
   const prodTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [prodCategory, setProdCategory] = useState('')
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
-  const [prodSearchMode, setProdSearchMode] = useState<'name' | 'sku' | 'category'>('name')
-  const [catPickerOpen, setCatPickerOpen] = useState(false)
-  const [catPickerSearch, setCatPickerSearch] = useState('')
-  const [catPickerResults, setCatPickerResults] = useState<ProductResult[]>([])
-  const [catPickerLoading, setCatPickerLoading] = useState(false)
-  const [catPickerActiveCatId, setCatPickerActiveCatId] = useState('')
+  const [modalSearchMode, setModalSearchMode] = useState<ModalSearchMode>('name')
+  const [modalSkuInput, setModalSkuInput] = useState('')
 
-  const [qSearchModes, setQSearchModes] = useState<Record<number, 'name' | 'sku' | 'category'>>({})
-  const [qNameInputs, setQNameInputs] = useState<Record<number, string>>({})
-  const [qSkuInputs, setQSkuInputs] = useState<Record<number, string>>({})
-  const [qCategoryIds, setQCategoryIds] = useState<Record<number, string>>({})
-  const [qPickerOpen, setQPickerOpen] = useState(false)
-  const [qPickerRow, setQPickerRow] = useState<number | null>(null)
-
-  const rawTotal = items.reduce((s, i) => s + i.amount, 0)
-  const subtotal = items.reduce((s, i) => s + i.amount / (1 + (Number(i.gst_rate) || 0) / 100), 0)
-  const cgst = items.reduce((s, i) => s + (i.amount / (1 + (Number(i.gst_rate) || 0) / 100)) * (Number(i.gst_rate) || 0) / 200, 0)
+  const subtotal = items.reduce((s, i) => s + i.amount, 0)
+  const cgst = items.reduce((s, i) => s + i.amount * i.gst_rate / 200, 0)
   const sgst = cgst
+  const rawTotal = subtotal + cgst + sgst
   const total = Math.round(rawTotal)
   const roundOff = total - rawTotal
 
@@ -201,24 +190,6 @@ export default function QuotationsClient() {
 
   useEffect(() => { if (view === 'list') loadList() }, [view, statusFilter])
 
-  function decodeLineItemId(encoded: string) {
-    const [product_id, variant_id_raw, base_price_raw, gst_raw, hsn_raw, mrp_raw, inv_raw] = encoded.split('|')
-    const rate = parseFloat(base_price_raw) || 0
-    const mrp = parseFloat(mrp_raw) || 0
-    const discount_pct = mrp > 0 && rate < mrp
-      ? Math.round((1 - rate / mrp) * 100 * 100) / 100
-      : 0
-    return {
-      product_id,
-      variant_id: variant_id_raw || null,
-      rate,
-      discount_pct,
-      gst_percentage: parseFloat(gst_raw) || 18,
-      hsn_code: hsn_raw || '',
-      inventory_quantity: inv_raw !== undefined && inv_raw !== '' ? parseFloat(inv_raw) : null,
-    }
-  }
-
   function newQuotation() {
     setEditId(null)
     setQuoteNumber('')
@@ -232,10 +203,6 @@ export default function QuotationsClient() {
     setIsFinal(false)
     setAutoSaveStatus('idle')
     isEditorMounted.current = false
-    setQSearchModes({})
-    setQNameInputs({})
-    setQSkuInputs({})
-    setQCategoryIds({})
     setView('editor')
   }
 
@@ -273,10 +240,6 @@ export default function QuotationsClient() {
       setConvertedOrderId(q.converted_order_id || null)
       setAutoSaveStatus('idle')
       isEditorMounted.current = false
-      setQSearchModes({})
-      setQNameInputs({})
-      setQSkuInputs({})
-      setQCategoryIds({})
       setView('editor')
     } catch {
       setError('Failed to load quotation')
@@ -324,9 +287,9 @@ export default function QuotationsClient() {
           description: i.description,
           hsn_code: i.hsn_code || null,
           gst_rate: i.gst_rate,
-          quantity: parseFloat(String(i.quantity)) || 0,
+          quantity: i.quantity,
           unit: i.unit,
-          rate: parseFloat(String(i.rate)) || 0,
+          rate: i.rate,
           discount_pct: i.discount_pct,
           amount: i.amount,
           product_id: i.product_id || null,
@@ -382,16 +345,6 @@ export default function QuotationsClient() {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])
-
-  useEffect(() => {
-    const hasCategory = Object.values(qSearchModes).includes('category')
-    if (hasCategory && categories.length === 0) {
-      fetch('/api/categories')
-        .then(r => r.json())
-        .then(d => setCategories((d.categories || []).map((c: any) => ({ id: c.id, name: c.name }))))
-        .catch(() => {})
-    }
-  }, [qSearchModes])
 
   async function downloadPDF() {
     if (!editId) { await save(); }
@@ -482,7 +435,8 @@ export default function QuotationsClient() {
     setProdSearch('')
     setProdResults([])
     setProdCategory('')
-    setProdSearchMode('name')
+    setModalSearchMode('name')
+    setModalSkuInput('')
     setProductModalOpen(true)
     if (categories.length === 0) {
       fetch('/api/categories')
@@ -515,71 +469,32 @@ export default function QuotationsClient() {
     loadProducts(q, prodCategory)
   }
 
-  async function loadCatPickerProducts(catId: string, q: string) {
-    if (!catId) return
-    setCatPickerLoading(true)
-    try {
-      const params = new URLSearchParams({ limit: '10000' })
-      params.set('category_id', catId)
-      if (q.trim()) params.set('q', q.trim())
-      const res = await fetch(`/api/admin/quotations/products?${params}`)
-      const data = await res.json()
-      setCatPickerResults(data.products || [])
-    } catch { setCatPickerResults([]) }
-    finally { setCatPickerLoading(false) }
-  }
-
-  function openCatPicker() {
-    setCatPickerActiveCatId(prodCategory)
-    setCatPickerSearch('')
-    setCatPickerOpen(true)
-    loadCatPickerProducts(prodCategory, '')
-  }
-
-  function openQPicker(rowIdx: number) {
-    const catId = qCategoryIds[rowIdx] || ''
-    setQPickerRow(rowIdx)
-    setCatPickerActiveCatId(catId)
-    setCatPickerSearch('')
-    setCatPickerOpen(true)
-    loadCatPickerProducts(catId, '')
-  }
-
-  function applyProductToRow(rowIdx: number, p: ProductResult) {
+  function selectProduct(p: ProductResult) {
+    if (productModalRow === null) return
     const desc = p.variant_name ? `${p.name} ${p.variant_name}` : p.name
+    updateItem(productModalRow, 'description', desc)
     setItems(prev => prev.map((item, i) => {
-      if (i !== rowIdx) return item
-      const gst = parseFloat(String(p.gst_percentage)) || 18
-      const basePrice_incl = Number(p.base_price) || 0
+      if (i !== productModalRow) return item
+      const mrp = Number(p.mrp) || 0
+      const basePrice = Number(p.base_price) || 0
+      const discPct = mrp > 0 && basePrice < mrp
+        ? Math.round((1 - basePrice / mrp) * 100 * 100) / 100
+        : 0
       const updated = {
         ...item,
         description: desc,
         hsn_code: p.hsn_code || '',
-        gst_rate: gst,
-        rate: basePrice_incl,
-        discount_pct: (() => {
-          const mrp = Number(p.mrp) || 0
-          return mrp > 0 && basePrice_incl < mrp
-            ? Math.round((1 - basePrice_incl / mrp) * 100 * 100) / 100
-            : 0
-        })(),
+        gst_rate: p.gst_percentage || 18,
+        rate: mrp > 0 ? mrp : basePrice,
+        discount_pct: discPct,
         product_id: p.product_id,
         variant_id: p.variant_id || null,
         is_draft_product: false,
         is_active_product: p.is_active,
-        inventory_quantity: p.inventory_quantity ?? null,
       }
       updated.amount = calcItemAmount(updated)
       return updated
     }))
-  }
-
-  function selectProduct(p: ProductResult) {
-    const rowIdx = qPickerRow !== null ? qPickerRow : productModalRow
-    if (rowIdx === null) return
-    applyProductToRow(rowIdx, p)
-    setCatPickerOpen(false)
-    setQPickerRow(null)
     setProductModalOpen(false)
     setProductModalRow(null)
   }
@@ -960,231 +875,125 @@ export default function QuotationsClient() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-foreground">Line Items</h2>
           {!isFinal && (
-            <button type="button" onClick={addItem}
-              className="flex items-center gap-1 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Item
+            <button onClick={addItem}
+              className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-medium transition-colors">
+              + Add Row
             </button>
           )}
         </div>
 
-
-        <div className="space-y-3">
-          {items.map((item, idx) => (
-            <div key={idx} className="border border-border-default rounded-lg p-3 space-y-3 bg-surface-elevated">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Item {idx + 1}</span>
-                  {item.product_id && item.is_draft_product && (
-                    <button type="button" title="Draft product — click to edit in new tab"
-                      onClick={() => window.open(`/admin/products/edit/${item.product_id}`, '_blank')}
-                      className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700 hover:bg-yellow-200 transition-colors">
-                      Draft ↗
-                    </button>
-                  )}
-                  {item.product_id && !item.is_draft_product && item.is_active_product === false && (
-                    <span title="Inactive product" className="w-2 h-2 rounded-full bg-yellow-400" />
-                  )}
-                  {item.product_id && !item.is_draft_product && item.is_active_product !== false && (
-                    <span title="Linked to product" className="w-2 h-2 rounded-full bg-green-500" />
-                  )}
-                </div>
-                {!isFinal && items.length > 1 && (
-                  <button type="button" onClick={() => removeItem(idx)}
-                    className="text-xs text-red-500 hover:text-red-600 font-medium">Remove</button>
-                )}
-              </div>
-
-              <div className="relative">
-                {item.description && !isFinal ? (
-                  <div className="flex items-center justify-between gap-2 px-3 py-2 bg-surface-secondary rounded-lg border border-border-default">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{item.description}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {item.hsn_code && <p className="text-xs text-foreground-muted">HSN {item.hsn_code}</p>}
-                        {item.inventory_quantity !== null && item.inventory_quantity !== undefined && (
-                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
-                            item.inventory_quantity === 0
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              : item.inventory_quantity <= 5
-                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                              : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          }`}>
-                            {item.inventory_quantity === 0 ? 'Out of stock' : `Stock: ${item.inventory_quantity}`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <button type="button"
-                      onClick={() => {
-                        setItems(prev => prev.map((it, i) => i !== idx ? it : {
-                          ...it, description: '', product_id: null, variant_id: null,
-                          hsn_code: '', gst_rate: 18, rate: 0, amount: 0,
-                          is_draft_product: false, is_active_product: undefined,
-                          inventory_quantity: null,
-                        }))
-                        setQNameInputs(p => { const n = { ...p }; delete n[idx]; return n })
-                        setQSkuInputs(p => { const n = { ...p }; delete n[idx]; return n })
-                        setQSearchModes(p => { const n = { ...p }; delete n[idx]; return n })
-                      }}
-                      className="shrink-0 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors">
-                      Change
-                    </button>
-                  </div>
-                ) : item.description && isFinal ? (
-                  <>
-                    <label className={labelCls}>Product / Description</label>
-                    <input value={item.description} disabled className={inputCls} />
-                  </>
-                ) : !isFinal ? (
-                  <>
-                    <div className="flex gap-1 mb-2 p-1 bg-surface-secondary rounded-lg w-fit">
-                      {(['name', 'sku', 'category'] as const).map(m => {
-                        const mode = qSearchModes[idx] ?? 'name'
-                        return (
-                          <button key={m} type="button"
-                            onClick={() => {
-                              setQSearchModes(p => ({ ...p, [idx]: m }))
-                              setQNameInputs(p => { const n = { ...p }; delete n[idx]; return n })
-                              setQSkuInputs(p => { const n = { ...p }; delete n[idx]; return n })
-                            }}
-                            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${mode === m ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900 shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
-                            {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : 'Category'}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {(qSearchModes[idx] ?? 'name') === 'name' && (
-                      <AdminTypeahead
-                        type="admin_line_items"
-                        value={qNameInputs[idx] ?? ''}
-                        onChange={v => setQNameInputs(p => ({ ...p, [idx]: v }))}
-                        onSelect={s => {
-                          const d = decodeLineItemId(s.id)
-                          setQNameInputs(p => ({ ...p, [idx]: s.label }))
-                          setItems(prev => prev.map((it, i) => {
-                            if (i !== idx) return it
-                            const updated = { ...it, description: s.label, product_id: d.product_id, variant_id: d.variant_id, hsn_code: d.hsn_code, gst_rate: d.gst_percentage, rate: d.rate, discount_pct: d.discount_pct, is_draft_product: false, is_active_product: true, inventory_quantity: d.inventory_quantity }
-                            updated.amount = calcItemAmount(updated)
-                            return updated
-                          }))
-                        }}
-                        inputClassName={inputCls}
-                        placeholder="Search by product name..."
-                      />
-                    )}
-                    {(qSearchModes[idx] ?? 'name') === 'sku' && (
-                      <AdminTypeahead
-                        type="admin_line_items"
-                        value={qSkuInputs[idx] ?? ''}
-                        onChange={v => setQSkuInputs(p => ({ ...p, [idx]: v }))}
-                        onSelect={s => {
-                          const d = decodeLineItemId(s.id)
-                          const sku = s.sublabel?.split(' · ')[0] ?? ''
-                          setQSkuInputs(p => ({ ...p, [idx]: sku }))
-                          setItems(prev => prev.map((it, i) => {
-                            if (i !== idx) return it
-                            const updated = { ...it, description: s.label, product_id: d.product_id, variant_id: d.variant_id, hsn_code: d.hsn_code, gst_rate: d.gst_percentage, rate: d.rate, discount_pct: d.discount_pct, is_draft_product: false, is_active_product: true, inventory_quantity: d.inventory_quantity }
-                            updated.amount = calcItemAmount(updated)
-                            return updated
-                          }))
-                        }}
-                        inputClassName={inputCls + ' font-mono'}
-                        placeholder="e.g. JFS-1234"
-                      />
-                    )}
-                    {(qSearchModes[idx] ?? 'name') === 'category' && (
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <AdminSelect
-                            value={qCategoryIds[idx] ?? ''}
-                            onChange={v => setQCategoryIds(p => ({ ...p, [idx]: v }))}
-                            placeholder="— Select category —"
-                            options={categories.map(c => ({ value: c.id, label: c.name }))}
-                          />
-                        </div>
-                        <button type="button" disabled={!qCategoryIds[idx]}
-                          onClick={() => openQPicker(idx)}
-                          className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap">
-                          Select Product
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border-default">
+                <th className="pb-2 pr-2 text-left font-semibold text-foreground-secondary w-6">#</th>
+                <th className="pb-2 pr-2 text-left font-semibold text-foreground-secondary min-w-[180px]">Description</th>
+                <th className="pb-2 pr-2 text-left font-semibold text-foreground-secondary w-20">HSN/SAC</th>
+                <th className="pb-2 pr-2 text-left font-semibold text-foreground-secondary w-16">GST %</th>
+                <th className="pb-2 pr-2 text-left font-semibold text-foreground-secondary w-20">Qty</th>
+                <th className="pb-2 pr-2 text-left font-semibold text-foreground-secondary w-20">Unit</th>
+                <th className="pb-2 pr-2 text-left font-semibold text-foreground-secondary w-24">Rate (ex-GST)</th>
+                <th className="pb-2 pr-2 text-left font-semibold text-foreground-secondary w-16">Disc %</th>
+                <th className="pb-2 pr-2 text-right font-semibold text-foreground-secondary w-24">Amount</th>
+                <th className="pb-2 w-6"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, idx) => (
+                <tr key={idx} className="border-b border-border-default/50">
+                  <td className="py-1.5 pr-2 text-foreground-secondary">{idx + 1}</td>
+                  <td className="py-1.5 pr-2">
+                    <div className="flex gap-1 items-center">
+                      <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)}
+                        placeholder="Description of goods" disabled={isFinal} className={inputCls + ' min-w-[160px]'} />
+                      {item.product_id && item.is_draft_product && (
+                        <button
+                          type="button"
+                          title="Draft product — click to edit in new tab"
+                          onClick={() => window.open(`/admin/products/edit/${item.product_id}`, '_blank')}
+                          className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400 border border-yellow-300 dark:border-yellow-700 hover:bg-yellow-200 transition-colors whitespace-nowrap"
+                        >
+                          Draft ↗
                         </button>
-                      </div>
-                    )}
-                  </>
-                ) : null}
-              </div>
-
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                <div>
-                  <label className={labelCls}>HSN/SAC</label>
-                  <input type="text" value={item.hsn_code} onChange={e => updateItem(idx, 'hsn_code', e.target.value)}
-                    disabled={isFinal} className={inputCls + ' font-mono'} placeholder="7318" />
-                </div>
-                <div>
-                  <label className={labelCls}>GST %</label>
-                  <AdminSelect
-                    value={String(item.gst_rate)}
-                    onChange={v => updateItem(idx, 'gst_rate', parseFloat(v) || 0)}
-                    disabled={isFinal}
-                    className="[&_button]:!bg-surface-secondary [&_button]:!border-border-default [&_button]:!rounded [&_button]:!py-1.5 [&_button]:!px-2 [&_button]:!text-sm [&_button]:!w-full"
-                    options={[
-                      { value: '0', label: '0%' }, { value: '5', label: '5%' },
-                      { value: '12', label: '12%' }, { value: '18', label: '18%' },
-                      { value: '28', label: '28%' },
-                    ]}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Qty <span className="text-red-500">*</span></label>
-                  <input type="number" min="0.001" step="any" value={item.quantity}
-                    onChange={e => updateItem(idx, 'quantity', e.target.value)}
-                    disabled={isFinal} required className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>Unit</label>
-                  <div className="flex items-center gap-0.5 w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary">
-                    <button type="button" disabled={isFinal} onClick={() => {
-                      const i = UNITS.indexOf(item.unit)
-                      updateItem(idx, 'unit', UNITS[(i - 1 + UNITS.length) % UNITS.length])
-                    }} className="text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-40">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                      )}
+                      {item.product_id && !item.is_draft_product && item.is_active_product === false && (
+                        <span title="Inactive product" className="shrink-0 w-2 h-2 rounded-full bg-yellow-400" />
+                      )}
+                      {item.product_id && !item.is_draft_product && item.is_active_product !== false && (
+                        <span title="Linked to product" className="shrink-0 w-2 h-2 rounded-full bg-green-500" />
+                      )}
+                      {!isFinal && (
+                        <button onClick={() => openProductModal(idx)} title="Pick from products"
+                          className="shrink-0 p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors border border-border-default rounded">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <input value={item.hsn_code} onChange={e => updateItem(idx, 'hsn_code', e.target.value)}
+                      placeholder="7318" disabled={isFinal} className={inputCls + ' font-mono'} />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <input type="number" value={item.gst_rate} min={0} max={28} step={0.5}
+                      onChange={e => updateItem(idx, 'gst_rate', parseFloat(e.target.value) || 0)}
+                      disabled={isFinal} className={inputCls} />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <input type="number" value={item.quantity} min={0} step="any"
+                      onChange={e => updateItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                      disabled={isFinal} className={inputCls} />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <div className="flex items-center gap-0.5">
+                      <button type="button" disabled={isFinal} onClick={() => {
+                        const i = UNITS.indexOf(item.unit)
+                        updateItem(idx, 'unit', UNITS[(i - 1 + UNITS.length) % UNITS.length])
+                      }} className="px-1 py-1 text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-40">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                      </button>
+                      <span className="text-xs font-medium text-foreground w-8 text-center tabular-nums">{item.unit}</span>
+                      <button type="button" disabled={isFinal} onClick={() => {
+                        const i = UNITS.indexOf(item.unit)
+                        updateItem(idx, 'unit', UNITS[(i + 1) % UNITS.length])
+                      }} className="px-1 py-1 text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-40">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                      </button>
+                    </div>
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <input type="number" value={item.rate} min={0} step="any"
+                      onChange={e => updateItem(idx, 'rate', parseFloat(e.target.value) || 0)}
+                      disabled={isFinal} className={inputCls} />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <input type="number" value={item.discount_pct} min={0} max={100} step="any"
+                      onChange={e => updateItem(idx, 'discount_pct', parseFloat(e.target.value) || 0)}
+                      disabled={isFinal} className={inputCls} />
+                  </td>
+                  <td className="py-1.5 pr-2 text-right font-semibold text-foreground tabular-nums">
+                    ₹{fmt2(item.amount)}
+                  </td>
+                  <td className="py-1.5">
+                    <button onClick={() => removeItem(idx)} disabled={items.length === 1 || isFinal}
+                      className="p-1 text-foreground-secondary hover:text-red-500 disabled:opacity-30 transition-colors">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
                     </button>
-                    <span className="text-sm font-medium text-foreground flex-1 text-center tabular-nums">{item.unit}</span>
-                    <button type="button" disabled={isFinal} onClick={() => {
-                      const i = UNITS.indexOf(item.unit)
-                      updateItem(idx, 'unit', UNITS[(i + 1) % UNITS.length])
-                    }} className="text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-40">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                    </button>
-                  </div>
-                </div>
-                <div>
-                  <label className={labelCls}>Rate (incl. GST) <span className="text-red-500">*</span></label>
-                  <input type="number" min="0" step="any" value={item.rate}
-                    onChange={e => updateItem(idx, 'rate', e.target.value)}
-                    disabled={isFinal} required className={inputCls} placeholder="0.00" />
-                </div>
-                <div>
-                  <label className={labelCls}>Disc %</label>
-                  <input type="number" min="0" max="100" step="any" value={item.discount_pct}
-                    onChange={e => updateItem(idx, 'discount_pct', parseFloat(e.target.value) || 0)}
-                    disabled={isFinal} className={inputCls} placeholder="0" />
-                </div>
-              </div>
-
-              <p className="text-xs text-foreground-secondary text-right">
-                Line total: <span className="font-semibold text-foreground">₹{fmt2(item.amount)}</span>
-              </p>
-            </div>
-          ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
-        <div className="flex justify-end border-t border-border-default pt-3 mt-1">
+        <div className="flex justify-end mt-4">
           <div className="w-64 space-y-1.5 text-sm">
             <div className="flex justify-between text-foreground-secondary">
-              <span>Taxable Value</span>
+              <span>Subtotal</span>
               <span className="tabular-nums">₹{fmt2(subtotal)}</span>
             </div>
             <div className="flex justify-between text-foreground-secondary">
@@ -1198,11 +1007,11 @@ export default function QuotationsClient() {
             {Math.abs(roundOff) >= 0.005 && (
               <div className="flex justify-between text-foreground-secondary">
                 <span>Round Off</span>
-                <span className="tabular-nums">{roundOff >= 0 ? '+' : ''}₹{fmt2(roundOff)}</span>
+                <span className="tabular-nums">{roundOff > 0 ? '+' : ''}₹{fmt2(roundOff)}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-foreground text-base border-t border-border-default pt-2">
-              <span>Total (incl. GST)</span>
+              <span>Total</span>
               <span className="tabular-nums">₹{fmt2(total)}</span>
             </div>
           </div>
@@ -1245,62 +1054,43 @@ export default function QuotationsClient() {
             </div>
             <div className="p-4 border-b border-border-default space-y-2">
               <div className="flex gap-1 p-1 bg-surface-secondary rounded-lg w-fit">
-                {(['name', 'sku', 'category'] as const).map(m => (
+                {(['name', 'sku', 'category'] as ModalSearchMode[]).map(m => (
                   <button key={m} type="button"
-                    onClick={() => { setProdSearchMode(m); setProdSearch(''); setProdCategory(''); loadProducts('', m === 'category' ? prodCategory : '') }}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize ${prodSearchMode === m ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900 shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
+                    onClick={() => {
+                      setModalSearchMode(m)
+                      setProdSearch('')
+                      setModalSkuInput('')
+                      setProdCategory('')
+                      loadProducts('', '')
+                    }}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize ${modalSearchMode === m ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900 shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
                     {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : 'Category'}
                   </button>
                 ))}
               </div>
-              {prodSearchMode === 'category' ? (
-                <div className="space-y-2">
-                  <AdminSelect
-                    value={prodCategory}
-                    placeholder="All Categories"
-                    options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
-                    onChange={val => { setProdCategory(val); loadProducts(prodSearch, val) }}
-                  />
-                  <button
-                    type="button"
-                    disabled={!prodCategory}
-                    onClick={openCatPicker}
-                    className="w-full py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors"
-                  >
-                    Browse Products in Category
-                  </button>
-                </div>
-              ) : (
-                <AdminTypeahead
-                  type="admin_line_items"
-                  value={prodSearch}
-                  onChange={setProdSearch}
-                  onSelect={s => {
-                    const [pid, vid_raw, price_raw, gst_raw, hsn_raw, mrp_raw, inv_raw] = s.id.split('|')
-                    const sku = s.sublabel?.split(' · ')[0] ?? ''
-                    const p: ProductResult = {
-                      id: s.id,
-                      product_id: pid,
-                      variant_id: vid_raw || null,
-                      name: s.label.includes(' — ') ? s.label.split(' — ')[0] : s.label,
-                      variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : null,
-                      sku,
-                      mrp: parseFloat(mrp_raw) || 0,
-                      base_price: parseFloat(price_raw) || 0,
-                      gst_percentage: parseFloat(gst_raw) || 18,
-                      hsn_code: hsn_raw || null,
-                      is_active: true,
-                      inventory_quantity: inv_raw !== undefined && inv_raw !== '' ? parseFloat(inv_raw) : null,
-                    }
-                    selectProduct(p)
-                  }}
-                  autoFocus
-                  inputClassName={inputCls}
-                  placeholder={prodSearchMode === 'sku' ? 'Search by SKU…' : 'Search by name…'}
+              {modalSearchMode === 'name' && (
+                <input
+                  autoFocus type="text" value={prodSearch}
+                  onChange={e => searchProducts(e.target.value)}
+                  placeholder="Search by name…" className={inputCls}
+                />
+              )}
+              {modalSearchMode === 'sku' && (
+                <input
+                  autoFocus type="text" value={modalSkuInput}
+                  onChange={e => { setModalSkuInput(e.target.value); loadProducts(e.target.value, '') }}
+                  placeholder="e.g. JFS-1234" className={inputCls + ' font-mono'}
+                />
+              )}
+              {modalSearchMode === 'category' && categories.length > 0 && (
+                <AdminSelect
+                  value={prodCategory}
+                  placeholder="All Categories"
+                  options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
+                  onChange={val => { setProdCategory(val); loadProducts(prodSearch, val) }}
                 />
               )}
             </div>
-            {prodSearchMode !== 'category' && (
             <div className="flex-1 overflow-y-auto">
               {prodLoading && <p className="p-4 text-center text-foreground-secondary text-sm">Searching…</p>}
               {!prodLoading && prodResults.length === 0 && (
@@ -1340,8 +1130,7 @@ export default function QuotationsClient() {
                 ))
               })()}
             </div>
-            )}
-            {prodSearch.trim() && prodSearchMode !== 'category' && productModalRow !== null && !items[productModalRow]?.product_id && (
+            {prodSearch.trim() && productModalRow !== null && !items[productModalRow]?.product_id && (
               <div className="p-3 border-t border-border-default bg-surface-secondary">
                 <button
                   type="button"
@@ -1360,94 +1149,6 @@ export default function QuotationsClient() {
         </div>,
         document.body
       )}
-
-      {catPickerOpen && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-surface-elevated border border-border-default rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Select Product</h3>
-                <p className="text-xs text-foreground-muted mt-0.5">
-                  {categories.find(c => c.id === catPickerActiveCatId)?.name || 'All products'}
-                </p>
-              </div>
-              <button type="button" onClick={() => setCatPickerOpen(false)}
-                className="p-1.5 text-foreground-secondary hover:text-foreground transition-colors">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="px-4 py-3 border-b border-border-default shrink-0">
-              <input
-                type="text"
-                value={catPickerSearch}
-                onChange={e => { setCatPickerSearch(e.target.value); loadCatPickerProducts(catPickerActiveCatId, e.target.value) }}
-                className={inputCls}
-                placeholder="Filter by name or SKU…"
-                autoFocus
-              />
-            </div>
-            <div className="overflow-y-auto flex-1">
-              {catPickerLoading ? (
-                <div className="p-8 text-center text-foreground-muted text-sm">Loading…</div>
-              ) : catPickerResults.length === 0 ? (
-                <div className="p-8 text-center text-foreground-muted text-sm">No products found in this category.</div>
-              ) : (() => {
-                const groups: { productId: string; name: string; items: ProductResult[] }[] = []
-                for (const p of catPickerResults) {
-                  const g = groups.find(g => g.productId === p.product_id)
-                  if (g) g.items.push(p)
-                  else groups.push({ productId: p.product_id, name: p.name, items: [p] })
-                }
-                return (
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-surface-secondary">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Product / Variant</th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">SKU</th>
-                        <th className="px-4 py-2 text-right text-xs font-semibold text-foreground-secondary">Price</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groups.map(g => (
-                        <>
-                          {g.items.length > 1 && (
-                            <tr key={`${g.productId}-header`}>
-                              <td colSpan={3} className="px-4 pt-2.5 pb-1 text-xs font-semibold text-foreground-muted uppercase tracking-wider bg-surface-secondary">
-                                {g.name}
-                              </td>
-                            </tr>
-                          )}
-                          {g.items.map(p => (
-                            <tr key={p.id}
-                              onClick={() => { selectProduct(p); setCatPickerOpen(false) }}
-                              className="border-t border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
-                              <td className="px-4 py-2.5">
-                                {g.items.length > 1 ? (
-                                  <span className="text-foreground pl-2">{p.variant_name || p.name}</span>
-                                ) : (
-                                  <span className="font-medium text-foreground">{p.name}</span>
-                                )}
-                                {!p.is_active && <span className="ml-1.5 text-[10px] text-yellow-600 dark:text-yellow-400">(inactive)</span>}
-                              </td>
-                              <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{p.sku}</td>
-                              <td className="px-4 py-2.5 text-right text-foreground font-medium">
-                                {p.mrp || p.base_price ? `₹${fmt2(Number(p.mrp || p.base_price))}` : '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </>
-                      ))}
-                    </tbody>
-                  </table>
-                )
-              })()}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>
   )
 }
@@ -1461,6 +1162,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
         className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-border-default">
           <div className="min-w-0 pr-4">
             <h2 className="text-lg font-bold text-foreground leading-tight font-mono">{q.quote_number}</h2>
@@ -1484,6 +1186,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
         </div>
 
         <div className="p-5 space-y-5">
+          {/* Consignee */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Consignee</p>
@@ -1510,6 +1213,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
             )}
           </div>
 
+          {/* Tax breakdown */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-surface-secondary">
             <div>
               <p className="text-xs text-foreground-muted">Subtotal</p>
@@ -1529,12 +1233,14 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
             </div>
           </div>
 
+          {/* Converted status */}
           {q.converted_order_id && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
               <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Converted to Invoice</span>
             </div>
           )}
 
+          {/* Downloads */}
           <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
             <a
               href={`/api/admin/quotations/${q.id}/pdf`}

@@ -6,7 +6,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
 import HoverCard from '@/components/ui/HoverCard'
-import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
+import LineItemsSection, { newLineItem, type LineItem as LILineItem } from '@/components/admin/LineItemsSection'
 
 interface Invoice {
   id: string
@@ -31,16 +31,9 @@ interface Invoice {
   pdf_url: string | null
 }
 
-type View = 'list' | 'create' | 'edit' | 'draft'
+type LineItem = LILineItem
 
-interface Draft {
-  id: string
-  order_number: string
-  customer_name: string
-  customer_phone: string
-  total_amount: string
-  updated_at: string
-}
+type View = 'list' | 'create' | 'edit'
 
 const PAYMENT_MODES = [
   { value: 'cash',    label: 'Cash',         paid: true },
@@ -48,6 +41,10 @@ const PAYMENT_MODES = [
   { value: 'upi_qr',  label: 'UPI (QR Scan)', paid: true },
   { value: 'credit',  label: 'Credit',       paid: false },
 ]
+
+function fmt(n: number) {
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 function fmtDate(s: string) {
   if (!s) return ''
@@ -76,12 +73,6 @@ export default function InvoicesClient() {
   const { showToast } = useToast()
   const [view, setView] = useState<View>('list')
   const [editId, setEditId] = useState<string | null>(null)
-  const [draftId, setDraftId] = useState<string | null>(null)
-  const [drafts, setDrafts] = useState<Draft[]>([])
-  const [draftsLoading, setDraftsLoading] = useState(false)
-  const [finalizingId, setFinalizingId] = useState<string | null>(null)
-  const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null)
-  const [confirmDeleteDraftId, setConfirmDeleteDraftId] = useState<string | null>(null)
 
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [total, setTotal] = useState(0)
@@ -142,27 +133,12 @@ export default function InvoicesClient() {
 
   useEffect(() => { fetchInvoices(1) }, [sourceFilter, paymentFilter, fromDate, toDate, searchQ])
 
-  const fetchDrafts = useCallback(async () => {
-    setDraftsLoading(true)
-    try {
-      const res = await fetch('/api/admin/invoices/drafts', { credentials: 'include' })
-      const data = await res.json()
-      setDrafts(data.drafts || [])
-    } catch {
-      showToast('Failed to load drafts', 'error')
-    } finally {
-      setDraftsLoading(false)
-    }
-  }, [showToast])
-
-  useEffect(() => { fetchDrafts() }, [fetchDrafts])
-
   function resetForm() {
     setCustomerName(''); setCustomerPhone(''); setCustomerEmail('')
     setAddressLine1(''); setAddressLine2(''); setCity(''); setState(''); setPostalCode('')
     setBuyerGstin(''); setPaymentMode('cash'); setInvoiceDate(''); setNotes('')
     setItems([newLineItem()]); setFormError('')
-    setEditId(null); setDraftId(null)
+    setEditId(null)
   }
 
   async function openEdit(inv: Invoice) {
@@ -199,11 +175,11 @@ export default function InvoicesClient() {
         hsn_code: it.hsn_code || '',
         gst_rate: String(it.gst_rate ?? '18'),
         quantity: String(it.quantity ?? '1'),
-        unit: it.unit || 'PCS',
+        unit: it.unit || 'pcs',
         unit_price: String(it.unit_price ?? ''),
-        discount_pct: 0,
-        mrp: 0,
-        inventory_quantity: null,
+        discount_pct: it.discount_pct ?? 0,
+        mrp: it.mrp ?? 0,
+        inventory_quantity: it.inventory_quantity ?? null,
       })) : [newLineItem()])
 
       setFormError('')
@@ -229,140 +205,6 @@ export default function InvoicesClient() {
       showToast(err.message, 'error')
     } finally {
       setCancellingId(null)
-    }
-  }
-
-  async function openDraft(draft: Draft) {
-    setEditLoading(true)
-    try {
-      const res = await fetch(`/api/admin/orders/${draft.id}`, { credentials: 'include' })
-      const data = await res.json()
-      const order = data.order || data
-      const orderItems: any[] = data.items || []
-
-      setDraftId(draft.id)
-      setCustomerName(order.customer_name || '')
-      setCustomerPhone(order.customer_phone || '')
-      setCustomerEmail(order.customer_email || '')
-      setBuyerGstin(order.buyer_gstin || '')
-      setPaymentMode(order.payment_status === 'unpaid' ? 'credit' : 'cash')
-      setNotes(order.notes || '')
-
-      const addr = order.shipping_address || {}
-      setAddressLine1(addr.address_line1 || '')
-      setAddressLine2(addr.address_line2 || '')
-      setCity(addr.city || '')
-      setState(addr.state || '')
-      setPostalCode(addr.postal_code || '')
-
-      setItems(orderItems.length > 0 ? orderItems.map((it: any) => ({
-        id: it.id || Math.random().toString(36).slice(2),
-        product_id: it.product_id || null,
-        product_name: it.product_name || '',
-        product_sku: it.product_sku || '',
-        variant_id: it.variant_id || null,
-        variant_name: it.variant_name || '',
-        hsn_code: it.hsn_code || '',
-        gst_rate: String(it.gst_rate ?? '18'),
-        quantity: String(it.quantity ?? '1'),
-        unit: it.unit || 'PCS',
-        unit_price: String(it.unit_price ?? ''),
-        discount_pct: 0,
-        mrp: 0,
-        inventory_quantity: null,
-      })) : [newLineItem()])
-
-      setFormError('')
-      setView('draft')
-    } catch {
-      showToast('Failed to load draft', 'error')
-    } finally {
-      setEditLoading(false)
-    }
-  }
-
-  async function handleSaveDraft() {
-    if (!customerName.trim()) { setFormError('Customer name is required'); return }
-    setFormError(''); setSubmitting(true)
-    try {
-      const payload = {
-        customerName, customerPhone, customerEmail,
-        addressLine1, addressLine2, city, state, postalCode,
-        buyerGstin, paymentMode, notes,
-        items: items.map(it => ({
-          product_id: it.product_id, product_name: it.product_name,
-          product_sku: it.product_sku, variant_id: it.variant_id,
-          variant_name: it.variant_name, hsn_code: it.hsn_code,
-          gst_rate: it.gst_rate, quantity: it.quantity, unit_price: it.unit_price,
-        })),
-      }
-
-      if (draftId) {
-        const res = await fetch(`/api/admin/invoices/drafts/${draftId}`, {
-          method: 'PATCH', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        const data = await res.json()
-        if (!res.ok) { setFormError(data.error || 'Failed'); return }
-        showToast('Draft saved', 'success')
-      } else {
-        const res = await fetch('/api/admin/invoices/drafts', {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        const data = await res.json()
-        if (!res.ok) { setFormError(data.error || 'Failed'); return }
-        setDraftId(data.draftId)
-        showToast('Draft saved', 'success')
-      }
-
-      fetchDrafts()
-    } catch (err: any) {
-      setFormError(err.message || 'Failed')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  async function handleFinalizeDraft(id: string) {
-    setFinalizingId(id)
-    try {
-      const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, {
-        method: 'POST', credentials: 'include',
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to finalize')
-      showToast(`Invoice ${data.invoiceNumber || ''} finalized`, 'success')
-      resetForm()
-      setView('list')
-      fetchInvoices(1)
-      fetchDrafts()
-      if (data.invoiceUrl) window.open(data.invoiceUrl, '_blank')
-    } catch (err: any) {
-      showToast(err.message, 'error')
-    } finally {
-      setFinalizingId(null)
-    }
-  }
-
-  async function handleDeleteDraft(id: string) {
-    if (confirmDeleteDraftId !== id) { setConfirmDeleteDraftId(id); return }
-    setConfirmDeleteDraftId(null)
-    setDeletingDraftId(id)
-    try {
-      const res = await fetch(`/api/admin/invoices/drafts/${id}`, {
-        method: 'DELETE', credentials: 'include',
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed')
-      showToast('Draft deleted', 'success')
-      fetchDrafts()
-    } catch (err: any) {
-      showToast(err.message, 'error')
-    } finally {
-      setDeletingDraftId(null)
     }
   }
 
@@ -442,9 +284,7 @@ export default function InvoicesClient() {
 
   const selectedPayment = PAYMENT_MODES.find(m => m.value === paymentMode)
 
-  function renderForm(mode: 'create' | 'edit' | 'draft') {
-    const isEdit = mode === 'edit'
-    const isDraft = mode === 'draft'
+  function renderForm(isEdit: boolean) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -457,16 +297,11 @@ export default function InvoicesClient() {
             </svg>
           </button>
           <div>
-            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-              {isEdit ? 'Edit Offline Invoice' : isDraft ? 'Invoice Draft' : 'New Offline Invoice'}
-              {isDraft && (
-                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
-                  Draft
-                </span>
-              )}
+            <h1 className="text-xl font-bold text-foreground">
+              {isEdit ? 'Edit Offline Invoice' : 'New Offline Invoice'}
             </h1>
             <p className="text-foreground-secondary text-xs mt-0.5">
-              {isEdit ? 'Update customer details, items and payment mode' : isDraft ? 'Save changes or finalize to generate invoice and deduct stock' : 'Walk-in, credit sale, B2B or bulk order'}
+              {isEdit ? 'Update customer details, items and payment mode' : 'Walk-in, credit sale, B2B or bulk order'}
             </p>
           </div>
         </div>
@@ -544,7 +379,10 @@ export default function InvoicesClient() {
             </div>
           </div>
 
-          <LineItemsSection items={items} onChange={setItems} />
+          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
+            <LineItemsSection items={items} onChange={setItems} />
+          </div>
+
 
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
             <h2 className="text-sm font-semibold text-foreground mb-3">Payment &amp; Notes</h2>
@@ -580,47 +418,11 @@ export default function InvoicesClient() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 pb-6">
-            {isDraft ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => { if (draftId) handleFinalizeDraft(draftId) }}
-                  disabled={submitting || finalizingId === draftId || !draftId}
-                  className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
-                >
-                  {finalizingId === draftId ? 'Finalizing…' : 'Finalize Invoice'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveDraft}
-                  disabled={submitting}
-                  className="px-6 py-2 border border-secondary-500 dark:border-secondary-400 text-secondary-600 dark:text-secondary-300 hover:bg-secondary-50 dark:hover:bg-secondary-900/20 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
-                >
-                  {submitting ? 'Saving…' : 'Save Draft'}
-                </button>
-              </>
-            ) : isEdit ? (
-              <button type="submit" disabled={submitting}
-                className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
-                {submitting ? 'Saving…' : 'Save Changes'}
-              </button>
-            ) : (
-              <>
-                <button type="submit" disabled={submitting}
-                  className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
-                  {submitting ? 'Creating…' : 'Create Invoice'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveDraft}
-                  disabled={submitting}
-                  className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors disabled:opacity-50"
-                >
-                  {submitting ? 'Saving…' : 'Save as Draft'}
-                </button>
-              </>
-            )}
+          <div className="flex gap-3 pb-6">
+            <button type="submit" disabled={submitting}
+              className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
+              {submitting ? (isEdit ? 'Saving…' : 'Creating…') : (isEdit ? 'Save Changes' : 'Create Invoice')}
+            </button>
             <button type="button" onClick={() => { resetForm(); setView('list') }}
               className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
               Cancel
@@ -637,13 +439,10 @@ export default function InvoicesClient() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
-  if (view === 'create') return renderForm('create')
-  if (view === 'draft') return editLoading
-    ? <div className="p-12 text-center text-foreground-muted text-sm">Loading draft…</div>
-    : renderForm('draft')
+  if (view === 'create') return renderForm(false)
   if (view === 'edit') return editLoading
     ? <div className="p-12 text-center text-foreground-muted text-sm">Loading invoice…</div>
-    : renderForm('edit')
+    : renderForm(true)
 
   return (
     <div className="space-y-4">
@@ -700,73 +499,6 @@ export default function InvoicesClient() {
               className={inputCls + ' w-36'} />
           </div>
         </div>
-      </div>
-
-      <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-default">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            Drafts
-            {drafts.length > 0 && (
-              <span className="px-1.5 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">
-                {drafts.length}
-              </span>
-            )}
-          </h2>
-          <button onClick={() => setView('create')}
-            className="text-xs text-secondary-500 dark:text-secondary-300 hover:underline font-medium">
-            New Draft
-          </button>
-        </div>
-        {draftsLoading ? (
-          <div className="px-4 py-3 text-xs text-foreground-muted">Loading…</div>
-        ) : drafts.length === 0 ? (
-          <div className="px-4 py-3 text-xs text-foreground-muted">No drafts</div>
-        ) : (
-          <div className="divide-y divide-border-default">
-            {drafts.map(d => (
-              <div key={d.id} className="flex items-center justify-between px-4 py-3 gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{d.customer_name}</p>
-                  <p className="text-xs text-foreground-muted font-mono">{d.order_number}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold text-foreground">₹{parseFloat(d.total_amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-foreground-muted">{fmtDate(d.updated_at)}</p>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <button onClick={() => openDraft(d)}
-                    className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors">
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleFinalizeDraft(d.id)}
-                    disabled={finalizingId === d.id}
-                    className="text-xs text-secondary-500 dark:text-secondary-300 hover:text-secondary-600 font-medium transition-colors disabled:opacity-50">
-                    {finalizingId === d.id ? '…' : 'Finalize'}
-                  </button>
-                  {confirmDeleteDraftId === d.id ? (
-                    <>
-                      <span className="text-xs text-foreground-secondary">Delete?</span>
-                      <button onClick={() => handleDeleteDraft(d.id)} disabled={deletingDraftId === d.id}
-                        className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50">
-                        {deletingDraftId === d.id ? '…' : 'Yes'}
-                      </button>
-                      <button onClick={() => setConfirmDeleteDraftId(null)}
-                        className="text-xs text-foreground-muted hover:text-foreground font-medium">
-                        No
-                      </button>
-                    </>
-                  ) : (
-                    <button onClick={() => handleDeleteDraft(d.id)} disabled={deletingDraftId === d.id}
-                      className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 font-medium disabled:opacity-50">
-                      Delete
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
@@ -1020,6 +752,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
         className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="flex items-start justify-between p-5 border-b border-border-default">
           <div className="min-w-0 pr-4">
             <h2 className="text-lg font-bold text-foreground leading-tight font-mono">{inv.invoice_number}</h2>
