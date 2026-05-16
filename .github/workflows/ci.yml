@@ -81,6 +81,9 @@ jobs:
           NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
           NEXT_PUBLIC_RAZORPAY_KEY_ID: ${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
           NEXT_PUBLIC_ENABLE_RAZORPAY: ${{ secrets.NEXT_PUBLIC_ENABLE_RAZORPAY }}
+          NEXT_PUBLIC_ENABLE_GST: ${{ secrets.NEXT_PUBLIC_ENABLE_GST }}
+          NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+          NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
 
   # ────────────────────────────────────────────────────────
   # Stage 3 — Docker build & push  (main only, gate: build)
@@ -132,6 +135,9 @@ jobs:
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
             NEXT_PUBLIC_RAZORPAY_KEY_ID=${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
             NEXT_PUBLIC_ENABLE_RAZORPAY=${{ secrets.NEXT_PUBLIC_ENABLE_RAZORPAY }}
+            NEXT_PUBLIC_ENABLE_GST=${{ secrets.NEXT_PUBLIC_ENABLE_GST }}
+            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+            NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL }}
 
   # ────────────────────────────────────────────────────────
   # Stage 4 — Deploy to EC2  (main only, gate: docker)
