@@ -78,6 +78,9 @@ jobs:
           JWT_SECRET: ci-test-secret
           NEXT_PUBLIC_APP_URL: http://localhost:3000
           SKIP_DB_CHECK: true
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+          NEXT_PUBLIC_RAZORPAY_KEY_ID: ${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
+          NEXT_PUBLIC_ENABLE_RAZORPAY: ${{ secrets.NEXT_PUBLIC_ENABLE_RAZORPAY }}
 
   # ────────────────────────────────────────────────────────
   # Stage 3 — Docker build & push  (main only, gate: build)
@@ -126,6 +129,9 @@ jobs:
             JWT_SECRET=ci-build-secret
             NEXT_PUBLIC_APP_URL=http://localhost:3000
             SKIP_DB_CHECK=true
+            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+            NEXT_PUBLIC_RAZORPAY_KEY_ID=${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
+            NEXT_PUBLIC_ENABLE_RAZORPAY=${{ secrets.NEXT_PUBLIC_ENABLE_RAZORPAY }}
 
   # ────────────────────────────────────────────────────────
   # Stage 4 — Deploy to EC2  (main only, gate: docker)
