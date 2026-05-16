@@ -457,7 +457,10 @@ function POTab() {
             ))}
           </select>
         </div>
-        <button className={btnSecondary} onClick={() => setShowCreate(v => !v)}>+ Create PO</button>
+        <div>
+          <div className={labelCls}>&nbsp;</div>
+          <button className={btnSecondary} onClick={() => setShowCreate(v => !v)}>+ Create PO</button>
+        </div>
       </div>
 
       {showCreate && (
