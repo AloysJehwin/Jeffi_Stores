@@ -96,7 +96,7 @@ export default async function AdminLayout({
       <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
 
         {/* Top bar — admin profile & actions */}
-        <div className="flex items-center justify-between px-4 h-12 bg-surface-elevated border-b border-border-default shrink-0 shadow-sm">
+        <div className="flex items-center justify-between px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0">
           {/* Mobile: hamburger + logo */}
           <div className="flex items-center gap-2 md:hidden">
             <AdminMobileNav
@@ -104,7 +104,7 @@ export default async function AdminLayout({
               username={session?.username || 'Admin'}
               role={session?.role || 'user'}
             />
-            <span className="font-bold text-foreground text-sm">Jeffi Admin</span>
+            <span className="font-bold text-white text-sm">Jeffi Admin</span>
           </div>
           {/* Desktop: spacer */}
           <div className="hidden md:block" />
@@ -112,12 +112,12 @@ export default async function AdminLayout({
           {/* Right side: avatar + name + role + theme + logout */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-secondary-500 dark:bg-secondary-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold shrink-0">
                 {usernameInitial}
               </div>
               <div className="hidden sm:block leading-tight">
-                <p className="text-xs font-semibold text-foreground leading-none">{session?.username || 'Admin'}</p>
-                <p className="text-[10px] text-foreground-muted capitalize">{session?.role || 'user'}</p>
+                <p className="text-xs font-semibold text-white leading-none">{session?.username || 'Admin'}</p>
+                <p className="text-[10px] text-white/60 capitalize">{session?.role || 'user'}</p>
               </div>
             </div>
             <ThemeToggle variant="admin" />
