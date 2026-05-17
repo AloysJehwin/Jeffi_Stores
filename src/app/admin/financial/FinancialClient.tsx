@@ -964,13 +964,17 @@ function TransactionsTab() {
                         </td>
                         <td className="px-4 py-3 font-medium text-foreground">
                           {r.direction === 'inflow'
-                            ? <Link href={`/admin/orders/${r.id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>
-                            : r.party}
+                            ? r.user_id
+                              ? <Link href={`/admin/users/${r.user_id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>
+                              : <Link href={`/admin/orders/${r.id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>
+                            : <Link href={`/admin/financial/payables/${r.expense_id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>}
                         </td>
                         <td className="px-4 py-3 text-foreground-secondary">
                           {r.direction === 'inflow'
-                            ? <Link href={`/admin/orders/${r.id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
-                            : r.txn_ref}
+                            ? r.invoice_number
+                              ? <a href={`/api/orders/${r.id}/invoice`} target="_blank" rel="noopener noreferrer" className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</a>
+                              : <Link href={`/admin/orders/${r.id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
+                            : <Link href={`/admin/financial/payables/${r.expense_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>}
                         </td>
                         <td className="px-4 py-3 text-foreground-secondary capitalize">{r.method?.replace('_', ' ')}</td>
                         <td className={`px-4 py-3 text-right font-semibold ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1000,12 +1004,16 @@ function TransactionsTab() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         {r.direction === 'inflow'
-                          ? <Link href={`/admin/orders/${r.id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
-                          : <p className="font-medium text-foreground text-sm">{r.party}</p>}
+                          ? r.user_id
+                            ? <Link href={`/admin/users/${r.user_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
+                            : <Link href={`/admin/orders/${r.id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
+                          : <Link href={`/admin/financial/payables/${r.expense_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>}
                         {r.txn_ref && (
                           r.direction === 'inflow'
-                            ? <Link href={`/admin/orders/${r.id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
-                            : <p className="text-xs text-foreground-secondary font-mono mt-0.5">{r.txn_ref}</p>
+                            ? r.invoice_number
+                              ? <a href={`/api/orders/${r.id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</a>
+                              : <Link href={`/admin/orders/${r.id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
+                            : <Link href={`/admin/financial/payables/${r.expense_id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
                         )}
                       </div>
                       <p className={`font-semibold text-sm shrink-0 ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
