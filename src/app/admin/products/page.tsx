@@ -7,11 +7,15 @@ import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
 import ProductsTableClient from '@/components/admin/ProductsTableClient'
+import SortableHeader from '@/components/admin/SortableHeader'
+import { sortOptions } from '@/components/admin/sortOptions'
 
 const PAGE_SIZE = 25
 
 export default async function ProductsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const sort = searchParams.sort
+  const dir = searchParams.dir as 'asc' | 'desc' | undefined
 
   const [{ products, total }, categories, brands, allProductsForStats] = await Promise.all([
     getFilteredProducts({
@@ -22,6 +26,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
       search: searchParams.search,
       page,
       limit: PAGE_SIZE,
+      sort,
+      dir,
     }),
     getAllCategories(),
     getAllBrands(),
@@ -49,6 +55,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
     if (searchParams.is_active) params.set('is_active', searchParams.is_active)
     if (searchParams.stock) params.set('stock', searchParams.stock)
     if (searchParams.search) params.set('search', searchParams.search)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
     return `/admin/products${qs ? `?${qs}` : ''}`
@@ -170,13 +178,13 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
           <table className="w-full divide-y divide-border-default table-fixed">
             <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[25%]">Product</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">SKU</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Category</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[8%]">Brand</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Price</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[7%]">Stock</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-[18%]">Status</th>
+                <SortableHeader label="Product" column="name" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[25%]" />
+                <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[10%]" />
+                <SortableHeader label="Category" column="category" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[10%]" />
+                <SortableHeader label="Brand" column="brand" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[8%]" />
+                <SortableHeader label="Price" column="price" options={sortOptions('number')} currentSort={sort} currentDir={dir} className="w-[10%]" />
+                <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={sort} currentDir={dir} className="w-[7%]" />
+                <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[18%]" />
                 <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[12%]">Actions</th>
               </tr>
             </thead>

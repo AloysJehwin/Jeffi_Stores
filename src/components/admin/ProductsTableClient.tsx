@@ -187,14 +187,34 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                   <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
                 </div>
               </td>
-              <td className="px-4 py-3 text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-end gap-1.5">
-                  <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 hover:text-accent-600">Edit</Link>
+              <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-end gap-1">
+                  <Link
+                    href={`/admin/products/${product.id}`}
+                    title="View Details"
+                    className="p-1.5 rounded hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </Link>
+                  <Link
+                    href={`/admin/products/edit/${product.id}`}
+                    title="Edit Product"
+                    className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </Link>
                   <button
                     onClick={() => setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })}
-                    className="text-orange-500 hover:text-orange-600 text-sm font-medium"
+                    title="Print Label"
+                    className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
                   >
-                    Label
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
                   </button>
                   <DownloadAdButton productId={product.id} productName={product.name} productSlug={product.slug} />
                   <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />

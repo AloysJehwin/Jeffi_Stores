@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { getStockLedger, getStockValuation } from '@/lib/inventory'
+import { getStockLedger, getStockValuation, logStockMovement } from '@/lib/inventory'
+import { getClient } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,56 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({ transactions: ledger.rows, total: ledger.total, page, limit })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const admin = await authenticateAdmin(request)
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { product_id, variant_id, new_quantity, notes } = await request.json()
+    if (!product_id || new_quantity == null) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+
+    const client = await getClient()
+    try {
+      await client.query('BEGIN')
+
+      const cur = variant_id
+        ? await client.query<{ inventory_quantity: number }>(
+            'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variant_id])
+        : await client.query<{ inventory_quantity: number }>(
+            'SELECT inventory_quantity FROM products WHERE id = $1', [product_id])
+
+      const currentQty = parseFloat(cur.rows[0]?.inventory_quantity as any) || 0
+      const change = new_quantity - currentQty
+
+      if (variant_id) {
+        await client.query('UPDATE product_variants SET inventory_quantity = $1 WHERE id = $2', [new_quantity, variant_id])
+      } else {
+        await client.query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [new_quantity, product_id])
+      }
+
+      await logStockMovement(client, {
+        productId: product_id,
+        variantId: variant_id || null,
+        transactionType: 'adjustment',
+        quantityChange: change,
+        referenceType: 'manual',
+        referenceId: product_id,
+        notes: notes || `Manual adjustment to ${new_quantity}`,
+      })
+
+      await client.query('COMMIT')
+      return NextResponse.json({ success: true })
+    } catch (e) {
+      await client.query('ROLLBACK')
+      throw e
+    } finally {
+      client.release()
+    }
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
