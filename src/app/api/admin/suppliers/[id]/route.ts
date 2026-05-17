@@ -40,8 +40,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
               e.amount, e.tax_amount, e.total_amount, e.status,
               e.description, po.po_number
        FROM expenses e
-       LEFT JOIN purchase_orders po ON po.id = e.po_id
-       WHERE po.supplier_id = $1
+       JOIN purchase_orders po ON po.id = e.po_id AND po.supplier_id = $1
        ORDER BY e.expense_date DESC
        LIMIT 50`,
       [params.id]
