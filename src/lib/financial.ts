@@ -183,7 +183,8 @@ export async function getPayables(filters: {
       s.bank_name AS supplier_bank_name,
       s.account_number AS supplier_account_number,
       s.ifsc AS supplier_ifsc,
-      s.upi_id AS supplier_upi_id
+      s.upi_id AS supplier_upi_id,
+      s.id AS supplier_id
     FROM expenses e
     LEFT JOIN purchase_orders po ON po.id = e.po_id
     LEFT JOIN suppliers s ON s.id = po.supplier_id

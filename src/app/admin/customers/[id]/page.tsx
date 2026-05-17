@@ -118,7 +118,7 @@ export default async function CustomerDetailPage({
             </div>
             <p className="text-zinc-400 text-sm mt-0.5">{customer.email}</p>
             {customer.phone && (
-              <p className="text-zinc-500 text-xs mt-0.5">{customer.phone}</p>
+              <p className="text-zinc-500 text-xs mt-0.5">+91 {customer.phone}</p>
             )}
           </div>
         </div>
