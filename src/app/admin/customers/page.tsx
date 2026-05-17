@@ -3,6 +3,8 @@ import { getCustomers } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import CustomersTableRows from '@/components/admin/CustomersTableRows'
+import SortableHeader from '@/components/admin/SortableHeader'
+import { sortOptions } from '@/components/admin/sortOptions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -11,9 +13,11 @@ const PAGE_SIZE = 25
 
 export default async function CustomersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const sort = searchParams.sort
+  const dir = searchParams.dir as 'asc' | 'desc' | undefined
 
   const [{ customers, total }, allStats] = await Promise.all([
-    getCustomers({ search: searchParams.search, status: searchParams.status, page, limit: PAGE_SIZE }),
+    getCustomers({ search: searchParams.search, status: searchParams.status, page, limit: PAGE_SIZE, sort, dir }),
     getCustomers({}),
   ])
 
@@ -25,6 +29,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
     const params = new URLSearchParams()
     if (searchParams.status) params.set('status', searchParams.status)
     if (searchParams.search) params.set('search', searchParams.search)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
     return `/admin/customers${qs ? `?${qs}` : ''}`
@@ -113,12 +119,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
           <table className="min-w-full divide-y divide-border-default">
             <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Phone</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Joined</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Orders</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+                <SortableHeader label="Name" column="name" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Email" column="email" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Phone" column="phone" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Joined" column="joined" options={sortOptions('date')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Orders" column="orders" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
                 <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
               </tr>
             </thead>

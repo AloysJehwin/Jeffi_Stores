@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 
@@ -141,47 +142,94 @@ function ReceivablesTab() {
           {data.rows.length === 0 ? (
             <p className="text-foreground-secondary text-sm text-center py-10">No outstanding receivables</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border-default">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-secondary">
-                  <tr>
-                    <th className={thCls}>Customer</th>
-                    <th className={thCls}>Invoice #</th>
-                    <th className={thCls}>Date</th>
-                    <th className={thRight}>Amount</th>
-                    <th className={thCenter}>Age</th>
-                    <th className={thCenter}>Status</th>
-                    <th className={thCenter}>Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {data.rows.map((r: any) => (
-                    <tr key={r.order_id} className="hover:bg-surface-secondary/40 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-foreground">{r.customer_name}</div>
-                        {r.customer_phone && <div className="text-xs text-foreground-secondary">{r.customer_phone}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-foreground-secondary">{r.invoice_number || r.order_number}</td>
-                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(r.invoice_date)}</td>
-                      <td className="px-4 py-3 text-right font-medium text-foreground">{formatINR(parseFloat(r.total_amount))}</td>
-                      <td className="px-4 py-3 text-center">{agingBadge(r.aging_bucket)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <StatusBadge status={r.payment_status} />
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          className="px-3 py-1 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
-                          disabled={markingPaid === r.order_id}
-                          onClick={() => markPaid(r.order_id)}
-                        >
-                          {markingPaid === r.order_id ? '…' : 'Mark Paid'}
-                        </button>
-                      </td>
+            <>
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-secondary">
+                    <tr>
+                      <th className={thCls}>Customer</th>
+                      <th className={thCls}>Invoice #</th>
+                      <th className={thCls}>Date</th>
+                      <th className={thRight}>Amount</th>
+                      <th className={thCenter}>Age</th>
+                      <th className={thCenter}>Status</th>
+                      <th className={thCenter}>Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-border-default">
+                    {data.rows.map((r: any) => (
+                      <tr key={r.order_id} className="hover:bg-surface-secondary/40 transition-colors">
+                        <td className="px-4 py-3">
+                          {r.user_id
+                            ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>
+                            : <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
+                          {r.customer_phone && <div className="text-xs text-foreground-secondary">+91 {r.customer_phone}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-foreground-secondary">
+                          {r.invoice_number
+                            ? <Link href={`/admin/invoices/${r.order_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.invoice_number || r.order_number}</Link>
+                            : <Link href={`/admin/orders/${r.order_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.order_number}</Link>}
+                          {r.invoice_number && (
+                            <a href={`/api/orders/${r.order_id}/invoice`} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-accent-500 hover:underline">PDF</a>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(r.invoice_date)}</td>
+                        <td className="px-4 py-3 text-right font-medium text-foreground">{formatINR(parseFloat(r.total_amount))}</td>
+                        <td className="px-4 py-3 text-center">{agingBadge(r.aging_bucket)}</td>
+                        <td className="px-4 py-3 text-center"><StatusBadge status={r.payment_status} /></td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            className="px-3 py-1 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
+                            disabled={markingPaid === r.order_id}
+                            onClick={() => markPaid(r.order_id)}
+                          >
+                            {markingPaid === r.order_id ? '…' : 'Mark Paid'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+                {data.rows.map((r: any) => (
+                  <div key={r.order_id} className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        {r.user_id
+                          ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>
+                          : <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
+                        {r.customer_phone && <p className="text-xs text-foreground-secondary mt-0.5">+91 {r.customer_phone}</p>}
+                      </div>
+                      <p className="font-semibold text-foreground text-sm shrink-0">{formatINR(parseFloat(r.total_amount))}</p>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
+                      <div className="flex items-center gap-1.5">
+                        {r.invoice_number
+                          ? <Link href={`/admin/invoices/${r.order_id}`} className="font-mono hover:text-accent-500 hover:underline">{r.invoice_number || r.order_number}</Link>
+                          : <Link href={`/admin/orders/${r.order_id}`} className="font-mono hover:text-accent-500 hover:underline">{r.order_number}</Link>}
+                        {r.invoice_number && (
+                          <a href={`/api/orders/${r.order_id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline">PDF</a>
+                        )}
+                      </div>
+                      <span>{formatDate(r.invoice_date)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {agingBadge(r.aging_bucket)}
+                      <StatusBadge status={r.payment_status} />
+                    </div>
+                    <button
+                      className="w-full mt-1 py-1.5 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
+                      disabled={markingPaid === r.order_id}
+                      onClick={() => markPaid(r.order_id)}
+                    >
+                      {markingPaid === r.order_id ? '…' : 'Mark Paid'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </>
       )}
@@ -322,7 +370,7 @@ function PayablesTab() {
             </div>
             <div>
               <label className={labelCls}>GSTIN</label>
-              <input className={inputCls} value={addForm.supplier_gstin} onChange={e => setAddForm(f => ({ ...f, supplier_gstin: e.target.value }))} />
+              <input className={inputCls + ' font-mono'} value={addForm.supplier_gstin} onChange={e => setAddForm(f => ({ ...f, supplier_gstin: e.target.value.toUpperCase() }))} maxLength={15} placeholder="00XXXXX0000X0Z0" />
             </div>
             <div>
               <label className={labelCls}>Description</label>
@@ -367,58 +415,104 @@ function PayablesTab() {
           {data.rows.length === 0 ? (
             <p className="text-foreground-secondary text-sm text-center py-10">No outstanding payables</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border-default">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-secondary">
-                  <tr>
-                    <th className={thCls}>Supplier</th>
-                    <th className={thCls}>Bill #</th>
-                    <th className={thCls}>Bill Date</th>
-                    <th className={thCls}>Due Date</th>
-                    <th className={thRight}>Amount</th>
-                    <th className={thRight}>Paid</th>
-                    <th className={thCenter}>Status</th>
-                    <th className={thCenter}>Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {data.rows.map((r: any) => {
-                    const remaining = parseFloat(r.total_amount) - parseFloat(r.paid_amount)
-                    return (
-                      <tr key={r.id} className="hover:bg-surface-secondary/40 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-foreground">{r.supplier_name}</div>
-                          {r.description && <div className="text-xs text-foreground-secondary">{r.description}</div>}
-                        </td>
-                        <td className="px-4 py-3 text-foreground-secondary">{r.expense_number}</td>
-                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(r.expense_date)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {r.due_date ? (
-                            <span className={r.days_overdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-foreground-secondary'}>
-                              {formatDate(r.due_date)}
-                              {r.days_overdue ? ` (${r.days_overdue}d overdue)` : ''}
-                            </span>
-                          ) : <span className="text-foreground-secondary">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium text-foreground">{formatINR(parseFloat(r.total_amount))}</td>
-                        <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(r.paid_amount))}</td>
-                        <td className="px-4 py-3 text-center">
-                          <StatusBadge status={r.status} />
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            className="px-3 py-1 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors"
-                            onClick={() => openPayModal(r)}
-                          >
-                            Pay
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-secondary">
+                    <tr>
+                      <th className={thCls}>Supplier</th>
+                      <th className={thCls}>Bill #</th>
+                      <th className={thCls}>Bill Date</th>
+                      <th className={thCls}>Due Date</th>
+                      <th className={thRight}>Amount</th>
+                      <th className={thRight}>Paid</th>
+                      <th className={thCenter}>Status</th>
+                      <th className={thCenter}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-default">
+                    {data.rows.map((r: any) => {
+                      const remaining = parseFloat(r.total_amount) - parseFloat(r.paid_amount)
+                      return (
+                        <tr key={r.id} className="hover:bg-surface-secondary/40 transition-colors">
+                          <td className="px-4 py-3">
+                            {r.supplier_id
+                              ? <Link href={`/admin/suppliers/${r.supplier_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.supplier_name}</Link>
+                              : <span className="font-medium text-foreground">{r.supplier_name}</span>}
+                            {r.description && <div className="text-xs text-foreground-secondary">{r.description}</div>}
+                          </td>
+                          <td className="px-4 py-3 text-foreground-secondary">
+                            <Link href={`/admin/financial/payables/${r.id}`} className="font-mono hover:text-accent-500 hover:underline">{r.expense_number}</Link>
+                          </td>
+                          <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(r.expense_date)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {r.due_date ? (
+                              <span className={r.days_overdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-foreground-secondary'}>
+                                {formatDate(r.due_date)}
+                                {r.days_overdue ? ` (${r.days_overdue}d overdue)` : ''}
+                              </span>
+                            ) : <span className="text-foreground-secondary">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium text-foreground">{formatINR(parseFloat(r.total_amount))}</td>
+                          <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(r.paid_amount))}</td>
+                          <td className="px-4 py-3 text-center"><StatusBadge status={r.status} /></td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              className="px-3 py-1 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors"
+                              onClick={() => openPayModal(r)}
+                            >
+                              Pay
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+                {data.rows.map((r: any) => {
+                  const remaining = parseFloat(r.total_amount) - parseFloat(r.paid_amount)
+                  return (
+                    <div key={r.id} className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          {r.supplier_id
+                            ? <Link href={`/admin/suppliers/${r.supplier_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.supplier_name}</Link>
+                            : <span className="font-medium text-foreground text-sm">{r.supplier_name}</span>}
+                          {r.description && <p className="text-xs text-foreground-secondary mt-0.5">{r.description}</p>}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-semibold text-foreground text-sm">{formatINR(parseFloat(r.total_amount))}</p>
+                          {parseFloat(r.paid_amount) > 0 && (
+                            <p className="text-xs text-foreground-secondary mt-0.5">Paid {formatINR(parseFloat(r.paid_amount))}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
+                        <Link href={`/admin/financial/payables/${r.id}`} className="font-mono hover:text-accent-500 hover:underline">{r.expense_number}</Link>
+                        <span>{formatDate(r.expense_date)}</span>
+                      </div>
+                      {r.due_date && (
+                        <p className={`text-xs ${r.days_overdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-foreground-secondary'}`}>
+                          Due {formatDate(r.due_date)}{r.days_overdue ? ` · ${r.days_overdue}d overdue` : ''}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between gap-2">
+                        <StatusBadge status={r.status} />
+                        <button
+                          className="px-4 py-1.5 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 text-white dark:text-secondary-900 transition-colors"
+                          onClick={() => openPayModal(r)}
+                        >
+                          Pay
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
           )}
         </>
       )}
@@ -579,43 +673,82 @@ function PLTab() {
           {data.monthly.length === 0 ? (
             <p className="text-foreground-secondary text-sm text-center py-10">No paid orders in this period</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border-default">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-secondary">
-                  <tr>
-                    <th className={thCls}>Month</th>
-                    <th className={thRight}>Revenue</th>
-                    <th className={thRight}>COGS</th>
-                    <th className={thRight}>Gross Profit</th>
-                    <th className={thCls}>Margin</th>
-                    <th className={thRight}>GST</th>
-                    <th className={thRight}>Orders</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {data.monthly.map((m: any) => (
-                    <tr key={m.month} className="hover:bg-surface-secondary/40 transition-colors">
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="px-4 py-3 text-right text-foreground">{formatINR(m.revenue)}</td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(m.cogs)}</td>
-                      <td className="px-4 py-3 text-right text-foreground">{formatINR(m.gross_profit)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-surface-secondary rounded-full h-2 overflow-hidden">
-                            <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(m.gross_margin_pct, 100)}%` }} />
-                          </div>
-                          <span className="text-xs text-foreground-secondary w-10 text-right">{m.gross_margin_pct}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(m.tax_collected)}</td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary">{m.order_count}</td>
+            <>
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-secondary">
+                    <tr>
+                      <th className={thCls}>Month</th>
+                      <th className={thRight}>Revenue</th>
+                      <th className={thRight}>COGS</th>
+                      <th className={thRight}>Gross Profit</th>
+                      <th className={thCls}>Margin</th>
+                      <th className={thRight}>GST</th>
+                      <th className={thRight}>Orders</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-border-default">
+                    {data.monthly.map((m: any) => (
+                      <tr key={m.month} className="hover:bg-surface-secondary/40 transition-colors">
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                        </td>
+                        <td className="px-4 py-3 text-right text-foreground">{formatINR(m.revenue)}</td>
+                        <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(m.cogs)}</td>
+                        <td className="px-4 py-3 text-right text-foreground">{formatINR(m.gross_profit)}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 bg-surface-secondary rounded-full h-2 overflow-hidden">
+                              <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(m.gross_margin_pct, 100)}%` }} />
+                            </div>
+                            <span className="text-xs text-foreground-secondary w-10 text-right">{m.gross_margin_pct}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(m.tax_collected)}</td>
+                        <td className="px-4 py-3 text-right text-foreground-secondary">{m.order_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+                {data.monthly.map((m: any) => (
+                  <div key={m.month} className="p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-foreground text-sm">
+                        {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                      </p>
+                      <span className="text-xs text-foreground-secondary">{m.order_count} orders</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-foreground-secondary">Revenue</span>
+                        <span className="font-medium text-foreground">{formatINR(m.revenue)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-foreground-secondary">COGS</span>
+                        <span className="text-foreground-secondary">{formatINR(m.cogs)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-foreground-secondary">Gross Profit</span>
+                        <span className="font-medium text-foreground">{formatINR(m.gross_profit)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-foreground-secondary">GST</span>
+                        <span className="text-foreground-secondary">{formatINR(m.tax_collected)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <div className="flex-1 bg-surface-secondary rounded-full h-1.5 overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(m.gross_margin_pct, 100)}%` }} />
+                      </div>
+                      <span className="text-xs text-foreground-secondary w-10 text-right">{m.gross_margin_pct}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </>
       )}
@@ -663,36 +796,70 @@ function CashflowTab() {
         data.monthly.length === 0 ? (
           <p className="text-foreground-secondary text-sm text-center py-10">No transactions in this period</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border-default">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-secondary">
-                <tr>
-                  <th className={thCls}>Month</th>
-                  <th className={thRight}>Cash In</th>
-                  <th className={thRight}>Cash Out</th>
-                  <th className={thRight}>Net</th>
-                  <th className={thRight}>Running Balance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {data.monthly.map((m: any) => (
-                  <tr key={m.month} className="hover:bg-surface-secondary/40 transition-colors">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-                    </td>
-                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400 font-medium">{formatINR(m.cash_in)}</td>
-                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</td>
-                    <td className={`px-4 py-3 text-right font-medium ${m.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {m.net >= 0 ? '+' : ''}{formatINR(m.net)}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-semibold ${m.running_balance >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'}`}>
-                      {formatINR(m.running_balance)}
-                    </td>
+          <>
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-secondary">
+                  <tr>
+                    <th className={thCls}>Month</th>
+                    <th className={thRight}>Cash In</th>
+                    <th className={thRight}>Cash Out</th>
+                    <th className={thRight}>Net</th>
+                    <th className={thRight}>Running Balance</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {data.monthly.map((m: any) => (
+                    <tr key={m.month} className="hover:bg-surface-secondary/40 transition-colors">
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                      </td>
+                      <td className="px-4 py-3 text-right text-green-600 dark:text-green-400 font-medium">{formatINR(m.cash_in)}</td>
+                      <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${m.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {m.net >= 0 ? '+' : ''}{formatINR(m.net)}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-semibold ${m.running_balance >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'}`}>
+                        {formatINR(m.running_balance)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+              {data.monthly.map((m: any) => (
+                <div key={m.month} className="p-4 space-y-2">
+                  <p className="font-medium text-foreground text-sm">
+                    {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-foreground-secondary">Cash In</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">{formatINR(m.cash_in)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-foreground-secondary">Cash Out</span>
+                      <span className="text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-foreground-secondary">Net</span>
+                      <span className={`font-medium ${m.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {m.net >= 0 ? '+' : ''}{formatINR(m.net)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-foreground-secondary">Balance</span>
+                      <span className={`font-semibold ${m.running_balance >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'}`}>
+                        {formatINR(m.running_balance)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )
       )}
     </div>
@@ -781,52 +948,115 @@ function TransactionsTab() {
           {data.rows.length === 0 ? (
             <p className="text-foreground-secondary text-sm text-center py-10">No transactions found</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border-default">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-secondary">
-                  <tr>
-                    <th className={thCls}>Date</th>
-                    <th className={thCls}>Type</th>
-                    <th className={thCls}>Party</th>
-                    <th className={thCls}>Ref</th>
-                    <th className={thCls}>Method</th>
-                    <th className={thRight}>Amount</th>
-                    <th className={thCls}>UTR / Payout</th>
-                    <th className={thCenter}>Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {data.rows.map((r: any) => (
-                    <tr key={r.id + r.direction} className="hover:bg-surface-secondary/40 transition-colors">
-                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(r.txn_date)}</td>
-                      <td className="px-4 py-3">
-                        {r.direction === 'inflow'
-                          ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Inflow</span>
-                          : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Outflow</span>}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-foreground">{r.party}</td>
-                      <td className="px-4 py-3 text-foreground-secondary">{r.txn_ref}</td>
-                      <td className="px-4 py-3 text-foreground-secondary capitalize">{r.method?.replace('_', ' ')}</td>
-                      <td className={`px-4 py-3 text-right font-semibold ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {r.direction === 'inflow' ? '+' : '-'}{formatINR(parseFloat(r.amount))}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-foreground-secondary font-mono">
-                        {r.payout_id || r.reference || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {r.payout_status ? (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            r.payout_status === 'processed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                            r.payout_status === 'failed' || r.payout_status === 'reversed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                            'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                          }`}>{r.payout_status}</span>
-                        ) : <span className="text-foreground-secondary">—</span>}
-                      </td>
+            <>
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-secondary">
+                    <tr>
+                      <th className={thCls}>Date</th>
+                      <th className={thCls}>Type</th>
+                      <th className={thCls}>Party</th>
+                      <th className={thCls}>Ref</th>
+                      <th className={thCls}>Method</th>
+                      <th className={thRight}>Amount</th>
+                      <th className={thCls}>UTR / Payout</th>
+                      <th className={thCenter}>Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-border-default">
+                    {data.rows.map((r: any) => (
+                      <tr key={r.id + r.direction} className="hover:bg-surface-secondary/40 transition-colors">
+                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(r.txn_date)}</td>
+                        <td className="px-4 py-3">
+                          {r.direction === 'inflow'
+                            ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Inflow</span>
+                            : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Outflow</span>}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {r.direction === 'inflow'
+                            ? r.user_id
+                              ? <Link href={`/admin/customers/${r.user_id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>
+                              : <Link href={`/admin/orders/${r.id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>
+                            : r.supplier_id
+                              ? <Link href={`/admin/suppliers/${r.supplier_id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>
+                              : <Link href={`/admin/financial/payables/${r.expense_id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>}
+                        </td>
+                        <td className="px-4 py-3 text-foreground-secondary">
+                          {r.direction === 'inflow'
+                            ? r.invoice_number
+                              ? <Link href={`/admin/invoices/${r.id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
+                              : <Link href={`/admin/orders/${r.id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
+                            : <Link href={`/admin/financial/payables/${r.expense_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>}
+                        </td>
+                        <td className="px-4 py-3 text-foreground-secondary capitalize">{r.method?.replace('_', ' ')}</td>
+                        <td className={`px-4 py-3 text-right font-semibold ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {r.direction === 'inflow' ? '+' : '-'}{formatINR(parseFloat(r.amount))}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-foreground-secondary font-mono">
+                          {r.payout_id || r.reference || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {r.payout_status ? (
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                              r.payout_status === 'processed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                              r.payout_status === 'failed' || r.payout_status === 'reversed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                              'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            }`}>{r.payout_status}</span>
+                          ) : <span className="text-foreground-secondary">—</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+                {data.rows.map((r: any) => (
+                  <div key={r.id + r.direction} className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        {r.direction === 'inflow'
+                          ? r.user_id
+                            ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
+                            : <Link href={`/admin/orders/${r.id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
+                          : r.supplier_id
+                            ? <Link href={`/admin/suppliers/${r.supplier_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
+                            : <Link href={`/admin/financial/payables/${r.expense_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>}
+                        {r.txn_ref && (
+                          r.direction === 'inflow'
+                            ? r.invoice_number
+                              ? <Link href={`/admin/invoices/${r.id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
+                              : <Link href={`/admin/orders/${r.id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
+                            : <Link href={`/admin/financial/payables/${r.expense_id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
+                        )}
+                      </div>
+                      <p className={`font-semibold text-sm shrink-0 ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {r.direction === 'inflow' ? '+' : '-'}{formatINR(parseFloat(r.amount))}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
+                      <span>{formatDate(r.txn_date)}</span>
+                      {r.method && <span className="capitalize">{r.method.replace('_', ' ')}</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {r.direction === 'inflow'
+                        ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Inflow</span>
+                        : <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Outflow</span>}
+                      {r.payout_status && (
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          r.payout_status === 'processed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                          r.payout_status === 'failed' || r.payout_status === 'reversed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                        }`}>{r.payout_status}</span>
+                      )}
+                    </div>
+                    {(r.payout_id || r.reference) && (
+                      <p className="text-xs text-foreground-secondary font-mono">{r.payout_id || r.reference}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </>
       )}

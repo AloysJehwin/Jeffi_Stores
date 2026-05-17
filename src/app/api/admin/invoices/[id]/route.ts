@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne, withTransaction } from '@/lib/db'
 import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
+import { logStockMovement } from '@/lib/inventory'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +15,7 @@ export async function PATCH(
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const order = await queryOne<any>(
-      `SELECT id, source, invoice_number FROM orders WHERE id = $1`,
+      `SELECT id, source, invoice_number, status FROM orders WHERE id = $1`,
       [params.id]
     )
     if (!order) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
@@ -77,7 +78,52 @@ export async function PATCH(
     const isPaid = paymentMode !== 'credit'
     const effectiveDate = invoiceDate || new Date().toISOString().slice(0, 10)
 
-    await withTransaction(async (client) => {
+    const result = await withTransaction(async (client) => {
+      const existingResult = await client.query<{ product_id: string | null; variant_id: string | null; quantity: string }>(
+        `SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1`,
+        [params.id]
+      )
+
+      const existingQtyMap = new Map<string, number>()
+      for (const r of existingResult.rows) {
+        const key = `${r.product_id ?? ''}::${r.variant_id ?? ''}`
+        existingQtyMap.set(key, (existingQtyMap.get(key) ?? 0) + parseFloat(r.quantity))
+      }
+
+      const insufficientItems: string[] = []
+
+      for (const item of processedItems) {
+        if (!item.product_id) continue
+        const key = `${item.product_id}::${item.variant_id ?? ''}`
+        const previousQty = existingQtyMap.get(key) ?? 0
+        const extraQty = item.quantity - previousQty
+        if (extraQty <= 0) continue
+
+        if (item.variant_id) {
+          const inv = await client.query<{ inventory_quantity: string }>(
+            `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+            [item.variant_id]
+          )
+          const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
+          if (stock < extraQty) {
+            insufficientItems.push(
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, extra needed: ${extraQty})`
+            )
+          }
+        } else {
+          const inv = await client.query<{ inventory_quantity: string }>(
+            `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
+            [item.product_id]
+          )
+          const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
+          if (stock < extraQty) {
+            insufficientItems.push(`${item.product_name} (available: ${stock}, extra needed: ${extraQty})`)
+          }
+        }
+      }
+
+      const moveToDraft = insufficientItems.length > 0
+
       await client.query(
         `UPDATE orders SET
           customer_name = $1, customer_phone = $2, customer_email = $3,
@@ -86,8 +132,9 @@ export async function PATCH(
           cgst_amount = $9, sgst_amount = $10, igst_amount = $11,
           total_amount = $12, payment_status = $13,
           invoice_date = $14, notes = $15,
+          status = $16, invoice_number = $17,
           updated_at = NOW()
-        WHERE id = $16`,
+        WHERE id = $18`,
         [
           customerName, customerPhone || null, customerEmail || null,
           buyerGstin || null, orderIsIgst,
@@ -95,9 +142,15 @@ export async function PATCH(
           Math.round(totalCgst * 100) / 100, Math.round(totalSgst * 100) / 100, Math.round(totalIgst * 100) / 100,
           totalAmount, isPaid ? 'paid' : 'unpaid',
           effectiveDate, notes || null,
+          moveToDraft ? 'draft' : order.status,
+          moveToDraft ? null : order.invoice_number,
           params.id,
         ]
       )
+
+      if (moveToDraft && order.invoice_number) {
+        await client.query(`DELETE FROM invoices WHERE order_id = $1`, [params.id])
+      }
 
       if (addressLine1) {
         await client.query(
@@ -126,7 +179,47 @@ export async function PATCH(
           ]
         )
       }
+
+      if (!moveToDraft) {
+        for (const item of processedItems) {
+          if (!item.product_id) continue
+          const key = `${item.product_id}::${item.variant_id ?? ''}`
+          const previousQty = existingQtyMap.get(key) ?? 0
+          const extraQty = item.quantity - previousQty
+          if (extraQty <= 0) continue
+
+          if (item.variant_id) {
+            await client.query(
+              `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+              [extraQty, item.variant_id]
+            )
+          } else {
+            await client.query(
+              `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+              [extraQty, item.product_id]
+            )
+          }
+          await logStockMovement(client, {
+            productId: item.product_id!,
+            variantId: item.variant_id || null,
+            transactionType: 'sale',
+            quantityChange: -extraQty,
+            referenceType: 'order',
+            referenceId: params.id,
+          })
+        }
+      }
+
+      return { moveToDraft, insufficientItems }
     })
+
+    if (result.moveToDraft) {
+      return NextResponse.json({
+        success: true,
+        movedToDraft: true,
+        insufficientItems: result.insufficientItems,
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
