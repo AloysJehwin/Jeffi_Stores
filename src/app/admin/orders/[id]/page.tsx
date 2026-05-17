@@ -126,7 +126,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                   Shipping Label
                 </a>
                 <a
-                  href={`/api/admin/orders/${order.id}/shipping-label?size=4R&inline=1`}
+                  href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Print Shipping Label"
@@ -394,7 +394,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 {order.users?.phone && (
                   <div>
                     <p className="text-sm text-foreground-secondary">Phone</p>
-                    <p className="text-foreground">{order.users.phone}</p>
+                    <p className="text-foreground">+91 {order.users.phone}</p>
                   </div>
                 )}
               </div>
@@ -414,7 +414,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                   {order.billing_address.landmark && <p className="text-foreground-secondary">Landmark: {order.billing_address.landmark}</p>}
                   <p>{order.billing_address.city}, {order.billing_address.state} {order.billing_address.postal_code}</p>
                   <p>{order.billing_address.country || 'India'}</p>
-                  {order.billing_address.phone && <p className="mt-2">Phone: {order.billing_address.phone}</p>}
+                  {order.billing_address.phone && <p className="mt-2">Phone: +91 {order.billing_address.phone}</p>}
                 </div>
               ) : (
                 <p className="text-sm text-foreground-muted">No billing address</p>
@@ -435,7 +435,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                   {order.shipping_address.landmark && <p className="text-foreground-secondary">Landmark: {order.shipping_address.landmark}</p>}
                   <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
                   <p>{order.shipping_address.country || 'India'}</p>
-                  {order.shipping_address.phone && <p className="mt-2">Phone: {order.shipping_address.phone}</p>}
+                  {order.shipping_address.phone && <p className="mt-2">Phone: +91 {order.shipping_address.phone}</p>}
                 </div>
               ) : (
                 <p className="text-sm text-foreground-muted">No shipping address</p>
