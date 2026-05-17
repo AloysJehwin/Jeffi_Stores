@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       currency: 'INR',
       orderId: order.id,
     })
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json({ error: 'Failed to create payment order' }, { status: 500 })
   }
 }
