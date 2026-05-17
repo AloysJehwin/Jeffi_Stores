@@ -160,13 +160,15 @@ function ReceivablesTab() {
                     {data.rows.map((r: any) => (
                       <tr key={r.order_id} className="hover:bg-surface-secondary/40 transition-colors">
                         <td className="px-4 py-3">
-                          <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>
+                          {r.user_id
+                            ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>
+                            : <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
                           {r.customer_phone && <div className="text-xs text-foreground-secondary">{r.customer_phone}</div>}
                         </td>
                         <td className="px-4 py-3 text-foreground-secondary">
-                          <Link href={`/admin/orders/${r.order_id}`} className="hover:text-accent-500 hover:underline font-mono">
-                            {r.invoice_number || r.order_number}
-                          </Link>
+                          {r.invoice_number
+                            ? <Link href={`/admin/invoices/${r.order_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.invoice_number || r.order_number}</Link>
+                            : <Link href={`/admin/orders/${r.order_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.order_number}</Link>}
                           {r.invoice_number && (
                             <a href={`/api/orders/${r.order_id}/invoice`} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-accent-500 hover:underline">PDF</a>
                           )}
@@ -195,14 +197,18 @@ function ReceivablesTab() {
                   <div key={r.order_id} className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>
+                        {r.user_id
+                          ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>
+                          : <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
                         {r.customer_phone && <p className="text-xs text-foreground-secondary mt-0.5">{r.customer_phone}</p>}
                       </div>
                       <p className="font-semibold text-foreground text-sm shrink-0">{formatINR(parseFloat(r.total_amount))}</p>
                     </div>
                     <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
                       <div className="flex items-center gap-1.5">
-                        <Link href={`/admin/orders/${r.order_id}`} className="font-mono hover:text-accent-500 hover:underline">{r.invoice_number || r.order_number}</Link>
+                        {r.invoice_number
+                          ? <Link href={`/admin/invoices/${r.order_id}`} className="font-mono hover:text-accent-500 hover:underline">{r.invoice_number || r.order_number}</Link>
+                          : <Link href={`/admin/orders/${r.order_id}`} className="font-mono hover:text-accent-500 hover:underline">{r.order_number}</Link>}
                         {r.invoice_number && (
                           <a href={`/api/orders/${r.order_id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline">PDF</a>
                         )}
