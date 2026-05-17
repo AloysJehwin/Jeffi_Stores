@@ -14,6 +14,7 @@ interface ReviewForm {
   id: string
   title: string
   description: string | null
+  template_type: 'google_review' | 'product_feedback' | 'testimonial'
   google_review_url: string
   slug: string
   is_active: boolean
@@ -23,7 +24,7 @@ interface ReviewForm {
 
 export default async function FormPage({ params }: { params: { slug: string } }) {
   const form = await queryOne<ReviewForm>(
-    'SELECT id, title, description, google_review_url, slug, is_active, coupon_id, custom_fields FROM review_forms WHERE slug = $1',
+    'SELECT id, title, description, template_type, google_review_url, slug, is_active, coupon_id, custom_fields FROM review_forms WHERE slug = $1',
     [params.slug]
   )
   if (!form) notFound()
@@ -31,7 +32,7 @@ export default async function FormPage({ params }: { params: { slug: string } })
   return (
     <>
       <FormsTopNav />
-      <FormClient form={{ ...form, custom_fields: form.custom_fields || [] }} />
+      <FormClient form={{ ...form, template_type: form.template_type || 'google_review', custom_fields: form.custom_fields || [] }} />
     </>
   )
 }

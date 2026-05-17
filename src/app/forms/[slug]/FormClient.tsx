@@ -14,6 +14,7 @@ interface ReviewForm {
   id: string
   title: string
   description: string | null
+  template_type: 'google_review' | 'product_feedback' | 'testimonial'
   google_review_url: string
   slug: string
   is_active: boolean
@@ -104,6 +105,11 @@ export default function FormClient({ form }: { form: ReviewForm }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
+  const isGoogleReview = form.template_type === 'google_review'
+  const isProductFeedback = form.template_type === 'product_feedback'
+  const isTestimonial = form.template_type === 'testimonial'
+  const screenshotRequired = isGoogleReview
+
   const handleFile = (f: File) => {
     setFile(f)
     const reader = new FileReader()
@@ -124,13 +130,13 @@ export default function FormClient({ form }: { form: ReviewForm }) {
       setError('Enter a valid email address')
       return
     }
-    if (!file) { setError('Please upload a screenshot of your Google review'); return }
+    if (screenshotRequired && !file) { setError('Please upload a screenshot of your Google review'); return }
 
     setSubmitting(true)
     try {
       const fd = new FormData(formRef.current!)
       fd.set('email', email)
-      fd.set('screenshot', file)
+      if (file) fd.set('screenshot', file)
       for (const [fieldId, val] of Object.entries(ratings)) {
         fd.set(`field_${fieldId}`, String(val))
       }
@@ -208,30 +214,68 @@ export default function FormClient({ form }: { form: ReviewForm }) {
           {form.description && <p className="text-gray-500 text-sm">{form.description}</p>}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
-          <div className="flex items-center gap-3">
-            <span className="w-7 h-7 rounded-full bg-blue-500 text-white text-sm font-bold flex items-center justify-center shrink-0">1</span>
-            <div>
-              <p className="font-semibold text-gray-800">Leave us a Google review</p>
-              <p className="text-xs text-gray-400">It takes less than a minute!</p>
+        {isGoogleReview && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="w-7 h-7 rounded-full bg-blue-500 text-white text-sm font-bold flex items-center justify-center shrink-0">1</span>
+              <div>
+                <p className="font-semibold text-gray-800">Leave us a Google review</p>
+                <p className="text-xs text-gray-400">It takes less than a minute!</p>
+              </div>
             </div>
+            <a
+              href={form.google_review_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold transition-colors"
+            >
+              Open Google Review Page
+            </a>
           </div>
-          <a
-            href={form.google_review_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-semibold transition-colors"
-          >
-            Open Google Review Page
-          </a>
-        </div>
+        )}
+
+        {isProductFeedback && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="w-7 h-7 rounded-full bg-purple-500 text-white text-sm font-bold flex items-center justify-center shrink-0">1</span>
+              <div>
+                <p className="font-semibold text-gray-800">Rate your experience</p>
+                <p className="text-xs text-gray-400">How was your recent purchase?</p>
+              </div>
+            </div>
+            <StarRating value={ratings['__overall'] || 0} onChange={v => setRatings(prev => ({ ...prev, __overall: v }))} />
+          </div>
+        )}
+
+        {isTestimonial && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="w-7 h-7 rounded-full bg-indigo-500 text-white text-sm font-bold flex items-center justify-center shrink-0">1</span>
+              <div>
+                <p className="font-semibold text-gray-800">Share your story</p>
+                <p className="text-xs text-gray-400">Tell us about your experience with Jeffi Stores</p>
+              </div>
+            </div>
+            <textarea
+              name="testimonial_text"
+              rows={4}
+              required
+              placeholder="Write your testimonial here…"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm resize-none"
+            />
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center gap-3 mb-4">
-            <span className="w-7 h-7 rounded-full bg-green-500 text-white text-sm font-bold flex items-center justify-center shrink-0">2</span>
+            <span className="w-7 h-7 rounded-full bg-green-500 text-white text-sm font-bold flex items-center justify-center shrink-0">
+              {isGoogleReview ? '2' : '2'}
+            </span>
             <div>
-              <p className="font-semibold text-gray-800">Submit your review screenshot</p>
-              <p className="text-xs text-gray-400">{form.coupon_id ? 'Get your discount coupon instantly' : 'We\'ll verify your review'}</p>
+              <p className="font-semibold text-gray-800">
+                {isGoogleReview ? 'Submit your review screenshot' : 'Submit your details'}
+              </p>
+              <p className="text-xs text-gray-400">{form.coupon_id ? 'Get your discount coupon instantly' : 'We\'ll verify your submission'}</p>
             </div>
           </div>
 
@@ -248,33 +292,65 @@ export default function FormClient({ form }: { form: ReviewForm }) {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1.5">Screenshot of your review *</label>
-              <div
-                onDrop={handleDrop}
-                onDragOver={e => e.preventDefault()}
-                onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
-              >
-                {preview ? (
-                  <div className="relative">
-                    <Image src={preview} alt="Preview" width={400} height={200} className="w-full max-h-48 object-contain rounded-lg" unoptimized />
-                    <button
-                      type="button"
-                      onClick={e => { e.stopPropagation(); setFile(null); setPreview(null) }}
-                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center hover:bg-red-600"
-                    >✕</button>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-3xl mb-2">📸</p>
-                    <p className="text-sm text-gray-500">Tap to upload screenshot</p>
-                    <p className="text-xs text-gray-400 mt-0.5">JPEG, PNG · max 5MB</p>
-                  </div>
-                )}
+            {isGoogleReview && (
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">Screenshot of your review *</label>
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={e => e.preventDefault()}
+                  onClick={() => fileRef.current?.click()}
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+                >
+                  {preview ? (
+                    <div className="relative">
+                      <Image src={preview} alt="Preview" width={400} height={200} className="w-full max-h-48 object-contain rounded-lg" unoptimized />
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setFile(null); setPreview(null) }}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center hover:bg-red-600"
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-3xl mb-2">📸</p>
+                      <p className="text-sm text-gray-500">Tap to upload screenshot</p>
+                      <p className="text-xs text-gray-400 mt-0.5">JPEG, PNG · max 5MB</p>
+                    </div>
+                  )}
+                </div>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
               </div>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
-            </div>
+            )}
+
+            {(isProductFeedback || isTestimonial) && (
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">Photo (optional)</label>
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={e => e.preventDefault()}
+                  onClick={() => fileRef.current?.click()}
+                  className="border-2 border-dashed border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+                >
+                  {preview ? (
+                    <div className="relative">
+                      <Image src={preview} alt="Preview" width={400} height={200} className="w-full max-h-48 object-contain rounded-lg" unoptimized />
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setFile(null); setPreview(null) }}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center hover:bg-red-600"
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-3xl mb-2">📎</p>
+                      <p className="text-sm text-gray-500">Tap to attach a photo</p>
+                      <p className="text-xs text-gray-400 mt-0.5">JPEG, PNG · max 5MB</p>
+                    </div>
+                  )}
+                </div>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+              </div>
+            )}
 
             {form.custom_fields.map(field => (
               <div key={field.id}>
@@ -316,7 +392,7 @@ export default function FormClient({ form }: { form: ReviewForm }) {
 
             <button
               type="submit"
-              disabled={submitting || !file || !email}
+              disabled={submitting || (screenshotRequired && !file) || !email}
               className="w-full py-3.5 bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
             >
               {submitting ? (

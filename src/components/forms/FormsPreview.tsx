@@ -8,6 +8,7 @@ interface CustomField {
 interface Props {
   title: string
   description: string
+  templateType: 'google_review' | 'product_feedback' | 'testimonial'
   googleReviewUrl: string
   couponId: string
   customFields: CustomField[]
@@ -23,7 +24,7 @@ function StarPreview() {
   )
 }
 
-export default function FormsPreview({ title, description, googleReviewUrl, couponId, customFields }: Props) {
+export default function FormsPreview({ title, description, templateType, googleReviewUrl, couponId, customFields }: Props) {
   return (
     <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl overflow-hidden border border-gray-200">
       <div style={{ background: '#1a3a4a' }} className="px-4 py-3 flex items-center justify-between">
@@ -37,25 +38,57 @@ export default function FormsPreview({ title, description, googleReviewUrl, coup
           {description && <p className="text-gray-500 text-xs mt-1">{description}</p>}
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">1</span>
-            <div>
-              <p className="font-semibold text-gray-800 text-sm">Leave us a Google review</p>
-              <p className="text-xs text-gray-400">It takes less than a minute!</p>
+        {templateType === 'google_review' && (
+          <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+              <div>
+                <p className="font-semibold text-gray-800 text-sm">Leave us a Google review</p>
+                <p className="text-xs text-gray-400">It takes less than a minute!</p>
+              </div>
+            </div>
+            <div className="w-full py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold text-center opacity-80">
+              Open Google Review Page {googleReviewUrl ? '✓' : ''}
             </div>
           </div>
-          <div className="w-full py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold text-center opacity-80">
-            Open Google Review Page {googleReviewUrl ? '✓' : ''}
+        )}
+
+        {templateType === 'product_feedback' && (
+          <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+              <div>
+                <p className="font-semibold text-gray-800 text-sm">How was your experience?</p>
+                <p className="text-xs text-gray-400">Rate your recent purchase</p>
+              </div>
+            </div>
+            <StarPreview />
           </div>
-        </div>
+        )}
+
+        {templateType === 'testimonial' && (
+          <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-indigo-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+              <div>
+                <p className="font-semibold text-gray-800 text-sm">Share your story</p>
+                <p className="text-xs text-gray-400">Tell us about your experience</p>
+              </div>
+            </div>
+            <div className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-xs text-gray-400 h-16">Write your testimonial…</div>
+          </div>
+        )}
 
         <div className="bg-white rounded-xl border border-gray-100 p-4">
           <div className="flex items-center gap-2 mb-3">
-            <span className="w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold flex items-center justify-center">2</span>
+            <span className="w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold flex items-center justify-center">
+              {templateType === 'google_review' ? '2' : '1'}
+            </span>
             <div>
-              <p className="font-semibold text-gray-800 text-sm">Submit your review screenshot</p>
-              <p className="text-xs text-gray-400">{couponId ? 'Get your discount coupon instantly' : 'We\'ll verify your review'}</p>
+              <p className="font-semibold text-gray-800 text-sm">
+                {templateType === 'google_review' ? 'Submit your review screenshot' : 'Submit your details'}
+              </p>
+              <p className="text-xs text-gray-400">{couponId ? 'Get your discount coupon instantly' : 'We\'ll verify your submission'}</p>
             </div>
           </div>
 
@@ -65,13 +98,15 @@ export default function FormsPreview({ title, description, googleReviewUrl, coup
               <div className="w-full px-3 py-2 border border-gray-200 rounded-xl text-gray-400 text-xs bg-gray-50">you@example.com</div>
             </div>
 
-            <div>
-              <p className="text-xs font-medium text-gray-600 mb-1">Screenshot of your review *</p>
-              <div className="border-2 border-dashed border-gray-200 rounded-xl p-3 text-center">
-                <p className="text-xl">📸</p>
-                <p className="text-xs text-gray-400">Tap to upload</p>
+            {templateType === 'google_review' && (
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-1">Screenshot of your review *</p>
+                <div className="border-2 border-dashed border-gray-200 rounded-xl p-3 text-center">
+                  <p className="text-xl">📸</p>
+                  <p className="text-xs text-gray-400">Tap to upload</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {customFields.map(field => (
               <div key={field.id}>

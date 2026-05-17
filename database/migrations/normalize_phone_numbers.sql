@@ -3,7 +3,7 @@ SET phone = regexp_replace(regexp_replace(phone, '^\+?91', ''), '[^0-9]', '', 'g
 WHERE phone IS NOT NULL
   AND phone ~ '^\+?91[0-9]';
 
-UPDATE user_addresses
+UPDATE addresses
 SET phone = regexp_replace(regexp_replace(phone, '^\+?91', ''), '[^0-9]', '', 'g')
 WHERE phone ~ '^\+?91[0-9]';
 
