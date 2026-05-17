@@ -734,7 +734,7 @@ export default function InvoicesClient() {
                     >
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <a
-                          href={`/admin/orders/${inv.id}`}
+                          href={`/admin/invoices/${inv.id}`}
                           className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 hover:underline"
                         >
                           {inv.invoice_number}
@@ -873,7 +873,7 @@ export default function InvoicesClient() {
                   <div className="flex items-start justify-between gap-2">
                     <div onClick={e => e.stopPropagation()}>
                       <a
-                        href={`/admin/orders/${inv.id}`}
+                        href={`/admin/invoices/${inv.id}`}
                         className="font-mono font-semibold text-sm text-accent-500 hover:underline"
                       >
                         {inv.invoice_number}

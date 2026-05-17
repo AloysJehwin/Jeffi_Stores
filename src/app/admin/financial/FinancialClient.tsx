@@ -972,7 +972,7 @@ function TransactionsTab() {
                         <td className="px-4 py-3 text-foreground-secondary">
                           {r.direction === 'inflow'
                             ? r.invoice_number
-                              ? <a href={`/api/orders/${r.id}/invoice`} target="_blank" rel="noopener noreferrer" className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</a>
+                              ? <Link href={`/admin/invoices/${r.id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
                               : <Link href={`/admin/orders/${r.id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
                             : <Link href={`/admin/financial/payables/${r.expense_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>}
                         </td>
@@ -1011,7 +1011,7 @@ function TransactionsTab() {
                         {r.txn_ref && (
                           r.direction === 'inflow'
                             ? r.invoice_number
-                              ? <a href={`/api/orders/${r.id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</a>
+                              ? <Link href={`/admin/invoices/${r.id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
                               : <Link href={`/admin/orders/${r.id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
                             : <Link href={`/admin/financial/payables/${r.expense_id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
                         )}
