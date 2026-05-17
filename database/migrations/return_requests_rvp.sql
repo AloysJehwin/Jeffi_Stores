@@ -1,3 +1,0 @@
-ALTER TABLE return_requests
-  ADD COLUMN IF NOT EXISTS rvp_awb_number VARCHAR(64),
-  ADD COLUMN IF NOT EXISTS rvp_created_at TIMESTAMPTZ;

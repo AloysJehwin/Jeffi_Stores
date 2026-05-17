@@ -17,6 +17,32 @@ concurrency:
 
 jobs:
   # ────────────────────────────────────────────────────────
+  # Stage 0 — Detect migration files  (PR + main)
+  # ────────────────────────────────────────────────────────
+  check-migrations:
+    name: Check for Migration Files
+    runs-on: ubuntu-latest
+    outputs:
+      has_migrations: ${{ steps.detect.outputs.has_migrations }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect new migration files
+        id: detect
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- 'database/migrations/*.sql' 2>/dev/null || echo "")
+          if [[ -n "$CHANGED" ]]; then
+            echo "has_migrations=true" >> $GITHUB_OUTPUT
+            echo "Migration files changed:"
+            echo "$CHANGED"
+          else
+            echo "has_migrations=false" >> $GITHUB_OUTPUT
+            echo "No migration files changed — skipping migrate job"
+          fi
+
+  # ────────────────────────────────────────────────────────
   # Stage 1 — Lint  (PR + main)
   # ────────────────────────────────────────────────────────
   lint:
@@ -209,13 +235,13 @@ jobs:
             docker compose -f docker-compose.prod.yml ps
 
   # ────────────────────────────────────────────────────────
-  # Stage 5 — DB migrations  (main only, gate: deploy)
+  # Stage 5 — DB migrations  (main only, gate: deploy + new .sql files)
   # ────────────────────────────────────────────────────────
   migrate:
     name: DB Migrations
     runs-on: ubuntu-latest
-    needs: [deploy]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [deploy, check-migrations]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-migrations.outputs.has_migrations == 'true'
     steps:
       - name: Get EC2 public IP
         id: ec2
@@ -315,7 +341,7 @@ jobs:
     name: Invalidate CloudFront
     runs-on: ubuntu-latest
     needs: [smoke-test, migrate]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.smoke-test.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
     steps:
       - name: Invalidate cache
         uses: chetan/invalidate-cloudfront-action@v2
@@ -358,7 +384,6 @@ jobs:
           echo "║  Author:  ${{ github.actor }}"
           echo "╚══════════════════════════════════════════╝"
 
-          # Fail if any active stage failed
           if [[ "${{ needs.lint.result }}"      == "failure" ||
                 "${{ needs.typecheck.result }}" == "failure" ||
                 "${{ needs.build.result }}"     == "failure" ]]; then
