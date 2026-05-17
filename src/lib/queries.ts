@@ -390,6 +390,16 @@ export async function getCustomers(filters: {
   sort?: string
   dir?: string
 }) {
+  const CUSTOMER_SORT_COLS: Record<string, string> = {
+    name: "u.first_name || ' ' || u.last_name",
+    email: 'u.email',
+    phone: 'u.phone',
+    joined: 'u.created_at',
+    orders: 'o.order_count',
+    lifetime_value: 'o.lifetime_value',
+    status: 'u.is_active',
+  }
+
   const conditions: string[] = ['u.is_guest = false']
   const params: any[] = []
   let i = 1
@@ -415,6 +425,9 @@ export async function getCustomers(filters: {
   const sortCol = CUSTOMER_SORT_COLS[filters.sort || ''] || 'u.created_at'
   const sortDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
 
+  const safeCol = (filters.sort && CUSTOMER_SORT_COLS[filters.sort]) ? CUSTOMER_SORT_COLS[filters.sort] : 'u.created_at'
+  const safeDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
+
   const [customers, total] = await Promise.all([
     queryMany(`
       SELECT
@@ -432,7 +445,7 @@ export async function getCustomers(filters: {
         FROM orders GROUP BY user_id
       ) o ON u.id = o.user_id
       ${where}
-      ORDER BY ${sortCol} ${sortDir}
+      ORDER BY ${safeCol} ${safeDir}
       LIMIT $${i} OFFSET $${i + 1}
     `, [...params, limit, offset]),
     queryCount(`SELECT COUNT(*) FROM users u ${where}`, params),
