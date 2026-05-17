@@ -185,7 +185,7 @@ export default function InvoicesClient() {
 
       setEditId(inv.id)
       setCustomerName(order.customer_name || '')
-      setCustomerPhone(order.customer_phone || '')
+      setCustomerPhone((order.customer_phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10))
       setCustomerEmail(order.customer_email || '')
       setBuyerGstin(order.buyer_gstin || '')
       setPaymentMode(order.payment_status === 'paid' ? 'cash' : 'credit')
@@ -417,18 +417,21 @@ export default function InvoicesClient() {
               </div>
               <div>
                 <label className={labelCls}>Phone</label>
-                <input type="tel" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-                  onBlur={async () => {
-                    if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
-                    const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
-                    const json = await res.json()
-                    if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
-                      setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
-                    } else {
-                      setCreditWarning(null)
-                    }
-                  }}
-                  className={inputCls} placeholder="+91 XXXXX XXXXX" />
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none">+91</span>
+                  <input type="tel" inputMode="numeric" maxLength={10} value={customerPhone} onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onBlur={async () => {
+                      if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
+                      const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
+                      const json = await res.json()
+                      if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
+                        setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
+                      } else {
+                        setCreditWarning(null)
+                      }
+                    }}
+                    className={inputCls + ' rounded-l-none'} placeholder="XXXXXXXXXX" />
+                </div>
               </div>
               <div>
                 <label className={labelCls}>Email</label>
@@ -637,7 +640,7 @@ export default function InvoicesClient() {
                       <tr key={draft.id} className="border-b border-amber-100 dark:border-amber-800/30 hover:bg-amber-100/40 dark:hover:bg-amber-900/20 transition-colors">
                         <td className="px-4 py-3 font-mono text-xs text-foreground font-medium">{draft.order_number}</td>
                         <td className="px-4 py-3 text-sm text-foreground">{draft.customer_name}</td>
-                        <td className="px-4 py-3 text-xs text-foreground-secondary">{draft.customer_phone || '—'}</td>
+                        <td className="px-4 py-3 text-xs text-foreground-secondary">{draft.customer_phone ? `+91 ${draft.customer_phone}` : '—'}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-foreground">
                           ₹{parseFloat(draft.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </td>
@@ -679,7 +682,7 @@ export default function InvoicesClient() {
                       <span className="text-xs text-foreground-secondary">{fmtDate(draft.created_at)}</span>
                     </div>
                     {draft.customer_phone && (
-                      <p className="text-xs text-foreground-secondary">{draft.customer_phone}</p>
+                      <p className="text-xs text-foreground-secondary">+91 {draft.customer_phone}</p>
                     )}
                     <div className="flex gap-4 pt-1">
                       <button
@@ -746,7 +749,7 @@ export default function InvoicesClient() {
                       <td className="px-4 py-3">
                         <div className="font-medium text-foreground text-sm">{inv.customer_name}</div>
                         {inv.customer_phone && (
-                          <div className="text-xs text-foreground-muted mt-0.5">{inv.customer_phone}</div>
+                          <div className="text-xs text-foreground-muted mt-0.5">+91 {inv.customer_phone}</div>
                         )}
                         {inv.buyer_gstin && (
                           <div className="text-xs text-foreground-muted font-mono mt-0.5">{inv.buyer_gstin}</div>
@@ -890,7 +893,7 @@ export default function InvoicesClient() {
                     <div>
                       <span className="text-sm text-foreground font-medium">{inv.customer_name}</span>
                       {inv.customer_phone && (
-                        <span className="text-xs text-foreground-muted ml-2">{inv.customer_phone}</span>
+                        <span className="text-xs text-foreground-muted ml-2">+91 {inv.customer_phone}</span>
                       )}
                     </div>
                     <span className="text-xs text-foreground-muted shrink-0">{fmtDate(inv.invoice_date)}</span>
@@ -1038,7 +1041,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
             <div>
               <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Customer</p>
               <p className="text-sm font-semibold text-foreground">{inv.customer_name}</p>
-              {inv.customer_phone && <p className="text-xs text-foreground-secondary mt-0.5">{inv.customer_phone}</p>}
+              {inv.customer_phone && <p className="text-xs text-foreground-secondary mt-0.5">+91 {inv.customer_phone}</p>}
               {inv.customer_email && <p className="text-xs text-foreground-secondary mt-0.5">{inv.customer_email}</p>}
               {inv.buyer_gstin && <p className="text-xs text-foreground-secondary font-mono mt-0.5">{inv.buyer_gstin}</p>}
             </div>

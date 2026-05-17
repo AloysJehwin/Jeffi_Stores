@@ -96,7 +96,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
             {s.phone && (
               <div className="flex justify-between gap-4">
                 <span className="text-foreground-secondary">Phone</span>
-                <a href={`tel:${s.phone}`} className="text-accent-500 hover:underline">{s.phone}</a>
+                <a href={`tel:+91${s.phone}`} className="text-accent-500 hover:underline">+91 {s.phone}</a>
               </div>
             )}
             {s.email && (

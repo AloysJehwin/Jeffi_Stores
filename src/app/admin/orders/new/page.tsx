@@ -138,13 +138,18 @@ export default function NewOfflineOrderPage() {
             </div>
             <div>
               <label className="block text-xs text-foreground-secondary mb-1">Phone</label>
-              <input
-                type="tel"
-                value={customerPhone}
-                onChange={e => setCustomerPhone(e.target.value)}
-                className="w-full border border-border-default rounded px-3 py-2 text-sm bg-surface text-foreground"
-                placeholder="+91 XXXXX XXXXX"
-              />
+              <div className="flex">
+                <span className="inline-flex items-center px-3 rounded-l border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none">+91</span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={customerPhone}
+                  onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  className="w-full border border-border-default rounded-r px-3 py-2 text-sm bg-surface text-foreground"
+                  placeholder="XXXXXXXXXX"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-xs text-foreground-secondary mb-1">Email</label>

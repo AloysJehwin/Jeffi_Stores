@@ -3,6 +3,7 @@ import { getFilteredOrders } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import OrdersTableRows from '@/components/admin/OrdersTableRows'
+import SortableHeader, { sortOptions } from '@/components/admin/SortableHeader'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -11,6 +12,8 @@ const PAGE_SIZE = 25
 
 export default async function OrdersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const sort = searchParams.sort
+  const dir = searchParams.dir as 'asc' | 'desc' | undefined
 
   const [{ orders, total }, allStats] = await Promise.all([
     getFilteredOrders({
@@ -20,6 +23,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
       search: searchParams.search,
       page,
       limit: PAGE_SIZE,
+      sort,
+      dir,
     }),
     getFilteredOrders({}),
   ])
@@ -38,6 +43,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
     if (searchParams.payment_status) params.set('payment_status', searchParams.payment_status)
     if (searchParams.source) params.set('source', searchParams.source)
     if (searchParams.search) params.set('search', searchParams.search)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
     return `/admin/orders${qs ? `?${qs}` : ''}`
@@ -235,13 +242,13 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
           <table className="min-w-full divide-y divide-border-default">
             <thead className="bg-surface-secondary">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Order ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Source</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Payment</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+                <SortableHeader label="Order ID" column="order_number" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Source" column="source" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Customer" column="customer" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Date" column="date" options={sortOptions('date')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Total" column="total" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Payment" column="payment" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
                 <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
               </tr>
             </thead>

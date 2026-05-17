@@ -156,8 +156,13 @@ export async function getStockValuation() {
       COALESCE(p.inventory_quantity, 0) * ROUND(COALESCE(p.sale_price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS stock_value,
       NULL::uuid AS variant_id,
       NULL AS variant_name,
-      FALSE AS has_variants
+      FALSE AS has_variants,
+      p.category_id,
+      c.name AS category_name,
+      b.name AS brand_name
     FROM products p
+    LEFT JOIN categories c ON c.id = p.category_id
+    LEFT JOIN brands b ON b.id = p.brand_id
     WHERE p.has_variants = FALSE AND p.is_active = TRUE
     UNION ALL
     SELECT
@@ -168,9 +173,14 @@ export async function getStockValuation() {
       COALESCE(pv.inventory_quantity, 0) * ROUND(COALESCE(pv.sale_price, pv.price, p.sale_price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS stock_value,
       pv.id AS variant_id,
       pv.variant_name,
-      TRUE AS has_variants
+      TRUE AS has_variants,
+      p.category_id,
+      c.name AS category_name,
+      b.name AS brand_name
     FROM product_variants pv
     JOIN products p ON p.id = pv.product_id
+    LEFT JOIN categories c ON c.id = p.category_id
+    LEFT JOIN brands b ON b.id = p.brand_id
     WHERE p.is_active = TRUE AND pv.is_active = TRUE
     ORDER BY name, variant_name
   `)
