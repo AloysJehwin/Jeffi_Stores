@@ -44,28 +44,6 @@ export async function POST(
         'SELECT product_id, variant_id, quantity, unit_price FROM order_items WHERE order_id = $1',
         [orderId]
       )
-      for (const item of orderItems) {
-        const qty = parseFloat(item.quantity)
-        if (item.variant_id) {
-          await query(
-            'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-            [qty, item.variant_id]
-          )
-        } else {
-          await query(
-            'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-            [qty, item.product_id]
-          )
-        }
-        await logStockMovement(null, {
-          productId: item.product_id,
-          variantId: item.variant_id || null,
-          transactionType: 'return',
-          quantityChange: qty,
-          referenceType: 'order',
-          referenceId: orderId,
-        })
-      }
 
       if (restoreToCart) {
         for (const item of orderItems) {
