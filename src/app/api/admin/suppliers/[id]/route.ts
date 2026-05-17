@@ -4,10 +4,12 @@ import { queryOne, queryMany } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const { id } = await params
 
     const supplier = await queryOne<any>(
       `SELECT id, name, gstin, contact_name, phone, email, address,
@@ -15,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
               ifsc, upi_id, created_at, updated_at
        FROM suppliers
        WHERE id = $1`,
-      [params.id]
+      [id]
     )
 
     if (!supplier) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -30,16 +32,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
          FROM purchase_orders po
          LEFT JOIN expenses e ON e.po_id = po.id
          WHERE po.supplier_id = $1`,
-        [params.id]
+        [id]
       ),
       queryMany<any>(
         `SELECT po.id, po.po_number, po.status, po.order_date, po.expected_date,
-                po.total_amount, po.received_amount, po.notes
+                po.total_amount, po.notes
          FROM purchase_orders po
          WHERE po.supplier_id = $1
          ORDER BY po.order_date DESC
          LIMIT 50`,
-        [params.id]
+        [id]
       ),
       queryMany<any>(
         `SELECT e.id, e.expense_number, e.expense_date, e.due_date,
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
          JOIN purchase_orders po ON po.id = e.po_id AND po.supplier_id = $1
          ORDER BY e.expense_date DESC
          LIMIT 50`,
-        [params.id]
+        [id]
       ),
     ])
 

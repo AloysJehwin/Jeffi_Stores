@@ -48,6 +48,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Supplier not found.</p>
+        {data?.error && <p className="text-red-500 text-xs mt-1 font-mono">{data.error}</p>}
         <Link href="/admin/inventory?tab=suppliers" className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Suppliers</Link>
       </div>
     )
