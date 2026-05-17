@@ -72,7 +72,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
           <table className="w-full text-sm">
             <thead className="bg-surface-secondary">
               <tr>
-                {['Title', 'Shareable Link', 'Coupon', 'Submissions', 'Status', 'Actions'].map(h => (
+                {['Title', 'Template', 'Shareable Link', 'Coupon', 'Submissions', 'Status', 'Actions'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -83,6 +83,15 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                 return (
                   <tr key={f.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground">{f.title}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        f.template_type === 'google_review' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                        f.template_type === 'product_feedback' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
+                        'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+                      }`}>
+                        {f.template_type === 'google_review' ? '⭐ Google' : f.template_type === 'product_feedback' ? '💬 Feedback' : '📝 Testimonial'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 max-w-[260px]">
                       <div className="flex items-center gap-2">
                         <a
@@ -117,7 +126,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                 )
               })}
               {forms.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-foreground-muted">No review forms yet. Create your first one!</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">No review forms yet. Create your first one!</td></tr>
               )}
             </tbody>
           </table>
@@ -158,6 +167,7 @@ interface FormRow {
   id: string
   title: string
   slug: string
+  template_type: 'google_review' | 'product_feedback' | 'testimonial'
   coupon_code: string | null
   submissions_count: number
   is_active: boolean
