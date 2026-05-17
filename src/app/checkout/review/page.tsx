@@ -546,7 +546,7 @@ function CheckoutReviewPage() {
               )}
               <button
                 onClick={handleProceedToCheckout}
-                disabled={!selectedAddress || addresses.length === 0 || belowMinimum}
+                disabled={!selectedAddress || addresses.length === 0 || belowMinimum || isLoadingShipping || (shippingCharge === null && !shippingError)}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 Proceed to Place Order

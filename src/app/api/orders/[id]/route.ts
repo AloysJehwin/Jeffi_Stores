@@ -67,6 +67,7 @@ export async function GET(
       awbNumber: order.awb_number || null,
       originalOrderId: order.original_order_id || null,
       originalOrderNumber: order.original_order_number || null,
+      orderType: order.order_type || 'cart',
       shippingAddress: order.shipping_address,
       items: orderItems.map((item: any) => ({
         id: item.id,
