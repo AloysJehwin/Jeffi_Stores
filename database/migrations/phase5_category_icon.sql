@@ -1,1 +1,0 @@
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_name VARCHAR(100);
