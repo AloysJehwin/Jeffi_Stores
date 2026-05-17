@@ -19,6 +19,14 @@ interface CustomField {
   required: boolean
 }
 
+type TemplateType = 'google_review' | 'product_feedback' | 'testimonial'
+
+const TEMPLATES: { value: TemplateType; label: string; icon: string; description: string }[] = [
+  { value: 'google_review', label: 'Google Review', icon: '⭐', description: 'Send customers to Google, then collect their screenshot' },
+  { value: 'product_feedback', label: 'Product Feedback', icon: '💬', description: 'Collect ratings and written feedback on a purchase' },
+  { value: 'testimonial', label: 'Testimonial', icon: '📝', description: 'Gather a written testimonial with optional photo' },
+]
+
 interface ReviewFormFormProps {
   submitLabel: string
   coupons: Coupon[]
@@ -26,6 +34,7 @@ interface ReviewFormFormProps {
   defaultValues?: {
     title?: string
     slug?: string
+    template_type?: TemplateType
     google_review_url?: string
     coupon_id?: string | null
     description?: string | null
@@ -50,6 +59,7 @@ function randomId() {
 
 export default function ReviewFormForm({ submitLabel, coupons, formId, defaultValues: d = {} }: ReviewFormFormProps) {
   const router = useRouter()
+  const [templateType, setTemplateType] = useState<TemplateType>(d.template_type || 'google_review')
   const [title, setTitle] = useState(d.title || '')
   const [slug, setSlug] = useState(d.slug || '')
   const [googleUrl, setGoogleUrl] = useState(d.google_review_url || '')
@@ -88,7 +98,8 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
       const payload = {
         title: title.trim(),
         slug: slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
-        google_review_url: googleUrl.trim(),
+        template_type: templateType,
+        google_review_url: templateType === 'google_review' ? googleUrl.trim() : '',
         coupon_id: couponId || null,
         description: description.trim() || null,
         is_active: isActive,
@@ -121,6 +132,28 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
     <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
       <div className="space-y-5">
         <div>
+          <label className={labelClass}>Template *</label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {TEMPLATES.map(t => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTemplateType(t.value)}
+                className={`flex flex-col gap-1.5 p-3 rounded-xl border-2 text-left transition-colors ${
+                  templateType === t.value
+                    ? 'border-accent-500 bg-accent-500/5'
+                    : 'border-border-default hover:border-accent-500/50'
+                }`}
+              >
+                <span className="text-xl">{t.icon}</span>
+                <span className={`text-sm font-semibold ${templateType === t.value ? 'text-accent-500' : 'text-foreground'}`}>{t.label}</span>
+                <span className="text-xs text-foreground-muted leading-snug">{t.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
           <label className={labelClass}>Form Title *</label>
           <input value={title} onChange={e => setTitle(e.target.value)} required className={inputClass} placeholder="e.g. Leave Us a Google Review" />
         </div>
@@ -138,11 +171,13 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
           />
         </div>
 
-        <div>
-          <label className={labelClass}>Google Review URL *</label>
-          <input value={googleUrl} onChange={e => setGoogleUrl(e.target.value)} type="url" required className={inputClass} placeholder="https://g.page/r/..." />
-          <p className="mt-1 text-xs text-foreground-muted">Customers are sent here first before submitting their screenshot</p>
-        </div>
+        {templateType === 'google_review' && (
+          <div>
+            <label className={labelClass}>Google Review URL *</label>
+            <input value={googleUrl} onChange={e => setGoogleUrl(e.target.value)} type="url" required className={inputClass} placeholder="https://g.page/r/..." />
+            <p className="mt-1 text-xs text-foreground-muted">Customers are sent here first before submitting their screenshot</p>
+          </div>
+        )}
 
         <AdminSelect
           label="Reward Coupon"
@@ -229,6 +264,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
         <FormsPreview
           title={title}
           description={description}
+          templateType={templateType}
           googleReviewUrl={googleUrl}
           couponId={couponId}
           customFields={customFields}
