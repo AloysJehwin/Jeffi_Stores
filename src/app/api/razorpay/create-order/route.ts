@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       amount: amountInPaise,
       currency: 'INR',
       receipt: order.order_number,
+      payment_capture: true,
       notes: {
         order_id: order.id,
         order_number: order.order_number,
