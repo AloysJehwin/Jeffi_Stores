@@ -87,11 +87,12 @@ export async function POST(request: NextRequest) {
     const mon = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][month]
     const prefix = `QT/${fy}/${mon}/`
 
-    const countRow = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) FROM quotations WHERE quote_number LIKE $1`,
+    const maxRow = await queryOne<{ max_seq: string | null }>(
+      `SELECT MAX(CAST(split_part(quote_number, '/', 4) AS INTEGER)) AS max_seq
+       FROM quotations WHERE quote_number LIKE $1`,
       [prefix + '%']
     )
-    const seq = parseInt(countRow?.count || '0') + 1
+    const seq = (parseInt(maxRow?.max_seq || '0') || 0) + 1
     const quoteNumber = buildQuoteNumber(now, seq)
 
     const qt = await queryOne<any>(
