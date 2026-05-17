@@ -105,6 +105,10 @@ export default function InvoicesClient() {
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
   const [editLoading, setEditLoading] = useState(false)
+  const [drafts, setDrafts] = useState<any[]>([])
+  const [draftsLoading, setDraftsLoading] = useState(false)
+  const [finalizingId, setFinalizingId] = useState<string | null>(null)
+  const [editIsDraft, setEditIsDraft] = useState(false)
 
   const totalPages = Math.ceil(total / 25)
 
@@ -133,12 +137,42 @@ export default function InvoicesClient() {
 
   useEffect(() => { fetchInvoices(1) }, [sourceFilter, paymentFilter, fromDate, toDate, searchQ])
 
+  const fetchDrafts = useCallback(async () => {
+    setDraftsLoading(true)
+    try {
+      const res = await fetch('/api/admin/invoices/drafts', { credentials: 'include' })
+      if (res.ok) setDrafts((await res.json()).drafts || [])
+    } finally {
+      setDraftsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchDrafts() }, [fetchDrafts])
+
+  async function finalizeDraft(id: string) {
+    setFinalizingId(id)
+    try {
+      const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, { method: 'POST', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) { showToast(data.error || 'Failed to finalize', 'error'); return }
+      showToast(`Invoice ${data.invoiceNumber || ''} finalized`, 'success')
+      fetchDrafts()
+      fetchInvoices(1)
+      if (data.invoiceUrl) window.open(data.invoiceUrl, '_blank')
+    } catch {
+      showToast('Failed to finalize draft', 'error')
+    } finally {
+      setFinalizingId(null)
+    }
+  }
+
   function resetForm() {
     setCustomerName(''); setCustomerPhone(''); setCustomerEmail('')
     setAddressLine1(''); setAddressLine2(''); setCity(''); setState(''); setPostalCode('')
     setBuyerGstin(''); setPaymentMode('cash'); setInvoiceDate(''); setNotes('')
     setItems([newLineItem()]); setFormError('')
     setEditId(null)
+    setEditIsDraft(false)
   }
 
   async function openEdit(inv: Invoice) {
@@ -183,6 +217,7 @@ export default function InvoicesClient() {
       })) : [newLineItem()])
 
       setFormError('')
+      setEditIsDraft(inv.status === 'draft')
       setView('edit')
     } catch {
       showToast('Failed to load invoice for editing', 'error')
@@ -233,11 +268,16 @@ export default function InvoicesClient() {
       })
       const data = await res.json()
       if (!res.ok) { setFormError(data.error || 'Failed'); return }
-      showToast(`Invoice ${data.invoiceNumber || ''} created`, 'success')
+      if (data.savedAsDraft) {
+        showToast(`Saved as draft — insufficient stock: ${data.insufficientItems.join(', ')}`, 'error')
+      } else {
+        showToast(`Invoice ${data.invoiceNumber || ''} created`, 'success')
+        if (data.invoiceUrl) window.open(data.invoiceUrl, '_blank')
+      }
       resetForm()
       setView('list')
       fetchInvoices(1)
-      if (data.invoiceUrl) window.open(data.invoiceUrl, '_blank')
+      fetchDrafts()
     } catch (err: any) {
       setFormError(err.message || 'Failed')
     } finally {
@@ -271,10 +311,63 @@ export default function InvoicesClient() {
       })
       const data = await res.json()
       if (!res.ok) { setFormError(data.error || 'Failed'); return }
-      showToast('Invoice updated', 'success')
+      if (data.movedToDraft) {
+        showToast(`Invoice moved to draft — insufficient stock: ${data.insufficientItems.join(', ')}`, 'error')
+      } else {
+        showToast('Invoice updated', 'success')
+      }
       resetForm()
       setView('list')
       fetchInvoices(1)
+      fetchDrafts()
+    } catch (err: any) {
+      setFormError(err.message || 'Failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleFinalizeEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editId) return
+    if (!customerName.trim()) { setFormError('Customer name is required'); return }
+    if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
+      setFormError('All items need a name and price'); return
+    }
+    setFormError(''); setSubmitting(true)
+    try {
+      const saveRes = await fetch(`/api/admin/invoices/${editId}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName, customerPhone, customerEmail,
+          addressLine1, addressLine2, city, state, postalCode,
+          buyerGstin, paymentMode, invoiceDate, notes,
+          items: items.map(it => ({
+            product_id: it.product_id, product_name: it.product_name,
+            product_sku: it.product_sku, variant_id: it.variant_id,
+            variant_name: it.variant_name, hsn_code: it.hsn_code,
+            gst_rate: it.gst_rate, quantity: it.quantity, unit_price: it.unit_price,
+          })),
+        }),
+      })
+      const saveData = await saveRes.json()
+      if (!saveRes.ok) { setFormError(saveData.error || 'Failed to save'); return }
+      if (saveData.movedToDraft) {
+        showToast(`Cannot finalize — insufficient stock: ${saveData.insufficientItems.join(', ')}`, 'error')
+        fetchDrafts()
+        return
+      }
+
+      const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, { method: 'POST', credentials: 'include' })
+      const finalData = await finalRes.json()
+      if (!finalRes.ok) { setFormError(finalData.error || 'Failed to finalize'); return }
+      showToast(`Invoice ${finalData.invoiceNumber || ''} finalized`, 'success')
+      resetForm()
+      setView('list')
+      fetchInvoices(1)
+      fetchDrafts()
+      if (finalData.invoiceUrl) window.open(finalData.invoiceUrl, '_blank')
     } catch (err: any) {
       setFormError(err.message || 'Failed')
     } finally {
@@ -423,6 +516,16 @@ export default function InvoicesClient() {
               className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
               {submitting ? (isEdit ? 'Saving…' : 'Creating…') : (isEdit ? 'Save Changes' : 'Create Invoice')}
             </button>
+            {isEdit && editIsDraft && (
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleFinalizeEdit}
+                className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+              >
+                {submitting ? 'Finalizing…' : 'Save & Finalize'}
+              </button>
+            )}
             <button type="button" onClick={() => { resetForm(); setView('list') }}
               className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
               Cancel
@@ -462,16 +565,14 @@ export default function InvoicesClient() {
 
       <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap gap-2 items-end">
-          <div className="flex-1 min-w-48">
-            <AdminTypeahead
-              type="invoices"
-              value={searchInput}
-              onChange={setSearchInput}
-              onSelect={item => { setSearchInput(item.label); setSearchQ(item.label) }}
-              onEnter={val => setSearchQ(val)}
-              placeholder="Search invoice, order, customer…"
-            />
-          </div>
+          <AdminTypeahead
+            type="invoices"
+            value={searchInput}
+            onChange={setSearchInput}
+            onSelect={item => { setSearchInput(item.label); setSearchQ(item.label) }}
+            onEnter={val => setSearchQ(val)}
+            placeholder="Search invoice, order, customer…"
+          />
           <button onClick={() => setSearchQ(searchInput)}
             className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-medium transition-colors">
             Search
@@ -501,6 +602,108 @@ export default function InvoicesClient() {
         </div>
       </div>
 
+      {(draftsLoading || drafts.length > 0) && (
+        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/50 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-amber-200 dark:border-amber-700/50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft Invoices</span>
+              {drafts.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-300">
+                  {drafts.length}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-amber-700 dark:text-amber-400">Saved due to insufficient stock — finalize once stock is restocked</p>
+          </div>
+
+          {draftsLoading ? (
+            <div className="p-6 text-center text-sm text-amber-700 dark:text-amber-400">Loading drafts…</div>
+          ) : (
+            <>
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-amber-200 dark:border-amber-700/50 bg-amber-100/50 dark:bg-amber-900/20">
+                      {['Order No', 'Customer', 'Phone', 'Amount', 'Created', 'Actions'].map(h => (
+                        <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-amber-700 dark:text-amber-400">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drafts.map(draft => (
+                      <tr key={draft.id} className="border-b border-amber-100 dark:border-amber-800/30 hover:bg-amber-100/40 dark:hover:bg-amber-900/20 transition-colors">
+                        <td className="px-4 py-3 font-mono text-xs text-foreground font-medium">{draft.order_number}</td>
+                        <td className="px-4 py-3 text-sm text-foreground">{draft.customer_name}</td>
+                        <td className="px-4 py-3 text-xs text-foreground-secondary">{draft.customer_phone || '—'}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground">
+                          ₹{parseFloat(draft.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-foreground-secondary whitespace-nowrap">{fmtDate(draft.created_at)}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
+                              className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => finalizeDraft(draft.id)}
+                              disabled={finalizingId === draft.id}
+                              className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 disabled:opacity-50 transition-colors"
+                            >
+                              {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="md:hidden divide-y divide-amber-100 dark:divide-amber-800/30">
+                {drafts.map(draft => (
+                  <div key={draft.id} className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-medium text-foreground">{draft.order_number}</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        ₹{parseFloat(draft.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-foreground">{draft.customer_name}</span>
+                      <span className="text-xs text-foreground-secondary">{fmtDate(draft.created_at)}</span>
+                    </div>
+                    {draft.customer_phone && (
+                      <p className="text-xs text-foreground-secondary">{draft.customer_phone}</p>
+                    )}
+                    <div className="flex gap-4 pt-1">
+                      <button
+                        onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
+                        className="text-xs text-foreground-secondary hover:text-foreground font-medium"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => finalizeDraft(draft.id)}
+                        disabled={finalizingId === draft.id}
+                        className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 disabled:opacity-50"
+                      >
+                        {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-12 text-center text-foreground-muted text-sm">Loading invoices…</div>
@@ -512,98 +715,72 @@ export default function InvoicesClient() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border-default bg-surface-secondary">
-                    {['Invoice No', 'Date', 'Customer', 'Source', 'Amount', 'Payment', 'IRN', 'Actions'].map(h => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">{h}</th>
-                    ))}
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Invoice</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Customer</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Amount</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Payment</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Source</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">IRN</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {invoices.map(inv => (
-                    <tr key={inv.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer" onClick={() => setSelectedInvoice(inv)}>
-                      <td className="px-4 py-3 font-mono font-semibold text-foreground text-sm">
-                        <HoverCard
-                          trigger={
-                            <span className="cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
-                              {inv.invoice_number}
-                            </span>
-                          }
-                          align="left"
-                          side="bottom"
-                          width="280px"
+                    <tr
+                      key={inv.id}
+                      className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer"
+                      onClick={() => setSelectedInvoice(inv)}
+                    >
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <a
+                          href={`/admin/orders/${inv.id}`}
+                          className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 hover:underline"
                         >
-                          <div className="p-3 space-y-2">
-                            <p className="font-semibold text-foreground text-sm">{inv.invoice_number}</p>
-                            <div className="text-xs text-foreground-secondary space-y-1">
-                              <div className="flex justify-between gap-4">
-                                <span>Customer</span>
-                                <span className="text-foreground font-medium">{inv.customer_name}</span>
-                              </div>
-                              {inv.buyer_gstin && (
-                                <div className="flex justify-between gap-4">
-                                  <span>GSTIN</span>
-                                  <span className="font-mono text-foreground">{inv.buyer_gstin}</span>
-                                </div>
-                              )}
-                              <div className="flex justify-between gap-4">
-                                <span>Taxable</span>
-                                <span className="text-foreground">₹{parseFloat(inv.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                              </div>
-                              {parseFloat(inv.cgst_amount) > 0 && (
-                                <div className="flex justify-between gap-4">
-                                  <span>CGST + SGST</span>
-                                  <span className="text-foreground">
-                                    ₹{parseFloat(inv.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹{parseFloat(inv.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              )}
-                              {parseFloat(inv.igst_amount) > 0 && (
-                                <div className="flex justify-between gap-4">
-                                  <span>IGST</span>
-                                  <span className="text-foreground">₹{parseFloat(inv.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                                </div>
-                              )}
-                              {inv.irn && (
-                                <div className="flex justify-between gap-4">
-                                  <span>IRN</span>
-                                  <span className={`font-medium ${inv.irn_status === 'generated' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                                    {inv.irn_status === 'generated' ? 'Generated ✓' : 'Stub'}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            <div className="pt-1 border-t border-border-default">
-                              <a
-                                href={`/api/orders/${inv.id}/invoice`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 text-xs text-accent-500 hover:text-accent-600 font-medium"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                </svg>
-                                Download PDF
-                              </a>
-                            </div>
-                          </div>
-                        </HoverCard>
+                          {inv.invoice_number}
+                        </a>
+                        {inv.order_number && (
+                          <div className="text-xs text-foreground-muted mt-0.5 font-mono">{inv.order_number}</div>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-sm">{fmtDate(inv.invoice_date)}</td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-foreground text-sm">{inv.customer_name}</div>
-                        {inv.buyer_gstin && <div className="text-xs text-foreground-muted font-mono">{inv.buyer_gstin}</div>}
+                        {inv.customer_phone && (
+                          <div className="text-xs text-foreground-muted mt-0.5">{inv.customer_phone}</div>
+                        )}
+                        {inv.buyer_gstin && (
+                          <div className="text-xs text-foreground-muted font-mono mt-0.5">{inv.buyer_gstin}</div>
+                        )}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
-                          {inv.source === 'offline' ? 'Offline' : 'Online'}
-                        </span>
+                      <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-sm">
+                        {fmtDate(inv.invoice_date)}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap text-sm">
-                        ₹{parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="font-semibold text-foreground text-sm">
+                          ₹{parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                        {parseFloat(inv.taxable_amount) > 0 && (
+                          <div className="text-xs text-foreground-muted mt-0.5">
+                            Taxable ₹{parseFloat(inv.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[inv.payment_status] || ''}`}>
                           {inv.payment_status}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
+                            {inv.source === 'offline' ? 'Offline' : 'Online'}
+                          </span>
+                          {inv.status === 'cancelled' && (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                              Cancelled
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         {inv.irn ? (
@@ -615,44 +792,68 @@ export default function InvoicesClient() {
                         )}
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center gap-3">
-                          <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
-                            className="text-xs text-secondary-500 dark:text-secondary-300 hover:underline font-medium">PDF</a>
-                          {inv.source === 'offline' ? (
-                            <>
-                              {inv.status !== 'cancelled' && (
-                                <button onClick={() => openEdit(inv)}
-                                  className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors">
-                                  Edit
+                        <div className="flex items-center justify-end gap-1">
+                          <a
+                            href={`/api/orders/${inv.id}/invoice`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Download Invoice PDF"
+                            className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </a>
+                          <a
+                            href={`/admin/orders/${inv.id}`}
+                            title="View Order"
+                            className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                          {inv.source === 'offline' && inv.status !== 'cancelled' && (
+                            <button
+                              onClick={() => openEdit(inv)}
+                              title="Edit Invoice"
+                              className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                          )}
+                          {inv.source === 'offline' && inv.status !== 'cancelled' && (
+                            confirmCancelId === inv.id ? (
+                              <div className="flex items-center gap-1.5 ml-1">
+                                <span className="text-xs text-foreground-secondary">Confirm?</span>
+                                <button
+                                  onClick={() => cancelInvoice(inv)}
+                                  disabled={cancellingId === inv.id}
+                                  className="text-xs text-red-600 hover:text-red-700 font-semibold disabled:opacity-50"
+                                >
+                                  {cancellingId === inv.id ? '…' : 'Yes'}
                                 </button>
-                              )}
-                              {inv.status !== 'cancelled' && (
-                                confirmCancelId === inv.id ? (
-                                  <>
-                                    <span className="text-xs text-foreground-secondary">Cancel {inv.invoice_number}?</span>
-                                    <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
-                                      className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50">
-                                      {cancellingId === inv.id ? '…' : 'Confirm'}
-                                    </button>
-                                    <button onClick={() => setConfirmCancelId(null)}
-                                      className="text-xs text-foreground-muted hover:text-foreground font-medium">
-                                      No
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
-                                    className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium transition-colors disabled:opacity-50">
-                                    Cancel
-                                  </button>
-                                )
-                              )}
-                              {inv.status === 'cancelled' && (
-                                <span className="text-xs text-foreground-muted italic">Cancelled</span>
-                              )}
-                            </>
-                          ) : (
-                            <a href={`/admin/orders/${inv.id}`}
-                              className="text-xs text-foreground-secondary hover:text-foreground">Order</a>
+                                <button
+                                  onClick={() => setConfirmCancelId(null)}
+                                  className="text-xs text-foreground-muted hover:text-foreground font-medium"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => cancelInvoice(inv)}
+                                disabled={cancellingId === inv.id}
+                                title="Cancel Invoice"
+                                className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-red-500 transition-colors disabled:opacity-50"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )
                           )}
                         </div>
                       </td>
@@ -664,66 +865,112 @@ export default function InvoicesClient() {
 
             <div className="md:hidden divide-y divide-border-default">
               {invoices.map(inv => (
-                <div key={inv.id} className="p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-semibold text-foreground text-sm">{inv.invoice_number}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
-                      {inv.source === 'offline' ? 'Offline' : 'Online'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-foreground">{inv.customer_name}</span>
-                    <span className="font-semibold text-foreground text-sm">
+                <div
+                  key={inv.id}
+                  className="p-4 space-y-2.5 hover:bg-surface-secondary transition-colors cursor-pointer"
+                  onClick={() => setSelectedInvoice(inv)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div onClick={e => e.stopPropagation()}>
+                      <a
+                        href={`/admin/orders/${inv.id}`}
+                        className="font-mono font-semibold text-sm text-accent-500 hover:underline"
+                      >
+                        {inv.invoice_number}
+                      </a>
+                      {inv.order_number && (
+                        <div className="text-xs text-foreground-muted mt-0.5 font-mono">{inv.order_number}</div>
+                      )}
+                    </div>
+                    <span className="font-semibold text-foreground text-sm shrink-0">
                       ₹{parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-foreground-muted">{fmtDate(inv.invoice_date)}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-sm text-foreground font-medium">{inv.customer_name}</span>
+                      {inv.customer_phone && (
+                        <span className="text-xs text-foreground-muted ml-2">{inv.customer_phone}</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-foreground-muted shrink-0">{fmtDate(inv.invoice_date)}</span>
+                  </div>
+                  {inv.buyer_gstin && (
+                    <div className="text-xs text-foreground-muted font-mono">{inv.buyer_gstin}</div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[inv.payment_status] || ''}`}>
                       {inv.payment_status}
                     </span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
+                      {inv.source === 'offline' ? 'Offline' : 'Online'}
+                    </span>
+                    {inv.status === 'cancelled' && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                        Cancelled
+                      </span>
+                    )}
+                    {inv.irn && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
+                        {inv.irn_status === 'generated' ? 'IRN ✓' : 'IRN Stub'}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex gap-4 pt-1">
-                    <a href={`/api/orders/${inv.id}/invoice`} target="_blank" rel="noreferrer"
-                      className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline">Download PDF</a>
-                    {inv.source === 'offline' ? (
-                      <>
-                        {inv.status !== 'cancelled' && (
-                          <button onClick={() => openEdit(inv)}
-                            className="text-xs text-foreground-secondary hover:text-foreground font-medium">Edit</button>
-                        )}
-                        {inv.status !== 'cancelled' && (
-                          confirmCancelId === inv.id ? (
-                            <>
-                              <span className="text-xs text-foreground-secondary">Cancel {inv.invoice_number}?</span>
-                              <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
-                                className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-50">
-                                {cancellingId === inv.id ? '…' : 'Confirm'}
-                              </button>
-                              <button onClick={() => setConfirmCancelId(null)}
-                                className="text-xs text-foreground-muted hover:text-foreground font-medium">
-                                No
-                              </button>
-                            </>
-                          ) : (
-                            <button onClick={() => cancelInvoice(inv)} disabled={cancellingId === inv.id}
-                              className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 font-medium disabled:opacity-50">
-                              Cancel
-                            </button>
-                          )
-                        )}
-                        {inv.status === 'cancelled' && (
-                          <span className="text-xs text-foreground-muted italic">Cancelled</span>
-                        )}
-                      </>
-                    ) : (
-                      <a href={`/admin/orders/${inv.id}`} className="text-xs text-foreground-secondary hover:text-foreground">View Order</a>
+                  <div className="flex gap-4 pt-1 border-t border-border-default" onClick={e => e.stopPropagation()}>
+                    <a
+                      href={`/api/orders/${inv.id}/invoice`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline"
+                    >
+                      PDF
+                    </a>
+                    <a
+                      href={`/admin/orders/${inv.id}`}
+                      className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+                    >
+                      View Order
+                    </a>
+                    {inv.source === 'offline' && inv.status !== 'cancelled' && (
+                      <button
+                        onClick={() => openEdit(inv)}
+                        className="text-xs text-foreground-secondary hover:text-foreground font-medium"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {inv.source === 'offline' && inv.status !== 'cancelled' && (
+                      confirmCancelId === inv.id ? (
+                        <>
+                          <span className="text-xs text-foreground-secondary">Cancel?</span>
+                          <button
+                            onClick={() => cancelInvoice(inv)}
+                            disabled={cancellingId === inv.id}
+                            className="text-xs text-red-600 font-semibold disabled:opacity-50"
+                          >
+                            {cancellingId === inv.id ? '…' : 'Yes'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmCancelId(null)}
+                            className="text-xs text-foreground-muted"
+                          >
+                            No
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => cancelInvoice(inv)}
+                          disabled={cancellingId === inv.id}
+                          className="text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
               ))}
             </div>
-
           </>
         )}
       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -375,7 +376,7 @@ function decodePOLineItemId(encoded: string) {
   return { product_id, variant_id: variant_id_raw || '', tax_rate: gst_raw ? String(Math.round(parseFloat(gst_raw))) : '0', hsn_code: hsn_raw || '' }
 }
 
-function POTab() {
+function POTab({ initialPO }: { initialPO?: string }) {
   const [pos, setPOs] = useState<PO[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -417,6 +418,14 @@ function POTab() {
   }, [search, statusFilter, page])
 
   useEffect(() => { load(page) }, [load, page])
+
+  useEffect(() => {
+    if (initialPO && pos.length > 0 && !viewPO) {
+      const match = pos.find(p => p.po_number === initialPO)
+      if (match) openPO(match.id)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPO, pos.length])
 
   useEffect(() => {
     if (showCreate && suppliers.length === 0) {
@@ -1210,7 +1219,9 @@ function StockTab() {
 }
 
 export default function InventoryClient() {
-  const [tab, setTab] = useState<Tab>('suppliers')
+  const searchParams = useSearchParams()
+  const poParam = searchParams.get('po') || undefined
+  const [tab, setTab] = useState<Tab>(poParam ? 'po' : 'suppliers')
 
   return (
     <div className="space-y-5">
@@ -1224,7 +1235,7 @@ export default function InventoryClient() {
       </div>
       <div>
         {tab === 'suppliers' && <SuppliersTab />}
-        {tab === 'po' && <POTab />}
+        {tab === 'po' && <POTab initialPO={poParam} />}
         {tab === 'stock' && <StockTab />}
       </div>
     </div>

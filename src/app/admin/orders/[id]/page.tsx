@@ -126,7 +126,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                   Shipping Label
                 </a>
                 <a
-                  href={`/api/admin/orders/${order.id}/shipping-label?size=4R&inline=1`}
+                  href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Print Shipping Label"
