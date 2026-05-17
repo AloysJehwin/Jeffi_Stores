@@ -45,7 +45,11 @@ export async function GET(request: NextRequest) {
           ep.payout_id,
           ep.payout_status,
           ep.notes,
-          ep.created_at
+          ep.created_at,
+          e.id AS expense_id,
+          NULL::uuid AS user_id,
+          NULL::text AS source,
+          NULL::text AS invoice_number
         FROM expense_payments ep
         JOIN expenses e ON e.id = ep.expense_id
 
@@ -63,7 +67,11 @@ export async function GET(request: NextRequest) {
           NULL AS payout_id,
           NULL AS payout_status,
           NULL AS notes,
-          o.updated_at AS created_at
+          o.updated_at AS created_at,
+          NULL::uuid AS expense_id,
+          o.user_id,
+          o.source,
+          o.invoice_number
         FROM orders o
         LEFT JOIN users u ON u.id = o.user_id
         WHERE o.payment_status = 'paid'
