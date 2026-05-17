@@ -90,7 +90,7 @@ export async function getReceivablesAging(filters: {
   customerPhone?: string
   search?: string
 }): Promise<{ rows: ReceivableRow[]; summary: ReceivablesSummary }> {
-  const conditions: string[] = ["o.payment_status IN ('unpaid', 'partial')", "o.status != 'draft'"]
+  const conditions: string[] = ["o.payment_status IN ('unpaid', 'partial')", "o.status NOT IN ('draft', 'cancelled', 'cancel_rejected', 'returned')"]
   const params: any[] = []
   let i = 1
 
