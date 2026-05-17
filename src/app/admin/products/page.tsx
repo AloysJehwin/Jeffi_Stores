@@ -7,7 +7,8 @@ import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
 import ProductsTableClient from '@/components/admin/ProductsTableClient'
-import SortableHeader, { sortOptions } from '@/components/admin/SortableHeader'
+import SortableHeader from '@/components/admin/SortableHeader'
+import { sortOptions } from '@/components/admin/sortOptions'
 
 const PAGE_SIZE = 25
 

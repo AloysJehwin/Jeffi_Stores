@@ -6,6 +6,7 @@ import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import HoverCard from '@/components/ui/HoverCard'
+import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -121,6 +122,23 @@ function SuppliersTab() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showAll, setShowAll] = useState(false)
+  const [sortCol, setSortCol] = useState<string | undefined>(undefined)
+  const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
+
+  const SUPPLIER_SORT_KEYS: Record<string, string> = {
+    name: 'name', gstin: 'gstin', contact: 'contact_name',
+    phone: 'phone', terms: 'payment_terms', pos: 'po_count', status: 'is_active',
+  }
+
+  const sortedSuppliers = sortCol && SUPPLIER_SORT_KEYS[sortCol]
+    ? [...suppliers].sort((a: any, b: any) => {
+        const k = SUPPLIER_SORT_KEYS[sortCol]
+        const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    : suppliers
+
+  function handleSort(col: string, dir: SortDir) { setSortCol(col); setSortDir(dir) }
 
   const load = useCallback(async (pg = page) => {
     setLoading(true)
@@ -188,13 +206,13 @@ function SuppliersTab() {
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">GSTIN</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Contact</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden md:table-cell">Phone</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden lg:table-cell">Terms</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">POs</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Status</th>
+                  <SortableHeader label="Name" column="name" options={sortOptions('text')} currentSort={sortCol} currentDir={sortDir} onSort={handleSort} />
+                  <SortableHeader label="GSTIN" column="gstin" options={sortOptions('text')} currentSort={sortCol} currentDir={sortDir} onSort={handleSort} />
+                  <SortableHeader label="Contact" column="contact" options={sortOptions('text')} currentSort={sortCol} currentDir={sortDir} onSort={handleSort} className="hidden sm:table-cell" />
+                  <SortableHeader label="Phone" column="phone" options={sortOptions('text')} currentSort={sortCol} currentDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Terms" column="terms" options={sortOptions('number')} currentSort={sortCol} currentDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" align="right" />
+                  <SortableHeader label="POs" column="pos" options={sortOptions('number')} currentSort={sortCol} currentDir={sortDir} onSort={handleSort} align="right" />
+                  <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sortCol} currentDir={sortDir} onSort={handleSort} />
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
@@ -204,7 +222,7 @@ function SuppliersTab() {
                     {search ? `No suppliers matching "${search}"` : 'No suppliers yet'}
                   </td></tr>
                 )}
-                {suppliers.map(s => (
+                {sortedSuppliers.map(s => (
                   <tr key={s.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground">
                       <Link href={`/admin/suppliers/${s.id}`} className="hover:text-accent-500 hover:underline">{s.name}</Link>
@@ -268,6 +286,23 @@ function POTab({ initialPO }: { initialPO?: string }) {
   const [receiveItems, setReceiveItems] = useState<any[]>([])
   const [receiveNotes, setReceiveNotes] = useState('')
   const [receiveSaving, setReceiveSaving] = useState(false)
+  const [poSortCol, setPoSortCol] = useState<string | undefined>(undefined)
+  const [poSortDir, setPoSortDir] = useState<SortDir | undefined>(undefined)
+
+  const PO_SORT_KEYS: Record<string, keyof PO> = {
+    po_number: 'po_number', supplier: 'supplier_name', date: 'order_date',
+    expected: 'expected_date', items: 'item_count', total: 'total_amount', status: 'status',
+  }
+
+  const sortedPOs = poSortCol && PO_SORT_KEYS[poSortCol]
+    ? [...pos].sort((a, b) => {
+        const k = PO_SORT_KEYS[poSortCol]
+        const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
+        return poSortDir === 'asc' ? cmp : -cmp
+      })
+    : pos
+
+  function handlePoSort(col: string, dir: SortDir) { setPoSortCol(col); setPoSortDir(dir) }
 
   const load = useCallback(async (pg = page) => {
     setLoading(true)
@@ -515,13 +550,13 @@ function POTab({ initialPO }: { initialPO?: string }) {
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">PO #</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Supplier</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden md:table-cell">Expected</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden lg:table-cell">Items</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Total</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Status</th>
+                  <SortableHeader label="PO #" column="po_number" options={sortOptions('text')} currentSort={poSortCol} currentDir={poSortDir} onSort={handlePoSort} />
+                  <SortableHeader label="Supplier" column="supplier" options={sortOptions('text')} currentSort={poSortCol} currentDir={poSortDir} onSort={handlePoSort} />
+                  <SortableHeader label="Date" column="date" options={sortOptions('date')} currentSort={poSortCol} currentDir={poSortDir} onSort={handlePoSort} className="hidden sm:table-cell" />
+                  <SortableHeader label="Expected" column="expected" options={sortOptions('date')} currentSort={poSortCol} currentDir={poSortDir} onSort={handlePoSort} className="hidden md:table-cell" />
+                  <SortableHeader label="Items" column="items" options={sortOptions('number')} currentSort={poSortCol} currentDir={poSortDir} onSort={handlePoSort} className="hidden lg:table-cell" align="right" />
+                  <SortableHeader label="Total" column="total" options={sortOptions('number')} currentSort={poSortCol} currentDir={poSortDir} onSort={handlePoSort} align="right" />
+                  <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={poSortCol} currentDir={poSortDir} onSort={handlePoSort} />
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
@@ -531,7 +566,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     {search || statusFilter ? 'No purchase orders match your filters' : 'No purchase orders yet'}
                   </td></tr>
                 )}
-                {pos.map(po => (
+                {sortedPOs.map(po => (
                   <tr key={po.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-foreground-secondary font-medium">{po.po_number}</td>
                     <td className="px-4 py-3 font-medium text-foreground">
@@ -594,6 +629,26 @@ function StockTab() {
   const [editQty, setEditQty] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  const [ledgerSortCol, setLedgerSortCol] = useState<string | undefined>(undefined)
+  const [ledgerSortDir, setLedgerSortDir] = useState<SortDir | undefined>(undefined)
+  const [valSortCol, setValSortCol] = useState<string | undefined>(undefined)
+  const [valSortDir, setValSortDir] = useState<SortDir | undefined>(undefined)
+
+  const LEDGER_SORT_KEYS: Record<string, keyof StockTransaction> = {
+    date: 'created_at', product: 'product_name', type: 'transaction_type',
+    change: 'quantity_change', balance: 'quantity_after', reference: 'reference_type',
+  }
+
+  const sortedTransactions = ledgerSortCol && LEDGER_SORT_KEYS[ledgerSortCol]
+    ? [...transactions].sort((a, b) => {
+        const k = LEDGER_SORT_KEYS[ledgerSortCol]
+        const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
+        return ledgerSortDir === 'asc' ? cmp : -cmp
+      })
+    : transactions
+
+  function handleLedgerSort(col: string, dir: SortDir) { setLedgerSortCol(col); setLedgerSortDir(dir) }
+  function handleValSort(col: string, dir: SortDir) { setValSortCol(col); setValSortDir(dir) }
 
   const loadLedger = useCallback(async (pg = txPage) => {
     setLoading(true)
@@ -638,7 +693,18 @@ function StockTab() {
   const valCategories = [...new Set(allValRows.map(p => p.category_name).filter(Boolean))].sort() as string[]
   const valBrands = [...new Set(allValRows.map(p => p.brand_name).filter(Boolean))].sort() as string[]
   const valTotalPages = Math.ceil(filteredValRows.length / VALUATION_PAGE_SIZE)
-  const valSlice = filteredValRows.slice((valPage - 1) * VALUATION_PAGE_SIZE, valPage * VALUATION_PAGE_SIZE)
+  const VAL_SORT_KEYS: Record<string, string> = {
+    product: 'name', variant: 'variant_name', sku: 'sku',
+    stock: 'inventory_quantity', price: 'cost_price', value: 'stock_value',
+  }
+  const sortedValRows = valSortCol && VAL_SORT_KEYS[valSortCol]
+    ? [...filteredValRows].sort((a, b) => {
+        const k = VAL_SORT_KEYS[valSortCol]
+        const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
+        return valSortDir === 'asc' ? cmp : -cmp
+      })
+    : filteredValRows
+  const valSlice = sortedValRows.slice((valPage - 1) * VALUATION_PAGE_SIZE, valPage * VALUATION_PAGE_SIZE)
 
   function startEdit(p: any) {
     const rowId = p.variant_id || p.id
@@ -711,12 +777,12 @@ function StockTab() {
                 <table className="w-full text-sm">
                   <thead className="bg-surface-secondary border-b border-border-default">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Type</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Change</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Balance</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden md:table-cell">Reference</th>
+                      <SortableHeader label="Date" column="date" options={sortOptions('date')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} />
+                      <SortableHeader label="Product" column="product" options={sortOptions('text')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} />
+                      <SortableHeader label="Type" column="type" options={sortOptions('text')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} />
+                      <SortableHeader label="Change" column="change" options={sortOptions('number')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} align="right" />
+                      <SortableHeader label="Balance" column="balance" options={sortOptions('number')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} align="right" />
+                      <SortableHeader label="Reference" column="reference" options={sortOptions('text')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} className="hidden md:table-cell" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default">
@@ -725,7 +791,7 @@ function StockTab() {
                         {search || from || to ? 'No transactions match your filters' : 'No stock transactions yet'}
                       </td></tr>
                     )}
-                    {transactions.map(tx => (
+                    {sortedTransactions.map(tx => (
                       <tr key={tx.id} className="hover:bg-surface-secondary/50 transition-colors">
                         <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-xs">
                           {new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -908,12 +974,12 @@ function StockTab() {
                   <table className="w-full text-sm">
                     <thead className="bg-surface-secondary border-b border-border-default">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Product</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Variant</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden md:table-cell">SKU</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Stock</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Price ex-GST</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Stock Value</th>
+                        <SortableHeader label="Product" column="product" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} />
+                        <SortableHeader label="Variant" column="variant" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden sm:table-cell" />
+                        <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden md:table-cell" />
+                        <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
+                        <SortableHeader label="Price ex-GST" column="price" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
+                        <SortableHeader label="Stock Value" column="value" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
                         <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Actions</th>
                       </tr>
                     </thead>

@@ -4,13 +4,25 @@ import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
 import CouponTableRow from '@/components/admin/CouponTableRow'
+import SortableHeader from '@/components/admin/SortableHeader'
+import { sortOptions } from '@/components/admin/sortOptions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-async function getFilteredCoupons(filters: { is_active?: string; search?: string; page?: number }) {
+const COUPON_SORT_COLS: Record<string, string> = {
+  code: 'code',
+  type: 'discount_type',
+  value: 'discount_value',
+  min_purchase: 'min_purchase_amount',
+  usage: 'times_used',
+  valid_until: 'valid_until',
+  status: 'is_active',
+}
+
+async function getFilteredCoupons(filters: { is_active?: string; search?: string; page?: number; sort?: string; dir?: string }) {
   const conditions: string[] = []
   const params: unknown[] = []
   let i = 1
@@ -29,8 +41,12 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
   const limit = PAGE_SIZE
   const offset = ((filters.page || 1) - 1) * limit
 
+  const safeCol = (filters.sort && COUPON_SORT_COLS[filters.sort]) ? COUPON_SORT_COLS[filters.sort] : 'created_at'
+  const safeDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
+  const orderBy = `ORDER BY ${safeCol} ${safeDir}`
+
   const [coupons, total] = await Promise.all([
-    queryMany(`SELECT * FROM coupons ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`, [...params, limit, offset]),
+    queryMany(`SELECT * FROM coupons ${where} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`, [...params, limit, offset]),
     queryCount(`SELECT COUNT(*) FROM coupons ${where}`, params),
   ])
 
@@ -39,9 +55,11 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
 
 export default async function CouponsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const sort = searchParams.sort
+  const dir = searchParams.dir as 'asc' | 'desc' | undefined
 
   const [{ coupons, total }, allStats] = await Promise.all([
-    getFilteredCoupons({ is_active: searchParams.is_active, search: searchParams.search, page }),
+    getFilteredCoupons({ is_active: searchParams.is_active, search: searchParams.search, page, sort, dir }),
     getFilteredCoupons({}),
   ])
 
@@ -53,6 +71,8 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
     const params = new URLSearchParams()
     if (searchParams.is_active) params.set('is_active', searchParams.is_active)
     if (searchParams.search) params.set('search', searchParams.search)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
     return `/admin/coupons${qs ? `?${qs}` : ''}`
@@ -96,9 +116,14 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
           <table className="w-full text-sm">
             <thead className="bg-surface-secondary">
               <tr>
-                {['Code', 'Type', 'Value', 'Min Purchase', 'Usage', 'Valid Until', 'Status', 'Actions'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">{h}</th>
-                ))}
+                <SortableHeader label="Code" column="code" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Type" column="type" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Value" column="value" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Min Purchase" column="min_purchase" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Usage" column="usage" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Valid Until" column="valid_until" options={sortOptions('date')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">

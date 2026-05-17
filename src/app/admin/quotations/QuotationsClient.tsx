@@ -7,6 +7,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
+import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 
 interface Quotation {
   id: string
@@ -69,6 +70,13 @@ export default function QuotationsClient() {
   const [searchQ, setSearchQ] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [sortCol, setSortCol] = useState<string | undefined>(undefined)
+  const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
+
+  function handleSort(col: string, dir: SortDir) {
+    setSortCol(col)
+    setSortDir(dir)
+  }
 
   const [editId, setEditId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -109,6 +117,26 @@ export default function QuotationsClient() {
   const custTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isEditorMounted = useRef(false)
+
+
+  const QUOTE_SORT_KEYS: Record<string, keyof Quotation> = {
+    quote_number: 'quote_number',
+    date: 'quote_date',
+    consignee: 'consignee_name',
+    total: 'total_amount',
+    status: 'status',
+  }
+
+  const sortedQuotations = sortCol && QUOTE_SORT_KEYS[sortCol]
+    ? [...quotations].sort((a, b) => {
+        const key = QUOTE_SORT_KEYS[sortCol]
+        const av = a[key] ?? ''
+        const bv = b[key] ?? ''
+        const cmp = String(av).localeCompare(String(bv), 'en', { numeric: true })
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    : quotations
+
 
   async function loadList() {
     setLoading(true)
@@ -432,11 +460,11 @@ export default function QuotationsClient() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border-default bg-surface-primary">
-                  <th className="px-4 py-3 text-left font-semibold text-foreground-secondary text-xs">Quote #</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground-secondary text-xs">Date</th>
-                  <th className="px-4 py-3 text-left font-semibold text-foreground-secondary text-xs">Consignee</th>
-                  <th className="px-4 py-3 text-right font-semibold text-foreground-secondary text-xs">Total</th>
-                  <th className="px-4 py-3 text-center font-semibold text-foreground-secondary text-xs">Status</th>
+                  <SortableHeader label="Quote #" column="quote_number" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                  <SortableHeader label="Date" column="date" options={sortOptions('date')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                  <SortableHeader label="Consignee" column="consignee" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                  <SortableHeader label="Total" column="total" options={sortOptions('number')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                  <SortableHeader label="Status" column="status" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                   <th className="px-4 py-3 text-center font-semibold text-foreground-secondary text-xs">Actions</th>
                 </tr>
               </thead>
@@ -445,7 +473,7 @@ export default function QuotationsClient() {
                   <tr><td colSpan={6} className="px-4 py-8 text-center text-foreground-secondary">Loading…</td></tr>
                 ) : quotations.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-12 text-center text-foreground-secondary">No quotations found. Create your first one.</td></tr>
-                ) : quotations.map(q => (
+                ) : sortedQuotations.map(q => (
                   <tr key={q.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer" onClick={() => setSelectedQuote(q)}>
                     <td className="px-4 py-3 font-mono font-semibold text-foreground">
                       <HoverCard

@@ -7,6 +7,7 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, { newLineItem, type LineItem as LILineItem } from '@/components/admin/LineItemsSection'
+import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 
 interface Invoice {
   id: string
@@ -87,6 +88,13 @@ export default function InvoicesClient() {
   const [toDate, setToDate] = useState('')
   const [searchQ, setSearchQ] = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [sortCol, setSortCol] = useState<string | undefined>(undefined)
+  const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
+
+  function handleSort(col: string, dir: SortDir) {
+    setSortCol(col)
+    setSortDir(dir)
+  }
 
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
@@ -111,6 +119,25 @@ export default function InvoicesClient() {
   const [editIsDraft, setEditIsDraft] = useState(false)
 
   const totalPages = Math.ceil(total / 25)
+
+  const INVOICE_SORT_KEYS: Record<string, keyof Invoice> = {
+    invoice_number: 'invoice_number',
+    date: 'invoice_date',
+    customer: 'customer_name',
+    amount: 'total_amount',
+    payment: 'payment_status',
+    source: 'source',
+  }
+
+  const sortedInvoices = sortCol && INVOICE_SORT_KEYS[sortCol]
+    ? [...invoices].sort((a, b) => {
+        const key = INVOICE_SORT_KEYS[sortCol]
+        const av = a[key] ?? ''
+        const bv = b[key] ?? ''
+        const cmp = String(av).localeCompare(String(bv), 'en', { numeric: true })
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    : invoices
 
   const fetchInvoices = useCallback(async (p = 1) => {
     setLoading(true)
@@ -718,18 +745,18 @@ export default function InvoicesClient() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border-default bg-surface-secondary">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Invoice</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Customer</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Amount</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Payment</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">Source</th>
+                    <SortableHeader label="Invoice No" column="invoice_number" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                    <SortableHeader label="Date" column="date" options={sortOptions('date')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                    <SortableHeader label="Customer" column="customer" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                    <SortableHeader label="Amount" column="amount" options={sortOptions('number')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                    <SortableHeader label="Payment" column="payment" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                    <SortableHeader label="Source" column="source" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                     <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">IRN</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map(inv => (
+                  {sortedInvoices.map(inv => (
                     <tr
                       key={inv.id}
                       className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer"

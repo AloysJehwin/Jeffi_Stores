@@ -3,7 +3,8 @@ import { getFilteredOrders } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import OrdersTableRows from '@/components/admin/OrdersTableRows'
-import SortableHeader, { sortOptions } from '@/components/admin/SortableHeader'
+import SortableHeader from '@/components/admin/SortableHeader'
+import { sortOptions } from '@/components/admin/sortOptions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
