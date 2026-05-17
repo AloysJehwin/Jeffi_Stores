@@ -46,7 +46,36 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     const safeOrderNum = (order.order_number || params.id.slice(0, 8)).replace(/[^a-zA-Z0-9-]/g, '-')
+    const print = request.nextUrl.searchParams.get('print') === '1'
     const inline = request.nextUrl.searchParams.get('inline') === '1'
+
+    if (print) {
+      const pdfBase64 = Buffer.from(buffer).toString('base64')
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Shipping Label — ${safeOrderNum}</title>
+<style>
+  html, body, embed { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 4in; height: 6in; background: #fff; }
+  @page { size: 4in 6in; margin: 0; }
+  embed { display: block; width: 4in; height: 6in; border: none; }
+</style>
+</head>
+<body>
+<embed src="data:application/pdf;base64,${pdfBase64}" type="application/pdf" width="384" height="576" />
+<script>
+  window.addEventListener('load', function() {
+    setTimeout(function() { window.print(); }, 800);
+  });
+</script>
+</body>
+</html>`
+      return new NextResponse(html, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      })
+    }
 
     return new NextResponse(buffer, {
       headers: {

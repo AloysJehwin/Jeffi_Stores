@@ -709,9 +709,9 @@ export default function QuotationsClient() {
                           </button>
                         )}
                         {q.status === 'final' && q.converted_order_id && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap">
-                            Invoiced
-                          </span>
+                          <a href={`/admin/orders/${q.converted_order_id}`} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
+                            Invoiced ↗
+                          </a>
                         )}
                         {q.status === 'draft' && (
                           <button onClick={() => deleteQuote(q.id)} title="Delete"

@@ -231,7 +231,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
             </a>
             {o.awb_number && (
             <a
-              href={`/api/admin/orders/${order.id}/shipping-label?size=4R&inline=1`}
+              href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
@@ -242,6 +242,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               Shipping Label
             </a>
             )}
+            {o.invoice_number && (
             <a
               href={`/api/orders/${order.id}/invoice`}
               target="_blank"
@@ -253,6 +254,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               </svg>
               Invoice PDF
             </a>
+            )}
           </div>
         </div>
 
