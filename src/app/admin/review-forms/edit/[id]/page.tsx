@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 
 interface ReviewForm {
   id: string; title: string; slug: string; description: string | null
+  template_type: 'google_review' | 'product_feedback' | 'testimonial'
   google_review_url: string; coupon_id: string | null; is_active: boolean
   custom_fields: { id: string; label: string; type: 'text' | 'textarea' | 'image' | 'rating'; required: boolean }[]
 }
@@ -35,6 +36,7 @@ export default async function EditReviewFormPage({ params }: { params: { id: str
         defaultValues={{
           title: form.title,
           slug: form.slug,
+          template_type: form.template_type || 'google_review',
           google_review_url: form.google_review_url,
           coupon_id: form.coupon_id,
           description: form.description,

@@ -16,7 +16,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const fields = ['title', 'slug', 'description', 'google_review_url', 'coupon_id', 'is_active', 'custom_fields']
+  const fields = ['title', 'slug', 'description', 'template_type', 'google_review_url', 'coupon_id', 'is_active', 'custom_fields']
   const updates: string[] = []
   const values: unknown[] = []
   let i = 1
