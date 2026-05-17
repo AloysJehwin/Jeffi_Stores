@@ -200,7 +200,6 @@ function CheckoutPage() {
         theme: { color: '#f97316' },
         modal: {
           ondismiss: function () {
-            clearCart()
             window.location.href = `/account/orders/${orderId}`
           },
         },
@@ -213,13 +212,16 @@ function CheckoutPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ errorDescription: response.error.description }),
         }).catch(() => {})
-        clearCart()
         window.location.href = `/account/orders/${orderId}`
       })
       rzp.open()
     } catch (err: any) {
-      setError(err.message)
-      setIsSubmitting(false)
+      await fetch(`/api/orders/${orderId}/payment-failed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ errorDescription: err.message }),
+      }).catch(() => {})
+      window.location.href = `/account/orders/${orderId}`
     }
   }
 
