@@ -53,6 +53,7 @@ interface OrderDetails {
   awbNumber: string | null
   originalOrderId: string | null
   originalOrderNumber: string | null
+  orderType: string
   shippingAddress: {
     full_name: string
     address_line1: string
@@ -184,7 +185,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const response = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restoreToCart: true }),
+        body: JSON.stringify({ restoreToCart: order?.orderType !== 'direct' }),
       })
       if (response.ok) {
         await fetchOrder()
@@ -224,12 +225,15 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     try {
       const response = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restoreToCart: order?.orderType !== 'direct' }),
       })
       const data = await response.json()
       if (!response.ok) {
         throw new Error(data.error || 'Failed to cancel order')
       }
       await fetchOrder()
+      await refreshCart()
       setShowCancelConfirm(false)
     } catch (err: any) {
       setError(err.message)

@@ -206,9 +206,7 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      if (!isRazorpayPayment) {
-        await client.query('DELETE FROM cart_items WHERE user_id = $1', [cartUserId])
-      }
+      await client.query('DELETE FROM cart_items WHERE user_id = $1', [cartUserId])
 
       if (couponId && appliedDiscount > 0) {
         await client.query(
