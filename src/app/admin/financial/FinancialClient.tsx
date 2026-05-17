@@ -163,7 +163,7 @@ function ReceivablesTab() {
                           {r.user_id
                             ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>
                             : <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
-                          {r.customer_phone && <div className="text-xs text-foreground-secondary">{r.customer_phone}</div>}
+                          {r.customer_phone && <div className="text-xs text-foreground-secondary">+91 {r.customer_phone}</div>}
                         </td>
                         <td className="px-4 py-3 text-foreground-secondary">
                           {r.invoice_number
@@ -200,7 +200,7 @@ function ReceivablesTab() {
                         {r.user_id
                           ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>
                           : <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
-                        {r.customer_phone && <p className="text-xs text-foreground-secondary mt-0.5">{r.customer_phone}</p>}
+                        {r.customer_phone && <p className="text-xs text-foreground-secondary mt-0.5">+91 {r.customer_phone}</p>}
                       </div>
                       <p className="font-semibold text-foreground text-sm shrink-0">{formatINR(parseFloat(r.total_amount))}</p>
                     </div>
@@ -370,7 +370,7 @@ function PayablesTab() {
             </div>
             <div>
               <label className={labelCls}>GSTIN</label>
-              <input className={inputCls} value={addForm.supplier_gstin} onChange={e => setAddForm(f => ({ ...f, supplier_gstin: e.target.value }))} />
+              <input className={inputCls + ' font-mono'} value={addForm.supplier_gstin} onChange={e => setAddForm(f => ({ ...f, supplier_gstin: e.target.value.toUpperCase() }))} maxLength={15} placeholder="00XXXXX0000X0Z0" />
             </div>
             <div>
               <label className={labelCls}>Description</label>

@@ -159,6 +159,16 @@ export async function getAllOrders() {
   `)
 }
 
+const ORDER_SORT_COLS: Record<string, string> = {
+  order_number: 'o.order_number',
+  customer: 'o.customer_name',
+  date: 'o.created_at',
+  total: 'o.total_amount',
+  status: 'o.status',
+  payment: 'o.payment_status',
+  source: 'o.source',
+}
+
 export async function getFilteredOrders(filters: {
   status?: string
   payment_status?: string
@@ -166,6 +176,8 @@ export async function getFilteredOrders(filters: {
   search?: string
   page?: number
   limit?: number
+  sort?: string
+  dir?: string
 }) {
   const conditions: string[] = []
   const params: any[] = []
@@ -193,6 +205,8 @@ export async function getFilteredOrders(filters: {
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
   const limit = filters.limit || 25
   const offset = ((filters.page || 1) - 1) * limit
+  const sortCol = ORDER_SORT_COLS[filters.sort || ''] || 'o.created_at'
+  const sortDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
 
   const [orders, countResult] = await Promise.all([
     queryMany(`
@@ -205,13 +219,24 @@ export async function getFilteredOrders(filters: {
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
       ${where}
-      ORDER BY o.created_at DESC
+      ORDER BY ${sortCol} ${sortDir}
       LIMIT $${i} OFFSET $${i + 1}
     `, [...params, limit, offset]),
     queryCount(`SELECT COUNT(*) FROM orders o ${where}`, params),
   ])
 
   return { orders, total: countResult }
+}
+
+const PRODUCT_SORT_COLS: Record<string, string> = {
+  name: 'p.name',
+  sku: 'p.sku',
+  price: 'p.price',
+  stock: 'p.stock_quantity',
+  created_at: 'p.created_at',
+  category: 'c.name',
+  brand: 'b.name',
+  status: 'p.is_active',
 }
 
 export async function getFilteredProducts(filters: {
@@ -222,6 +247,8 @@ export async function getFilteredProducts(filters: {
   search?: string
   page?: number
   limit?: number
+  sort?: string
+  dir?: string
 }) {
   const conditions: string[] = []
   const params: any[] = []
@@ -279,6 +306,12 @@ export async function getFilteredProducts(filters: {
 
   const limit = filters.limit || 25
   const offset = ((filters.page || 1) - 1) * limit
+  const hasSortFilter = filters.sort && PRODUCT_SORT_COLS[filters.sort]
+  const sortCol = hasSortFilter ? PRODUCT_SORT_COLS[filters.sort!] : null
+  const sortDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
+  const orderBy = sortCol
+    ? `${sortCol} ${sortDir}`
+    : `${rankExpr}, p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
 
   const [products, total] = await Promise.all([
     queryMany(`
@@ -301,7 +334,7 @@ export async function getFilteredProducts(filters: {
       LEFT JOIN categories pc ON c.parent_category_id = pc.id
       LEFT JOIN brands b ON p.brand_id = b.id
       ${where}
-      ORDER BY ${rankExpr}, p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC
+      ORDER BY ${orderBy}
       LIMIT $${i} OFFSET $${i + 1}
     `, [...params, limit, offset]),
     queryCount(`SELECT COUNT(*) FROM products p ${where}`, countParams),
@@ -340,11 +373,22 @@ export async function getFilteredCategories(filters: {
   return queryMany(`SELECT * FROM categories ${where} ORDER BY display_order ASC`, params)
 }
 
+const CUSTOMER_SORT_COLS: Record<string, string> = {
+  name: "u.first_name || ' ' || u.last_name",
+  email: 'u.email',
+  phone: 'u.phone',
+  joined: 'u.created_at',
+  orders: 'o.order_count',
+  lifetime_value: 'o.lifetime_value',
+}
+
 export async function getCustomers(filters: {
   search?: string
   status?: string
   page?: number
   limit?: number
+  sort?: string
+  dir?: string
 }) {
   const conditions: string[] = ['u.is_guest = false']
   const params: any[] = []
@@ -368,6 +412,8 @@ export async function getCustomers(filters: {
   const where = `WHERE ${conditions.join(' AND ')}`
   const limit = filters.limit || 50
   const offset = ((filters.page || 1) - 1) * limit
+  const sortCol = CUSTOMER_SORT_COLS[filters.sort || ''] || 'u.created_at'
+  const sortDir = filters.dir === 'asc' ? 'ASC' : 'DESC'
 
   const [customers, total] = await Promise.all([
     queryMany(`
@@ -386,7 +432,7 @@ export async function getCustomers(filters: {
         FROM orders GROUP BY user_id
       ) o ON u.id = o.user_id
       ${where}
-      ORDER BY u.created_at DESC
+      ORDER BY ${sortCol} ${sortDir}
       LIMIT $${i} OFFSET $${i + 1}
     `, [...params, limit, offset]),
     queryCount(`SELECT COUNT(*) FROM users u ${where}`, params),
