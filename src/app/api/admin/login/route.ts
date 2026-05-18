@@ -100,6 +100,8 @@ export async function POST(request: Request) {
     const token = await generateToken({
       adminId: result.admin.id,
       username: result.admin.username,
+      first_name: result.admin.first_name || undefined,
+      last_name: result.admin.last_name || undefined,
       role: result.admin.role,
       scopes: result.admin.scopes || [],
       authCertCN: certCN || undefined,

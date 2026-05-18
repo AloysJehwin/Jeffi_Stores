@@ -163,6 +163,25 @@ export async function PATCH(
     const statusChanged = status && status !== currentOrder.status
     const paymentStatusChanged = payment_status && payment_status !== currentOrder.payment_status
 
+    if (statusChanged && status === 'processing') {
+      const items = await queryMany<any>(
+        `SELECT oi.product_id, oi.variant_id, oi.quantity,
+          CASE WHEN oi.variant_id IS NOT NULL
+            THEN (SELECT inventory_quantity FROM product_variants WHERE id = oi.variant_id)
+            ELSE (SELECT inventory_quantity FROM products WHERE id = oi.product_id)
+          END AS inventory_quantity
+         FROM order_items oi WHERE oi.order_id = $1`,
+        [orderId]
+      )
+      const insufficient = items.filter((item: any) => Number(item.inventory_quantity) < parseFloat(item.quantity))
+      if (insufficient.length > 0) {
+        return NextResponse.json(
+          { error: 'Insufficient stock for one or more items. Update inventory before marking as processing.' },
+          { status: 400 }
+        )
+      }
+    }
+
     const updates: string[] = ['updated_at = NOW()']
     const values: any[] = []
     let paramIndex = 1
@@ -196,21 +215,10 @@ export async function PATCH(
 
     if (statusChanged && status === 'processing') {
       const items = await queryMany<any>(
-        `SELECT oi.product_id, oi.variant_id, oi.quantity,
-          CASE WHEN oi.variant_id IS NOT NULL
-            THEN (SELECT inventory_quantity FROM product_variants WHERE id = oi.variant_id)
-            ELSE (SELECT inventory_quantity FROM products WHERE id = oi.product_id)
-          END AS inventory_quantity
+        `SELECT oi.product_id, oi.variant_id, oi.quantity
          FROM order_items oi WHERE oi.order_id = $1`,
         [orderId]
       )
-      const insufficient = items.filter((item: any) => Number(item.inventory_quantity) < parseFloat(item.quantity))
-      if (insufficient.length > 0) {
-        return NextResponse.json(
-          { error: 'Insufficient stock for one or more items. Update inventory before marking as processing.' },
-          { status: 400 }
-        )
-      }
       await withTransaction(async (client) => {
         for (const item of items) {
           const qty = parseFloat(item.quantity)

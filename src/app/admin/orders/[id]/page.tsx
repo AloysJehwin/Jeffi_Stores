@@ -9,6 +9,7 @@ import InitiateRefundButton from '@/components/admin/InitiateRefundButton'
 import RetryPaymentEmailButton from '@/components/admin/RetryPaymentEmailButton'
 import CreateShipmentButton from '@/components/admin/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
+import CustomerMailPanel from '@/components/admin/CustomerMailPanel'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -55,37 +56,52 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               {new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2 sm:gap-4">
-            <span className={`px-4 py-2 text-sm font-semibold rounded-full ${
+          <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
               order.payment_status === 'paid'
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
                 : order.payment_status === 'pending'
-                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
             }`}>
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                order.payment_status === 'paid' ? 'bg-green-500' : order.payment_status === 'pending' ? 'bg-yellow-500' : 'bg-red-500'
+              }`} />
               Payment: {order.payment_status}
             </span>
-            <span className={`px-4 py-2 text-sm font-semibold rounded-full ${
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
               order.status === 'delivered'
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
                 : order.status === 'processing' || order.status === 'shipped'
-                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
                 : order.status === 'out_for_delivery'
-                ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
+                ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
                 : order.status === 'cancelled' || order.status === 'return_rejected'
-                ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
                 : order.status === 'cancel_requested' || order.status === 'return_requested'
-                ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800'
                 : order.status === 'cancel_rejected'
-                ? 'bg-gray-100 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300'
+                ? 'bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'
                 : order.status === 'returned'
-                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
                 : order.status === 'return_approved' || order.status === 'return_received'
-                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-                : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
             }`}>
-              Status: {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status === 'cancel_rejected' ? 'Cancellation Rejected' : order.status.replace(/_/g, ' ')}
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                order.status === 'delivered' ? 'bg-green-500'
+                : order.status === 'processing' || order.status === 'shipped' || order.status === 'return_approved' || order.status === 'return_received' ? 'bg-blue-500'
+                : order.status === 'out_for_delivery' ? 'bg-indigo-500'
+                : order.status === 'cancelled' || order.status === 'return_rejected' ? 'bg-red-500'
+                : order.status === 'cancel_requested' || order.status === 'return_requested' ? 'bg-orange-500'
+                : order.status === 'cancel_rejected' ? 'bg-gray-400'
+                : order.status === 'returned' ? 'bg-purple-500'
+                : 'bg-yellow-500'
+              }`} />
+              {order.status === 'cancel_requested' ? 'Cancellation Requested' : order.status === 'cancel_rejected' ? 'Cancellation Rejected' : order.status.replace(/_/g, ' ')}
             </span>
+            {/* Divider between status pills and action buttons */}
+            <span className="w-px h-6 bg-border-default hidden sm:block" />
             {/* Packing Slip — download + print combined pill */}
             <div className="inline-flex rounded-full overflow-hidden border border-secondary-300 dark:border-secondary-700 text-sm font-semibold">
               <a
@@ -143,7 +159,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                 href={`/api/orders/${order.id}/invoice`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 text-sm font-semibold rounded-full bg-accent-100 text-accent-800 hover:bg-accent-200 transition-colors inline-flex items-center gap-1.5"
+                className="px-3 py-2 text-sm font-semibold rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 border border-accent-300 dark:border-accent-700 transition-colors inline-flex items-center gap-1.5"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -372,6 +388,17 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           </div>
           )}
+
+          <CustomerMailPanel
+            orderId={order.id}
+            orderNumber={order.order_number || order.id.slice(0, 8)}
+            customerName={
+              order.users
+                ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Customer'
+                : order.customer_name || 'Customer'
+            }
+            customerEmail={order.users?.email || order.billing_email || ''}
+          />
         </div>
 
         <div className="space-y-4 sm:space-y-6">
