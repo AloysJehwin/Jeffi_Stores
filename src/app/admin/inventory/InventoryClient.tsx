@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -966,8 +966,8 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Total Stock Value" value={formatINR(valuation.totalValue)} accent sub="All products" />
-                <SummaryCard label="Listed Stock Value" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.stock_value || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'Matches total'} />
+                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(valuation.totalValue)} accent sub="All products" />
+                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub="All products" />
                 <SummaryCard label="Total SKUs" value={String(filteredValRows.length)} sub={filteredValRows.length !== allValRows.length ? `of ${allValRows.length} total` : 'across all products'} />
                 <SummaryCard label="In Stock" value={String(filteredValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="SKUs with stock > 0" />
               </div>
@@ -1019,13 +1019,15 @@ function StockTab() {
                         <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden md:table-cell" />
                         <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
                         <SortableHeader label="Price ex-GST" column="price" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
-                        <SortableHeader label="Stock Value" column="value" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">GST %</th>
+                        <SortableHeader label="Stock Value (ex-GST)" column="value" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Stock Value (incl. GST)</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">
                       {valSlice.length === 0 && (
-                        <tr><td colSpan={7} className="py-12 text-center text-foreground-secondary text-sm">
+                        <tr><td colSpan={9} className="py-12 text-center text-foreground-secondary text-sm">
                           {valSearch ? `No products match "${valSearch}"` : 'No products in stock'}
                         </td></tr>
                       )}
@@ -1074,7 +1076,9 @@ function StockTab() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
+                            <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
                             <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.stock_value || '0'))}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'))}</td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <Link
@@ -1117,14 +1121,23 @@ function StockTab() {
 
 export default function InventoryClient() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const tabParam = searchParams.get('tab') as Tab | null
   const poParam = searchParams.get('po') || undefined
-  const [tab, setTab] = useState<Tab>(poParam ? 'po' : 'suppliers')
+  const [tab, setTab] = useState<Tab>(tabParam && ['suppliers', 'po', 'stock'].includes(tabParam) ? tabParam : poParam ? 'po' : 'suppliers')
+
+  function handleTabChange(key: Tab) {
+    setTab(key)
+    const params = new URLSearchParams()
+    params.set('tab', key)
+    router.replace(`/admin/inventory?${params.toString()}`, { scroll: false })
+  }
 
   return (
     <div className="space-y-5">
       <div className="flex border-b border-border-default gap-1">
         {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
+          <button key={t.key} onClick={() => handleTabChange(t.key)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === t.key ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}>
             {t.label}
           </button>
