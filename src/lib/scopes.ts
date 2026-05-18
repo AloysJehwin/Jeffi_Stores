@@ -110,6 +110,27 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     group: 'Marketing',
   },
   {
+    key: 'financial',
+    label: 'Financial',
+    description: 'View payables, purchase records, and financial summaries',
+    routes: ['/admin/financial'],
+    group: 'Finance',
+  },
+  {
+    key: 'inventory',
+    label: 'Inventory',
+    description: 'View and manage stock levels, stock movements, and suppliers',
+    routes: ['/admin/inventory'],
+    group: 'Finance',
+  },
+  {
+    key: 'gst',
+    label: 'GST Compliance',
+    description: 'Access GST reports, GSTR summaries, and tax compliance tools',
+    routes: ['/admin/gst'],
+    group: 'Finance',
+  },
+  {
     key: 'inflation',
     label: 'Inflation / Pricing',
     description: 'Bulk price adjustments via inflation tool',
@@ -139,6 +160,9 @@ export function getScopeForPath(pathname: string): string | null {
     }
   }
 
+  if (pathname.startsWith('/api/admin/financial')) return 'financial'
+  if (pathname.startsWith('/api/admin/inventory')) return 'inventory'
+  if (pathname.startsWith('/api/admin/gst')) return 'gst'
   if (pathname.startsWith('/api/admin/labels')) return 'labels'
   if (pathname.startsWith('/api/admin/quotations')) return 'quotations'
   if (pathname.startsWith('/api/admin/invoices')) return 'invoices'

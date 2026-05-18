@@ -95,18 +95,19 @@ export async function POST(request: NextRequest) {
             statusType = 'OD'
           } else {
             const scans: any[] = shipment.Scans ?? []
-            for (let i = scans.length - 1; i >= 0; i--) {
+            for (let i = 0; i < scans.length; i++) {
               const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
               if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
               const activity = (scans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
+              if (activity.includes('out for delivery')) { statusType = 'OD'; break }
               if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
               if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
               if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
               if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
-              if (activity.includes('out for delivery')) { statusType = 'OD'; break }
-              if (activity.includes('delivered')) { statusType = 'DL'; break }
               if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
-              if (activity.includes('picked up') || activity.includes('shipment picked')) { statusType = 'PU'; break }
+              if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) { statusType = 'PU'; break }
+              if (activity === 'manifested' || activity.includes('manifest')) { statusType = 'MF'; break }
+              if (activity.includes('delivered')) { statusType = 'DL'; break }
             }
           }
         }
@@ -159,10 +160,73 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const rvpRequests = await queryMany<{
+    id: string; rvp_awb_number: string; order_id: string
+  }>(
+    `SELECT id, rvp_awb_number, order_id
+     FROM return_requests
+     WHERE rvp_awb_number IS NOT NULL
+       AND status = 'approved'
+       AND received_at IS NULL`,
+    []
+  ).catch(() => [] as { id: string; rvp_awb_number: string; order_id: string }[])
+
+  const rvpResults: { returnRequestId: string; awb: string; receivedAt: boolean }[] = []
+  const rvpErrors: { awb: string; error: string }[] = []
+
+  for (let i = 0; i < rvpRequests.length; i += BATCH_SIZE) {
+    const batch = rvpRequests.slice(i, i + BATCH_SIZE)
+    const waybills = batch.map(r => r.rvp_awb_number).join(',')
+
+    try {
+      const res = await fetch(
+        `https://track.delhivery.com/api/v1/packages/json/?waybill=${encodeURIComponent(waybills)}`,
+        { headers: { Authorization: `Token ${DELHIVERY_TOKEN}` } }
+      )
+
+      if (!res.ok) {
+        batch.forEach(r => rvpErrors.push({ awb: r.rvp_awb_number, error: `HTTP ${res.status}` }))
+        continue
+      }
+
+      const data = await res.json()
+      const shipments: any[] = data?.ShipmentData ?? []
+
+      for (const entry of shipments) {
+        const shipment = entry?.Shipment
+        if (!shipment) continue
+
+        const awb: string = shipment.AWB
+        const rr = batch.find(r => r.rvp_awb_number === awb)
+        if (!rr) continue
+
+        const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+        const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
+
+        if (rawType !== 'DL') continue
+
+        await query(
+          `UPDATE return_requests SET received_at = $2, updated_at = NOW() WHERE id = $1`,
+          [rr.id, statusDateTime ?? new Date().toISOString()]
+        ).catch(() => {})
+
+        rvpResults.push({ returnRequestId: rr.id, awb, receivedAt: true })
+      }
+    } catch (err: any) {
+      batch.forEach(r => rvpErrors.push({ awb: r.rvp_awb_number, error: err.message }))
+    }
+  }
+
   return NextResponse.json({
     total: orders.length,
     synced: results.length,
     results,
     errors: errors.length > 0 ? errors : undefined,
+    rvp: {
+      total: rvpRequests.length,
+      received: rvpResults.length,
+      results: rvpResults,
+      errors: rvpErrors.length > 0 ? rvpErrors : undefined,
+    },
   })
 }

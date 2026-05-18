@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
         poi.quantity,
         poi.unit_cost,
         COALESCE(poi.tax_rate, 0)::numeric AS tax_rate,
+        ROUND(poi.quantity * poi.unit_cost, 2) AS taxable_amount,
         ROUND(poi.quantity * poi.unit_cost * COALESCE(poi.tax_rate, 0) / 100, 2) AS tax_amount,
-        ROUND(poi.quantity * poi.unit_cost / (1 + COALESCE(poi.tax_rate, 0) / 100), 2) AS taxable_amount,
         po.status AS po_status
       FROM purchase_order_items poi
       JOIN purchase_orders po ON po.id = poi.po_id

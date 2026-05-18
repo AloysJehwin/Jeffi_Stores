@@ -370,6 +370,29 @@ function POTab({ initialPO }: { initialPO?: string }) {
     if (json.success) { setReceiveMode(null); load(page) }
   }
 
+  async function sendPO(id: string) {
+    await fetch(`/api/admin/inventory/po/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'sent' }),
+    })
+    load(page)
+    if (viewPO?.po.id === id) {
+      const res = await fetch(`/api/admin/inventory/po/${id}`)
+      const json = await res.json()
+      setViewPO({ po: json.purchase_order, items: json.items || [] })
+    }
+  }
+
+  async function cancelPO(id: string) {
+    if (!confirm('Cancel this purchase order?')) return
+    await fetch(`/api/admin/inventory/po/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'cancelled' }),
+    })
+    load(page)
+    if (viewPO?.po.id === id) setViewPO(null)
+  }
+
   const openCount = pos.filter(p => ['draft', 'sent', 'partial'].includes(p.status)).length
   const pendingValue = pos.filter(p => ['draft', 'sent', 'partial'].includes(p.status)).reduce((s, p) => s + parseFloat(p.total_amount || '0'), 0)
 
@@ -494,6 +517,17 @@ function POTab({ initialPO }: { initialPO?: string }) {
             </table>
           </div>
         </div>
+        {viewPO.po.status === 'draft' && (
+          <div className="flex gap-3 pt-2">
+            <button className={btnPrimary} onClick={() => sendPO(viewPO.po.id)}>Mark as Sent</button>
+            <button className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors" onClick={() => cancelPO(viewPO.po.id)}>Cancel PO</button>
+          </div>
+        )}
+        {['sent', 'partial'].includes(viewPO.po.status) && (
+          <div className="flex gap-3 pt-2">
+            <button className={btnPrimary} onClick={() => { setViewPO(null); openReceive(viewPO.po.id) }}>Record Receipt</button>
+          </div>
+        )}
       </div>
     )
   }
@@ -582,8 +616,14 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">
                         <button className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium" onClick={() => openPO(po.id)}>View</button>
-                        {['draft', 'sent', 'partial'].includes(po.status) && (
+                        {po.status === 'draft' && (
+                          <button className="text-xs text-accent-500 hover:underline font-medium" onClick={() => sendPO(po.id)}>Send</button>
+                        )}
+                        {['sent', 'partial'].includes(po.status) && (
                           <button className="text-xs text-green-600 dark:text-green-400 hover:underline font-medium" onClick={() => openReceive(po.id)}>Receive</button>
+                        )}
+                        {po.status === 'draft' && (
+                          <button className="text-xs text-red-500 hover:underline font-medium" onClick={() => cancelPO(po.id)}>Cancel</button>
                         )}
                       </div>
                     </td>
@@ -926,10 +966,10 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Total Stock Value" value={formatINR(valuation.totalValue)} accent />
+                <SummaryCard label="Total Stock Value" value={formatINR(valuation.totalValue)} accent sub="All products" />
+                <SummaryCard label="Listed Stock Value" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.stock_value || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'Matches total'} />
                 <SummaryCard label="Total SKUs" value={String(filteredValRows.length)} sub={filteredValRows.length !== allValRows.length ? `of ${allValRows.length} total` : 'across all products'} />
                 <SummaryCard label="In Stock" value={String(filteredValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="SKUs with stock > 0" />
-                <SummaryCard label="Out of Stock" value={String(filteredValRows.filter(p => parseFloat(p.inventory_quantity || '0') === 0).length)} sub="SKUs at zero" />
               </div>
               {editingId && (
                 <div className="bg-surface-elevated rounded-xl border border-secondary-200 dark:border-secondary-800/40 p-4 flex flex-wrap gap-4 items-end">

@@ -47,7 +47,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const codAmount = '0'
     const totalAmount = String(Math.round(Number(order.total_amount) * 100) / 100)
     const orderDate = new Date(order.created_at).toISOString().slice(0, 10)
-    const invoiceRef = order.order_number || order.id.slice(0, 12)
+    const baseRef = order.order_number || order.id.slice(0, 12)
+    const invoiceRef = `${baseRef}-${Date.now()}`
 
     const orderItemRows = await queryMany<any>(`
       SELECT
