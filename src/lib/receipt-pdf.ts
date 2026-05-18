@@ -70,13 +70,56 @@ export async function generateReceiptPDF(
   items: ReceiptItem[],
   business: ReceiptBusinessSettings
 ): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const W = 226
-    const MARGIN = 12
-    const CW = W - MARGIN * 2
+  const W = 226
+  const MARGIN = 10
+  const CW = W - MARGIN * 2
+  const LINE_H = 9
+  const FS = 7
+  const FS_SM = 6.5
 
+  function measureHeight(
+    lines: Array<{ text: string; fs?: number; bold?: boolean; gap?: number }>
+  ): number {
+    let h = 0
+    for (const l of lines) h += (l.fs ?? FS) + (l.gap ?? 1)
+    return h
+  }
+
+  const headerLines = [
+    { text: business.tradeName || business.legalName, fs: 10, bold: true, gap: 2 },
+    { text: business.address, fs: 7, gap: 1 },
+    ...(business.phone ? [{ text: `Ph: ${business.phone}`, fs: 7, gap: 1 }] : []),
+    ...(business.gstin ? [{ text: `GSTIN: ${business.gstin}`, fs: 7, gap: 1 }] : []),
+  ]
+
+  const metaLines = [
+    { text: '', fs: 9, bold: true, gap: 2 },
+    { text: '', gap: 1 },
+    { text: '', gap: 1 },
+    { text: '', gap: 1 },
+    ...(order.customer_name && order.customer_name.toLowerCase() !== 'walk-in customer'
+      ? [{ text: '', gap: 1 }] : []),
+  ]
+
+  const itemsH = items.length * (LINE_H + 2)
+  const summaryLines = 1 + (order.is_igst ? (order.igst_amount > 0 ? 1 : 0) : (order.cgst_amount > 0 ? 1 : 0) + (order.sgst_amount > 0 ? 1 : 0)) + 1
+  const notesH = order.notes ? FS_SM + 6 : 0
+  const footerH = 7 + 6 + 2
+
+  const estH =
+    measureHeight(headerLines) + 8 +
+    9 + 2 +
+    measureHeight(metaLines) + 6 +
+    LINE_H + 4 +
+    itemsH + 4 +
+    summaryLines * LINE_H + 8 +
+    FS_SM + 6 +
+    notesH +
+    8 + footerH + MARGIN * 2
+
+  return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
-      size: [W, 800],
+      size: [W, Math.max(100, estH)],
       margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN },
       autoFirstPage: true,
       bufferPages: true,
@@ -90,143 +133,123 @@ export async function generateReceiptPDF(
     const x = MARGIN
     let y = MARGIN
 
-    function text(str: string, opts: Record<string, unknown> = {}, fontSize = 8) {
-      doc.fontSize(fontSize).text(str, x, y, { width: CW, ...opts })
+    function draw(str: string, opts: Record<string, unknown> = {}, fs = FS, isBold = false) {
+      doc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fs)
+        .text(str, x, y, { width: CW, lineGap: 0, ...opts })
+      if (!isBold) doc.font('Helvetica')
       y = doc.y
     }
 
-    function bold(str: string, opts: Record<string, unknown> = {}, fontSize = 8) {
-      doc.font('Helvetica-Bold').fontSize(fontSize).text(str, x, y, { width: CW, ...opts })
-      doc.font('Helvetica')
-      y = doc.y
-    }
-
-    function line(extra = 2) {
-      y += extra
-      doc.moveTo(x, y).lineTo(x + CW, y).lineWidth(0.5).stroke('#000')
-      y += extra
-    }
-
-    function dline(extra = 2) {
-      y += extra
-      doc.moveTo(x, y).lineTo(x + CW, y).lineWidth(0.3).dash(2, { space: 1 }).stroke('#000').undash()
-      y += extra
+    function ruler(dashed = false, gap = 2) {
+      y += gap
+      if (dashed) {
+        doc.moveTo(x, y).lineTo(x + CW, y).lineWidth(0.3).dash(2, { space: 1 }).stroke('#000').undash()
+      } else {
+        doc.moveTo(x, y).lineTo(x + CW, y).lineWidth(0.5).stroke('#000')
+      }
+      y += gap
     }
 
     doc.font('Helvetica')
 
-    bold(business.tradeName || business.legalName, { align: 'center' }, 10)
+    draw(business.tradeName || business.legalName, { align: 'center' }, 10, true)
     y += 1
-    text(business.address, { align: 'center' }, 7)
-    if (business.phone) text(`Ph: ${business.phone}`, { align: 'center' }, 7)
-    if (business.gstin) text(`GSTIN: ${business.gstin}`, { align: 'center' }, 7)
+    draw(business.address, { align: 'center' }, 7)
+    if (business.phone) draw(`Ph: ${business.phone}`, { align: 'center' }, 7)
+    if (business.gstin) draw(`GSTIN: ${business.gstin}`, { align: 'center' }, 7)
 
-    line()
-
-    bold('CASH SALE RECEIPT', { align: 'center' }, 9)
+    ruler(false, 3)
+    draw('CASH SALE RECEIPT', { align: 'center' }, 9, true)
     y += 2
 
-    const labelW = 60
+    const labelW = 58
     const valX = x + labelW
 
-    function row(label: string, val: string, fs = 7.5) {
-      const rowY = y
-      doc.font('Helvetica').fontSize(fs).text(label, x, rowY, { width: labelW })
-      doc.font('Helvetica').fontSize(fs).text(val, valX, rowY, { width: CW - labelW })
-      y = doc.y + 1
+    function metaRow(label: string, val: string) {
+      const ry = y
+      doc.font('Helvetica').fontSize(FS).text(label, x, ry, { width: labelW, lineGap: 0 })
+      doc.font('Helvetica').fontSize(FS).text(val, valX, ry, { width: CW - labelW, lineGap: 0 })
+      y = Math.max(doc.y, ry + FS + 1) + 1
     }
 
-    row('Receipt No.', order.invoice_number)
-    row('Date', fmtDate(order.invoice_date))
-    row('Payment', order.payment_mode || 'Cash')
+    metaRow('Receipt No.', order.invoice_number)
+    metaRow('Date', fmtDate(order.invoice_date))
+    metaRow('Payment', order.payment_mode || 'Cash')
     if (order.customer_name && order.customer_name.toLowerCase() !== 'walk-in customer') {
-      row('Customer', order.customer_name)
+      metaRow('Customer', order.customer_name)
     }
 
-    dline()
+    ruler(true, 2)
 
-    const col = {
-      item: x,
-      qty: x + CW - 70,
-      rate: x + CW - 46,
-      amt: x + CW - 22,
-    }
-    const colW = {
-      item: CW - 70,
-      qty: 24,
-      rate: 24,
-      amt: 22,
-    }
+    const col = { item: x, qty: x + CW - 68, rate: x + CW - 44, amt: x + CW - 20 }
+    const colW = { item: CW - 68, qty: 24, rate: 24, amt: 20 }
 
-    doc.font('Helvetica-Bold').fontSize(7)
-    doc.text('Item', col.item, y, { width: colW.item })
-    doc.text('Qty', col.qty, y, { width: colW.qty, align: 'right' })
-    doc.text('Rate', col.rate, y, { width: colW.rate, align: 'right' })
-    doc.text('Amt', col.amt, y, { width: colW.amt, align: 'right' })
+    doc.font('Helvetica-Bold').fontSize(FS)
+    doc.text('Item', col.item, y, { width: colW.item, lineGap: 0 })
+    doc.text('Qty', col.qty, y, { width: colW.qty, align: 'right', lineGap: 0 })
+    doc.text('Rate', col.rate, y, { width: colW.rate, align: 'right', lineGap: 0 })
+    doc.text('Amt', col.amt, y, { width: colW.amt, align: 'right', lineGap: 0 })
     doc.font('Helvetica')
-    y = doc.y + 1
+    y += FS + 2
 
-    dline(1)
+    ruler(true, 1)
 
     for (const item of items) {
-      const rowY = y
-      doc.font('Helvetica').fontSize(7).text(item.product_name, col.item, rowY, { width: colW.item })
-      const itemH = doc.heightOfString(item.product_name, { width: colW.item })
-      const numY = rowY + Math.max(0, (itemH - 9) / 2)
-      doc.text(String(item.quantity), col.qty, numY, { width: colW.qty, align: 'right' })
-      doc.text(fmtAmt(item.unit_price), col.rate, numY, { width: colW.rate, align: 'right' })
-      doc.text(fmtAmt(item.total_price), col.amt, numY, { width: colW.amt, align: 'right' })
-      y = rowY + itemH + 2
+      const ry = y
+      doc.font('Helvetica').fontSize(FS)
+      const nameH = doc.heightOfString(item.product_name, { width: colW.item })
+      doc.text(item.product_name, col.item, ry, { width: colW.item, lineGap: 0 })
+      const ny = ry + Math.max(0, (nameH - FS) / 2)
+      doc.text(String(item.quantity), col.qty, ny, { width: colW.qty, align: 'right', lineGap: 0 })
+      doc.text(fmtAmt(item.unit_price), col.rate, ny, { width: colW.rate, align: 'right', lineGap: 0 })
+      doc.text(fmtAmt(item.total_price), col.amt, ny, { width: colW.amt, align: 'right', lineGap: 0 })
+      y = ry + nameH + 2
     }
 
-    dline(1)
+    ruler(true, 1)
 
-    function summaryRow(label: string, val: string, isBold = false) {
-      const rowY = y
-      if (isBold) {
-        doc.font('Helvetica-Bold').fontSize(7.5).text(label, x, rowY, { width: CW - 40 })
-        doc.font('Helvetica-Bold').fontSize(7.5).text(val, x + CW - 40, rowY, { width: 40, align: 'right' })
-        doc.font('Helvetica')
-      } else {
-        doc.font('Helvetica').fontSize(7).text(label, x, rowY, { width: CW - 40 })
-        doc.font('Helvetica').fontSize(7).text(val, x + CW - 40, rowY, { width: 40, align: 'right' })
-      }
-      y = doc.y + 1
+    function sumRow(label: string, val: string, bold = false) {
+      const ry = y
+      const fs = bold ? 7.5 : FS
+      const font = bold ? 'Helvetica-Bold' : 'Helvetica'
+      doc.font(font).fontSize(fs).text(label, x, ry, { width: CW - 38, lineGap: 0 })
+      doc.font(font).fontSize(fs).text(val, x + CW - 38, ry, { width: 38, align: 'right', lineGap: 0 })
+      doc.font('Helvetica')
+      y = ry + fs + 2
     }
 
-    summaryRow('Taxable Amount', fmtAmt(order.taxable_amount))
-
+    sumRow('Taxable Amount', fmtAmt(order.taxable_amount))
     if (order.is_igst && order.igst_amount > 0) {
-      summaryRow('IGST', fmtAmt(order.igst_amount))
+      sumRow('IGST', fmtAmt(order.igst_amount))
     } else {
-      if (order.cgst_amount > 0) summaryRow('CGST', fmtAmt(order.cgst_amount))
-      if (order.sgst_amount > 0) summaryRow('SGST', fmtAmt(order.sgst_amount))
+      if (order.cgst_amount > 0) sumRow('CGST', fmtAmt(order.cgst_amount))
+      if (order.sgst_amount > 0) sumRow('SGST', fmtAmt(order.sgst_amount))
     }
 
-    line(1)
-    summaryRow('TOTAL', `Rs. ${fmtAmt(order.total_amount)}`, true)
-    line(1)
+    ruler(false, 1)
+    sumRow(`TOTAL`, `Rs. ${fmtAmt(order.total_amount)}`, true)
+    ruler(false, 1)
 
     y += 2
-    doc.font('Helvetica').fontSize(6.5).text(
+    doc.font('Helvetica').fontSize(FS_SM).text(
       `Amount in words: ${toWords(order.total_amount)}`,
-      x, y, { width: CW }
+      x, y, { width: CW, lineGap: 0 }
     )
-    y = doc.y + 4
+    y = doc.y + 3
 
     if (order.notes) {
-      doc.font('Helvetica').fontSize(6.5).text(`Notes: ${order.notes}`, x, y, { width: CW })
-      y = doc.y + 4
+      doc.font('Helvetica').fontSize(FS_SM).text(`Notes: ${order.notes}`, x, y, { width: CW, lineGap: 0 })
+      y = doc.y + 3
     }
 
-    dline()
+    ruler(true, 2)
 
-    doc.font('Helvetica').fontSize(7).text('Thank you for your purchase!', x, y, { width: CW, align: 'center' })
-    y = doc.y + 2
-    doc.font('Helvetica').fontSize(6).text('This is a computer-generated receipt.', x, y, { width: CW, align: 'center' })
+    doc.font('Helvetica').fontSize(7).text('Thank you for your purchase!', x, y, { width: CW, align: 'center', lineGap: 0 })
+    y = doc.y + 1
+    doc.font('Helvetica').fontSize(FS_SM).text('This is a computer-generated receipt.', x, y, { width: CW, align: 'center', lineGap: 0 })
     y = doc.y
 
-    doc.page.height = y + MARGIN + 4
+    doc.page.height = y + MARGIN + 2
     doc.flushPages()
     doc.end()
   })
