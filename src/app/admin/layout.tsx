@@ -56,6 +56,7 @@ export default async function AdminLayout({
     { href: '/admin/orders', label: 'Orders', scope: 'orders', group: 'Sales' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations', group: 'Sales' },
     { href: '/admin/invoices', label: 'Invoices', scope: 'invoices', group: 'Sales' },
+    { href: '/admin/cash-sale', label: 'Cash Sale', scope: 'invoices', group: 'Sales' },
     { href: '/admin/customers', label: 'Customers', scope: 'customers', group: 'Sales' },
     { href: '/admin/delhivery', label: 'Pickup Request', scope: 'orders', group: 'Fulfilment' },
     { href: '/admin/packing-slips', label: 'Packing Slips', scope: 'packing_slips', group: 'Fulfilment' },

@@ -120,6 +120,8 @@ export function createSessionToken(admin: any) {
     id: admin.id,
     user_id: admin.user_id,
     username: admin.username,
+    first_name: admin.first_name || undefined,
+    last_name: admin.last_name || undefined,
     role: admin.role,
     email: admin.email,
     exp: Date.now() + 30 * 60 * 1000,

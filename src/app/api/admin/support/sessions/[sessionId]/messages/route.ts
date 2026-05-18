@@ -50,9 +50,13 @@ export async function POST(
 
     const isFirstAgentMessage = !session.admin_name
 
+    const adminDisplayName = (admin.first_name && admin.last_name)
+      ? `${admin.first_name} ${admin.last_name}`
+      : admin.username
+
     await queryOne(
       `UPDATE support_sessions SET admin_name = COALESCE(admin_name, $1) WHERE id = $2`,
-      [admin.username, params.sessionId]
+      [adminDisplayName, params.sessionId]
     )
 
     const msg = await queryOne(
@@ -69,11 +73,11 @@ export async function POST(
       )
       if (customer) {
         const customerName = `${customer.first_name} ${customer.last_name}`.trim()
-        sendAgentConnectedEmail(customerName, customer.email, admin.username).catch(() => {})
+        sendAgentConnectedEmail(customerName, customer.email, adminDisplayName).catch(() => {})
       }
     }
 
-    return NextResponse.json({ message: { ...msg, sender_name: admin.username, is_closing: isClosingMessage || false } })
+    return NextResponse.json({ message: { ...msg, sender_name: adminDisplayName, is_closing: isClosingMessage || false } })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }

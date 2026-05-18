@@ -594,15 +594,18 @@ export default function InvoicesClient() {
       </div>
 
       <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
-        <div className="flex flex-wrap gap-2 items-end">
-          <AdminTypeahead
-            type="invoices"
-            value={searchInput}
-            onChange={setSearchInput}
-            onSelect={item => { setSearchInput(item.label); setSearchQ(item.label) }}
-            onEnter={val => setSearchQ(val)}
-            placeholder="Search invoice, order, customer…"
-          />
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex-1 min-w-[200px]">
+            <AdminTypeahead
+              type="invoices"
+              value={searchInput}
+              onChange={setSearchInput}
+              onSelect={item => { setSearchInput(item.label); setSearchQ(item.label) }}
+              onEnter={val => setSearchQ(val)}
+              placeholder="Search invoice, order, customer…"
+              inputClassName={inputCls + ' pr-9'}
+            />
+          </div>
           <button onClick={() => setSearchQ(searchInput)}
             className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-medium transition-colors">
             Search
