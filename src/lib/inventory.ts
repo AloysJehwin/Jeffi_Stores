@@ -3,7 +3,7 @@ import { PoolClient } from 'pg'
 import { buildProductSearchClause } from './search'
 
 export type TransactionType = 'purchase' | 'sale' | 'return' | 'adjustment'
-export type ReferenceType = 'order' | 'grn' | 'manual'
+export type ReferenceType = 'order' | 'grn' | 'manual' | 'cash_sale'
 
 export async function logStockMovement(
   client: PoolClient | null,
