@@ -181,8 +181,8 @@ export async function generateReceiptPDF(
 
     ruler(true, 2)
 
-    const col = { item: x, qty: x + CW - 68, rate: x + CW - 44, amt: x + CW - 20 }
-    const colW = { item: CW - 68, qty: 24, rate: 24, amt: 20 }
+    const col = { item: x, qty: x + CW - 80, rate: x + CW - 52, amt: x + CW - 30 }
+    const colW = { item: CW - 80, qty: 28, rate: 22, amt: 30 }
 
     doc.font('Helvetica-Bold').fontSize(FS)
     doc.text('Item', col.item, y, { width: colW.item, lineGap: 0 })
@@ -213,7 +213,7 @@ export async function generateReceiptPDF(
       const fs = bold ? 7.5 : FS
       const font = bold ? 'Helvetica-Bold' : 'Helvetica'
       doc.font(font).fontSize(fs).text(label, x, ry, { width: CW - 38, lineGap: 0 })
-      doc.font(font).fontSize(fs).text(val, x + CW - 38, ry, { width: 38, align: 'right', lineGap: 0 })
+      doc.font(font).fontSize(fs).text(val, x + CW - 46, ry, { width: 46, align: 'right', lineGap: 0 })
       doc.font('Helvetica')
       y = ry + fs + 2
     }

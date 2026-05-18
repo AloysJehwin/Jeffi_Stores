@@ -31,8 +31,8 @@ export default function Pagination({ page, total, pageSize, buildUrl }: Paginati
   const disabled = `${btnBase} text-foreground-muted border border-border-default opacity-40 pointer-events-none`
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1 pt-4">
-      <p className="text-sm text-foreground-muted">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-4">
+      <p className="text-sm text-foreground-muted hidden sm:block">
         Showing <span className="font-medium text-foreground">{start}–{end}</span> of{' '}
         <span className="font-medium text-foreground">{total}</span> results
       </p>
