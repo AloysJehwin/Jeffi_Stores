@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -61,17 +62,27 @@ function todayISO() {
 
 export default function QuotationsClient() {
   const { showToast, showConfirm } = useToast()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [view, setView] = useState<View>('list')
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [selectedQuote, setSelectedQuote] = useState<Quotation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [searchQ, setSearchQ] = useState('')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all')
+  const [searchQ, setSearchQ] = useState(searchParams.get('q') || '')
+  const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
+  const [toDate, setToDate] = useState(searchParams.get('to') || '')
   const [sortCol, setSortCol] = useState<string | undefined>(undefined)
   const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
+
+  function syncUrl(patch: Record<string, string>) {
+    const p = new URLSearchParams(window.location.search)
+    for (const [k, v] of Object.entries(patch)) {
+      if (v && v !== 'all') p.set(k, v); else p.delete(k)
+    }
+    router.replace(`/admin/quotations?${p.toString()}`, { scroll: false })
+  }
 
   function handleSort(col: string, dir: SortDir) {
     setSortCol(col)
@@ -426,7 +437,7 @@ export default function QuotationsClient() {
               <AdminTypeahead
                 type="quotations"
                 value={searchQ}
-                onChange={setSearchQ}
+                onChange={v => { setSearchQ(v); syncUrl({ q: v }) }}
                 onEnter={() => loadList()}
                 placeholder="Search quote # or consignee..."
                 inputClassName={inputCls + ' pr-9'}
@@ -436,7 +447,7 @@ export default function QuotationsClient() {
               Search
             </button>
             {(searchQ || statusFilter !== 'all' || fromDate || toDate) && (
-              <button onClick={() => { setSearchQ(''); setStatusFilter('all'); setFromDate(''); setToDate('') }}
+              <button onClick={() => { setSearchQ(''); setStatusFilter('all'); setFromDate(''); setToDate(''); syncUrl({ q: '', status: '', from: '', to: '' }) }}
                 className="px-4 py-1.5 border border-border-default rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
                 Clear
               </button>
@@ -445,7 +456,7 @@ export default function QuotationsClient() {
           <div className="flex flex-wrap gap-2 items-center">
             <div className="flex gap-1">
               {['all', 'draft', 'final'].map(s => (
-                <button key={s} onClick={() => setStatusFilter(s)}
+                <button key={s} onClick={() => { setStatusFilter(s); syncUrl({ status: s }) }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
                     statusFilter === s
                       ? 'bg-secondary-500 text-white'
@@ -455,9 +466,9 @@ export default function QuotationsClient() {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className={inputCls + ' w-36'} />
+              <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); syncUrl({ from: e.target.value }) }} className={inputCls + ' w-36'} />
               <span className="text-foreground-secondary text-xs">to</span>
-              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className={inputCls + ' w-36'} />
+              <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); syncUrl({ to: e.target.value }) }} className={inputCls + ' w-36'} />
             </div>
           </div>
         </div>

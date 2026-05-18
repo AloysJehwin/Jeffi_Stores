@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -72,6 +73,8 @@ const SOURCE_COLORS: Record<string, string> = {
 
 export default function InvoicesClient() {
   const { showToast } = useToast()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [view, setView] = useState<View>('list')
   const [editId, setEditId] = useState<string | null>(null)
 
@@ -82,14 +85,22 @@ export default function InvoicesClient() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
-  const [sourceFilter, setSourceFilter] = useState('')
-  const [paymentFilter, setPaymentFilter] = useState('')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [searchQ, setSearchQ] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '')
+  const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
+  const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
+  const [toDate, setToDate] = useState(searchParams.get('to') || '')
+  const [searchQ, setSearchQ] = useState(searchParams.get('search') || '')
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '')
   const [sortCol, setSortCol] = useState<string | undefined>(undefined)
   const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
+
+  function syncUrl(patch: Record<string, string>) {
+    const p = new URLSearchParams(window.location.search)
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) p.set(k, v); else p.delete(k)
+    }
+    router.replace(`/admin/invoices?${p.toString()}`, { scroll: false })
+  }
 
   function handleSort(col: string, dir: SortDir) {
     setSortCol(col)
@@ -600,36 +611,36 @@ export default function InvoicesClient() {
               type="invoices"
               value={searchInput}
               onChange={setSearchInput}
-              onSelect={item => { setSearchInput(item.label); setSearchQ(item.label) }}
-              onEnter={val => setSearchQ(val)}
+              onSelect={item => { setSearchInput(item.label); setSearchQ(item.label); syncUrl({ search: item.label }) }}
+              onEnter={val => { setSearchQ(val); syncUrl({ search: val }) }}
               placeholder="Search invoice, order, customer…"
               inputClassName={inputCls + ' pr-9'}
             />
           </div>
-          <button onClick={() => setSearchQ(searchInput)}
+          <button onClick={() => { setSearchQ(searchInput); syncUrl({ search: searchInput }) }}
             className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-medium transition-colors">
             Search
           </button>
           {(searchQ || sourceFilter || paymentFilter || fromDate || toDate) && (
-            <button onClick={() => { setSearchQ(''); setSearchInput(''); setSourceFilter(''); setPaymentFilter(''); setFromDate(''); setToDate('') }}
+            <button onClick={() => { setSearchQ(''); setSearchInput(''); setSourceFilter(''); setPaymentFilter(''); setFromDate(''); setToDate(''); syncUrl({ search: '', source: '', payment: '', from: '', to: '' }) }}
               className="px-4 py-1.5 border border-border-default rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
               Clear
             </button>
           )}
         </div>
         <div className="flex flex-wrap gap-2 items-center">
-          <AdminSelect value={sourceFilter} onChange={setSourceFilter} placeholder="All Sources"
+          <AdminSelect value={sourceFilter} onChange={v => { setSourceFilter(v); syncUrl({ source: v }) }} placeholder="All Sources"
             options={[{ value: 'online', label: 'Online' }, { value: 'offline', label: 'Offline' }]} />
-          <AdminSelect value={paymentFilter} onChange={setPaymentFilter} placeholder="All Payments"
+          <AdminSelect value={paymentFilter} onChange={v => { setPaymentFilter(v); syncUrl({ payment: v }) }} placeholder="All Payments"
             options={[
               { value: 'paid', label: 'Paid' }, { value: 'unpaid', label: 'Unpaid' },
               { value: 'refunded', label: 'Refunded' }, { value: 'failed', label: 'Failed' },
             ]} />
           <div className="flex items-center gap-2">
-            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+            <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); syncUrl({ from: e.target.value }) }}
               className={inputCls + ' w-36'} />
             <span className="text-foreground-secondary text-xs">to</span>
-            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+            <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); syncUrl({ to: e.target.value }) }}
               className={inputCls + ' w-36'} />
           </div>
         </div>

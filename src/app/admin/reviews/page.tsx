@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 
 interface Review {
@@ -23,13 +24,26 @@ interface Review {
 }
 
 export default function AdminReviewsPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
   const [reviews, setReviews] = useState<Review[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>('pending')
-  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>(
+    (searchParams.get('filter') as 'all' | 'pending' | 'approved') || 'pending'
+  )
+  const [search, setSearch] = useState(searchParams.get('q') || '')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const { showToast } = useToast()
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function syncUrl(patch: Record<string, string>) {
+    const p = new URLSearchParams(window.location.search)
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) p.set(k, v); else p.delete(k)
+    }
+    router.replace(`/admin/reviews?${p.toString()}`, { scroll: false })
+  }
 
   useEffect(() => {
     fetchReviews()
@@ -53,6 +67,7 @@ export default function AdminReviewsPage() {
 
   function handleSearchChange(val: string) {
     setSearch(val)
+    syncUrl({ q: val })
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => fetchReviews(val), 300)
   }
@@ -128,7 +143,7 @@ export default function AdminReviewsPage() {
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default mb-6">
         <div className="flex border-b border-border-default">
           <button
-            onClick={() => setFilter('pending')}
+            onClick={() => { setFilter('pending'); syncUrl({ filter: 'pending' }) }}
             className={`px-3 sm:px-6 py-3 text-sm sm:text-base font-medium transition-colors ${
               filter === 'pending'
                 ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
@@ -138,7 +153,7 @@ export default function AdminReviewsPage() {
             Pending Approval
           </button>
           <button
-            onClick={() => setFilter('approved')}
+            onClick={() => { setFilter('approved'); syncUrl({ filter: 'approved' }) }}
             className={`px-3 sm:px-6 py-3 text-sm sm:text-base font-medium transition-colors ${
               filter === 'approved'
                 ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'
@@ -148,7 +163,7 @@ export default function AdminReviewsPage() {
             Approved
           </button>
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => { setFilter('all'); syncUrl({ filter: 'all' }) }}
             className={`px-3 sm:px-6 py-3 text-sm sm:text-base font-medium transition-colors ${
               filter === 'all'
                 ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-600 dark:border-primary-400'

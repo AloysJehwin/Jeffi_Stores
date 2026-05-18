@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -77,6 +78,8 @@ function calcTotals(items: LineItem[]) {
 
 export default function CashSaleClient() {
   const { showToast } = useToast()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [view, setView] = useState<View>('list')
 
   const [sales, setSales] = useState<CashSale[]>([])
@@ -84,13 +87,21 @@ export default function CashSaleClient() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [selectedSale, setSelectedSale] = useState<CashSale | null>(null)
-  const [paymentFilter, setPaymentFilter] = useState('')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [searchQ, setSearchQ] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
+  const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
+  const [toDate, setToDate] = useState(searchParams.get('to') || '')
+  const [searchQ, setSearchQ] = useState(searchParams.get('search') || '')
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') || '')
   const [sortCol, setSortCol] = useState<string | undefined>(undefined)
   const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
+
+  function syncUrl(patch: Record<string, string>) {
+    const p = new URLSearchParams(window.location.search)
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) p.set(k, v); else p.delete(k)
+    }
+    router.replace(`/admin/cash-sale?${p.toString()}`, { scroll: false })
+  }
 
   const [paymentMode, setPaymentMode] = useState('cash')
   const [notes, setNotes] = useState('')
@@ -471,21 +482,21 @@ export default function CashSaleClient() {
               type="invoices"
               value={searchInput}
               onChange={setSearchInput}
-              onSelect={item => { setSearchInput(item.label); setSearchQ(item.label) }}
-              onEnter={val => setSearchQ(val)}
+              onSelect={item => { setSearchInput(item.label); setSearchQ(item.label); syncUrl({ search: item.label }) }}
+              onEnter={val => { setSearchQ(val); syncUrl({ search: val }) }}
               placeholder="Search receipt no, order no…"
               inputClassName={inputCls + ' pr-9'}
             />
           </div>
           <button
-            onClick={() => setSearchQ(searchInput)}
+            onClick={() => { setSearchQ(searchInput); syncUrl({ search: searchInput }) }}
             className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Search
           </button>
           {(searchQ || paymentFilter || fromDate || toDate) && (
             <button
-              onClick={() => { setSearchQ(''); setSearchInput(''); setPaymentFilter(''); setFromDate(''); setToDate('') }}
+              onClick={() => { setSearchQ(''); setSearchInput(''); setPaymentFilter(''); setFromDate(''); setToDate(''); syncUrl({ search: '', payment: '', from: '', to: '' }) }}
               className="px-4 py-1.5 border border-border-default rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               Clear
@@ -495,7 +506,7 @@ export default function CashSaleClient() {
         <div className="flex flex-wrap gap-2 items-center">
           <AdminSelect
             value={paymentFilter}
-            onChange={setPaymentFilter}
+            onChange={v => { setPaymentFilter(v); syncUrl({ payment: v }) }}
             placeholder="All Payments"
             options={[
               { value: 'paid', label: 'Paid' },
@@ -504,9 +515,9 @@ export default function CashSaleClient() {
             ]}
           />
           <div className="flex items-center gap-2">
-            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className={inputCls + ' w-36'} />
+            <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); syncUrl({ from: e.target.value }) }} className={inputCls + ' w-36'} />
             <span className="text-foreground-secondary text-xs">to</span>
-            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className={inputCls + ' w-36'} />
+            <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); syncUrl({ to: e.target.value }) }} className={inputCls + ' w-36'} />
           </div>
         </div>
       </div>
