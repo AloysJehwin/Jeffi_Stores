@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { withTransaction } from '@/lib/db'
-import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
+import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'All items need a name and price' }, { status: 400 })
     }
 
-    const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
     const orderIsIgst = false
 
     let subtotal = 0
@@ -73,22 +72,39 @@ export async function POST(request: NextRequest) {
     const result = await withTransaction(async (client) => {
       const ts = Date.now()
       const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
-      const orderNumber = `CS-${ts}-${rand}`
+      const saleNumber = `CS-${ts}-${rand}`
 
-      const orderResult = await client.query(
-        `INSERT INTO orders (
-          order_number, customer_name, customer_phone, customer_email,
-          subtotal, tax_amount, total_amount, discount_amount, shipping_amount,
+      const isGSTEnabled = process.env.ENABLE_GST === 'true'
+      let invoiceNumber: string | null = null
+      let fy: string | null = null
+      let seq: number | null = null
+
+      if (isGSTEnabled) {
+        const settingsResult = await client.query(`SELECT value FROM site_settings WHERE key = 'invoice_prefix'`)
+        const prefix = settingsResult.rows[0]?.value || 'JS'
+        fy = getFinancialYear(new Date())
+        seq = await getNextInvoiceSequence(client, fy)
+        invoiceNumber = generateInvoiceNumber(prefix, fy, seq)
+      }
+
+      const saleResult = await client.query(
+        `INSERT INTO cash_sales (
+          sale_number, invoice_number, invoice_date, financial_year, sequence_number,
+          customer_name, payment_mode, payment_status,
+          subtotal, tax_amount, total_amount,
           taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst,
-          payment_status, status, source, notes
+          notes
         ) VALUES (
-          $1, 'Walk-in Customer', '', '',
-          $2, $3, $4, 0, 0,
-          $5, $6, $7, $8, false,
-          'paid', 'draft', 'cash_sale', $9
-        ) RETURNING id, order_number`,
+          $1, $2, now(), $3, $4,
+          'Walk-in Customer', $5, 'paid',
+          $6, $7, $8,
+          $9, $10, $11, $12, false,
+          $13
+        ) RETURNING id, sale_number`,
         [
-          orderNumber, subtotal, taxAmount, totalAmount,
+          saleNumber, invoiceNumber, fy, seq,
+          paymentMode,
+          subtotal, taxAmount, totalAmount,
           Math.round(totalTaxable * 100) / 100,
           Math.round(totalCgst * 100) / 100,
           Math.round(totalSgst * 100) / 100,
@@ -96,17 +112,17 @@ export async function POST(request: NextRequest) {
           notes || null,
         ]
       )
-      const orderId = orderResult.rows[0].id
+      const saleId = saleResult.rows[0].id
 
       for (const item of processedItems) {
         await client.query(
-          `INSERT INTO order_items (
-            order_id, product_id, product_name, product_sku, variant_id, variant_name,
+          `INSERT INTO cash_sale_items (
+            sale_id, product_id, product_name, product_sku, variant_id, variant_name,
             hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,$11,$12,$13,$14,$15,$16)`,
           [
-            orderId, item.product_id, item.product_name, item.product_sku,
+            saleId, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.variant_name,
             item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
             item.tax_amount, item.total_price, item.taxable_amount,
@@ -114,8 +130,6 @@ export async function POST(request: NextRequest) {
           ]
         )
       }
-
-      await client.query(`SELECT id FROM orders WHERE id = $1 FOR UPDATE`, [orderId])
 
       for (const item of processedItems) {
         if (!item.product_id) continue
@@ -158,45 +172,19 @@ export async function POST(request: NextRequest) {
           variantId: item.variant_id || null,
           transactionType: 'sale',
           quantityChange: -qty,
-          referenceType: 'order',
-          referenceId: orderId,
+          referenceType: 'cash_sale',
+          referenceId: saleId,
         })
       }
 
-      const isGSTEnabled = process.env.ENABLE_GST === 'true'
-      let invoiceNumber: string | null = null
-
-      if (isGSTEnabled) {
-        const settingsResult = await client.query(`SELECT value FROM site_settings WHERE key = 'invoice_prefix'`)
-        const prefix = settingsResult.rows[0]?.value || 'JS'
-        const fy = getFinancialYear(new Date())
-        const seq = await getNextInvoiceSequence(client, fy)
-        invoiceNumber = generateInvoiceNumber(prefix, fy, seq)
-        const invoiceDate = new Date().toISOString()
-
-        await client.query(
-          `UPDATE orders SET invoice_number = $1, invoice_date = $2, status = 'delivered', updated_at = NOW() WHERE id = $3`,
-          [invoiceNumber, invoiceDate, orderId]
-        )
-        await client.query(
-          `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)`,
-          [orderId, invoiceNumber, fy, seq]
-        )
-      } else {
-        await client.query(
-          `UPDATE orders SET status = 'delivered', invoice_date = NOW(), updated_at = NOW() WHERE id = $1`,
-          [orderId]
-        )
-      }
-
-      return { invoiceNumber, orderId }
+      return { invoiceNumber, saleId, saleNumber }
     })
 
     return NextResponse.json({
       success: true,
       invoiceNumber: result.invoiceNumber,
-      orderId: result.orderId,
-      invoiceUrl: result.invoiceNumber ? `/api/orders/${result.orderId}/invoice` : null,
+      saleId: result.saleId,
+      invoiceUrl: `/api/admin/cash-sale/${result.saleId}/receipt`,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })

@@ -19,37 +19,35 @@ export async function GET(request: NextRequest) {
     const limit = 25
     const offset = (page - 1) * limit
 
-    const conditions: string[] = ["o.source = 'cash_sale'"]
+    const conditions: string[] = []
     const params: any[] = []
     let i = 1
 
-    if (payment) { conditions.push(`o.payment_status = $${i++}`); params.push(payment) }
-    if (from) { conditions.push(`o.invoice_date >= $${i++}`); params.push(from) }
-    if (to) { conditions.push(`o.invoice_date < ($${i++}::date + interval '1 day')`); params.push(to) }
+    if (payment) { conditions.push(`cs.payment_status = $${i++}`); params.push(payment) }
+    if (from) { conditions.push(`cs.invoice_date >= $${i++}`); params.push(from) }
+    if (to) { conditions.push(`cs.invoice_date < ($${i++}::date + interval '1 day')`); params.push(to) }
     if (search) {
-      const sc = buildVectorSearchClause(search, 'o.search_vector', ['o.customer_name'], ['o.invoice_number', 'o.order_number'], i, 'simple')
+      const sc = buildVectorSearchClause(search, 'cs.search_vector', ['cs.customer_name'], ['cs.invoice_number', 'cs.sale_number'], i, 'simple')
       conditions.push(sc.clause)
       params.push(...sc.params)
       i = sc.nextIdx
     }
 
-    const where = `WHERE ${conditions.join(' AND ')}`
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
     const [rows, countRow] = await Promise.all([
       queryMany(`
         SELECT
-          o.id, o.order_number, o.invoice_number, o.invoice_date,
-          o.customer_name, o.total_amount, o.taxable_amount,
-          o.cgst_amount, o.sgst_amount, o.igst_amount,
-          o.payment_status, o.status, o.notes,
-          inv.pdf_url
-        FROM orders o
-        LEFT JOIN invoices inv ON inv.order_id = o.id
+          cs.id, cs.sale_number AS order_number, cs.invoice_number, cs.invoice_date,
+          cs.customer_name, cs.total_amount, cs.taxable_amount,
+          cs.cgst_amount, cs.sgst_amount, cs.igst_amount,
+          cs.payment_status, cs.payment_mode, cs.notes
+        FROM cash_sales cs
         ${where}
-        ORDER BY o.created_at DESC
+        ORDER BY cs.created_at DESC
         LIMIT $${i} OFFSET $${i + 1}
       `, [...params, limit, offset]),
-      queryOne<{ count: string }>(`SELECT COUNT(*) AS count FROM orders o ${where}`, params),
+      queryOne<{ count: string }>(`SELECT COUNT(*) AS count FROM cash_sales cs ${where}`, params),
     ])
 
     return NextResponse.json({
