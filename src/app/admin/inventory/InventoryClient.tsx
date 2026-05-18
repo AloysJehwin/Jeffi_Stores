@@ -68,7 +68,7 @@ function ClientPagination({ page, total, pageSize, onChange }: { page: number; t
 
   const base = 'inline-flex items-center justify-center h-8 min-w-[2rem] px-2 rounded-md text-sm font-medium transition-colors'
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-1 pt-4 border-t border-border-default mt-2">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-4 border-t border-border-default mt-2">
       <p className="text-xs text-foreground-muted">
         Showing <span className="font-medium text-foreground">{start}–{end}</span> of <span className="font-medium text-foreground">{total}</span>
       </p>
