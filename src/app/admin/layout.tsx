@@ -61,22 +61,26 @@ export default async function AdminLayout({
     { href: '/admin/packing-slips', label: 'Packing Slips', scope: 'packing_slips', group: 'Fulfilment' },
     { href: '/admin/labels', label: 'Labels', scope: 'labels', group: 'Fulfilment' },
     { href: '/admin/scan', label: 'QuickScan', scope: 'quick_scan', group: 'Fulfilment', mobileOnly: true },
-    { href: '/admin/financial', label: 'Financial', scope: 'settings', group: 'Finance' },
-    { href: '/admin/inventory', label: 'Inventory', scope: 'settings', group: 'Finance' },
-    { href: '/admin/gst', label: 'GST Compliance', scope: 'settings', group: 'Finance' },
+    { href: '/admin/financial', label: 'Financial', scope: 'financial', group: 'Finance' },
+    { href: '/admin/inventory', label: 'Inventory', scope: 'inventory', group: 'Finance' },
+    { href: '/admin/gst', label: 'GST Compliance', scope: 'gst', group: 'Finance' },
     { href: '/admin/traffic', label: 'Traffic', scope: 'dashboard', group: 'Marketing' },
     { href: '/admin/coupons', label: 'Coupons', scope: 'coupons', group: 'Marketing' },
     { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms', group: 'Marketing' },
     { href: '/admin/mailer', label: 'Mailer', scope: 'mailer', group: 'Marketing' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews', group: 'Marketing' },
     { href: '/admin/inflation', label: 'Inflation', scope: 'inflation', group: 'Settings' },
+    { href: '/admin/team', label: 'Team Members', scope: 'settings', group: 'Settings' },
     { href: '/admin/settings', label: 'Settings', scope: 'settings', group: 'Settings' },
   ]
 
   const filteredNavLinks = navLinks.filter(link => hasScope(role, scopes, link.scope))
   const desktopNavLinks = filteredNavLinks.filter(link => !('mobileOnly' in link && link.mobileOnly))
 
-  const usernameInitial = (session?.username || 'A')[0].toUpperCase()
+  const displayName = session?.first_name && session?.last_name
+    ? `${session.first_name} ${session.last_name}`
+    : session?.username || 'Admin'
+  const usernameInitial = (session?.first_name || session?.username || 'A')[0].toUpperCase()
 
   return (
     <div className="h-screen overflow-hidden flex flex-row bg-surface-secondary">
@@ -101,7 +105,7 @@ export default async function AdminLayout({
           <div className="flex items-center gap-2 md:hidden">
             <AdminMobileNav
               navLinks={filteredNavLinks}
-              username={session?.username || 'Admin'}
+              username={displayName}
               role={session?.role || 'user'}
             />
             <span className="font-bold text-white text-sm">Jeffi Admin</span>
@@ -116,7 +120,7 @@ export default async function AdminLayout({
                 {usernameInitial}
               </div>
               <div className="hidden sm:block leading-tight">
-                <p className="text-xs font-semibold text-white leading-none">{session?.username || 'Admin'}</p>
+                <p className="text-xs font-semibold text-white leading-none">{displayName}</p>
                 <p className="text-[10px] text-white/60 capitalize">{session?.role || 'user'}</p>
               </div>
             </div>

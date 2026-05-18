@@ -7,6 +7,8 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
   const [awb, setAwb] = useState<string | null>(awbNumber || null)
   const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelConfirming, setCancelConfirming] = useState(false)
 
   const handleCreate = async () => {
     setConfirming(false)
@@ -24,16 +26,68 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
     }
   }
 
+  const handleCancel = async () => {
+    setCancelConfirming(false)
+    setCancelling(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/cancel-shipment`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.details || data.error || 'Failed to cancel shipment')
+      setAwb(null)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   if (awb) {
     return (
-      <div className="flex items-center gap-3 px-4 py-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-        <svg className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-        <div>
-          <p className="text-sm text-green-800 dark:text-green-300 font-medium">Shipment registered</p>
-          <p className="text-xs text-green-700 dark:text-green-400 font-mono mt-0.5">AWB: {awb}</p>
+      <div className="space-y-2">
+        {error && (
+          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>
+        )}
+        <div className="flex items-center gap-3 px-4 py-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+          <svg className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-green-800 dark:text-green-300 font-medium">Shipment registered</p>
+            <p className="text-xs text-green-700 dark:text-green-400 font-mono mt-0.5">AWB: {awb}</p>
+          </div>
         </div>
+        {cancelConfirming ? (
+          <div className="flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+            <p className="text-sm text-red-800 dark:text-red-300 flex-1">Cancel this shipment with Delhivery? This cannot be undone once picked up.</p>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+              >
+                {cancelling ? 'Cancelling…' : 'Confirm Cancel'}
+              </button>
+              <button
+                onClick={() => setCancelConfirming(false)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg text-foreground-secondary hover:text-foreground transition-colors"
+              >
+                Keep
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setCancelConfirming(true)}
+            disabled={cancelling}
+            className="w-full px-4 py-2 text-sm font-medium rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Cancel Shipment
+          </button>
+        )}
       </div>
     )
   }

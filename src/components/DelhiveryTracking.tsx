@@ -27,7 +27,7 @@ function resolveDisplayType(statusType: string | null, scans: Scan[]): string | 
   const type = statusType?.toUpperCase() ?? ''
   if (!EXCEPTION_TYPES.has(type)) return statusType
 
-  for (let i = scans.length - 1; i >= 0; i--) {
+  for (let i = 0; i < scans.length; i++) {
     const activity = (scans[i]?.activity ?? '').toLowerCase()
     if (activity.includes('out for delivery')) return 'OD'
     if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) return 'RTO-DL'
@@ -35,7 +35,8 @@ function resolveDisplayType(statusType: string | null, scans: Scan[]): string | 
     if (activity.includes('return in transit') || activity.includes('in return transit')) return 'RTO-IT'
     if (activity.includes('rto initiated') || activity.includes('return initiated')) return 'RTO'
     if (activity.includes('in transit') || activity === 'transit') return 'IT'
-    if (activity.includes('picked up') || activity.includes('shipment picked')) return 'PU'
+    if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) return 'PU'
+    if (activity === 'manifested' || activity.includes('manifest')) return 'MF'
     if (activity.includes('delivered')) return 'DL'
   }
   return statusType
@@ -63,7 +64,8 @@ function statusBadge(type: string | null) {
 
 function statusLabel(type: string | null) {
   switch (type?.toUpperCase()) {
-    case 'PP':     return 'Pickup Pending'
+    case 'PP':     return 'Shipment Created'
+    case 'MF':     return 'Shipment Created'
     case 'PU':     return 'Picked Up'
     case 'IT':     return 'In Transit'
     case 'OT':
@@ -83,7 +85,7 @@ function statusLabel(type: string | null) {
 }
 
 const TIMELINE_STEPS: { key: string; label: string }[] = [
-  { key: 'manifested', label: 'Order Dispatched' },
+  { key: 'created',    label: 'Shipment Created' },
   { key: 'picked_up',  label: 'Picked Up'  },
   { key: 'in_transit', label: 'In Transit'  },
   { key: 'out',        label: 'Out for Delivery' },
@@ -96,6 +98,7 @@ function resolveStep(scans: Scan[], statusType: string | null): number {
   if (type === 'OT' || type === 'OD') return 3
   if (type === 'IT') return 2
   if (type === 'PU') return 1
+  if (type === 'PP' || type === 'MF') return 0
 
   const activities = scans.map(s => s.activity?.toLowerCase() ?? '')
   if (activities.some(a => a.includes('deliver'))) return 4
@@ -250,7 +253,7 @@ export default function DelhiveryTracking({
 
   const displayType = resolveDisplayType(tracking.statusType, tracking.scans)
   const latestScan = tracking.scans?.[0]
-  const isException = ['RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL', 'UD', 'NDR', 'HOLD', 'LOST', 'MIS'].includes(tracking.statusType?.toUpperCase() ?? '')
+  const isException = ['RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL', 'UD', 'NDR', 'HOLD', 'LOST', 'MIS'].includes(displayType?.toUpperCase() ?? '')
 
   if (variant === 'admin') {
     return (
@@ -270,7 +273,7 @@ export default function DelhiveryTracking({
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             </svg>
-            Shipment exception: <span className="font-semibold">{statusLabel(tracking.statusType)}</span>
+            Shipment exception: <span className="font-semibold">{statusLabel(displayType)}</span>
           </div>
         )}
 

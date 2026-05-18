@@ -71,7 +71,7 @@ export async function GET(
     let statusType = rawStatusType
     if (EXCEPTION_TYPES.has(rawStatusType)) {
       const scans: any[] = shipment.Scans ?? []
-      for (let i = scans.length - 1; i >= 0; i--) {
+      for (let i = 0; i < scans.length; i++) {
         const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
         if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
         const activity = (scans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
@@ -81,7 +81,8 @@ export async function GET(
         if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
         if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
         if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
-        if (activity.includes('picked up') || activity.includes('shipment picked')) { statusType = 'PU'; break }
+        if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) { statusType = 'PU'; break }
+        if (activity === 'manifested' || activity.includes('manifest')) { statusType = 'MF'; break }
         if (activity.includes('delivered')) { statusType = 'DL'; break }
       }
     }

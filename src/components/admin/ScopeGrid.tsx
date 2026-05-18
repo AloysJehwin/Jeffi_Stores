@@ -17,7 +17,7 @@ export default function ScopeGrid({ selected, onToggle, variant = 'card' }: Prop
     return acc
   }, {})
 
-  const groupOrder = [UNGROUPED_LABEL, 'Catalogue', 'Operations', 'Marketing', 'Settings'].filter(g => groups[g])
+  const groupOrder = [UNGROUPED_LABEL, 'Catalogue', 'Operations', 'Finance', 'Marketing', 'Settings'].filter(g => groups[g])
 
   return (
     <div className="space-y-4">

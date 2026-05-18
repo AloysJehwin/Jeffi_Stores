@@ -67,7 +67,7 @@ export default function NewSupplierPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Basic Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
