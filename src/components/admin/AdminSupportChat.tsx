@@ -105,7 +105,8 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
         fetch('/api/admin/check-session'),
       ])
       const meData = await meRes.json()
-      const username = meData.user?.username || ''
+      const u = meData.user || {}
+      const username = (u.first_name && u.last_name) ? `${u.first_name} ${u.last_name}` : (u.username || '')
       setAdminUsername(username)
 
       if (!sessionRes.ok) { setIsLoading(false); return }

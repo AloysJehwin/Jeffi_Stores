@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
       await client.query(
         `INSERT INTO price_inflation_log (category_id, category_name, percentage, applied_fields, product_count, applied_by, snapshot)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [category_id, category_name, percentage, validFields, products.length, admin.username || 'admin', JSON.stringify(snapshotProducts)]
+        [category_id, category_name, percentage, validFields, products.length, (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username) || 'admin', JSON.stringify(snapshotProducts)]
       )
     })
   } catch (e: any) {

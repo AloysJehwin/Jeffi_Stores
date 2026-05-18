@@ -8,6 +8,8 @@ import ScopeGrid from '@/components/admin/ScopeGrid'
 interface AdminUser {
   id: string
   username: string
+  first_name?: string
+  last_name?: string
   role: string
   scopes: string[]
   is_active: boolean
@@ -225,7 +227,7 @@ export default function AdminUserActions({
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-default shrink-0">
               <div>
                 <h3 className="font-semibold text-foreground text-base">Edit admin</h3>
-                <p className="text-xs text-foreground-muted mt-0.5">{admin.username}</p>
+                <p className="text-xs text-foreground-muted mt-0.5">{admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username}</p>
               </div>
               <button type="button" onClick={() => setEditing(false)} className="text-foreground-muted hover:text-foreground p-1.5 rounded-lg hover:bg-surface-secondary">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
