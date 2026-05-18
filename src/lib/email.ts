@@ -119,7 +119,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-                            <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+                            <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
           </div>
         </body>
@@ -219,7 +219,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-                                          <p>Phone: +91 89030 31299 | +91 94883 54099<br>Email: jeffistoress@gmail.com</p>
+                                          <p>Phone: +91 96853 54099<br>Email: jeffistoress@gmail.com</p>
             </div>
           </div>
         </body>
@@ -376,7 +376,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
             </div>
 
             <p>If you have any questions, feel free to contact us:</p>
-                                        <p>Phone: +91 89030 31299 | +91 94883 54099<br>Email: jeffistoress@gmail.com</p>
+                                        <p>Phone: +91 96853 54099<br>Email: jeffistoress@gmail.com</p>
 
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
@@ -736,7 +736,7 @@ export async function sendOrderStatusUpdate(
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-                            <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+                            <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
           </div>
         </body>
@@ -953,7 +953,7 @@ export async function sendPaymentStatusUpdate(
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-                            <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+                            <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
           </div>
         </body>
@@ -1108,7 +1108,7 @@ export async function sendAdminCertificateEmail(
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-              <p>Phone: +91 89030 31299 | Email: admin@jeffistores.in</p>
+              <p>Phone: +91 96853 54099 | Email: admin@jeffistores.in</p>
             </div>
           </div>
         </body>
@@ -1428,7 +1428,7 @@ export async function sendAdminContactEmail(
             <div class="footer">
               <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
               <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
-              <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
           </div>
         </body>

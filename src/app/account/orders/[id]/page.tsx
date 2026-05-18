@@ -968,7 +968,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-blue-800 dark:text-blue-300 text-sm">
-                    Our team will contact you to confirm your order and provide payment details. For queries, call +91 89030 31299 or email jeffistoress@gmail.com.
+                    Our team will contact you to confirm your order and provide payment details. For queries, call +91 96853 54099 or email jeffistoress@gmail.com.
                   </p>
                 </div>
               </div>

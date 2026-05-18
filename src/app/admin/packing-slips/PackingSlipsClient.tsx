@@ -169,8 +169,6 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
   }
 
   const hasActiveFilters = fromDate || toDate || customerSearch || statusFilter
-  const [filterOpen, setFilterOpen] = useState(false)
-  const activeCount = [fromDate, toDate, customerSearch, statusFilter].filter(Boolean).length
 
   return (
     <div className="p-4 sm:p-6">
@@ -179,110 +177,78 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
         <p className="text-sm text-foreground-muted mt-1">Download packing slips to attach to parcels</p>
       </div>
 
-      <div className="bg-surface-elevated rounded-lg border border-border-default shadow-sm mb-6">
-        <div className="px-4 sm:px-6 py-4 border-b border-border-default sm:border-b-0">
-          {/* Mobile toggle */}
-          <button
-            type="button"
-            onClick={() => setFilterOpen(o => !o)}
-            className="sm:hidden w-full flex items-center justify-between text-sm font-medium text-foreground"
-          >
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 010 2H4a1 1 0 01-1-1zm3 6a1 1 0 011-1h10a1 1 0 010 2H7a1 1 0 01-1-1zm4 6a1 1 0 011-1h4a1 1 0 010 2h-4a1 1 0 01-1-1z" />
-              </svg>
-              Filter Orders
-              {activeCount > 0 && (
-                <span className="inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1.5 rounded-full bg-accent-500 text-white text-xs font-semibold">
-                  {activeCount}
-                </span>
+      <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3 mb-6">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex-1 min-w-[200px]" ref={customerRef}>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by customer name…"
+                value={customerSearch}
+                onChange={e => { setCustomerSearch(e.target.value); setShowSuggestions(true) }}
+                onFocus={() => setShowSuggestions(true)}
+                className="w-full px-2 py-1.5 pr-9 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 placeholder:text-foreground-muted"
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+                </svg>
+              </span>
+              {showSuggestions && customerSuggestions.length > 0 && (
+                <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                  {customerSuggestions.map(name => (
+                    <li key={name}>
+                      <button
+                        type="button"
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => { setCustomerSearch(name); setShowSuggestions(false) }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
+                      >
+                        {name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
-            </span>
-            <svg
-              className={`w-4 h-4 text-foreground-muted transition-transform ${filterOpen ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {/* Desktop heading */}
-          <h2 className="hidden sm:block text-base font-semibold text-foreground">Filter Orders</h2>
-        </div>
-        <div className={`${filterOpen ? 'block' : 'hidden'} sm:block p-4 sm:p-6`}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-foreground-secondary mb-1">From Date</label>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={e => setFromDate(e.target.value)}
-                className="w-full border border-border-default rounded-lg px-4 py-2.5 text-sm bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-400"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-foreground-secondary mb-1">To Date</label>
-              <input
-                type="date"
-                value={toDate}
-                onChange={e => setToDate(e.target.value)}
-                className="w-full border border-border-default rounded-lg px-4 py-2.5 text-sm bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-400"
-              />
-            </div>
-            <div ref={customerRef}>
-              <label className="block text-xs font-medium text-foreground-secondary mb-1">Customer</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search by name…"
-                  value={customerSearch}
-                  onChange={e => { setCustomerSearch(e.target.value); setShowSuggestions(true) }}
-                  onFocus={() => setShowSuggestions(true)}
-                  className="w-full border border-border-default rounded-lg px-4 py-2.5 text-sm bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-400 placeholder:text-foreground-muted"
-                />
-                {showSuggestions && customerSuggestions.length > 0 && (
-                  <ul className="absolute z-50 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg overflow-hidden max-h-60 overflow-y-auto">
-                    {customerSuggestions.map(name => (
-                      <li key={name}>
-                        <button
-                          type="button"
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => { setCustomerSearch(name); setShowSuggestions(false) }}
-                          className="w-full text-left px-4 py-2.5 text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
-                        >
-                          {name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-foreground-secondary mb-1">Status</label>
-              <AdminSelect
-                value={statusFilter}
-                options={STATUS_OPTIONS}
-                onChange={setStatusFilter}
-                placeholder="All Statuses"
-              />
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-4">
+          <button
+            onClick={applyDateFilter}
+            disabled={filtering}
+            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
+          >
+            {filtering ? 'Loading…' : 'Search'}
+          </button>
+          {hasActiveFilters && (
             <button
-              onClick={applyDateFilter}
-              disabled={filtering}
-              className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
+              onClick={clearAll}
+              className="px-4 py-1.5 border border-border-default text-sm text-foreground-secondary rounded-lg hover:bg-surface-secondary transition-colors"
             >
-              {filtering ? 'Loading…' : 'Apply Date Range'}
+              Clear
             </button>
-            {hasActiveFilters && (
-              <button
-                onClick={clearAll}
-                className="px-4 py-2 border border-border-default text-sm text-foreground-secondary rounded-lg hover:bg-surface transition-colors"
-              >
-                Clear All
-              </button>
-            )}
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 items-center">
+          <AdminSelect
+            value={statusFilter}
+            options={STATUS_OPTIONS}
+            onChange={setStatusFilter}
+            placeholder="All Statuses"
+          />
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+              className="w-36 px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500"
+            />
+            <span className="text-foreground-secondary text-xs">to</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+              className="w-36 px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500"
+            />
           </div>
         </div>
       </div>

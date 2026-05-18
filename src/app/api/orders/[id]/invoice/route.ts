@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany, query } from '@/lib/db'
 import { authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { generateInvoicePDF, InvoiceBusinessSettings, InvoiceOrder, InvoiceOrderItem, InvoiceBuyerAddress } from '@/lib/invoice-pdf'
+import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem } from '@/lib/receipt-pdf'
 import { uploadInvoicePDF } from '@/lib/s3'
 import { getFinancialYear } from '@/lib/gst'
 import { generateOrderInvoice } from '@/lib/invoice'
@@ -146,15 +147,54 @@ export async function GET(
     }
 
     const isCancelled = isVoided
-
-    const voidLabel = order.status === 'returned' ? 'RETURNED' : 'CANCELLED'
-    const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, isCancelled, voidLabel)
-
     const safeFileName = order.invoice_number.replace(/\//g, '-')
     const voidSuffix = order.status === 'returned' ? '-RETURNED' : order.status === 'cancelled' ? '-CANCELLED' : ''
     const downloadName = isVoided ? `${safeFileName}${voidSuffix}.pdf` : `${safeFileName}.pdf`
 
-    if (!isCancelled) {
+    let pdfBuffer: Buffer
+
+    if (order.source === 'cash_sale') {
+      const receiptBusiness: ReceiptBusinessSettings = {
+        legalName: settings.business_legal_name || '',
+        tradeName: settings.business_trade_name || '',
+        address: settings.business_address || '',
+        phone: settings.business_phone || '',
+        gstin: settings.business_gstin || '',
+      }
+
+      const receiptOrder: ReceiptOrder = {
+        invoice_number: order.invoice_number,
+        invoice_date: order.invoice_date || order.created_at,
+        payment_mode: order.payment_mode || 'Cash',
+        customer_name: order.customer_name,
+        notes: order.notes || '',
+        taxable_amount: parseFloat(order.taxable_amount || '0'),
+        cgst_amount: parseFloat(order.cgst_amount || '0'),
+        sgst_amount: parseFloat(order.sgst_amount || '0'),
+        igst_amount: parseFloat(order.igst_amount || '0'),
+        is_igst: order.is_igst || false,
+        total_amount: parseFloat(order.total_amount),
+      }
+
+      const receiptItems: ReceiptItem[] = (orderItems || []).map((item: any) => ({
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: parseFloat(item.unit_price),
+        total_price: parseFloat(item.total_price),
+        taxable_amount: parseFloat(item.taxable_amount || '0'),
+        cgst_amount: parseFloat(item.cgst_amount || '0'),
+        sgst_amount: parseFloat(item.sgst_amount || '0'),
+        igst_amount: parseFloat(item.igst_amount || '0'),
+        gst_rate: parseFloat(item.gst_rate || '0'),
+      }))
+
+      pdfBuffer = await generateReceiptPDF(receiptOrder, receiptItems, receiptBusiness)
+    } else {
+      const voidLabel = order.status === 'returned' ? 'RETURNED' : 'CANCELLED'
+      pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, isCancelled, voidLabel)
+    }
+
+    if (!isCancelled && order.source !== 'cash_sale') {
       const fy = getFinancialYear(new Date(order.invoice_date || order.created_at))
       const s3Url = await uploadInvoicePDF(pdfBuffer, order.invoice_number, fy)
 
