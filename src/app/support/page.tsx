@@ -41,8 +41,7 @@ export default async function SupportPage() {
 
             <div>
               <p className="text-xs text-foreground-muted mb-1">Phone</p>
-              <a href="tel:+918903031299" className="text-sm font-medium text-foreground hover:text-accent-500 block transition-colors">+91 89030 31299</a>
-              <a href="tel:+919488354099" className="text-sm font-medium text-foreground hover:text-accent-500 block transition-colors">+91 94883 54099</a>
+              <a href="tel:+919685354099" className="text-sm font-medium text-foreground hover:text-accent-500 block transition-colors">+91 96853 54099</a>
             </div>
 
             <div>

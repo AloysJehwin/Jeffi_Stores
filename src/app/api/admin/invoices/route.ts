@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const limit = 25
     const offset = (page - 1) * limit
 
-    const conditions: string[] = ['o.invoice_number IS NOT NULL']
+    const conditions: string[] = ['o.invoice_number IS NOT NULL', "o.source != 'cash_sale'"]
     const params: any[] = []
     let i = 1
 
