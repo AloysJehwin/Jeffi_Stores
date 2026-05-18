@@ -10,8 +10,6 @@ export async function PATCH(request: NextRequest) {
     }
 
     const userId = authUser.userId
-
-    // Get update data
     const body = await request.json()
     const { firstName, lastName, phone } = body
 
@@ -19,7 +17,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'First name is required' }, { status: 400 })
     }
 
-    // Validate and normalize phone
     let normalizedPhone = null
     if (phone) {
       const digits = phone.replace(/\D/g, '')
@@ -27,10 +24,9 @@ export async function PATCH(request: NextRequest) {
       if (cleaned.length !== 10) {
         return NextResponse.json({ error: 'Enter a valid 10-digit mobile number' }, { status: 400 })
       }
-      normalizedPhone = `+91${cleaned}`
+      normalizedPhone = cleaned
     }
 
-    // Update user profile
     const updatedUser = await queryOne(
       `UPDATE users SET first_name = $1, last_name = $2, phone = $3, updated_at = NOW()
        WHERE id = $4
@@ -42,7 +38,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
     }
 
-    // Transform to camelCase
     const user = {
       id: updatedUser.id,
       email: updatedUser.email,
@@ -53,8 +48,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ user })
-  } catch (error) {
-    console.error('Error in user update API:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

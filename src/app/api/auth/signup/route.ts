@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       if (cleaned.length !== 10) {
         return NextResponse.json({ error: 'Enter a valid 10-digit mobile number' }, { status: 400 })
       }
-      normalizedPhone = `+91${cleaned}`
+      normalizedPhone = cleaned
     }
 
     const existingUser = await queryOne(

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 type Tab = 'gstr1' | 'gstr3b' | 'irn' | 'itc'
 
@@ -69,7 +70,16 @@ function Badge({ status }: { status: string | null }) {
 }
 
 export default function GSTPage() {
-  const [tab, setTab] = useState<Tab>('gstr1')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const tabParam = searchParams.get('tab') as Tab | null
+  const validTabs: Tab[] = ['gstr1', 'gstr3b', 'irn', 'itc']
+  const [tab, setTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'gstr1')
+
+  function handleTabChange(id: Tab) {
+    setTab(id)
+    router.replace(`/admin/gst?tab=${id}`, { scroll: false })
+  }
   const [preset, setPreset] = useState('this_month')
   const initial = getPresetRange('this_month')
   const [from, setFrom] = useState(initial.from)
@@ -201,7 +211,7 @@ export default function GSTPage() {
       <div className="bg-surface-elevated rounded-lg border border-border-default shadow-sm overflow-hidden">
         <div className="flex border-b border-border-default overflow-x-auto">
           {tabs.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
+            <button key={t.id} onClick={() => handleTabChange(t.id)}
               className={`px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
                 tab === t.id
                   ? 'border-b-2 border-accent-500 text-accent-500'
