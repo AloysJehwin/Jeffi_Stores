@@ -9,6 +9,8 @@ const JWT_EXPIRES_IN = '8h'
 export interface JWTPayload {
   adminId: string
   username: string
+  first_name?: string
+  last_name?: string
   role: string
   scopes: string[]
   authCertCN?: string

@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { queryMany } from './db'
 
 const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -9,6 +10,20 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SES_SMTP_PASSWORD,
   },
 })
+
+async function getAdminNotificationEmails(): Promise<string> {
+  try {
+    const rows = await queryMany<{ email: string }>(
+      `SELECT u.email FROM admins a
+       JOIN users u ON u.id = a.user_id
+       WHERE a.is_active = TRUE AND a.role IN ('super_admin', 'admin') AND u.email IS NOT NULL
+       ORDER BY a.role = 'super_admin' DESC`,
+      []
+    )
+    if (rows.length > 0) return rows.map(r => r.email).join(', ')
+  } catch {}
+  return process.env.ADMIN_EMAIL || 'admin@admin.jeffistores.in'
+}
 
 export async function sendOTPEmail(email: string, otp: string, name?: string) {
   const mailOptions = {
@@ -387,10 +402,10 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
 }
 
 export async function sendNewOrderNotification(order: any, orderItems: any[], _user: any) {
-  const adminEmail = process.env.ADMIN_EMAIL || 'jeffistoress@gmail.com'
-  
+  const adminEmail = await getAdminNotificationEmails()
+
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
     to: adminEmail,
     subject: `New Order - ${order.order_number}`,
     html: `
@@ -964,7 +979,7 @@ export async function sendAdminCertificateEmail(
   role: string
 ) {
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
     to: email,
     subject: 'Your Admin Certificate - Jeffi Stores',
     html: `
@@ -1093,7 +1108,7 @@ export async function sendAdminCertificateEmail(
             <div class="footer">
               <p><strong>Jeffi Stores</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-              <p>Phone: +91 89030 31299 | Email: jeffistoress@gmail.com</p>
+              <p>Phone: +91 89030 31299 | Email: admin@jeffistores.in</p>
             </div>
           </div>
         </body>
@@ -1117,10 +1132,10 @@ export async function sendAdminCertificateEmail(
 }
 
 export async function sendNewReviewNotification(review: any, user: any, product: any) {
-  const adminEmail = process.env.ADMIN_EMAIL || 'aloysjehwin@gmail.com'
+  const adminEmail = await getAdminNotificationEmails()
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
     to: adminEmail,
     subject: `New Review Pending Approval - ${product.name}`,
     html: `
@@ -1287,12 +1302,9 @@ export async function sendPaymentFailedAdminNotification(
   order: { order_number: string; id: string; customer_name: string; customer_email: string; total_amount: string | number; customer_phone?: string },
   errorDescription?: string
 ) {
-  const adminEmail = process.env.ADMIN_EMAIL || 'jeffistoress@gmail.com'
+  const adminEmail = await getAdminNotificationEmails()
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
-    to: adminEmail,
-    subject: `Payment Failed - Order ${order.order_number}`,
     html: `
       <!DOCTYPE html>
       <html>

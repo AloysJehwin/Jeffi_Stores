@@ -243,16 +243,23 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
       </div>
 
       <div>
-        <label htmlFor="admin-role" className="block text-sm font-medium text-foreground-secondary mb-1">Role</label>
-        <select
-          id="admin-role"
-          value={form.role}
-          onChange={e => setForm(prev => ({ ...prev, role: e.target.value }))}
-          className="w-full border border-border-secondary rounded-lg px-3 py-2 text-sm bg-surface text-foreground focus:ring-accent-500 focus:border-accent-500"
-        >
-          <option value="admin">Admin</option>
-          <option value="moderator">Moderator</option>
-        </select>
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">Role</label>
+        <div className="flex gap-2">
+          {(['admin', 'moderator'] as const).map(r => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setForm(prev => ({ ...prev, role: r }))}
+              className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                form.role === r
+                  ? 'border-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
+                  : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'
+              }`}
+            >
+              <span className="capitalize">{r}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div>

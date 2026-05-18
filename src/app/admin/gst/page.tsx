@@ -232,7 +232,7 @@ export default function GSTPage() {
                       <thead className="bg-surface-secondary">
                         <tr>
                           {['Invoice No', 'Date', 'Customer', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'].map(h => (
-                            <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">{h}</th>
+                            <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -264,7 +264,7 @@ export default function GSTPage() {
                       <thead className="bg-surface-secondary">
                         <tr>
                           {['Invoice No', 'Date', 'Customer', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'].map(h => (
-                            <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">{h}</th>
+                            <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -295,7 +295,7 @@ export default function GSTPage() {
                       <thead className="bg-surface-secondary">
                         <tr>
                           {['HSN Code', 'GST Rate', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax'].map(h => (
-                            <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">{h}</th>
+                            <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -303,7 +303,7 @@ export default function GSTPage() {
                         {hsnSummary.map((r, i) => (
                           <tr key={i} className="hover:bg-surface-secondary/50">
                             <td className="px-4 py-2.5 font-mono font-medium text-foreground">{r.hsnCode}</td>
-                            <td className="px-4 py-2.5 text-foreground">{r.gstRate}%</td>
+                            <td className="px-4 py-2.5 text-right text-foreground">{r.gstRate}%</td>
                             <td className="px-4 py-2.5 text-right text-foreground">{INR(r.taxableVal)}</td>
                             <td className="px-4 py-2.5 text-right text-foreground">{INR(r.cgstAmt)}</td>
                             <td className="px-4 py-2.5 text-right text-foreground">{INR(r.sgstAmt)}</td>
@@ -364,7 +364,7 @@ export default function GSTPage() {
                         <thead className="bg-surface-secondary/50">
                           <tr>
                             {['GST Rate', 'Supply Type', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total Tax'].map(h => (
-                              <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">{h}</th>
+                              <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total Tax'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                             ))}
                           </tr>
                         </thead>
@@ -426,7 +426,7 @@ export default function GSTPage() {
                     <thead className="bg-surface-secondary">
                       <tr>
                         {['Invoice No', 'Date', 'Customer', 'Type', 'Amount', 'IRN', 'Ack No', 'Ack Date', 'Status'].map(h => (
-                          <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">{h}</th>
+                          <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Amount'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -486,7 +486,7 @@ export default function GSTPage() {
                           <thead className="bg-surface-secondary">
                             <tr>
                               {['Supplier', 'GSTIN', 'POs', 'Taxable', 'ITC (Tax)'].map(h => (
-                                <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">{h}</th>
+                                <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['POs', 'Taxable', 'ITC (Tax)'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                               ))}
                             </tr>
                           </thead>
@@ -495,7 +495,7 @@ export default function GSTPage() {
                               <tr key={i} className="hover:bg-surface-secondary/50">
                                 <td className="px-4 py-2.5 font-medium text-foreground">{r.supplierName}</td>
                                 <td className="px-4 py-2.5 font-mono text-xs text-foreground-secondary">{r.gstin || <span className="text-foreground-muted italic">No GSTIN</span>}</td>
-                                <td className="px-4 py-2.5 text-foreground">{r.poCount}</td>
+                                <td className="px-4 py-2.5 text-right text-foreground">{r.poCount}</td>
                                 <td className="px-4 py-2.5 text-right text-foreground">{INR(r.taxable)}</td>
                                 <td className="px-4 py-2.5 text-right font-medium text-green-700 dark:text-green-400">{INR(r.tax)}</td>
                               </tr>
@@ -514,7 +514,7 @@ export default function GSTPage() {
                           <thead className="bg-surface-secondary">
                             <tr>
                               {['PO No', 'Date', 'Supplier', 'Product', 'Qty', 'Unit Cost', 'GST %', 'Taxable', 'ITC'].map(h => (
-                                <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">{h}</th>
+                                <th key={h} className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Qty', 'Unit Cost', 'GST %', 'Taxable', 'ITC'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                               ))}
                             </tr>
                           </thead>
