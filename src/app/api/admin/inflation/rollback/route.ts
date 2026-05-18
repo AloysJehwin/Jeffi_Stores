@@ -74,13 +74,13 @@ export async function POST(request: NextRequest) {
 
       await client.query(
         `UPDATE price_inflation_log SET rolled_back_at = NOW(), rolled_back_by = $1 WHERE id = $2`,
-        [admin.username || 'admin', log_id]
+        [(admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username) || 'admin', log_id]
       )
 
       await client.query(
         `INSERT INTO price_inflation_log (category_id, category_name, percentage, applied_fields, product_count, applied_by, is_rollback)
          VALUES ($1, $2, $3, $4, $5, $6, true)`,
-        [log.category_id, log.category_name, log.percentage, log.applied_fields, snapshot.length, admin.username || 'admin']
+        [log.category_id, log.category_name, log.percentage, log.applied_fields, snapshot.length, (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username) || 'admin']
       )
     })
   } catch (e: any) {

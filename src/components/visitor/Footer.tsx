@@ -23,7 +23,7 @@ export default function Footer() {
 
           <div className="flex flex-col gap-1 text-sm text-gray-300">
             <a href="mailto:jeffistoress@gmail.com" className="hover:text-accent-400 transition-colors">jeffistoress@gmail.com</a>
-            <a href="tel:+918903031299" className="hover:text-accent-400 transition-colors">+91 89030 31299</a>
+            <a href="tel:+919685354099" className="hover:text-accent-400 transition-colors">+91 96853 54099</a>
           </div>
 
         </div>

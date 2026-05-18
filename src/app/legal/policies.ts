@@ -57,7 +57,7 @@ export const policies: Policy[] = [
       },
       {
         heading: '7. Contact',
-        body: 'For privacy-related requests, contact us at jeffistoress@gmail.com or call +91 89030 31299.',
+        body: 'For privacy-related requests, contact us at jeffistoress@gmail.com or call +91 96853 54099.',
       },
     ],
   },
@@ -331,7 +331,7 @@ export const policies: Policy[] = [
         body: [
           'Do I need an account to order? — You can browse without an account, but an account is required to place orders and track them.',
           'How do I reset my password? — Click "Forgot Password" on the login page and follow the instructions sent to your email.',
-          'How can I contact support? — Via the Support page on our website, email at jeffistoress@gmail.com, or call +91 89030 31299.',
+          'How can I contact support? — Via the Support page on our website, email at jeffistoress@gmail.com, or call +91 96853 54099.',
         ],
       },
     ],
@@ -351,7 +351,7 @@ export const policies: Policy[] = [
         body: [
           'Name: Jeffi Stores Management',
           'Email: jeffistoress@gmail.com',
-          'Phone: +91 89030 31299',
+          'Phone: +91 96853 54099',
           'Address: Sanjay Gandhi Chowk, Station Road, Raipur, CG 490092',
           'Working Hours: Monday – Friday, 9:00 AM – 7:00 PM IST',
         ],

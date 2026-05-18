@@ -26,6 +26,8 @@ export interface UserJWTPayload {
 export interface AdminJWTPayload {
   adminId: string
   username: string
+  first_name?: string
+  last_name?: string
   role: string
   scopes: string[]
   [key: string]: any
@@ -81,6 +83,8 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
     return {
       adminId: payload.adminId as string,
       username: payload.username as string,
+      first_name: payload.first_name as string | undefined,
+      last_name: payload.last_name as string | undefined,
       role: payload.role as string,
       scopes: (payload.scopes as string[]) || [],
     }

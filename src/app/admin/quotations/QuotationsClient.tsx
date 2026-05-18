@@ -420,21 +420,8 @@ export default function QuotationsClient() {
           </div>
         )}
 
-        <div className="bg-surface-elevated border border-border-default rounded-xl p-4 mb-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div>
-              <div className="flex gap-1 mb-0">
-                {['all', 'draft', 'final'].map(s => (
-                  <button key={s} onClick={() => setStatusFilter(s)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
-                      statusFilter === s
-                        ? 'bg-secondary-500 text-white'
-                        : 'bg-surface-primary text-foreground-secondary hover:bg-surface-secondary border border-border-default'
-                    }`}
-                  >{s}</button>
-                ))}
-              </div>
-            </div>
+        <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3 mb-4">
+          <div className="flex flex-wrap gap-2 items-center">
             <div className="flex-1 min-w-[160px]">
               <AdminTypeahead
                 type="quotations"
@@ -442,16 +429,36 @@ export default function QuotationsClient() {
                 onChange={setSearchQ}
                 onEnter={() => loadList()}
                 placeholder="Search quote # or consignee..."
+                inputClassName={inputCls + ' pr-9'}
               />
-            </div>
-            <div className="flex gap-2 items-center">
-              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className={inputCls + ' w-36'} />
-              <span className="text-foreground-secondary text-xs">to</span>
-              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className={inputCls + ' w-36'} />
             </div>
             <button onClick={loadList} className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors">
               Search
             </button>
+            {(searchQ || statusFilter !== 'all' || fromDate || toDate) && (
+              <button onClick={() => { setSearchQ(''); setStatusFilter('all'); setFromDate(''); setToDate('') }}
+                className="px-4 py-1.5 border border-border-default rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex gap-1">
+              {['all', 'draft', 'final'].map(s => (
+                <button key={s} onClick={() => setStatusFilter(s)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
+                    statusFilter === s
+                      ? 'bg-secondary-500 text-white'
+                      : 'bg-surface-primary text-foreground-secondary hover:bg-surface-secondary border border-border-default'
+                  }`}
+                >{s}</button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className={inputCls + ' w-36'} />
+              <span className="text-foreground-secondary text-xs">to</span>
+              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className={inputCls + ' w-36'} />
+            </div>
           </div>
         </div>
 
