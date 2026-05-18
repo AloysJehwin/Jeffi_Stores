@@ -27,7 +27,7 @@ interface CashSale {
 
 interface Receipt {
   invoiceNumber: string | null
-  orderId: string
+  saleId: string
   invoiceUrl: string | null
   items: LineItem[]
   paymentMode: string
@@ -189,7 +189,7 @@ export default function CashSaleClient() {
       const { subtotal, tax } = calcTotals(items)
       setReceipt({
         invoiceNumber: data.invoiceNumber,
-        orderId: data.orderId,
+        saleId: data.saleId,
         invoiceUrl: data.invoiceUrl,
         items: [...items],
         paymentMode,
@@ -577,7 +577,7 @@ export default function CashSaleClient() {
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           <a
-                            href={`/api/orders/${sale.id}/invoice`}
+                            href={`/api/admin/cash-sale/${sale.id}/receipt`}
                             target="_blank"
                             rel="noreferrer"
                             title="Download Receipt PDF"
@@ -645,7 +645,7 @@ export default function CashSaleClient() {
                   </div>
                   <div className="flex gap-4 pt-1 border-t border-border-default" onClick={e => e.stopPropagation()}>
                     <a
-                      href={`/api/orders/${sale.id}/invoice`}
+                      href={`/api/admin/cash-sale/${sale.id}/receipt`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline"
@@ -773,7 +773,7 @@ function SaleDetailModal({ sale, onClose }: { sale: CashSale; onClose: () => voi
 
           <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
             <a
-              href={`/api/orders/${sale.id}/invoice`}
+              href={`/api/admin/cash-sale/${sale.id}/receipt`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
