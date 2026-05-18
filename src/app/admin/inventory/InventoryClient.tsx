@@ -966,8 +966,8 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(valuation.totalValue)} accent sub="All products" />
-                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub="All products" />
+                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.stock_value || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'All products'} />
+                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'All products'} />
                 <SummaryCard label="Total SKUs" value={String(filteredValRows.length)} sub={filteredValRows.length !== allValRows.length ? `of ${allValRows.length} total` : 'across all products'} />
                 <SummaryCard label="In Stock" value={String(filteredValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="SKUs with stock > 0" />
               </div>
