@@ -3,6 +3,9 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     instrumentationHook: true,
+    outputFileTracingIncludes: {
+      '/api/admin/orders/[id]/shipping-label': ['./node_modules/pdfkit/js/data/**/*'],
+    },
   },
   serverExternalPackages: ['pdfkit'],
   images: {
