@@ -38,11 +38,10 @@ export default function SortDropdown() {
       params.delete('order')
     }
 
-    router.push(`/products?${params.toString()}`)
+    router.replace(`/products?${params.toString()}`)
     setIsOpen(false)
   }, [searchParams, router])
 
-  // Close on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -53,7 +52,6 @@ export default function SortDropdown() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Scroll highlighted into view
   useEffect(() => {
     if (isOpen && highlightedIndex >= 0 && listRef.current) {
       const items = listRef.current.children

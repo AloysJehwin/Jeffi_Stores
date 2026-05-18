@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
+
 
 interface Order {
   id: string
@@ -36,17 +38,28 @@ function statusLabel(s: string) {
 }
 
 export default function PackingSlipsClient({ initialOrders }: { initialOrders: Order[] }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
   const [orders, setOrders] = useState<Order[]>(initialOrders)
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [customerSearch, setCustomerSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
+  const [toDate, setToDate] = useState(searchParams.get('to') || '')
+  const [customerSearch, setCustomerSearch] = useState(searchParams.get('customer') || '')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [filtering, setFiltering] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const customerRef = useRef<HTMLDivElement>(null)
+
+  function syncUrl(patch: Record<string, string>) {
+    const p = new URLSearchParams(window.location.search)
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) p.set(k, v); else p.delete(k)
+    }
+    router.replace(`/admin/packing-slips?${p.toString()}`, { scroll: false })
+  }
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -135,6 +148,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
     setToDate('')
     setCustomerSearch('')
     setStatusFilter('')
+    syncUrl({ from: '', to: '', customer: '', status: '' })
   }
 
   async function downloadBulk() {
@@ -185,7 +199,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                 type="text"
                 placeholder="Search by customer name…"
                 value={customerSearch}
-                onChange={e => { setCustomerSearch(e.target.value); setShowSuggestions(true) }}
+                onChange={e => { setCustomerSearch(e.target.value); setShowSuggestions(true); syncUrl({ customer: e.target.value }) }}
                 onFocus={() => setShowSuggestions(true)}
                 className="w-full px-2 py-1.5 pr-9 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 placeholder:text-foreground-muted"
               />
@@ -201,7 +215,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                       <button
                         type="button"
                         onMouseDown={e => e.preventDefault()}
-                        onClick={() => { setCustomerSearch(name); setShowSuggestions(false) }}
+                        onClick={() => { setCustomerSearch(name); setShowSuggestions(false); syncUrl({ customer: name }) }}
                         className="w-full text-left px-4 py-2.5 text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
                       >
                         {name}
@@ -232,21 +246,21 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
           <AdminSelect
             value={statusFilter}
             options={STATUS_OPTIONS}
-            onChange={setStatusFilter}
+            onChange={v => { setStatusFilter(v); syncUrl({ status: v }) }}
             placeholder="All Statuses"
           />
           <div className="flex items-center gap-2">
             <input
               type="date"
               value={fromDate}
-              onChange={e => setFromDate(e.target.value)}
+              onChange={e => { setFromDate(e.target.value); syncUrl({ from: e.target.value }) }}
               className="w-36 px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500"
             />
             <span className="text-foreground-secondary text-xs">to</span>
             <input
               type="date"
               value={toDate}
-              onChange={e => setToDate(e.target.value)}
+              onChange={e => { setToDate(e.target.value); syncUrl({ to: e.target.value }) }}
               className="w-36 px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500"
             />
           </div>

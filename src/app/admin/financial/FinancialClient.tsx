@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -1073,7 +1074,16 @@ const TABS: { key: Tab; label: string }[] = [
 ]
 
 export default function FinancialClient() {
-  const [tab, setTab] = useState<Tab>('receivables')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const tabParam = searchParams.get('tab') as Tab | null
+  const validTabs: Tab[] = ['receivables', 'payables', 'transactions', 'pl', 'cashflow']
+  const [tab, setTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'receivables')
+
+  function handleTabChange(key: Tab) {
+    setTab(key)
+    router.replace(`/admin/financial?tab=${key}`, { scroll: false })
+  }
 
   return (
     <div className="space-y-4">
@@ -1081,7 +1091,7 @@ export default function FinancialClient() {
         {TABS.map(t => (
           <button
             key={t.key}
-            onClick={() => setTab(t.key)}
+            onClick={() => handleTabChange(t.key as Tab)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
               tab === t.key
                 ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400'

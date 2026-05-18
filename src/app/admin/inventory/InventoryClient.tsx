@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -651,25 +651,36 @@ type StockTransaction = {
 }
 
 function StockTab() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
   const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
   const [valuation, setValuation] = useState<{ products: any[]; totalValue: number } | null>(null)
   const [valPage, setValPage] = useState(1)
-  const [valSearch, setValSearch] = useState('')
-  const [valCategory, setValCategory] = useState('')
-  const [valBrand, setValBrand] = useState('')
-  const [valStockStatus, setValStockStatus] = useState('')
+  const [valSearch, setValSearch] = useState(searchParams.get('val_search') || '')
+  const [valCategory, setValCategory] = useState(searchParams.get('val_category') || '')
+  const [valBrand, setValBrand] = useState(searchParams.get('val_brand') || '')
+  const [valStockStatus, setValStockStatus] = useState(searchParams.get('val_stock') || '')
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [view, setView] = useState<'ledger' | 'valuation'>('ledger')
+  const [search, setSearch] = useState(searchParams.get('ledger_search') || '')
+  const [from, setFrom] = useState(searchParams.get('ledger_from') || '')
+  const [to, setTo] = useState(searchParams.get('ledger_to') || '')
+  const [view, setView] = useState<'ledger' | 'valuation'>((searchParams.get('stock_view') as 'ledger' | 'valuation') || 'ledger')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editQty, setEditQty] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [ledgerSortCol, setLedgerSortCol] = useState<string | undefined>(undefined)
+
+  function syncUrl(patch: Record<string, string>) {
+    const p = new URLSearchParams(window.location.search)
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) p.set(k, v); else p.delete(k)
+    }
+    router.replace(`/admin/inventory?${p.toString()}`, { scroll: false })
+  }
   const [ledgerSortDir, setLedgerSortDir] = useState<SortDir | undefined>(undefined)
   const [valSortCol, setValSortCol] = useState<string | undefined>(undefined)
   const [valSortDir, setValSortDir] = useState<SortDir | undefined>(undefined)
@@ -780,7 +791,7 @@ function StockTab() {
     <div className="space-y-5">
       <div className="flex gap-1 border-b border-border-default">
         {(['ledger', 'valuation'] as const).map(v => (
-          <button key={v} onClick={() => setView(v)}
+          <button key={v} onClick={() => { setView(v); syncUrl({ stock_view: v }) }}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${view === v ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}>
             {v === 'ledger' ? 'Stock Ledger' : 'Valuation'}
           </button>
@@ -793,17 +804,17 @@ function StockTab() {
             <div className="flex-1 min-w-[200px]">
               <label className={labelCls}>Search product</label>
               <AdminTypeahead type="products" value={search}
-                onChange={v => { setSearch(v); setTxPage(1) }}
+                onChange={v => { setSearch(v); setTxPage(1); syncUrl({ ledger_search: v }) }}
                 placeholder="Name, SKU..."
                 inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted" />
             </div>
             <div>
               <label className={labelCls}>From</label>
-              <input type="date" className="px-3 py-2.5 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent hover:border-border-default w-36" value={from} onChange={e => { setFrom(e.target.value); setTxPage(1) }} />
+              <input type="date" className="px-3 py-2.5 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent hover:border-border-default w-36" value={from} onChange={e => { setFrom(e.target.value); setTxPage(1); syncUrl({ ledger_from: e.target.value }) }} />
             </div>
             <div>
               <label className={labelCls}>To</label>
-              <input type="date" className="px-3 py-2.5 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent hover:border-border-default w-36" value={to} onChange={e => { setTo(e.target.value); setTxPage(1) }} />
+              <input type="date" className="px-3 py-2.5 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent hover:border-border-default w-36" value={to} onChange={e => { setTo(e.target.value); setTxPage(1); syncUrl({ ledger_to: e.target.value }) }} />
             </div>
           </div>
 
@@ -903,7 +914,7 @@ function StockTab() {
               <AdminTypeahead
                 type="products"
                 value={valSearch}
-                onChange={v => { setValSearch(v); setValPage(1) }}
+                onChange={v => { setValSearch(v); setValPage(1); syncUrl({ val_search: v }) }}
                 placeholder="Name, SKU, variant..."
                 inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
               />
@@ -912,7 +923,7 @@ function StockTab() {
               <label className={labelCls}>Category</label>
               <AdminSelect
                 value={valCategory}
-                onChange={v => { setValCategory(v); setValPage(1) }}
+                onChange={v => { setValCategory(v); setValPage(1); syncUrl({ val_category: v }) }}
                 placeholder="All categories"
                 options={[
                   { value: '', label: 'All categories' },
@@ -924,7 +935,7 @@ function StockTab() {
               <label className={labelCls}>Brand</label>
               <AdminSelect
                 value={valBrand}
-                onChange={v => { setValBrand(v); setValPage(1) }}
+                onChange={v => { setValBrand(v); setValPage(1); syncUrl({ val_brand: v }) }}
                 placeholder="All brands"
                 options={[
                   { value: '', label: 'All brands' },
@@ -936,7 +947,7 @@ function StockTab() {
               <label className={labelCls}>Stock status</label>
               <AdminSelect
                 value={valStockStatus}
-                onChange={v => { setValStockStatus(v); setValPage(1) }}
+                onChange={v => { setValStockStatus(v); setValPage(1); syncUrl({ val_stock: v }) }}
                 placeholder="All"
                 options={[
                   { value: '', label: 'All' },
@@ -950,7 +961,7 @@ function StockTab() {
               <div className="flex flex-col">
                 <span className={labelCls}>&nbsp;</span>
                 <button
-                  onClick={() => { setValSearch(''); setValCategory(''); setValBrand(''); setValStockStatus(''); setValPage(1) }}
+                  onClick={() => { setValSearch(''); setValCategory(''); setValBrand(''); setValStockStatus(''); setValPage(1); syncUrl({ val_search: '', val_category: '', val_brand: '', val_stock: '' }) }}
                   className="px-3 py-2.5 rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
                 >
                   Clear filters
@@ -966,8 +977,8 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Total Stock Value" value={formatINR(valuation.totalValue)} accent sub="All products" />
-                <SummaryCard label="Listed Stock Value" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.stock_value || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'Matches total'} />
+                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.stock_value || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'All products'} />
+                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'All products'} />
                 <SummaryCard label="Total SKUs" value={String(filteredValRows.length)} sub={filteredValRows.length !== allValRows.length ? `of ${allValRows.length} total` : 'across all products'} />
                 <SummaryCard label="In Stock" value={String(filteredValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="SKUs with stock > 0" />
               </div>
@@ -1019,13 +1030,15 @@ function StockTab() {
                         <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden md:table-cell" />
                         <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
                         <SortableHeader label="Price ex-GST" column="price" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
-                        <SortableHeader label="Stock Value" column="value" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">GST %</th>
+                        <SortableHeader label="Stock Value (ex-GST)" column="value" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Stock Value (incl. GST)</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">
                       {valSlice.length === 0 && (
-                        <tr><td colSpan={7} className="py-12 text-center text-foreground-secondary text-sm">
+                        <tr><td colSpan={9} className="py-12 text-center text-foreground-secondary text-sm">
                           {valSearch ? `No products match "${valSearch}"` : 'No products in stock'}
                         </td></tr>
                       )}
@@ -1074,7 +1087,9 @@ function StockTab() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
+                            <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
                             <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.stock_value || '0'))}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'))}</td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 <Link
@@ -1117,14 +1132,23 @@ function StockTab() {
 
 export default function InventoryClient() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const tabParam = searchParams.get('tab') as Tab | null
   const poParam = searchParams.get('po') || undefined
-  const [tab, setTab] = useState<Tab>(poParam ? 'po' : 'suppliers')
+  const [tab, setTab] = useState<Tab>(tabParam && ['suppliers', 'po', 'stock'].includes(tabParam) ? tabParam : poParam ? 'po' : 'suppliers')
+
+  function handleTabChange(key: Tab) {
+    setTab(key)
+    const params = new URLSearchParams()
+    params.set('tab', key)
+    router.replace(`/admin/inventory?${params.toString()}`, { scroll: false })
+  }
 
   return (
     <div className="space-y-5">
       <div className="flex border-b border-border-default gap-1">
         {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
+          <button key={t.key} onClick={() => handleTabChange(t.key)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === t.key ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}>
             {t.label}
           </button>
