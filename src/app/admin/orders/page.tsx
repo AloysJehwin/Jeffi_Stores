@@ -259,7 +259,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
           </table>
         </div>
       </div>
-      <div className="px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
+      <div className="hidden md:block px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
         <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
     </div>
