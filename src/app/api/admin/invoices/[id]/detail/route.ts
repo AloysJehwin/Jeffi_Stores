@@ -32,7 +32,11 @@ export async function GET(
       [params.id]
     )
 
-    if (!order) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+    if (!order) {
+      const cashSale = await queryOne<{ id: string }>(`SELECT id FROM cash_sales WHERE id = $1`, [params.id])
+      if (cashSale) return NextResponse.json({ redirect: `/admin/cash-sale/${cashSale.id}` }, { status: 200 })
+      return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+    }
 
     const items = await queryMany<any>(
       `SELECT product_name, product_sku, variant_name, hsn_code, gst_rate,

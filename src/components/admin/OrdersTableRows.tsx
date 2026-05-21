@@ -26,80 +26,6 @@ function statusLabel(status: string) {
   return status.replace(/_/g, ' ')
 }
 
-function OrderPopover({ order }: { order: any }) {
-  const orderNum = order.order_number || order.id.slice(0, 8)
-  const date = new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-  const amount = Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })
-
-  return (
-    <HoverCard
-      trigger={
-        <span className="cursor-default underline decoration-dotted underline-offset-2 text-foreground font-medium hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
-          #{orderNum}
-        </span>
-      }
-      align="left"
-      side="bottom"
-      width="380px"
-    >
-      <div className="p-3 space-y-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold text-foreground text-sm font-mono break-all">#{orderNum}</p>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            order.source === 'offline'
-              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-              : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-          }`}>
-            {order.source === 'offline' ? 'Offline' : 'Online'}
-          </span>
-        </div>
-        <div className="text-xs text-foreground-secondary space-y-1">
-          <div className="flex justify-between">
-            <span>Date</span>
-            <span className="text-foreground">{date}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Amount</span>
-            <span className="font-semibold text-foreground">₹{amount}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Payment</span>
-            <span className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-              {order.payment_status}
-            </span>
-          </div>
-        </div>
-        <div className="pt-1 border-t border-border-default flex flex-col gap-1.5">
-          <a
-            href={`/api/admin/packing-slips/${order.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-accent-500 hover:text-accent-600 font-medium"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            Packing Slip
-          </a>
-          {order.awb_number && (
-          <a
-            href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-accent-500 hover:text-accent-600 font-medium"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Shipping Label
-          </a>
-          )}
-        </div>
-      </div>
-    </HoverCard>
-  )
-}
-
 function CustomerPopover({ order }: { order: any }) {
   const name = order.users
     ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest'
@@ -168,16 +94,47 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
           className="hover:bg-surface-secondary cursor-pointer"
           onClick={() => setSelected(order)}
         >
-          <td className="px-6 py-4 whitespace-nowrap">
-            <OrderPopover order={order} />
+          <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+            <HoverCard
+              trigger={
+                <a
+                  href={`/admin/orders/${order.id}`}
+                  className="font-mono font-semibold text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                  onClick={e => e.stopPropagation()}
+                >
+                  #{order.order_number || order.id.slice(0, 8)}
+                </a>
+              }
+              align="left"
+              side="bottom"
+              width="260px"
+            >
+              <div className="p-3 space-y-2">
+                <p className="font-mono font-semibold text-foreground text-sm">#{order.order_number || order.id.slice(0, 8)}</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                  <span className="text-foreground-muted">Customer</span>
+                  <span className="text-foreground font-medium truncate">
+                    {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest' : order.customer_name || 'Guest'}
+                  </span>
+                  <span className="text-foreground-muted">Date</span>
+                  <span className="text-foreground">{new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  <span className="text-foreground-muted">Total</span>
+                  <span className="text-foreground font-semibold">₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground-muted">Payment</span>
+                  <span className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : order.payment_status === 'pending' ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{order.payment_status}</span>
+                  <span className="text-foreground-muted">Source</span>
+                  <span className="text-foreground">{order.source === 'online' ? 'Online' : 'Offline'}</span>
+                </div>
+              </div>
+            </HoverCard>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-              order.source === 'offline'
-                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+              order.source === 'online'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
             }`}>
-              {order.source === 'offline' ? 'Offline' : 'Online'}
+              {order.source === 'online' ? 'Online' : 'Offline'}
             </span>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
@@ -214,7 +171,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Packing Slip"
-                className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -226,7 +183,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Shipping Label"
-                  className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -239,7 +196,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Invoice PDF"
-                  className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -249,7 +206,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
               <Link
                 href={`/admin/orders/${order.id}`}
                 title="View Details"
-                className="p-1.5 rounded hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />

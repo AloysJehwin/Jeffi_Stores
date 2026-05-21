@@ -150,11 +150,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
                       #{order.order_number || order.id.slice(0, 8)}
                     </span>
                     <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${
-                      order.source === 'offline'
-                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                      order.source === 'online'
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                        : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
                     }`}>
-                      {order.source === 'offline' ? 'Offline' : 'Online'}
+                      {order.source === 'online' ? 'Online' : 'Offline'}
                     </span>
                   </div>
                   <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${

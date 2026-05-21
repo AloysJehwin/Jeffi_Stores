@@ -1132,7 +1132,7 @@ function StockTab() {
                                 <Link
                                   href={`/admin/products/${p.id}`}
                                   title="View Product"
-                                  className="p-1.5 rounded hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
+                                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
                                 >
                                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -1141,7 +1141,7 @@ function StockTab() {
                                 <button
                                   onClick={() => isEditing ? cancelEdit() : startEdit(p)}
                                   title={isEditing ? 'Cancel edit' : 'Adjust stock'}
-                                  className={`p-1.5 rounded transition-colors ${isEditing ? 'hover:bg-surface-secondary text-secondary-500 hover:text-secondary-600' : 'hover:bg-surface-secondary text-foreground-muted hover:text-foreground'}`}
+                                  className={`p-1.5 rounded-lg transition-colors ${isEditing ? 'hover:bg-surface-secondary text-secondary-500 hover:text-secondary-600' : 'hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500'}`}
                                 >
                                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

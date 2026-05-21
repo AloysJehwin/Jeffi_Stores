@@ -121,11 +121,11 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               {o.payment_status}
             </span>
             <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
-              o.source === 'offline'
-                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+              o.source === 'online'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
             }`}>
-              {o.source === 'offline' ? 'Offline' : 'Online'}
+              {o.source === 'online' ? 'Online' : 'Offline'}
             </span>
           </div>
 
