@@ -12,6 +12,7 @@ interface Review {
   is_verified_purchase: boolean
   is_approved: boolean
   image_urls: string[]
+  image_thumbnail_urls: string[]
   created_at: string
   users: {
     first_name: string
@@ -265,7 +266,7 @@ export default function AdminReviewsPage() {
                         onClick={() => setLightboxUrl(url)}
                         className="w-20 h-20 rounded-lg overflow-hidden border border-border-secondary hover:border-accent-500 transition-colors shrink-0"
                       >
-                        <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        <img src={review.image_thumbnail_urls?.[idx] || url} alt="" className="w-full h-full object-cover" loading="lazy" />
                       </button>
                     ))}
                   </div>

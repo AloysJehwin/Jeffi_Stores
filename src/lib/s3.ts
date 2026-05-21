@@ -143,7 +143,7 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
   }
 }
 
-export async function uploadReviewImage(file: File, reviewId: string): Promise<string> {
+export async function uploadReviewImage(file: File, reviewId: string): Promise<{ url: string; thumbnailUrl: string }> {
   if (!ALLOWED_TYPES.includes(file.type)) {
     throw new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.')
   }
@@ -153,10 +153,13 @@ export async function uploadReviewImage(file: File, reviewId: string): Promise<s
   const timestamp = Date.now()
   const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
   const s3Key = `${KEY_PREFIX}reviews/${reviewId}/${timestamp}-${sanitizedName}`
+  const s3ThumbnailKey = `${KEY_PREFIX}reviews/${reviewId}/thumbnails/${timestamp}-${sanitizedName}`
   const buffer = Buffer.from(await file.arrayBuffer())
   const resized = await sharp(buffer).rotate().resize(1200, 1200, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer()
+  const thumbnail = await sharp(buffer).rotate().resize(300, 300, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer()
   await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key, Body: resized, ContentType: 'image/jpeg' }))
-  return getS3Url(s3Key)
+  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3ThumbnailKey, Body: thumbnail, ContentType: 'image/jpeg' }))
+  return { url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3ThumbnailKey) }
 }
 
 export async function deleteGalleryImage(s3Key: string, s3ThumbnailKey: string) {
