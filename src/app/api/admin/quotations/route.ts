@@ -99,10 +99,10 @@ export async function POST(request: NextRequest) {
       `INSERT INTO quotations (
         quote_number, quote_date, status,
         consignee_name, consignee_addr1, consignee_addr2, consignee_city, consignee_state, consignee_gstin,
-        consignee_phone, consignee_pincode,
+        consignee_phone, consignee_pincode, consignee_email,
         buyer_same, buyer_name, buyer_addr1, buyer_addr2, buyer_city, buyer_state, buyer_gstin,
         notes, subtotal, cgst_amount, sgst_amount, total_amount, created_by
-      ) VALUES ($1,$2,'draft',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+      ) VALUES ($1,$2,'draft',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
       RETURNING *`,
       [
         quoteNumber,
@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
         fields.consignee_gstin || null,
         fields.consignee_phone || null,
         fields.consignee_pincode || null,
+        fields.consignee_email || null,
         fields.buyer_same !== false,
         fields.buyer_name || null,
         fields.buyer_addr1 || null,

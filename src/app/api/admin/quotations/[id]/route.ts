@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { query, queryMany, queryOne } from '@/lib/db'
+import { generateQuotationPDF, QuotationBusiness } from '@/lib/quotation-pdf'
+import { sendQuotationFinalizedEmail } from '@/lib/email'
 
 function calcTotals(items: any[]) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
@@ -69,7 +71,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const textFields = [
       'quote_date', 'status',
       'consignee_name', 'consignee_addr1', 'consignee_addr2', 'consignee_city', 'consignee_state', 'consignee_gstin',
-      'consignee_phone', 'consignee_pincode',
+      'consignee_phone', 'consignee_pincode', 'consignee_email',
       'buyer_same', 'buyer_name', 'buyer_addr1', 'buyer_addr2', 'buyer_city', 'buyer_state', 'buyer_gstin', 'notes',
     ]
     for (const field of textFields) {
@@ -89,6 +91,54 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     )
 
     const savedItems = await queryMany(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [params.id])
+
+    if (fields.status === 'final' && qt?.consignee_email) {
+      try {
+        const settingsRows = await queryMany<{ key: string; value: string }>(
+          `SELECT key, value FROM site_settings WHERE key LIKE 'business_%' OR key LIKE 'bank_%'`,
+          []
+        )
+        const s: Record<string, string> = {}
+        for (const row of settingsRows) s[row.key] = row.value || ''
+
+        const business: QuotationBusiness = {
+          gstin: s.business_gstin || '',
+          legalName: s.business_legal_name || '',
+          tradeName: s.business_trade_name || '',
+          address: s.business_address || '',
+          state: s.business_state || '',
+          stateCode: s.business_state_code || '',
+          phone: s.business_phone || '',
+          email: s.business_email || '',
+          bankName: s.bank_name || '',
+          bankAccount: s.bank_account || '',
+          bankIfsc: s.bank_ifsc || '',
+          bankBranch: s.bank_branch || '',
+        }
+
+        const pdfItems = (savedItems || []).map((item: any) => ({
+          description: item.description,
+          hsn_code: item.hsn_code,
+          gst_rate: Number(item.gst_rate),
+          quantity: Number(item.quantity),
+          unit: item.unit,
+          rate: Number(item.rate),
+          discount_pct: Number(item.discount_pct),
+          amount: Number(item.amount),
+        }))
+
+        const pdfBuffer = await generateQuotationPDF(qt, pdfItems, business)
+        await sendQuotationFinalizedEmail(
+          qt.consignee_email,
+          qt.consignee_name || 'Customer',
+          qt.quote_number,
+          Number(qt.total_amount),
+          pdfBuffer
+        )
+      } catch (_emailErr) {
+      }
+    }
+
     return NextResponse.json({ quotation: qt, items: savedItems })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed to update' }, { status: 500 })
