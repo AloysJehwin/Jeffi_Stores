@@ -8,6 +8,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
+import DatePicker from '@/components/ui/DatePicker'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
 
@@ -542,9 +543,9 @@ export default function QuotationsClient() {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); syncUrl({ from: e.target.value }) }} className={inputCls + ' w-36'} />
+              <DatePicker className="w-36" value={fromDate} onChange={v => { setFromDate(v); syncUrl({ from: v }) }} />
               <span className="text-foreground-secondary text-xs">to</span>
-              <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); syncUrl({ to: e.target.value }) }} className={inputCls + ' w-36'} />
+              <DatePicker className="w-36" value={toDate} onChange={v => { setToDate(v); syncUrl({ to: v }) }} />
             </div>
           </div>
         </div>
@@ -739,7 +740,7 @@ export default function QuotationsClient() {
             </div>
             <div>
               <label className={labelCls}>Date</label>
-              <input type="date" value={quoteDate} onChange={e => setQuoteDate(e.target.value)} disabled={isFinal} className={inputCls} />
+              <DatePicker value={quoteDate} onChange={setQuoteDate} disabled={isFinal} />
             </div>
             <div>
               <label className={labelCls}>Notes (optional)</label>
