@@ -558,7 +558,7 @@ export default function QuotationsClient() {
                   <SortableHeader label="Consignee" column="consignee" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                   <SortableHeader label="Total" column="total" align="right" options={sortOptions('number')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                   <SortableHeader label="Status" column="status" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
-                  <th className="px-4 py-3 text-center font-semibold text-foreground-secondary text-xs">Actions</th>
+                  <th className="px-4 py-3 text-right font-semibold text-foreground-secondary text-xs">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -608,17 +608,17 @@ export default function QuotationsClient() {
                       </span>
                     </td>
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-end gap-1">
                         {q.status === 'draft' && (
                           <button onClick={() => openEdit(q.id)} title="Edit"
-                            className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors">
+                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
                         )}
                         <a href={`/api/admin/quotations/${q.id}/pdf`} target="_blank" rel="noopener noreferrer" title="Download PDF"
-                          className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors">
+                          className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
@@ -628,7 +628,7 @@ export default function QuotationsClient() {
                             onClick={() => sendQuoteEmail(q.id)}
                             disabled={sendingEmailId === q.id}
                             title={`Send email to ${q.consignee_email}`}
-                            className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors disabled:opacity-50"
+                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-blue-500 transition-colors disabled:opacity-50"
                           >
                             {sendingEmailId === q.id ? (
                               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -655,7 +655,7 @@ export default function QuotationsClient() {
                         )}
                         {q.status === 'draft' && (
                           <button onClick={() => deleteQuote(q.id)} title="Delete"
-                            className="p-1.5 text-foreground-secondary hover:text-red-500 transition-colors">
+                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-red-500 transition-colors">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
