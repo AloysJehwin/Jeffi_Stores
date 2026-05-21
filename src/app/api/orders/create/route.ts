@@ -50,14 +50,14 @@ export async function POST(request: NextRequest) {
         ci.*,
         json_build_object(
           'id', p.id, 'name', p.name, 'sku', p.sku,
-          'base_price', p.base_price, 'sale_price', p.sale_price,
+          'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
           'stock_quantity', p.stock_quantity, 'inventory_quantity', p.inventory_quantity, 'is_in_stock', p.is_in_stock
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
-            'price', pv.price, 'sale_price', pv.sale_price,
+            'price', pv.price, 'price_ex_gst', pv.price_ex_gst,
             'stock_quantity', pv.stock_quantity, 'inventory_quantity', pv.inventory_quantity
           )
         ELSE NULL END AS variant
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
         return sum + (parseFloat(item.price_at_addition) * parseFloat(item.quantity))
       }
-      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+      const price = item.variant?.price ?? item.products.base_price
       return sum + (parseFloat(price) * parseFloat(item.quantity))
     }, 0)
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     const taxAmount = cartItems.reduce((sum: number, item: any) => {
       const lineTotal = item.buy_mode === 'weight' || item.buy_mode === 'length'
         ? parseFloat(item.price_at_addition) * parseFloat(item.quantity)
-        : parseFloat(item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price) * parseFloat(item.quantity)
+        : parseFloat(item.variant?.price ?? item.products.base_price) * parseFloat(item.quantity)
       const gstRate = parseFloat(item.products.gst_percentage || '0')
       return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
     }, 0)
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
         const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
         const unitPrice = isCustomQty
           ? parseFloat(item.price_at_addition)
-          : parseFloat(item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price)
+          : parseFloat(item.variant?.price ?? item.products.base_price)
         const qty = parseFloat(item.quantity)
         const gstRate = parseFloat(item.products.gst_percentage || '0')
         const itemTotal = unitPrice * qty
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
       const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
       const unitPrice = isCustomQty
         ? parseFloat(item.price_at_addition)
-        : parseFloat(item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price)
+        : parseFloat(item.variant?.price ?? item.products.base_price)
       return {
         order_id: order.id,
         product_id: item.product_id,

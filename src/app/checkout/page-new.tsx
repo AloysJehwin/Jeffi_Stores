@@ -162,7 +162,7 @@ export default function CheckoutPage() {
                 <div className="space-y-4">
                   {cartItems.map((item) => {
                     const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                    const price = item.products.sale_price || item.products.base_price
+                    const price = item.products.price_ex_gst || item.products.base_price
                     const itemTotal = price * item.quantity
 
                     return (

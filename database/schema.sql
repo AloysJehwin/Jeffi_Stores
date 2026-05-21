@@ -119,8 +119,9 @@ CREATE TABLE products (
     -- Pricing
     base_price DECIMAL(12, 2) NOT NULL,
     mrp DECIMAL(12, 2),
-    sale_price DECIMAL(12, 2),
-    wholesale_price DECIMAL(12, 2),
+    price_ex_gst DECIMAL(12, 2),
+    mrp_ex_gst DECIMAL(12, 2),
+    wholeprice_ex_gst DECIMAL(12, 2),
     gst_percentage DECIMAL(5, 2) DEFAULT 18,
     hsn_code VARCHAR(20),
     mpn VARCHAR(100),          -- Manufacturer Part Number (for Google Merchant)
@@ -202,8 +203,9 @@ CREATE TABLE product_variants (
     variant_name VARCHAR(255) NOT NULL,
     price DECIMAL(12, 2),
     mrp DECIMAL(12, 2),
-    sale_price DECIMAL(12, 2),
-    wholesale_price DECIMAL(12, 2),
+    price_ex_gst DECIMAL(12, 2),
+    mrp_ex_gst DECIMAL(12, 2),
+    wholeprice_ex_gst DECIMAL(12, 2),
     stock_quantity INT DEFAULT 0,
     mpn VARCHAR(100),          -- Manufacturer Part Number
     gtin VARCHAR(50),          -- GTIN/EAN/barcode

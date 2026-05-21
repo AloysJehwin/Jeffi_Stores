@@ -9,7 +9,7 @@ interface Product {
   name: string
   slug: string
   base_price: number
-  sale_price: number | null
+  price_ex_gst: number | null
   has_variants: boolean
   variant_min_price: number | null
   product_images: Array<{ image_url: string; thumbnail_url: string; is_primary: boolean }>
@@ -200,7 +200,7 @@ export default function ProductsSearch({ defaultValue }: { defaultValue?: string
                       const primaryImage = product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
                       const displayPrice = product.has_variants && product.variant_min_price
                         ? product.variant_min_price
-                        : (product.sale_price || product.base_price)
+                        : (product.price_ex_gst || product.base_price)
 
                       return (
                         <Link

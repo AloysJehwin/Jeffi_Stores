@@ -30,7 +30,7 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[])
         '[]'::json
       ) AS product_images,
       COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
-      (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
+      (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -123,7 +123,7 @@ export default async function CategoryDetailPage({
                 const hasVariants = product.has_variants
                 const displayPrice = hasVariants && product.variant_min_price
                   ? product.variant_min_price
-                  : (product.sale_price || product.base_price)
+                  : (product.price_ex_gst || product.base_price)
                 const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
                 const mrp = product.mrp ? Number(product.mrp) : null
                 const mrpDiscount = mrp && mrp > Number(displayPrice)

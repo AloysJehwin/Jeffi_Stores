@@ -144,7 +144,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                   <span className="text-sm font-semibold text-primary-500">
                     {product.has_variants
                       ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN')}`
-                      : `Rs. ${Number(product.sale_price || product.base_price).toLocaleString('en-IN')}`
+                      : `Rs. ${Number(product.base_price).toLocaleString('en-IN')}`
                     }
                   </span>
                   <span className="text-sm text-foreground">

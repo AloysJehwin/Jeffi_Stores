@@ -20,7 +20,7 @@ interface ProductInfo {
   sku: string
   slug: string
   mrp: number
-  sale_price: number | null
+  price_ex_gst: number | null
   base_price: number
   gst_percentage: number
   brand_name: string | null
@@ -243,7 +243,7 @@ export default function ScanClient() {
   const nextStatuses = order ? (VALID_TRANSITIONS[order.status] ?? []) : []
 
   const incGst = product
-    ? Number((((product.sale_price ?? product.base_price) || 0) * (1 + (product.gst_percentage || 0) / 100)).toFixed(2))
+    ? Number(((product.base_price || 0) * (1 + (product.gst_percentage || 0) / 100)).toFixed(2))
     : 0
   const mrpIncGst = product && product.mrp > 0
     ? Number((product.mrp * (1 + (product.gst_percentage || 0) / 100)).toFixed(2))
@@ -471,13 +471,13 @@ export default function ScanClient() {
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400">Sale Price</span>
+                  <span className="text-xs text-gray-400">Selling Price</span>
                   <span className="text-base font-bold text-secondary-400">{fmt2(incGst)}</span>
                 </div>
                 {product.gst_percentage > 0 && (
                   <div className="flex justify-between items-center border-t border-gray-600 pt-1.5">
                     <span className="text-xs text-gray-500">ex. GST ({product.gst_percentage}%)</span>
-                    <span className="text-xs text-gray-400">{fmt2(product.sale_price ?? product.base_price)}</span>
+                    <span className="text-xs text-gray-400">{fmt2(product.base_price)}</span>
                   </div>
                 )}
               </div>

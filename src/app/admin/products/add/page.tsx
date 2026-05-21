@@ -15,8 +15,8 @@ async function createProduct(formData: FormData) {
   const variantType = formData.get('variant_type') as string || null
   const basePrice = hasVariants ? 0 : Math.round(parseFloat(formData.get('base_price') as string) * 100) / 100
   const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
-  const salePrice = formData.get('sale_price') ? Math.round(parseFloat(formData.get('sale_price') as string) * 100) / 100 : null
-  const wholesalePrice = formData.get('wholesale_price') ? Math.round(parseFloat(formData.get('wholesale_price') as string) * 100) / 100 : null
+  const salePrice = formData.get('price_ex_gst') ? Math.round(parseFloat(formData.get('price_ex_gst') as string) * 100) / 100 : null
+  const wholesalePrice = formData.get('wholeprice_ex_gst') ? Math.round(parseFloat(formData.get('wholeprice_ex_gst') as string) * 100) / 100 : null
   const costPrice = formData.get('cost_price') ? Math.round(parseFloat(formData.get('cost_price') as string) * 100) / 100 : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
@@ -57,7 +57,7 @@ async function createProduct(formData: FormData) {
     const data = await queryOne(
       `INSERT INTO products (
         name, slug, sku, description, category_id, brand_id,
-        base_price, mrp, sale_price, wholesale_price, gst_percentage, hsn_code, mpn, gtin,
+        base_price, mrp, price_ex_gst, wholeprice_ex_gst, gst_percentage, hsn_code, mpn, gtin,
         stock_quantity, low_stock_threshold, weight, dimensions, is_active, is_featured,
         has_variants, variant_type, weight_rate, weight_unit, length_rate, length_unit,
         weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price
@@ -158,7 +158,7 @@ async function createProduct(formData: FormData) {
           if (!isWeightOrLength && !variant.variant_name) continue
           const variantSku = generateVariantSku(sku, variant.variant_name)
           await query(
-            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, sale_price, wholesale_price, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_rate, weight_unit, length_rate, length_unit, weight_grams, package_type, length_cm, breadth_cm, height_cm, is_active)
+            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, price_ex_gst, wholeprice_ex_gst, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_rate, weight_unit, length_rate, length_unit, weight_grams, package_type, length_cm, breadth_cm, height_cm, is_active)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, true)`,
             [
               data.id,
@@ -166,8 +166,9 @@ async function createProduct(formData: FormData) {
               variant.variant_name,
               variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
               variant.mrp ? Math.round(parseFloat(variant.mrp) * 100) / 100 : null,
-              variant.sale_price ? Math.round(parseFloat(variant.sale_price) * 100) / 100 : null,
-              variant.wholesale_price ? Math.round(parseFloat(variant.wholesale_price) * 100) / 100 : null,
+              variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100
+                : variant.price ? Math.round(parseFloat(variant.price) / (1 + gstPercentage / 100) * 100) / 100 : null,
+              variant.wholeprice_ex_gst ? Math.round(parseFloat(variant.wholeprice_ex_gst) * 100) / 100 : null,
               parseInt(variant.stock_quantity) || 0,
               variant.mpn || null,
               variant.gtin || null,

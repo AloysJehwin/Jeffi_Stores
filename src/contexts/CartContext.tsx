@@ -16,7 +16,7 @@ interface CartItem {
     name: string
     slug: string
     base_price: number
-    sale_price: number | null
+    price_ex_gst: number | null
     gst_percentage: number | null
     stock_quantity: number
     is_in_stock: boolean
@@ -32,8 +32,8 @@ interface CartItem {
     sku: string
     price: number | null
     mrp: number | null
-    sale_price: number | null
-    wholesale_price: number | null
+    price_ex_gst: number | null
+    wholeprice_ex_gst: number | null
     stock_quantity: number
     pricing_type?: string
     unit?: string | null
@@ -161,7 +161,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
         return total + item.price_at_addition * item.quantity
       }
-      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+      const price = item.variant?.price ?? item.products.base_price
       return total + price * item.quantity
     }, 0)
   }
@@ -173,7 +173,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const itemTotal = item.price_at_addition * item.quantity
         return tax + (itemTotal - itemTotal / (1 + gstRate / 100))
       }
-      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+      const price = item.variant?.price ?? item.products.base_price
       const gstRate = item.products.gst_percentage || 0
       const itemTotal = price * item.quantity
       const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))

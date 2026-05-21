@@ -12,8 +12,8 @@ interface Variant {
   sku: string
   price: number | null
   mrp: number | null
-  sale_price: number | null
-  wholesale_price: number | null
+  price_ex_gst: number | null
+  wholeprice_ex_gst: number | null
   stock_quantity: number
   pricing_type?: string
   unit?: string
@@ -117,13 +117,13 @@ export default function ProductActions({
   }, [selectedVariantId, hasVariants, selectedVariant])
 
   const effectivePrice = hasVariants
-    ? (selectedVariant?.sale_price ?? selectedVariant?.price ?? salePrice ?? basePrice)
+    ? (selectedVariant?.price ?? basePrice)
     : (salePrice ?? basePrice)
   const effectiveMrp = hasVariants
     ? (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp)
     : mrp
   const effectiveWholesalePrice = hasVariants
-    ? (selectedVariant?.wholesale_price != null ? Number(selectedVariant.wholesale_price) : wholesalePrice)
+    ? (selectedVariant?.wholeprice_ex_gst != null ? Number(selectedVariant.wholeprice_ex_gst) : wholesalePrice)
     : wholesalePrice
   const effectiveStock = hasVariants ? (selectedVariant?.stock_quantity ?? 0) : stockQuantity
 

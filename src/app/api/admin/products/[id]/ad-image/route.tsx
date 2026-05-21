@@ -40,7 +40,7 @@ export async function GET(
 
   const product = await queryOne<any>(`
     SELECT
-      p.id, p.name, p.slug, p.base_price, p.sale_price,
+      p.id, p.name, p.slug, p.base_price, p.price_ex_gst,
       (SELECT pi.image_url FROM product_images pi
        WHERE pi.product_id = p.id
        ORDER BY pi.is_primary DESC, pi.display_order ASC
@@ -51,7 +51,7 @@ export async function GET(
 
   if (!product) return new Response('Product not found', { status: 404 })
 
-  const salePrice = product.sale_price ? Number(product.sale_price) : null
+  const salePrice = product.price_ex_gst ? Number(product.price_ex_gst) : null
   const basePrice = product.base_price ? Number(product.base_price) : null
 
   const displayPrice  = salePrice ?? basePrice ?? 0
