@@ -1687,3 +1687,63 @@ export async function sendPaymentRetryEmail(
     return { success: false, error }
   }
 }
+
+export async function sendQuotationFinalizedEmail(
+  toEmail: string,
+  consigneeName: string,
+  quoteNumber: string,
+  totalAmount: number,
+  pdfBuffer?: Buffer | null
+) {
+  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: toEmail,
+    subject: `Quotation ${quoteNumber} from Jeffi Stores`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
+            .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+            .header{background:#1a3a4a;padding:24px;text-align:center}
+            .logo{font-size:22px;font-weight:bold;color:#fff}
+            .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
+            .box{background:#f0f9ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
+            .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><div class="logo">Jeffi Store's</div></div>
+            <div class="body">
+              <p>Dear ${consigneeName},</p>
+              <p>Please find attached your quotation from Jeffi Stores.</p>
+              <div class="box">
+                <p style="margin:0 0 6px"><strong>Quotation No.:</strong> ${quoteNumber}</p>
+                <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
+              </div>
+              <p>If you have any questions regarding this quotation, please feel free to contact us.</p>
+              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+            </div>
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    attachments: pdfBuffer ? [{
+      filename: `Quotation-${quoteNumber.replace(/\//g, '-')}.pdf`,
+      content: pdfBuffer,
+      contentType: 'application/pdf',
+    }] : [],
+  }
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}

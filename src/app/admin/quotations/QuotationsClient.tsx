@@ -23,6 +23,7 @@ interface Quotation {
   consignee_gstin: string | null
   consignee_phone: string | null
   consignee_pincode: string | null
+  consignee_email: string | null
   buyer_same: boolean
   buyer_name: string | null
   buyer_addr1: string | null
@@ -111,6 +112,7 @@ export default function QuotationsClient() {
   const [cGstin, setCGstin] = useState('')
   const [cPhone, setCPhone] = useState('')
   const [cPincode, setCPincode] = useState('')
+  const [cEmail, setCEmail] = useState('')
 
   const [buyerSame, setBuyerSame] = useState(true)
   const [bName, setBName] = useState('')
@@ -174,7 +176,7 @@ export default function QuotationsClient() {
     setQuoteNumber('')
     setQuoteDate(todayISO())
     setNotes('')
-    setCName(''); setCAddr1(''); setCAddr2(''); setCCity(''); setCState('Chhattisgarh'); setCGstin(''); setCPhone(''); setCPincode('')
+    setCName(''); setCAddr1(''); setCAddr2(''); setCCity(''); setCState('Chhattisgarh'); setCGstin(''); setCPhone(''); setCPincode(''); setCEmail('')
     setBuyerSame(true)
     setBName(''); setBAddr1(''); setBAddr2(''); setBCity(''); setBState('Chhattisgarh'); setBGstin('')
     setItems([newLineItem()])
@@ -197,7 +199,7 @@ export default function QuotationsClient() {
       setNotes(q.notes || '')
       setCName(q.consignee_name || ''); setCAddr1(q.consignee_addr1 || ''); setCAddr2(q.consignee_addr2 || '')
       setCCity(q.consignee_city || ''); setCState(q.consignee_state || 'Chhattisgarh'); setCGstin(q.consignee_gstin || '')
-      setCPhone((q.consignee_phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10)); setCPincode(q.consignee_pincode || '')
+      setCPhone((q.consignee_phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10)); setCPincode(q.consignee_pincode || ''); setCEmail(q.consignee_email || '')
       setBuyerSame(q.buyer_same)
       setBName(q.buyer_name || ''); setBAddr1(q.buyer_addr1 || ''); setBAddr2(q.buyer_addr2 || '')
       setBCity(q.buyer_city || ''); setBState(q.buyer_state || 'Chhattisgarh'); setBGstin(q.buyer_gstin || '')
@@ -269,6 +271,7 @@ export default function QuotationsClient() {
         consignee_name: cName, consignee_addr1: cAddr1, consignee_addr2: cAddr2 || null,
         consignee_city: cCity, consignee_state: cState, consignee_gstin: cGstin || null,
         consignee_phone: cPhone || null, consignee_pincode: cPincode || null,
+        consignee_email: cEmail || null,
         buyer_same: buyerSame,
         buyer_name: buyerSame ? null : bName, buyer_addr1: buyerSame ? null : bAddr1,
         buyer_addr2: buyerSame ? null : (bAddr2 || null),
@@ -333,7 +336,7 @@ export default function QuotationsClient() {
     if (view !== 'editor') return
     if (!isEditorMounted.current) { isEditorMounted.current = true; return }
     scheduleAutoSave()
-  }, [quoteDate, notes, cName, cAddr1, cAddr2, cCity, cState, cGstin, cPhone, cPincode,
+  }, [quoteDate, notes, cName, cAddr1, cAddr2, cCity, cState, cGstin, cPhone, cPincode, cEmail,
       buyerSame, bName, bAddr1, bAddr2, bCity, bState, bGstin, items])
 
   useEffect(() => {
@@ -402,6 +405,7 @@ export default function QuotationsClient() {
     setCGstin(c.gst_number || '')
     setCPhone((c.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10))
     setCPincode(c.postal_code || '')
+    setCEmail(c.email || '')
     setCustSearch('')
     setShowCustDrop(false)
   }
@@ -728,6 +732,7 @@ export default function QuotationsClient() {
             </div>
             <input value={cPincode} onChange={e => setCPincode(e.target.value)} placeholder="Pincode" disabled={isFinal} className={inputCls + ' font-mono'} />
             <input value={cGstin} onChange={e => setCGstin(e.target.value.toUpperCase())} placeholder="00XXXXX0000X0Z0" disabled={isFinal} className={inputCls + ' font-mono'} />
+            <input type="email" value={cEmail} onChange={e => setCEmail(e.target.value)} placeholder="Email address" disabled={isFinal} className={inputCls} />
           </div>
         </div>
 
@@ -823,6 +828,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
               <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Consignee</p>
               <p className="text-sm font-semibold text-foreground">{q.consignee_name}</p>
               {q.consignee_phone && <p className="text-xs text-foreground-secondary mt-0.5">{q.consignee_phone}</p>}
+              {q.consignee_email && <p className="text-xs text-foreground-secondary mt-0.5">{q.consignee_email}</p>}
               {[q.consignee_addr1, q.consignee_addr2, q.consignee_city, q.consignee_state, q.consignee_pincode].filter(Boolean).length > 0 && (
                 <p className="text-xs text-foreground-secondary mt-0.5">
                   {[q.consignee_addr1, q.consignee_addr2, q.consignee_city, q.consignee_state, q.consignee_pincode].filter(Boolean).join(', ')}
