@@ -166,7 +166,8 @@ async function createProduct(formData: FormData) {
               variant.variant_name,
               variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
               variant.mrp ? Math.round(parseFloat(variant.mrp) * 100) / 100 : null,
-              variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100 : null,
+              variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100
+                : variant.price ? Math.round(parseFloat(variant.price) / (1 + gstPercentage / 100) * 100) / 100 : null,
               variant.wholeprice_ex_gst ? Math.round(parseFloat(variant.wholeprice_ex_gst) * 100) / 100 : null,
               parseInt(variant.stock_quantity) || 0,
               variant.mpn || null,

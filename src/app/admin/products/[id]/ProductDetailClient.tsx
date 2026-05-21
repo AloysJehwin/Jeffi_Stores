@@ -129,8 +129,9 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { label: 'MRP', val: p.mrp },
-                { label: p.has_variants ? 'From' : 'Sale Price', val: p.has_variants ? p.variant_min_price : p.price_ex_gst },
-                { label: 'Base Price', val: p.has_variants ? null : p.base_price },
+                { label: p.has_variants ? 'From' : 'Selling Price', val: p.has_variants ? p.variant_min_price : p.base_price },
+                { label: 'Ex-GST', val: p.has_variants ? null : p.price_ex_gst },
+                { label: 'Wholesale', val: p.wholeprice_ex_gst },
               ].map(({ label, val }) => val != null && (
                 <div key={label}>
                   <p className="text-xs text-foreground-secondary mb-0.5">{label}</p>
@@ -201,7 +202,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 <tr>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Variant</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden sm:table-cell">SKU</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Price</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Price (incl. GST)</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">Ex-GST</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">MRP</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Stock</th>
                   <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Status</th>
@@ -215,7 +217,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
                     <tr key={v.id} className="hover:bg-surface-secondary/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">{v.variant_name}</td>
                       <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">{v.sku || '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground">{v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : v.price ? formatINR(Number(v.price)) : '—'}</td>
+                      <td className="px-4 py-3 text-right text-foreground">{v.price ? formatINR(Number(v.price)) : '—'}</td>
+                      <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : '—'}</td>
                       <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{v.mrp ? formatINR(Number(v.mrp)) : '—'}</td>
                       <td className={`px-4 py-3 text-right font-semibold ${vStockColor}`}>{vStock}</td>
                       <td className="px-4 py-3 text-center">
