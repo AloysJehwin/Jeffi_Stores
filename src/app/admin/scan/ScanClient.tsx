@@ -471,7 +471,7 @@ export default function ScanClient() {
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400">Sale Price</span>
+                  <span className="text-xs text-gray-400">Selling Price</span>
                   <span className="text-base font-bold text-secondary-400">{fmt2(incGst)}</span>
                 </div>
                 {product.gst_percentage > 0 && (

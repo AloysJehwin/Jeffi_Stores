@@ -86,7 +86,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                             <p className="text-foreground font-medium">
                               {product.has_variants
                                 ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN')}`
-                                : `Rs. ${Number(product.price_ex_gst || product.base_price || 0).toLocaleString('en-IN')}`
+                                : `Rs. ${Number(product.base_price || 0).toLocaleString('en-IN')}`
                               }
                             </p>
                           </div>
@@ -131,7 +131,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                 <div className="text-sm font-semibold text-primary-500 truncate">
                     {product.has_variants
                       ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                      : `Rs. ${Number(product.price_ex_gst || product.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                      : `Rs. ${Number(product.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
                     }
                 </div>
               </td>
