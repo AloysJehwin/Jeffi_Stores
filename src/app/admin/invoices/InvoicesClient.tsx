@@ -850,12 +850,36 @@ export default function InvoicesClient() {
                       onClick={() => setSelectedInvoice(inv)}
                     >
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        <a
-                          href={inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`}
-                          className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 hover:underline"
+                        <HoverCard
+                          trigger={
+                            <a
+                              href={inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`}
+                              className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                            >
+                              {inv.invoice_number}
+                            </a>
+                          }
+                          align="left"
+                          side="bottom"
+                          width="260px"
                         >
-                          {inv.invoice_number}
-                        </a>
+                          <div className="p-3 space-y-2">
+                            <p className="font-mono font-semibold text-foreground text-sm">{inv.invoice_number}</p>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                              <span className="text-foreground-muted">Customer</span>
+                              <span className="text-foreground font-medium truncate">{inv.customer_name || '—'}</span>
+                              {inv.customer_phone && (<><span className="text-foreground-muted">Phone</span><span className="text-foreground">+91 {inv.customer_phone}</span></>)}
+                              <span className="text-foreground-muted">Date</span>
+                              <span className="text-foreground">{fmtDate(inv.invoice_date)}</span>
+                              <span className="text-foreground-muted">Total</span>
+                              <span className="text-foreground font-semibold">₹{fmt(parseFloat(inv.total_amount))}</span>
+                              <span className="text-foreground-muted">Payment</span>
+                              <span className={`font-medium ${inv.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : inv.payment_status === 'unpaid' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>{inv.payment_status}</span>
+                              <span className="text-foreground-muted">Source</span>
+                              <span className="text-foreground">{inv.source === 'online' ? 'Online' : 'Offline'}</span>
+                            </div>
+                          </div>
+                        </HoverCard>
                         {inv.order_number && (
                           <div className="text-xs text-foreground-muted mt-0.5 font-mono">{inv.order_number}</div>
                         )}
