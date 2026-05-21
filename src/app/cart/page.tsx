@@ -139,7 +139,7 @@ export default function CartPage() {
                 const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
                 const price = isCustomQty
                   ? item.price_at_addition
-                  : (item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price)
+                  : (item.variant?.price ?? item.products.base_price)
                 const stockQty = item.variant?.stock_quantity ?? item.products.stock_quantity
                 const itemTotal = isCustomQty
                   ? item.price_at_addition * item.quantity
@@ -181,7 +181,7 @@ export default function CartPage() {
                           <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
                             ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
                           </span>
-                          {!isCustomQty && item.products.sale_price && (
+                          {!isCustomQty && item.products.price_ex_gst && (
                             <span className="text-sm text-foreground-muted line-through">
                               ₹{item.products.base_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </span>

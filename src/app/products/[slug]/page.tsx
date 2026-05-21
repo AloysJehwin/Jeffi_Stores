@@ -41,7 +41,7 @@ export async function generateMetadata({
   if (!product) return { title: 'Product Not Found' }
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-  const displayPrice = product.sale_price || product.base_price
+  const displayPrice = product.base_price
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
 
   return {
@@ -67,7 +67,7 @@ function buildProductJsonLd(product: any, baseUrl: string) {
 
   const offers = hasVariants
     ? product.product_variants.map((v: any) => {
-        const price = v.sale_price ?? v.price
+        const price = v.price
         return {
           '@type': 'Offer',
           name: v.variant_name,
@@ -87,7 +87,7 @@ function buildProductJsonLd(product: any, baseUrl: string) {
         {
           '@type': 'Offer',
           sku: product.sku,
-          price: Number(product.sale_price || product.base_price),
+          price: Number(product.base_price),
           priceCurrency: 'INR',
           availability: product.stock_quantity > 0
             ? 'https://schema.org/InStock'
@@ -125,7 +125,7 @@ async function getRelatedProducts(productId: string, categoryId: string) {
         '[]'::json
       ) AS product_images,
       COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
-      (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price
+      (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -154,7 +154,7 @@ export default async function ProductDetailPage({
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
   const hasVariants = product.has_variants && product.product_variants?.length > 0
-  const displayPrice = product.sale_price || product.base_price
+  const displayPrice = product.base_price
   const mrp = product.mrp ? Number(product.mrp) : null
   const mrpDiscount = mrp && mrp > Number(displayPrice)
     ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
@@ -301,10 +301,10 @@ export default async function ProductDetailPage({
                       Inclusive of all taxes
                       {product.gst_percentage ? ` (${parseFloat(product.gst_percentage)}% GST)` : ''}
                     </p>
-                    {product.wholesale_price && (
+                    {product.wholeprice_ex_gst && (
                       <div className="mt-3 pt-3 border-t border-border-default">
                         <span className="text-sm text-foreground-secondary">
-                          Wholesale Price: <span className="font-semibold text-foreground">Rs. {Number(product.wholesale_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                          Wholesale Price: <span className="font-semibold text-foreground">Rs. {Number(product.wholeprice_ex_gst).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                         </span>
                       </div>
                     )}
@@ -339,10 +339,10 @@ export default async function ProductDetailPage({
                 sku={product.sku}
                 stockQuantity={product.stock_quantity}
                 basePrice={Number(product.base_price)}
-                salePrice={product.sale_price ? Number(product.sale_price) : null}
+                salePrice={null}
                 mrp={mrp}
                 gstPercentage={product.gst_percentage ? Number(product.gst_percentage) : null}
-                wholesalePrice={product.wholesale_price ? Number(product.wholesale_price) : null}
+                wholesalePrice={product.wholeprice_ex_gst ? Number(product.wholeprice_ex_gst) : null}
                 variants={hasVariants ? product.product_variants : []}
                 variantType={product.variant_type || 'Variant'}
                 initialSkuParam={skuParam}
@@ -457,7 +457,7 @@ export default async function ProductDetailPage({
                 const relatedHasVariants = relatedProduct.has_variants
                 const relatedDisplayPrice = relatedHasVariants && relatedProduct.variant_min_price
                   ? relatedProduct.variant_min_price
-                  : (relatedProduct.sale_price || relatedProduct.base_price)
+                  : (relatedProduct.base_price)
                 const relatedMrp = relatedProduct.mrp ? Number(relatedProduct.mrp) : null
                 const relatedMrpDiscount = relatedMrp && relatedMrp > Number(relatedDisplayPrice)
                   ? Math.round(((relatedMrp - Number(relatedDisplayPrice)) / relatedMrp) * 100)

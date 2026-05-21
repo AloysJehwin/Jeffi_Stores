@@ -19,7 +19,7 @@ interface ProductResult {
   sku: string
   slug: string
   mrp: number | null
-  sale_price: number | null
+  price_ex_gst: number | null
   base_price: number
   gst_percentage: number
   brand_name: string | null
@@ -143,7 +143,7 @@ function LabelPreview({ size, product, scale }: {
   const variantName = product?.variant_name || null
   const sku = product?.sku || 'SKU-001'
   const brand = product?.brand_name || null
-  const exGst = product ? (product.sale_price ?? product.base_price) : null
+  const exGst = product ? (product.base_price) : null
   const mrp = product?.mrp ?? null
   const gstPct = product?.gst_percentage ?? 0
   const barcodeText = product?.sku || 'SKU-001'
@@ -558,7 +558,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
             )}
             {!searching && searchResults.map(p => {
               const isSelected = selectedProducts.some(sp => sp.id === p.id)
-              const displayPrice = fmtPrice(p.sale_price ?? p.base_price)
+              const displayPrice = fmtPrice(p.base_price)
               return (
                 <label
                   key={p.id}

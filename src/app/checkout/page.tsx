@@ -398,7 +398,7 @@ function CheckoutPage() {
                   ) : (
                     cartItems.map((item) => {
                       const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
-                      const price = item.variant?.sale_price ?? item.variant?.price ?? item.products.sale_price ?? item.products.base_price
+                      const price = item.variant?.price ?? item.products.base_price
                       const itemTotal = price * item.quantity
                       return (
                         <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">

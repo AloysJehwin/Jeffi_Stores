@@ -16,7 +16,7 @@ interface WishlistItem {
     name: string
     slug: string
     base_price: number
-    sale_price: number | null
+    price_ex_gst: number | null
     mrp: number | null
     has_variants: boolean
     stock_quantity: number
@@ -199,7 +199,7 @@ export default function WishlistPage() {
             const hasVariants = item.products.has_variants
             const price = hasVariants && item.products.variant_min_price
               ? item.products.variant_min_price
-              : (item.products.sale_price || item.products.base_price)
+              : (item.products.price_ex_gst || item.products.base_price)
             const effectiveStock = hasVariants ? Number(item.products.variant_stock_total) : item.products.stock_quantity
             const isInStock = effectiveStock > 0
             const mrp = item.products.mrp ? Number(item.products.mrp) : null

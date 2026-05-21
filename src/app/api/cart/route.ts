@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
         ci.*,
         json_build_object(
           'id', p.id, 'name', p.name, 'slug', p.slug,
-          'base_price', p.base_price, 'sale_price', p.sale_price,
+          'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'gst_percentage', p.gst_percentage,
           'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
           'product_images', COALESCE(
@@ -46,8 +46,8 @@ export async function GET(request: NextRequest) {
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
-            'price', pv.price, 'mrp', pv.mrp, 'sale_price', pv.sale_price,
-            'wholesale_price', pv.wholesale_price, 'stock_quantity', pv.stock_quantity,
+            'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
+            'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'stock_quantity', pv.stock_quantity,
             'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value,
             'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
             'length_rate', pv.length_rate, 'length_unit', pv.length_unit
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     const { userId } = await resolveUserId(cookieStore)
 
     const product = await queryOne(
-      'SELECT id, base_price, sale_price, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
+      'SELECT id, base_price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
       [productId]
     )
     if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     if (variantId) {
       const variant = await queryOne(
-        'SELECT id, price, sale_price, weight_rate, weight_unit, length_rate, length_unit FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
+        'SELECT id, price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
         [variantId, productId]
       )
       if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       } else if (buyMode === 'length') {
         priceAtAddition = variant.length_rate ?? product.length_rate ?? 0
       } else {
-        priceAtAddition = variant.sale_price ?? variant.price ?? product.sale_price ?? product.base_price
+        priceAtAddition = variant.price ?? product.base_price
       }
     } else {
       if (buyMode === 'weight') {
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       } else if (buyMode === 'length') {
         priceAtAddition = product.length_rate ?? 0
       } else {
-        priceAtAddition = product.sale_price || product.base_price
+        priceAtAddition = product.price_ex_gst || product.base_price
       }
     }
 

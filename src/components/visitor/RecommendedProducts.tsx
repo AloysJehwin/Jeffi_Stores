@@ -8,7 +8,7 @@ interface Product {
   name: string
   slug: string
   base_price: number
-  sale_price: number | null
+  price_ex_gst: number | null
   mrp: number | null
   has_variants: boolean
   variant_min_price: number | null
@@ -42,7 +42,7 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
           const img = product.product_images?.find(i => i.is_primary) || product.product_images?.[0]
           const price = product.has_variants && product.variant_min_price
             ? product.variant_min_price
-            : (product.sale_price || product.base_price)
+            : (product.price_ex_gst || product.base_price)
           const mrp = product.mrp ? Number(product.mrp) : null
           const discount = mrp && mrp > Number(price)
             ? Math.round(((mrp - Number(price)) / mrp) * 100)

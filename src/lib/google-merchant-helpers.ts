@@ -41,7 +41,7 @@ export function buildProductDetails(product: any): Array<{ section: string; attr
 }
 
 export function buildCustomLabels(product: any, variantStockQty?: number): [string, string, string, string, string] {
-  const sellingPrice = Number(product.sale_price ?? product.base_price ?? 0)
+  const sellingPrice = Number(product.base_price ?? 0)
 
   // custom_label_0: Category name
   const label0 = product.categories?.name || ''

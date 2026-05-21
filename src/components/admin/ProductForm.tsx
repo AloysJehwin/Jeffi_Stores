@@ -21,8 +21,8 @@ interface VariantRow {
   variant_name: string
   price: string
   mrp: string
-  sale_price: string
-  wholesale_price: string
+  price_ex_gst: string
+  wholeprice_ex_gst: string
   stock_quantity: string
   mpn: string
   gtin: string
@@ -97,7 +97,7 @@ function defaultUnit(pricing_type: string): string {
 
 function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string): VariantRow {
   return {
-    variant_name: '', price: '', mrp: '', sale_price: '', wholesale_price: '',
+    variant_name: '', price: '', mrp: '', price_ex_gst: '', wholeprice_ex_gst: '',
     stock_quantity: '0', mpn: '', gtin: '',
     pricing_type, unit, numeric_value: '',
     weight_rate: '', weight_unit: 'kg', weight_rate_on: false,
@@ -152,8 +152,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [basePrice, setBasePrice] = useState(product?.base_price != null ? String(product.base_price) : '')
   const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '')
   const [mrp, setMrp] = useState(product?.mrp != null ? String(product.mrp) : '')
-  const [salePrice, setSalePrice] = useState(product?.sale_price != null ? String(product.sale_price) : '')
-  const [wholesalePrice, setWholesalePrice] = useState(product?.wholesale_price != null ? String(product.wholesale_price) : '')
+  const [salePrice, setSalePrice] = useState(product?.price_ex_gst != null ? String(product.price_ex_gst) : '')
+  const [wholesalePrice, setWholesalePrice] = useState(product?.wholeprice_ex_gst != null ? String(product.wholeprice_ex_gst) : '')
 
   const draftKey = productId ? `draft_product_${productId}` : 'draft_product_new'
   const [isActive, setIsActive] = useState<boolean>(product?.is_active ?? true)
@@ -168,8 +168,8 @@ export default function ProductForm({ categories, brands, action, product, produ
         variant_name: v.variant_name,
         price: v.price != null ? String(v.price) : '',
         mrp: v.mrp != null ? String(v.mrp) : '',
-        sale_price: v.sale_price != null ? String(v.sale_price) : '',
-        wholesale_price: v.wholesale_price != null ? String(v.wholesale_price) : '',
+        price_ex_gst: v.price_ex_gst != null ? String(v.price_ex_gst) : '',
+        wholeprice_ex_gst: v.wholeprice_ex_gst != null ? String(v.wholeprice_ex_gst) : '',
         stock_quantity: String(v.stock_quantity || 0),
         mpn: v.mpn || '',
         gtin: v.gtin || '',
@@ -377,12 +377,12 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (!hasVariants) {
         formData.set('base_price', toInclusive(basePrice, gstRate, gstMode))
         formData.set('mrp', toInclusive(mrp, gstRate, gstMode))
-        formData.set('sale_price', toInclusive(salePrice, gstRate, gstMode))
-        formData.set('wholesale_price', toInclusive(wholesalePrice, gstRate, gstMode))
+        formData.set('price_ex_gst', toInclusive(salePrice, gstRate, gstMode))
+        formData.set('wholeprice_ex_gst', toInclusive(wholesalePrice, gstRate, gstMode))
       } else {
         formData.set('mrp', toInclusive(mrp, gstRate, gstMode))
-        formData.set('sale_price', toInclusive(salePrice, gstRate, gstMode))
-        formData.set('wholesale_price', toInclusive(wholesalePrice, gstRate, gstMode))
+        formData.set('price_ex_gst', toInclusive(salePrice, gstRate, gstMode))
+        formData.set('wholeprice_ex_gst', toInclusive(wholesalePrice, gstRate, gstMode))
       }
       formData.set('cost_price', costPrice || '0')
 
@@ -392,8 +392,8 @@ export default function ProductForm({ categories, brands, action, product, produ
           ...v,
           price: toInclusive(v.price, gstRate, gstMode),
           mrp: toInclusive(v.mrp, gstRate, gstMode),
-          sale_price: toInclusive(v.sale_price, gstRate, gstMode),
-          wholesale_price: toInclusive(v.wholesale_price, gstRate, gstMode),
+          price_ex_gst: toInclusive(v.price_ex_gst, gstRate, gstMode),
+          wholeprice_ex_gst: toInclusive(v.wholeprice_ex_gst, gstRate, gstMode),
           weight_rate: v.weight_rate_on ? toInclusive(v.weight_rate, gstRate, gstMode) : v.weight_rate,
           length_rate: v.length_rate_on ? toInclusive(v.length_rate, gstRate, gstMode) : v.length_rate,
         }))
@@ -660,13 +660,13 @@ export default function ProductForm({ categories, brands, action, product, produ
           {/* Sale Price — hidden when has variants */}
           {!hasVariants && (
           <div>
-            <label htmlFor="sale_price" className="block text-sm font-medium text-foreground-secondary mb-2">
+            <label htmlFor="price_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
               Sale Price (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
             </label>
             <input
               type="number"
-              id="sale_price"
-              name="sale_price"
+              id="price_ex_gst"
+              name="price_ex_gst"
               step="0.01"
               min="0"
               value={salePrice}
@@ -683,13 +683,13 @@ export default function ProductForm({ categories, brands, action, product, produ
           {/* Wholesale Price — hidden when has variants */}
           {!hasVariants && (
           <div>
-            <label htmlFor="wholesale_price" className="block text-sm font-medium text-foreground-secondary mb-2">
+            <label htmlFor="wholeprice_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
               Wholesale Price (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
             </label>
             <input
               type="number"
-              id="wholesale_price"
-              name="wholesale_price"
+              id="wholeprice_ex_gst"
+              name="wholeprice_ex_gst"
               step="0.01"
               min="0"
               value={wholesalePrice}
@@ -1107,11 +1107,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Sale Price</label>
-                                  <input type="number" step="0.01" min="0" value={variant.sale_price} onChange={(e) => updateVariant(index, 'sale_price', e.target.value)} className={inputCls} placeholder="0.00" />
+                                  <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => updateVariant(index, 'price_ex_gst', e.target.value)} className={inputCls} placeholder="0.00" />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale</label>
-                                  <input type="number" step="0.01" min="0" value={variant.wholesale_price} onChange={(e) => updateVariant(index, 'wholesale_price', e.target.value)} className={inputCls} placeholder="0.00" />
+                                  <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className={inputCls} placeholder="0.00" />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock *</label>
@@ -1299,10 +1299,10 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
                                   </td>
                                   <td className="py-2 px-2">
-                                    <input type="number" step="0.01" min="0" value={variant.sale_price} onChange={(e) => updateVariant(index, 'sale_price', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => updateVariant(index, 'price_ex_gst', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
                                   </td>
                                   <td className="py-2 px-2">
-                                    <input type="number" step="0.01" min="0" value={variant.wholesale_price} onChange={(e) => updateVariant(index, 'wholesale_price', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
                                   </td>
                                   <td className="py-2 px-2">
                                     <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0" required />
