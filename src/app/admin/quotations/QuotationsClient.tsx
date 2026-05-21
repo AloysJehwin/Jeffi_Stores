@@ -23,6 +23,7 @@ interface Quotation {
   consignee_gstin: string | null
   consignee_phone: string | null
   consignee_pincode: string | null
+  consignee_email: string | null
   buyer_same: boolean
   buyer_name: string | null
   buyer_addr1: string | null
@@ -30,6 +31,9 @@ interface Quotation {
   buyer_city: string | null
   buyer_state: string | null
   buyer_gstin: string | null
+  buyer_phone: string | null
+  buyer_pincode: string | null
+  buyer_email: string | null
   notes: string | null
   subtotal: number
   cgst_amount: number
@@ -97,6 +101,7 @@ export default function QuotationsClient() {
   const [downloading, setDownloading] = useState(false)
   const [convertingInvoice, setConvertingInvoice] = useState(false)
   const [convertedOrderId, setConvertedOrderId] = useState<string | null>(null)
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [quoteNumber, setQuoteNumber] = useState('')
@@ -111,6 +116,7 @@ export default function QuotationsClient() {
   const [cGstin, setCGstin] = useState('')
   const [cPhone, setCPhone] = useState('')
   const [cPincode, setCPincode] = useState('')
+  const [cEmail, setCEmail] = useState('')
 
   const [buyerSame, setBuyerSame] = useState(true)
   const [bName, setBName] = useState('')
@@ -119,6 +125,9 @@ export default function QuotationsClient() {
   const [bCity, setBCity] = useState('')
   const [bState, setBState] = useState('Chhattisgarh')
   const [bGstin, setBGstin] = useState('')
+  const [bPhone, setBPhone] = useState('')
+  const [bPincode, setBPincode] = useState('')
+  const [bEmail, setBEmail] = useState('')
 
   const [items, setItems] = useState<LineItem[]>([newLineItem()])
 
@@ -126,6 +135,11 @@ export default function QuotationsClient() {
   const [custResults, setCustResults] = useState<any[]>([])
   const [showCustDrop, setShowCustDrop] = useState(false)
   const custTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const [buyerSearch, setBuyerSearch] = useState('')
+  const [buyerResults, setBuyerResults] = useState<any[]>([])
+  const [showBuyerDrop, setShowBuyerDrop] = useState(false)
+  const buyerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isEditorMounted = useRef(false)
 
@@ -174,9 +188,9 @@ export default function QuotationsClient() {
     setQuoteNumber('')
     setQuoteDate(todayISO())
     setNotes('')
-    setCName(''); setCAddr1(''); setCAddr2(''); setCCity(''); setCState('Chhattisgarh'); setCGstin(''); setCPhone(''); setCPincode('')
+    setCName(''); setCAddr1(''); setCAddr2(''); setCCity(''); setCState('Chhattisgarh'); setCGstin(''); setCPhone(''); setCPincode(''); setCEmail('')
     setBuyerSame(true)
-    setBName(''); setBAddr1(''); setBAddr2(''); setBCity(''); setBState('Chhattisgarh'); setBGstin('')
+    setBName(''); setBAddr1(''); setBAddr2(''); setBCity(''); setBState('Chhattisgarh'); setBGstin(''); setBPhone(''); setBPincode(''); setBEmail('')
     setItems([newLineItem()])
     setSaveError('')
     setIsFinal(false)
@@ -197,10 +211,11 @@ export default function QuotationsClient() {
       setNotes(q.notes || '')
       setCName(q.consignee_name || ''); setCAddr1(q.consignee_addr1 || ''); setCAddr2(q.consignee_addr2 || '')
       setCCity(q.consignee_city || ''); setCState(q.consignee_state || 'Chhattisgarh'); setCGstin(q.consignee_gstin || '')
-      setCPhone((q.consignee_phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10)); setCPincode(q.consignee_pincode || '')
+      setCPhone((q.consignee_phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10)); setCPincode(q.consignee_pincode || ''); setCEmail(q.consignee_email || '')
       setBuyerSame(q.buyer_same)
       setBName(q.buyer_name || ''); setBAddr1(q.buyer_addr1 || ''); setBAddr2(q.buyer_addr2 || '')
       setBCity(q.buyer_city || ''); setBState(q.buyer_state || 'Chhattisgarh'); setBGstin(q.buyer_gstin || '')
+      setBPhone((q.buyer_phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10)); setBPincode(q.buyer_pincode || ''); setBEmail(q.buyer_email || '')
       const loadedItems: LineItem[] = (data.items || []).map((i: any) => {
         const gstRate = Number(i.gst_rate) || 0
         const rateExGst = Number(i.rate) || 0
@@ -259,6 +274,20 @@ export default function QuotationsClient() {
   }
 
   async function save(newStatus?: string) {
+    if (newStatus === 'final') {
+      if (!cName.trim()) { setSaveError('Consignee name is required'); return }
+      if (!cAddr1.trim()) { setSaveError('Consignee address line 1 is required'); return }
+      if (!cCity.trim()) { setSaveError('Consignee city is required'); return }
+      if (!cPhone.trim()) { setSaveError('Consignee phone number is required'); return }
+      if (!buyerSame) {
+        if (!bName.trim()) { setSaveError('Buyer name is required'); return }
+        if (!bAddr1.trim()) { setSaveError('Buyer address line 1 is required'); return }
+        if (!bCity.trim()) { setSaveError('Buyer city is required'); return }
+      }
+      if (items.every(i => !i.product_name.trim() || !i.unit_price)) {
+        setSaveError('At least one line item with a description and price is required'); return
+      }
+    }
     setSaving(true)
     setSaveError('')
     setAutoSaveStatus('saving')
@@ -269,11 +298,15 @@ export default function QuotationsClient() {
         consignee_name: cName, consignee_addr1: cAddr1, consignee_addr2: cAddr2 || null,
         consignee_city: cCity, consignee_state: cState, consignee_gstin: cGstin || null,
         consignee_phone: cPhone || null, consignee_pincode: cPincode || null,
+        consignee_email: cEmail || null,
         buyer_same: buyerSame,
         buyer_name: buyerSame ? null : bName, buyer_addr1: buyerSame ? null : bAddr1,
         buyer_addr2: buyerSame ? null : (bAddr2 || null),
         buyer_city: buyerSame ? null : bCity, buyer_state: buyerSame ? null : bState,
         buyer_gstin: buyerSame ? null : (bGstin || null),
+        buyer_phone: buyerSame ? null : (bPhone || null),
+        buyer_pincode: buyerSame ? null : (bPincode || null),
+        buyer_email: buyerSame ? null : (bEmail || null),
         items: items.map(i => {
           const gstRate = Number(i.gst_rate) || 0
           const unitPrice = Number(i.unit_price) || 0
@@ -333,8 +366,8 @@ export default function QuotationsClient() {
     if (view !== 'editor') return
     if (!isEditorMounted.current) { isEditorMounted.current = true; return }
     scheduleAutoSave()
-  }, [quoteDate, notes, cName, cAddr1, cAddr2, cCity, cState, cGstin, cPhone, cPincode,
-      buyerSame, bName, bAddr1, bAddr2, bCity, bState, bGstin, items])
+  }, [quoteDate, notes, cName, cAddr1, cAddr2, cCity, cState, cGstin, cPhone, cPincode, cEmail,
+      buyerSame, bName, bAddr1, bAddr2, bCity, bState, bGstin, bPhone, bPincode, bEmail, items])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedQuote(null) }
@@ -381,6 +414,20 @@ export default function QuotationsClient() {
     }
   }
 
+  async function sendQuoteEmail(id: string) {
+    setSendingEmailId(id)
+    try {
+      const res = await fetch(`/api/admin/quotations/${id}/resend-email`, { method: 'POST', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send email')
+      showToast('Quotation email sent', 'success')
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setSendingEmailId(null)
+    }
+  }
+
   function searchCustomers(q: string) {
     setCustSearch(q)
     if (custTimer.current) clearTimeout(custTimer.current)
@@ -402,8 +449,35 @@ export default function QuotationsClient() {
     setCGstin(c.gst_number || '')
     setCPhone((c.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10))
     setCPincode(c.postal_code || '')
+    setCEmail(c.email || '')
     setCustSearch('')
     setShowCustDrop(false)
+  }
+
+  function searchBuyers(q: string) {
+    setBuyerSearch(q)
+    if (buyerTimer.current) clearTimeout(buyerTimer.current)
+    if (q.length < 2) { setBuyerResults([]); setShowBuyerDrop(false); return }
+    buyerTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setBuyerResults(data.results || [])
+      setShowBuyerDrop(true)
+    }, 300)
+  }
+
+  function selectBuyer(c: any) {
+    setBName(c.addr_name || c.full_name || '')
+    setBAddr1(c.address_line1 || '')
+    setBAddr2(c.address_line2 || '')
+    setBCity(c.city || '')
+    setBState(c.state || 'Chhattisgarh')
+    setBGstin(c.gst_number || '')
+    setBPhone((c.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10))
+    setBPincode(c.postal_code || '')
+    setBEmail(c.email || '')
+    setBuyerSearch('')
+    setShowBuyerDrop(false)
   }
 
   const inputCls = 'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 disabled:opacity-60 disabled:cursor-not-allowed'
@@ -587,6 +661,25 @@ export default function QuotationsClient() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
                         </a>
+                        {q.consignee_email && (
+                          <button
+                            onClick={() => sendQuoteEmail(q.id)}
+                            disabled={sendingEmailId === q.id}
+                            title={`Send email to ${q.consignee_email}`}
+                            className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors disabled:opacity-50"
+                          >
+                            {sendingEmailId === q.id ? (
+                              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
                         {q.status === 'final' && !q.converted_order_id && (
                           <button onClick={() => convertToInvoice(q.id)} disabled={convertingInvoice} title="Convert to Invoice"
                             className="px-2 py-1 rounded text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap">
@@ -722,9 +815,12 @@ export default function QuotationsClient() {
               <input value={cCity} onChange={e => setCCity(e.target.value)} placeholder="City" disabled={isFinal} className={inputCls} />
               <input value={cState} onChange={e => setCState(e.target.value)} placeholder="State" disabled={isFinal} className={inputCls} />
             </div>
-            <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none">+91</span>
-              <input type="tel" inputMode="numeric" maxLength={10} value={cPhone} onChange={e => setCPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="XXXXXXXXXX" disabled={isFinal} className={inputCls + ' rounded-l-none'} />
+            <div className="flex gap-2">
+              <div className="flex flex-1 min-w-0">
+                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
+                <input type="tel" inputMode="numeric" maxLength={10} value={cPhone} onChange={e => setCPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="XXXXXXXXXX" disabled={isFinal} className={inputCls + ' rounded-l-none min-w-0'} />
+              </div>
+              <input type="email" value={cEmail} onChange={e => setCEmail(e.target.value)} placeholder="Email address" disabled={isFinal} className={inputCls + ' flex-1 min-w-0'} />
             </div>
             <input value={cPincode} onChange={e => setCPincode(e.target.value)} placeholder="Pincode" disabled={isFinal} className={inputCls + ' font-mono'} />
             <input value={cGstin} onChange={e => setCGstin(e.target.value.toUpperCase())} placeholder="00XXXXX0000X0Z0" disabled={isFinal} className={inputCls + ' font-mono'} />
@@ -744,6 +840,23 @@ export default function QuotationsClient() {
             <p className="text-foreground-secondary text-xs py-4 text-center">Using same address as consignee</p>
           ) : (
             <div className="space-y-2">
+              <div className="relative">
+                <input
+                  type="text" value={buyerSearch} onChange={e => searchBuyers(e.target.value)}
+                  placeholder="Search existing customer…" disabled={isFinal} className={inputCls}
+                />
+                {showBuyerDrop && buyerResults.length > 0 && (
+                  <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {buyerResults.map(c => (
+                      <button key={c.id} onClick={() => selectBuyer(c)}
+                        className="w-full text-left px-3 py-2 hover:bg-surface-secondary transition-colors">
+                        <p className="text-sm font-medium text-foreground">{c.company_name || c.full_name}</p>
+                        <p className="text-xs text-foreground-secondary">{c.city}, {c.state}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input value={bName} onChange={e => setBName(e.target.value)} placeholder="Name / Company" disabled={isFinal} className={inputCls} />
               <input value={bAddr1} onChange={e => setBAddr1(e.target.value)} placeholder="Address line 1" disabled={isFinal} className={inputCls} />
               <input value={bAddr2} onChange={e => setBAddr2(e.target.value)} placeholder="Address line 2 (optional)" disabled={isFinal} className={inputCls} />
@@ -751,6 +864,14 @@ export default function QuotationsClient() {
                 <input value={bCity} onChange={e => setBCity(e.target.value)} placeholder="City" disabled={isFinal} className={inputCls} />
                 <input value={bState} onChange={e => setBState(e.target.value)} placeholder="State" disabled={isFinal} className={inputCls} />
               </div>
+              <div className="flex gap-2">
+                <div className="flex flex-1 min-w-0">
+                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
+                  <input type="tel" inputMode="numeric" maxLength={10} value={bPhone} onChange={e => setBPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="XXXXXXXXXX" disabled={isFinal} className={inputCls + ' rounded-l-none min-w-0'} />
+                </div>
+                <input type="email" value={bEmail} onChange={e => setBEmail(e.target.value)} placeholder="Email address" disabled={isFinal} className={inputCls + ' flex-1 min-w-0'} />
+              </div>
+              <input value={bPincode} onChange={e => setBPincode(e.target.value)} placeholder="Pincode" disabled={isFinal} className={inputCls + ' font-mono'} />
               <input value={bGstin} onChange={e => setBGstin(e.target.value.toUpperCase())} placeholder="00XXXXX0000X0Z0" disabled={isFinal} className={inputCls + ' font-mono'} />
             </div>
           )}
@@ -823,6 +944,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
               <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Consignee</p>
               <p className="text-sm font-semibold text-foreground">{q.consignee_name}</p>
               {q.consignee_phone && <p className="text-xs text-foreground-secondary mt-0.5">{q.consignee_phone}</p>}
+              {q.consignee_email && <p className="text-xs text-foreground-secondary mt-0.5">{q.consignee_email}</p>}
               {[q.consignee_addr1, q.consignee_addr2, q.consignee_city, q.consignee_state, q.consignee_pincode].filter(Boolean).length > 0 && (
                 <p className="text-xs text-foreground-secondary mt-0.5">
                   {[q.consignee_addr1, q.consignee_addr2, q.consignee_city, q.consignee_state, q.consignee_pincode].filter(Boolean).join(', ')}

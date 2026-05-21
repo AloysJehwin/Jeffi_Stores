@@ -15,6 +15,24 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL(`/forms${slug}`, request.url))
   }
 
+  if (hostname.startsWith('quotation.')) {
+    if (pathname.startsWith('/api/')) return NextResponse.next()
+    const slug = pathname === '/' ? '' : pathname
+    return NextResponse.rewrite(new URL(`/quotation${slug}`, request.url))
+  }
+
+  if (hostname.startsWith('invoice.')) {
+    if (pathname.startsWith('/api/')) return NextResponse.next()
+    const slug = pathname === '/' ? '' : pathname
+    return NextResponse.rewrite(new URL(`/invoice${slug}`, request.url))
+  }
+
+  if (hostname.startsWith('purchaseorder.')) {
+    if (pathname.startsWith('/api/')) return NextResponse.next()
+    const slug = pathname === '/' ? '' : pathname
+    return NextResponse.rewrite(new URL(`/purchaseorder${slug}`, request.url))
+  }
+
   if (pathname.startsWith('/forms/')) {
     const slug = pathname.replace('/forms/', '')
     return NextResponse.redirect(new URL(`https://forms.jeffistores.in/${slug}`, request.url), 301)

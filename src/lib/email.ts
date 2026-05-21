@@ -1687,3 +1687,268 @@ export async function sendPaymentRetryEmail(
     return { success: false, error }
   }
 }
+
+export async function sendInvoiceFinalizedEmail(
+  toEmail: string,
+  customerName: string,
+  invoiceNumber: string,
+  totalAmount: number,
+  orderNumber?: string,
+  viewUrl?: string
+) {
+  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: toEmail,
+    subject: `Invoice ${invoiceNumber} from Jeffi Stores`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
+            .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+            .header{background:#1a3a4a;padding:24px;text-align:center}
+            .logo{font-size:22px;font-weight:bold;color:#fff}
+            .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
+            .box{background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;border-radius:4px;margin:20px 0}
+            .btn{display:inline-block;background:#1a3a4a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
+            .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><div class="logo">Jeffi Store's</div></div>
+            <div class="body">
+              <p>Dear ${customerName},</p>
+              <p>Thank you for your purchase! Your invoice has been generated.</p>
+              <div class="box">
+                <p style="margin:0 0 6px"><strong>Invoice No.:</strong> ${invoiceNumber}</p>
+                ${orderNumber ? `<p style="margin:0 0 6px"><strong>Order No.:</strong> ${orderNumber}</p>` : ''}
+                <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
+              </div>
+              ${viewUrl ? `<p style="text-align:center"><a href="${viewUrl}" class="btn">View Invoice</a></p>` : ''}
+              <p>For any queries, please contact us.</p>
+              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+            </div>
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+export async function sendPurchaseOrderEmail(
+  toEmail: string,
+  contactName: string,
+  supplierName: string,
+  poNumber: string,
+  totalAmount: number,
+  items: Array<{ product_name: string; variant_name?: string | null; quantity: number; unit_cost: number }>,
+  viewUrl?: string
+) {
+  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const itemRows = items.map(it =>
+    `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${it.product_name}${it.variant_name ? ` / ${it.variant_name}` : ''}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${it.quantity}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">₹${it.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+    </tr>`
+  ).join('')
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: toEmail,
+    subject: `Purchase Order ${poNumber} from Jeffi Stores`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
+            .container{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+            .header{background:#1a3a4a;padding:24px;text-align:center}
+            .logo{font-size:22px;font-weight:bold;color:#fff}
+            .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
+            .box{background:#eff6ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
+            .btn{display:inline-block;background:#1a3a4a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
+            table{width:100%;border-collapse:collapse;margin-top:16px}
+            thead{background:#f3f4f6}
+            th{padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
+            .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><div class="logo">Jeffi Store's</div></div>
+            <div class="body">
+              <p>Dear ${contactName || supplierName},</p>
+              <p>Please find below our purchase order. Kindly confirm receipt and expected delivery.</p>
+              <div class="box">
+                <p style="margin:0 0 6px"><strong>PO Number:</strong> ${poNumber}</p>
+                <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
+              </div>
+              ${viewUrl ? `<p style="text-align:center"><a href="${viewUrl}" class="btn">View Purchase Order</a></p>` : ''}
+              <table>
+                <thead><tr>
+                  <th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Cost</th>
+                </tr></thead>
+                <tbody>${itemRows}</tbody>
+              </table>
+              <p style="margin-top:20px">For any questions, please contact us.</p>
+              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+            </div>
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+export async function sendPOReceiveNotificationEmail(
+  toEmail: string,
+  contactName: string,
+  supplierName: string,
+  poNumber: string,
+  grnNumber: string,
+  newStatus: string,
+  items: Array<{ product_name: string; variant_name?: string | null; quantity_received: number; unit_cost: number }>
+) {
+  const statusLabel = newStatus === 'received' ? 'Fully Received' : 'Partially Received'
+  const itemRows = items.map(it =>
+    `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${it.product_name}${it.variant_name ? ` / ${it.variant_name}` : ''}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${it.quantity_received}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">₹${it.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+    </tr>`
+  ).join('')
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: toEmail,
+    subject: `Goods Receipt Confirmation — PO ${poNumber} (${statusLabel})`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
+            .container{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+            .header{background:#1a3a4a;padding:24px;text-align:center}
+            .logo{font-size:22px;font-weight:bold;color:#fff}
+            .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
+            .box{background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;border-radius:4px;margin:20px 0}
+            table{width:100%;border-collapse:collapse;margin-top:16px}
+            thead{background:#f3f4f6}
+            th{padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
+            .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><div class="logo">Jeffi Store's</div></div>
+            <div class="body">
+              <p>Dear ${contactName || supplierName},</p>
+              <p>We have recorded receipt of goods against your purchase order.</p>
+              <div class="box">
+                <p style="margin:0 0 6px"><strong>PO Number:</strong> ${poNumber}</p>
+                <p style="margin:0 0 6px"><strong>GRN Number:</strong> ${grnNumber}</p>
+                <p style="margin:0"><strong>Status:</strong> ${statusLabel}</p>
+              </div>
+              <table>
+                <thead><tr>
+                  <th>Product</th><th style="text-align:right">Qty Received</th><th style="text-align:right">Unit Cost</th>
+                </tr></thead>
+                <tbody>${itemRows}</tbody>
+              </table>
+              <p style="margin-top:20px">Thank you for your supply.</p>
+              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+            </div>
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+export async function sendQuotationFinalizedEmail(
+  toEmail: string,
+  consigneeName: string,
+  quoteNumber: string,
+  totalAmount: number,
+  viewUrl: string
+) {
+  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: toEmail,
+    subject: `Quotation ${quoteNumber} from Jeffi Stores`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
+            .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+            .header{background:#1a3a4a;padding:24px;text-align:center}
+            .logo{font-size:22px;font-weight:bold;color:#fff}
+            .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
+            .box{background:#f0f9ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
+            .btn{display:inline-block;background:#1a3a4a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
+            .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><div class="logo">Jeffi Store's</div></div>
+            <div class="body">
+              <p>Dear ${consigneeName},</p>
+              <p>Please find your quotation from Jeffi Stores.</p>
+              <div class="box">
+                <p style="margin:0 0 6px"><strong>Quotation No.:</strong> ${quoteNumber}</p>
+                <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
+              </div>
+              <p style="text-align:center"><a href="${viewUrl}" class="btn">View Quotation</a></p>
+              <p>If you have any questions regarding this quotation, please feel free to contact us.</p>
+              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+            </div>
+            <div class="footer">
+              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
