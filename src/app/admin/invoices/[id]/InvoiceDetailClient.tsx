@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 function formatINR(n: number) {
@@ -25,13 +26,17 @@ const STATUS_COLORS: Record<string, string> = {
 export default function InvoiceDetailClient({ id }: { id: string }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
     fetch(`/api/admin/invoices/${id}/detail`)
       .then(r => r.json())
-      .then(j => { setData(j); setLoading(false) })
+      .then(j => {
+        if (j.redirect) { router.replace(j.redirect); return }
+        setData(j); setLoading(false)
+      })
       .catch(() => setLoading(false))
-  }, [id])
+  }, [id, router])
 
   if (loading) {
     return (
