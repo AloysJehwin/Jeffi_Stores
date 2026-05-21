@@ -1,22 +1,45 @@
 -- Rename sale_price -> price_ex_gst, wholesale_price -> wholeprice_ex_gst on products
 -- Rename wholesale_price -> wholeprice_ex_gst on product_variants
 -- Add mrp_ex_gst to products; populate all ex-GST fields
+-- Idempotent: each RENAME is skipped if source column no longer exists
 
--- products table
-ALTER TABLE products
-  RENAME COLUMN sale_price TO price_ex_gst;
+-- products: sale_price -> price_ex_gst
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'products' AND column_name = 'sale_price'
+  ) THEN
+    ALTER TABLE products RENAME COLUMN sale_price TO price_ex_gst;
+  END IF;
+END $$;
 
-ALTER TABLE products
-  RENAME COLUMN wholesale_price TO wholeprice_ex_gst;
+-- products: wholesale_price -> wholeprice_ex_gst
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'products' AND column_name = 'wholesale_price'
+  ) THEN
+    ALTER TABLE products RENAME COLUMN wholesale_price TO wholeprice_ex_gst;
+  END IF;
+END $$;
 
 ALTER TABLE products
   ADD COLUMN IF NOT EXISTS mrp_ex_gst numeric(12,2);
 
--- product_variants table (wholesale_price rename)
-ALTER TABLE product_variants
-  RENAME COLUMN wholesale_price TO wholeprice_ex_gst;
+-- product_variants: wholesale_price -> wholeprice_ex_gst
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'product_variants' AND column_name = 'wholesale_price'
+  ) THEN
+    ALTER TABLE product_variants RENAME COLUMN wholesale_price TO wholeprice_ex_gst;
+  END IF;
+END $$;
 
--- Populate ex-GST values on products from base_price / mrp
+-- Populate ex-GST values on products from base_price / mrp (safe to re-run)
 UPDATE products
 SET
   price_ex_gst = ROUND(base_price / (1 + COALESCE(gst_percentage, 18) / 100), 2),
