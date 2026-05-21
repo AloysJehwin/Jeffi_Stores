@@ -101,6 +101,7 @@ export default function QuotationsClient() {
   const [downloading, setDownloading] = useState(false)
   const [convertingInvoice, setConvertingInvoice] = useState(false)
   const [convertedOrderId, setConvertedOrderId] = useState<string | null>(null)
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [quoteNumber, setQuoteNumber] = useState('')
@@ -413,6 +414,20 @@ export default function QuotationsClient() {
     }
   }
 
+  async function sendQuoteEmail(id: string) {
+    setSendingEmailId(id)
+    try {
+      const res = await fetch(`/api/admin/quotations/${id}/resend-email`, { method: 'POST', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send email')
+      showToast('Quotation email sent', 'success')
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setSendingEmailId(null)
+    }
+  }
+
   function searchCustomers(q: string) {
     setCustSearch(q)
     if (custTimer.current) clearTimeout(custTimer.current)
@@ -646,6 +661,25 @@ export default function QuotationsClient() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
                         </a>
+                        {q.consignee_email && (
+                          <button
+                            onClick={() => sendQuoteEmail(q.id)}
+                            disabled={sendingEmailId === q.id}
+                            title={`Send email to ${q.consignee_email}`}
+                            className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors disabled:opacity-50"
+                          >
+                            {sendingEmailId === q.id ? (
+                              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
                         {q.status === 'final' && !q.converted_order_id && (
                           <button onClick={() => convertToInvoice(q.id)} disabled={convertingInvoice} title="Convert to Invoice"
                             className="px-2 py-1 rounded text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap">

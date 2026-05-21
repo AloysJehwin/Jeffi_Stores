@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne, queryMany, query } from '@/lib/db'
+import { sendPurchaseOrderEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const po = await queryOne<any>(
       `SELECT po.*, s.name AS supplier_name, s.gstin AS supplier_gstin,
-              s.contact_name, s.phone AS supplier_phone
+              s.contact_name, s.phone AS supplier_phone, s.email AS supplier_email
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        WHERE po.id = $1`,
@@ -60,6 +61,43 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     values.push(params.id)
 
     await query(`UPDATE purchase_orders SET ${updates.join(', ')} WHERE id = $${i}`, values)
+
+    if (status === 'sent') {
+      try {
+        const po = await queryOne<any>(
+          `SELECT po.*, s.name AS supplier_name, s.contact_name, s.email AS supplier_email
+           FROM purchase_orders po
+           JOIN suppliers s ON s.id = po.supplier_id
+           WHERE po.id = $1`,
+          [params.id]
+        )
+        const poItems = await queryMany<any>(
+          `SELECT poi.quantity, poi.unit_cost,
+                  COALESCE(poi.product_name, p.name) AS product_name,
+                  pv.variant_name
+           FROM purchase_order_items poi
+           LEFT JOIN products p ON p.id = poi.product_id
+           LEFT JOIN product_variants pv ON pv.id = poi.variant_id
+           WHERE poi.po_id = $1`,
+          [params.id]
+        )
+        if (po?.supplier_email) {
+          await sendPurchaseOrderEmail(
+            po.supplier_email,
+            po.contact_name || '',
+            po.supplier_name,
+            po.po_number,
+            parseFloat(po.total_amount),
+            (poItems || []).map((it: any) => ({
+              product_name: it.product_name,
+              variant_name: it.variant_name,
+              quantity: parseFloat(it.quantity),
+              unit_cost: parseFloat(it.unit_cost),
+            }))
+          )
+        }
+      } catch (_) {}
+    }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

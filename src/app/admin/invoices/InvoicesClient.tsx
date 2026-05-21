@@ -85,6 +85,7 @@ export default function InvoicesClient() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '')
   const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
   const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
@@ -309,6 +310,20 @@ export default function InvoicesClient() {
       showToast(err.message, 'error')
     } finally {
       setCancellingId(null)
+    }
+  }
+
+  async function sendInvoiceEmail(inv: Invoice) {
+    setSendingEmailId(inv.id)
+    try {
+      const res = await fetch(`/api/admin/invoices/${inv.id}/resend-email`, { method: 'POST', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send email')
+      showToast('Email sent successfully', 'success')
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setSendingEmailId(null)
     }
   }
 
@@ -906,14 +921,32 @@ export default function InvoicesClient() {
                             </svg>
                           </a>
                           <a
-                            href={`/admin/orders/${inv.id}`}
-                            title="View Order"
+                            href={`/admin/invoices/${inv.id}`}
+                            title="View Invoice"
                             className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           </a>
+                          {inv.customer_email && (
+                            <button
+                              onClick={() => sendInvoiceEmail(inv)}
+                              disabled={sendingEmailId === inv.id}
+                              title={`Send email to ${inv.customer_email}`}
+                              className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-blue-500 transition-colors disabled:opacity-40"
+                            >
+                              {sendingEmailId === inv.id ? (
+                                <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                              )}
+                            </button>
+                          )}
                           {inv.source === 'offline' && inv.status !== 'cancelled' && (
                             <button
                               onClick={() => openEdit(inv)}
@@ -1027,11 +1060,20 @@ export default function InvoicesClient() {
                       PDF
                     </a>
                     <a
-                      href={`/admin/orders/${inv.id}`}
+                      href={`/admin/invoices/${inv.id}`}
                       className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                     >
-                      View Order
+                      View Invoice
                     </a>
+                    {inv.customer_email && (
+                      <button
+                        onClick={() => sendInvoiceEmail(inv)}
+                        disabled={sendingEmailId === inv.id}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium disabled:opacity-50"
+                      >
+                        {sendingEmailId === inv.id ? 'Sending…' : 'Send Email'}
+                      </button>
+                    )}
                     {inv.source === 'offline' && inv.status !== 'cancelled' && (
                       <button
                         onClick={() => openEdit(inv)}

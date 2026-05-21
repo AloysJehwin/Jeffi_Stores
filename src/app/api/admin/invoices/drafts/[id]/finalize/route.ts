@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne, withTransaction } from '@/lib/db'
 import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
+import { sendInvoiceFinalizedEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const order = await queryOne<any>(
-      `SELECT id, status, customer_name FROM orders WHERE id = $1`,
+      `SELECT id, status, customer_name, customer_email, total_amount, order_number FROM orders WHERE id = $1`,
       [params.id]
     )
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
@@ -105,6 +106,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
       return { invoiceNumber, orderId: params.id }
     })
+
+    if (result.invoiceNumber && order.customer_email) {
+      try {
+        await sendInvoiceFinalizedEmail(order.customer_email, order.customer_name, result.invoiceNumber, Number(order.total_amount), order.order_number)
+      } catch (_) {}
+    }
 
     return NextResponse.json({
       success: true,

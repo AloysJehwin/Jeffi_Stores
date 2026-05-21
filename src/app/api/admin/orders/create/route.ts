@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { withTransaction } from '@/lib/db'
 import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
+import { sendInvoiceFinalizedEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -214,6 +215,12 @@ export async function POST(request: NextRequest) {
 
       return { orderId, orderNumber: finalOrderNumber, invoiceNumber, saveAsDraft, insufficientItems }
     })
+
+    if (!result.saveAsDraft && result.invoiceNumber && customerEmail) {
+      try {
+        await sendInvoiceFinalizedEmail(customerEmail, customerName, result.invoiceNumber, Math.round(totalAmount * 100) / 100, result.orderNumber)
+      } catch (_) {}
+    }
 
     return NextResponse.json({
       success: true,
