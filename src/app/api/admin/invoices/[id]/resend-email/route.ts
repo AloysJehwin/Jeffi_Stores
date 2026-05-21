@@ -18,7 +18,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!order.customer_email) return NextResponse.json({ error: 'No email address on file' }, { status: 400 })
     if (!order.invoice_number) return NextResponse.json({ error: 'Invoice not yet finalized' }, { status: 400 })
 
-    const viewUrl = `https://invoice.jeffistores.com/${order.view_token}`
+    const viewUrl = `https://invoice.jeffistores.in/${order.view_token}`
 
     await sendInvoiceFinalizedEmail(
       order.customer_email,

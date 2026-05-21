@@ -17,7 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (!qt.consignee_email) return NextResponse.json({ error: 'No email address on file' }, { status: 400 })
 
-    const viewUrl = `https://quotation.jeffistores.com/${qt.view_token}`
+    const viewUrl = `https://quotation.jeffistores.in/${qt.view_token}`
 
     await sendQuotationFinalizedEmail(
       qt.consignee_email,

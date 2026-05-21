@@ -33,22 +33,22 @@ export default function PurchaseOrderViewClient({ po, items, settings, token }: 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-[#1a3a4a] text-white px-6 py-4 flex items-center justify-between">
-        <div>
-          <div className="font-bold text-lg">{tradeName}</div>
-          <div className="text-sm text-gray-300">{settings.business_address}</div>
+      <div className="bg-[#1a3a4a] text-white px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-bold text-lg truncate">{tradeName}</div>
+          <div className="text-sm text-gray-300 truncate">{settings.business_address}</div>
         </div>
         <button
           onClick={handleDownload}
           disabled={downloading}
-          className="bg-white text-[#1a3a4a] font-semibold px-5 py-2 rounded hover:bg-gray-100 disabled:opacity-60 text-sm"
+          className="shrink-0 bg-white text-[#1a3a4a] font-semibold px-4 sm:px-5 py-2 rounded hover:bg-gray-100 disabled:opacity-60 text-sm whitespace-nowrap"
         >
           {downloading ? 'Downloading…' : 'Download PDF'}
         </button>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow p-6">
+      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <div className="flex justify-between items-start mb-6">
             <div>
               <h1 className="text-xl font-bold text-gray-800">Purchase Order</h1>
@@ -62,7 +62,7 @@ export default function PurchaseOrderViewClient({ po, items, settings, token }: 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <div className="bg-gray-50 rounded p-3 text-sm">
               <div className="font-semibold text-gray-700 mb-1">From</div>
               <div className="text-gray-600">{tradeName}</div>
@@ -78,30 +78,32 @@ export default function PurchaseOrderViewClient({ po, items, settings, token }: 
             </div>
           </div>
 
-          <table className="w-full text-sm mb-4">
-            <thead>
-              <tr className="bg-[#1a3a4a] text-white">
-                <th className="text-left px-3 py-2">Product</th>
-                <th className="text-right px-3 py-2">Qty</th>
-                <th className="text-right px-3 py-2">Unit Cost</th>
-                <th className="text-right px-3 py-2">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, i) => {
-                const lineTotal = Number(item.quantity) * Number(item.unit_cost)
-                const label = item.variant_name ? `${item.product_name} / ${item.variant_name}` : item.product_name
-                return (
-                  <tr key={i} className="border-b border-gray-100">
-                    <td className="px-3 py-2 text-gray-700">{label}</td>
-                    <td className="px-3 py-2 text-right text-gray-600">{item.quantity}</td>
-                    <td className="px-3 py-2 text-right text-gray-600">₹{Number(item.unit_cost).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                    <td className="px-3 py-2 text-right text-gray-800 font-medium">₹{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <table className="w-full text-sm mb-4 min-w-[480px] sm:min-w-0">
+              <thead>
+                <tr className="bg-[#1a3a4a] text-white">
+                  <th className="text-left px-3 py-2">Product</th>
+                  <th className="text-right px-3 py-2">Qty</th>
+                  <th className="text-right px-3 py-2">Unit Cost</th>
+                  <th className="text-right px-3 py-2">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, i) => {
+                  const lineTotal = Number(item.quantity) * Number(item.unit_cost)
+                  const label = item.variant_name ? `${item.product_name} / ${item.variant_name}` : item.product_name
+                  return (
+                    <tr key={i} className="border-b border-gray-100">
+                      <td className="px-3 py-2 text-gray-700">{label}</td>
+                      <td className="px-3 py-2 text-right text-gray-600">{item.quantity}</td>
+                      <td className="px-3 py-2 text-right text-gray-600">₹{Number(item.unit_cost).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2 text-right text-gray-800 font-medium">₹{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
 
           <div className="flex justify-end">
             <div className="w-56 text-sm">
