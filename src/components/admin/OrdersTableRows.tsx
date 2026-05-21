@@ -104,11 +104,11 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-              order.source === 'offline'
-                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+              order.source === 'online'
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
             }`}>
-              {order.source === 'offline' ? 'Offline' : 'Online'}
+              {order.source === 'online' ? 'Online' : 'Offline'}
             </span>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
