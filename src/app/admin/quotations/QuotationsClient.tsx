@@ -311,7 +311,7 @@ export default function QuotationsClient() {
         items: items.map(i => {
           const gstRate = Number(i.gst_rate) || 0
           const unitPrice = Number(i.unit_price) || 0
-          const rateExGst = unitPrice / (1 + gstRate / 100)
+          const rateExGst = i.price_ex_gst || unitPrice / (1 + gstRate / 100)
           return {
             description: i.product_name,
             hsn_code: i.hsn_code || null,

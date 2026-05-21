@@ -17,6 +17,7 @@ export interface LineItem {
   quantity: string | number
   unit: string
   unit_price: string | number
+  price_ex_gst?: number
   discount_pct: number
   mrp: number
   inventory_quantity: number | null
@@ -30,6 +31,7 @@ interface Suggestion {
   variant_name: string | null
   sku: string
   base_price: number | null
+  price_ex_gst: number | null
   mrp: number | null
   gst_percentage: number | null
   hsn_code: string | null
@@ -137,6 +139,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
   function buildLineItemFromSuggestion(it: LineItem, s: Suggestion): LineItem {
     const mrp = Number(s.mrp) || 0
     const basePrice = Number(s.base_price) || 0
+    const priceExGst = Number(s.price_ex_gst) || 0
     const discount_pct = mrp > 0 && basePrice < mrp
       ? Math.round((1 - basePrice / mrp) * 100 * 100) / 100
       : 0
@@ -150,6 +153,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       hsn_code: s.hsn_code || '',
       gst_rate: String(Math.round(Number(s.gst_percentage ?? 18))),
       unit_price: basePrice,
+      price_ex_gst: priceExGst || undefined,
       discount_pct,
       mrp,
       inventory_quantity: s.inventory_quantity ?? null,
