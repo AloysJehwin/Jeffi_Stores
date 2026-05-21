@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     if (fields.status === 'final' && qt?.consignee_email) {
       try {
-        const viewUrl = `https://quotation.jeffistores.com/${qt.view_token}`
+        const viewUrl = `https://quotation.jeffistores.in/${qt.view_token}`
         await sendQuotationFinalizedEmail(
           qt.consignee_email,
           qt.consignee_name || 'Customer',

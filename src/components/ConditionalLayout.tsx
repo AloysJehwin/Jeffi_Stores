@@ -17,8 +17,9 @@ export default function ConditionalLayout({ children, isFormsSubdomain }: { chil
   const pathname = usePathname()
   const isAdminPage = pathname?.startsWith('/admin')
   const isFormsPage = isFormsSubdomain || pathname?.startsWith('/forms')
+  const isDocumentPage = pathname?.startsWith('/invoice/') || pathname?.startsWith('/quotation/') || pathname?.startsWith('/purchaseorder/')
 
-  if (isAdminPage || isFormsPage) {
+  if (isAdminPage || isFormsPage || isDocumentPage) {
     return (
       <ThemeProvider>
         <ToastProvider>
