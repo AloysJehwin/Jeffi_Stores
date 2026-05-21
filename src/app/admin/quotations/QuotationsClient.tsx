@@ -8,6 +8,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
+import HoverCard from '@/components/ui/HoverCard'
 
 interface Quotation {
   id: string
@@ -568,12 +569,35 @@ export default function QuotationsClient() {
                 ) : sortedQuotations.map(q => (
                   <tr key={q.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer" onClick={() => setSelectedQuote(q)}>
                     <td className="px-4 py-3 font-mono font-semibold text-foreground" onClick={e => e.stopPropagation()}>
-                      <a
-                        href={`/admin/quotations/${q.id}`}
-                        className="text-accent-500 hover:text-accent-600 hover:underline"
+                      <HoverCard
+                        trigger={
+                          <a
+                            href={`/admin/quotations/${q.id}`}
+                            className="text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                          >
+                            {q.quote_number}
+                          </a>
+                        }
+                        align="left"
+                        side="bottom"
+                        width="260px"
                       >
-                        {q.quote_number}
-                      </a>
+                        <div className="p-3 space-y-2">
+                          <p className="font-mono font-semibold text-foreground text-sm">{q.quote_number}</p>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                            <span className="text-foreground-muted">Customer</span>
+                            <span className="text-foreground font-medium truncate">{q.consignee_name || '—'}</span>
+                            {q.consignee_phone && (<><span className="text-foreground-muted">Phone</span><span className="text-foreground">{q.consignee_phone}</span></>)}
+                            {q.consignee_city && (<><span className="text-foreground-muted">City</span><span className="text-foreground">{q.consignee_city}{q.consignee_state ? `, ${q.consignee_state}` : ''}</span></>)}
+                            <span className="text-foreground-muted">Date</span>
+                            <span className="text-foreground">{fmtDate(q.quote_date)}</span>
+                            <span className="text-foreground-muted">Total</span>
+                            <span className="text-foreground font-semibold">₹{fmt2(Number(q.total_amount))}</span>
+                            <span className="text-foreground-muted">Status</span>
+                            <span className={`font-medium ${q.status === 'final' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>{q.status === 'final' ? 'Final' : 'Draft'}</span>
+                          </div>
+                        </div>
+                      </HoverCard>
                     </td>
                     <td className="px-4 py-3 text-foreground-secondary">{fmtDate(q.quote_date)}</td>
                     <td className="px-4 py-3 text-foreground">{q.consignee_name || '—'}</td>

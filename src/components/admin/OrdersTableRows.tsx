@@ -95,12 +95,38 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
           onClick={() => setSelected(order)}
         >
           <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-            <a
-              href={`/admin/orders/${order.id}`}
-              className="font-mono font-semibold text-accent-500 hover:text-accent-600 hover:underline"
+            <HoverCard
+              trigger={
+                <a
+                  href={`/admin/orders/${order.id}`}
+                  className="font-mono font-semibold text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                  onClick={e => e.stopPropagation()}
+                >
+                  #{order.order_number || order.id.slice(0, 8)}
+                </a>
+              }
+              align="left"
+              side="bottom"
+              width="260px"
             >
-              #{order.order_number || order.id.slice(0, 8)}
-            </a>
+              <div className="p-3 space-y-2">
+                <p className="font-mono font-semibold text-foreground text-sm">#{order.order_number || order.id.slice(0, 8)}</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                  <span className="text-foreground-muted">Customer</span>
+                  <span className="text-foreground font-medium truncate">
+                    {order.users ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest' : order.customer_name || 'Guest'}
+                  </span>
+                  <span className="text-foreground-muted">Date</span>
+                  <span className="text-foreground">{new Date(order.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  <span className="text-foreground-muted">Total</span>
+                  <span className="text-foreground font-semibold">₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground-muted">Payment</span>
+                  <span className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : order.payment_status === 'pending' ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{order.payment_status}</span>
+                  <span className="text-foreground-muted">Source</span>
+                  <span className="text-foreground">{order.source === 'online' ? 'Online' : 'Offline'}</span>
+                </div>
+              </div>
+            </HoverCard>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${

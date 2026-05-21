@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import Tooltip from '@/components/ui/Tooltip'
+import HoverCard from '@/components/ui/HoverCard'
 
 function CustomerDetailModal({ customer, onClose }: { customer: any; onClose: () => void }) {
   if (typeof document === 'undefined') return null
@@ -113,12 +114,37 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
           onClick={() => setSelected(customer)}
         >
           <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-            <Link
-              href={`/admin/customers/${customer.id}`}
-              className="text-sm font-medium text-accent-500 hover:text-accent-600 hover:underline"
+            <HoverCard
+              trigger={
+                <Link
+                  href={`/admin/customers/${customer.id}`}
+                  className="text-sm font-medium text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                >
+                  {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || '—'}
+                </Link>
+              }
+              align="left"
+              side="bottom"
+              width="260px"
             >
-              {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || '—'}
-            </Link>
+              <div className="p-3 space-y-2">
+                <p className="font-semibold text-foreground text-sm">{[customer.first_name, customer.last_name].filter(Boolean).join(' ') || '—'}</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                  {customer.email && (<><span className="text-foreground-muted">Email</span><span className="text-foreground truncate">{customer.email}</span></>)}
+                  {customer.phone && (<><span className="text-foreground-muted">Phone</span><span className="text-foreground">{customer.phone}</span></>)}
+                  <span className="text-foreground-muted">Orders</span>
+                  <span className="text-foreground font-medium">{Number(customer.order_count)}</span>
+                  <span className="text-foreground-muted">Lifetime</span>
+                  <span className="text-foreground font-semibold">₹{Number(customer.lifetime_value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                  <span className="text-foreground-muted">Status</span>
+                  <span className={`font-medium ${customer.is_flagged ? 'text-red-600 dark:text-red-400' : customer.is_active ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                    {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                  <span className="text-foreground-muted">Joined</span>
+                  <span className="text-foreground">{new Date(customer.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                </div>
+              </div>
+            </HoverCard>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <div className="text-sm text-foreground">{customer.email}</div>

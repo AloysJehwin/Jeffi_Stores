@@ -8,6 +8,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import LineItemsSection, { newLineItem, type LineItem } from '@/components/admin/LineItemsSection'
+import HoverCard from '@/components/ui/HoverCard'
 
 interface CashSale {
   id: string
@@ -549,16 +550,37 @@ export default function CashSaleClient() {
                       onClick={() => setSelectedSale(sale)}
                     >
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        {sale.invoice_number ? (
-                          <a
-                            href={`/admin/invoices/${sale.id}`}
-                            className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 hover:underline"
-                          >
-                            {sale.invoice_number}
-                          </a>
-                        ) : (
-                          <span className="font-mono text-xs text-foreground-muted">—</span>
-                        )}
+                        <HoverCard
+                          trigger={
+                            sale.invoice_number ? (
+                              <a
+                                href={`/admin/cash-sale/${sale.id}`}
+                                className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                              >
+                                {sale.invoice_number}
+                              </a>
+                            ) : (
+                              <span className="font-mono text-xs text-foreground-muted underline decoration-dotted underline-offset-2 cursor-default">—</span>
+                            )
+                          }
+                          align="left"
+                          side="bottom"
+                          width="260px"
+                        >
+                          <div className="p-3 space-y-2">
+                            <p className="font-mono font-semibold text-foreground text-sm">{sale.invoice_number || sale.order_number}</p>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                              <span className="text-foreground-muted">Customer</span>
+                              <span className="text-foreground font-medium">Walk-in Customer</span>
+                              <span className="text-foreground-muted">Date</span>
+                              <span className="text-foreground">{fmtDate(sale.invoice_date)}</span>
+                              <span className="text-foreground-muted">Total</span>
+                              <span className="text-foreground font-semibold">₹{fmt(parseFloat(sale.total_amount))}</span>
+                              <span className="text-foreground-muted">Payment</span>
+                              <span className={`font-medium ${sale.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>{sale.payment_status}</span>
+                            </div>
+                          </div>
+                        </HoverCard>
                         <div className="text-xs text-foreground-muted mt-0.5 font-mono">{sale.order_number}</div>
                       </td>
                       <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-sm">
