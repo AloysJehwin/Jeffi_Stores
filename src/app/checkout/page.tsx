@@ -98,12 +98,19 @@ function CheckoutPage() {
         imageUrl: null,
       })
 
-      fetch(`/api/products/${productId}/primary-image`)
+      const imageUrl = `/api/products/${productId}/primary-image${variantId ? `?variantId=${variantId}` : ''}`
+      fetch(imageUrl)
         .then(r => r.json())
         .then(data => {
-          if (data.imageUrl) {
-            setBuyNowItem(prev => prev ? { ...prev, imageUrl: data.imageUrl } : prev)
-          }
+          setBuyNowItem(prev => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              imageUrl: data.imageUrl || prev.imageUrl,
+              productName: prev.productName || data.productName || '',
+              variantName: prev.variantName || data.variantName || null,
+            }
+          })
         })
         .catch(() => {})
     }
