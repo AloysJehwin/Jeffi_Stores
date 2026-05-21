@@ -12,7 +12,7 @@ interface RecentProduct {
 }
 
 const STORAGE_KEY = 'jeffi_recently_viewed'
-const MAX_ITEMS = 6
+const MAX_ITEMS = 7
 
 export function trackRecentlyViewed(product: RecentProduct) {
   try {
