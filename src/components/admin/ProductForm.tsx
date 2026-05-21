@@ -113,6 +113,13 @@ function toInclusive(val: string, rate: number, mode: 'inclusive' | 'exclusive')
   return val
 }
 
+function toExGst(val: string, rate: number, mode: 'inclusive' | 'exclusive'): string {
+  const n = parseFloat(val)
+  if (!val || isNaN(n)) return val
+  const incl = mode === 'exclusive' ? n * (1 + rate / 100) : n
+  return String(Math.round(incl / (1 + rate / 100) * 100) / 100)
+}
+
 function inclusivePreview(val: string, rate: number, mode: 'inclusive' | 'exclusive'): string | null {
   if (mode !== 'exclusive') return null
   const n = parseFloat(val)
@@ -377,12 +384,12 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (!hasVariants) {
         formData.set('base_price', toInclusive(basePrice, gstRate, gstMode))
         formData.set('mrp', toInclusive(mrp, gstRate, gstMode))
-        formData.set('price_ex_gst', toInclusive(salePrice, gstRate, gstMode))
-        formData.set('wholeprice_ex_gst', toInclusive(wholesalePrice, gstRate, gstMode))
+        formData.set('price_ex_gst', toExGst(salePrice, gstRate, gstMode))
+        formData.set('wholeprice_ex_gst', toExGst(wholesalePrice, gstRate, gstMode))
       } else {
         formData.set('mrp', toInclusive(mrp, gstRate, gstMode))
-        formData.set('price_ex_gst', toInclusive(salePrice, gstRate, gstMode))
-        formData.set('wholeprice_ex_gst', toInclusive(wholesalePrice, gstRate, gstMode))
+        formData.set('price_ex_gst', toExGst(salePrice, gstRate, gstMode))
+        formData.set('wholeprice_ex_gst', toExGst(wholesalePrice, gstRate, gstMode))
       }
       formData.set('cost_price', costPrice || '0')
 
@@ -392,8 +399,8 @@ export default function ProductForm({ categories, brands, action, product, produ
           ...v,
           price: toInclusive(v.price, gstRate, gstMode),
           mrp: toInclusive(v.mrp, gstRate, gstMode),
-          price_ex_gst: toInclusive(v.price_ex_gst, gstRate, gstMode),
-          wholeprice_ex_gst: toInclusive(v.wholeprice_ex_gst, gstRate, gstMode),
+          price_ex_gst: toExGst(v.price_ex_gst || v.price, gstRate, gstMode),
+          wholeprice_ex_gst: toExGst(v.wholeprice_ex_gst, gstRate, gstMode),
           weight_rate: v.weight_rate_on ? toInclusive(v.weight_rate, gstRate, gstMode) : v.weight_rate,
           length_rate: v.length_rate_on ? toInclusive(v.length_rate, gstRate, gstMode) : v.length_rate,
         }))
