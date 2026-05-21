@@ -58,8 +58,8 @@ interface InflationLog {
 const FIELD_LABELS: Record<string, string> = {
   base_price: 'Selling Price',
   mrp: 'MRP',
-  sale_price: 'Sale Price',
-  wholesale_price: 'Wholesale Price',
+  price_ex_gst: 'Sale Price',
+  wholeprice_ex_gst: 'Wholesale Price',
   weight_rate: 'Weight Rate',
   length_rate: 'Length Rate',
 }

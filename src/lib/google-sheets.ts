@@ -93,7 +93,7 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
 
   if (hasVariants) {
     for (const variant of product.product_variants) {
-      const sellingPrice = variant.sale_price ?? variant.price
+      const sellingPrice = variant.price
       if (sellingPrice == null) continue
       const variantMrp = variant.mrp ? Number(variant.mrp) : (product.mrp ? Number(product.mrp) : null)
       const hasSalePrice = variantMrp && variantMrp > Number(sellingPrice)
@@ -149,7 +149,7 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
       ])
     }
   } else {
-    const sellingPrice = product.sale_price ?? product.base_price
+    const sellingPrice = product.base_price
     const productMrp = product.mrp ? Number(product.mrp) : null
     const hasSalePrice = productMrp && productMrp > Number(sellingPrice)
     const [cl0, cl1, cl2, cl3, cl4] = buildCustomLabels(product)

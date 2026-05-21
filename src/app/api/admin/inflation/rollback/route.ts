@@ -5,8 +5,8 @@ import { authenticateAdmin } from '@/lib/jwt'
 const VARIANT_FIELD_MAP: Record<string, string> = {
   base_price: 'price',
   mrp: 'mrp',
-  sale_price: 'sale_price',
-  wholesale_price: 'wholesale_price',
+  price_ex_gst: 'price_ex_gst',
+  wholeprice_ex_gst: 'wholeprice_ex_gst',
   weight_rate: 'weight_rate',
   length_rate: 'length_rate',
 }

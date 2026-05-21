@@ -11,7 +11,7 @@ export interface LabelProduct {
   sku: string
   slug: string
   mrp: number | null
-  sale_price: number | null
+  price_ex_gst: number | null
   base_price: number
   gst_percentage: number
   brand_name?: string | null
@@ -79,7 +79,7 @@ function drawPrice(
   mainSize: number,
   subSize: number
 ): number {
-  const incGst = Number((p.sale_price ?? p.base_price).toFixed(2))
+  const incGst = Number((p.price_ex_gst ?? p.base_price).toFixed(2))
   if (!incGst || incGst === 0) return py
 
   const gstRate = p.gst_percentage || 0

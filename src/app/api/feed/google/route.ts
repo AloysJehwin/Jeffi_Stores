@@ -83,7 +83,7 @@ export async function GET() {
 
     if (hasVariants) {
       for (const variant of product.product_variants) {
-        const sellingPrice = variant.sale_price ?? variant.price
+        const sellingPrice = variant.price
         if (sellingPrice == null) continue
         const variantMrp = variant.mrp ? Number(variant.mrp) : (product.mrp ? Number(product.mrp) : null)
         const hasSalePrice = variantMrp && variantMrp > Number(sellingPrice)
@@ -103,7 +103,7 @@ export async function GET() {
       <link>${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(variant.sku)}</link>
       <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}
       <g:price>${Number(hasSalePrice ? variantMrp : sellingPrice).toFixed(2)} INR</g:price>${hasSalePrice ? `
-      <g:sale_price>${Number(sellingPrice).toFixed(2)} INR</g:sale_price>` : ''}
+      <g:price_ex_gst>${Number(sellingPrice).toFixed(2)} INR</g:price_ex_gst>` : ''}
       <g:availability>${variant.stock_quantity > 0 ? 'in_stock' : 'out_of_stock'}</g:availability>
       <g:condition>new</g:condition>
       <g:identifier_exists>${(variantMpn || variantGtin || brandName) ? 'true' : 'false'}</g:identifier_exists>${brandName ? `
@@ -116,7 +116,7 @@ export async function GET() {
     </item>`)
       }
     } else {
-      const sellingPrice = product.sale_price ?? product.base_price
+      const sellingPrice = product.base_price
       const productMrp = product.mrp ? Number(product.mrp) : null
       const hasSalePrice = productMrp && productMrp > Number(sellingPrice)
 
@@ -127,7 +127,7 @@ export async function GET() {
       <link>${baseUrl}/products/${product.slug}</link>
       <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}
       <g:price>${Number(hasSalePrice ? productMrp : sellingPrice).toFixed(2)} INR</g:price>${hasSalePrice ? `
-      <g:sale_price>${Number(sellingPrice).toFixed(2)} INR</g:sale_price>` : ''}
+      <g:price_ex_gst>${Number(sellingPrice).toFixed(2)} INR</g:price_ex_gst>` : ''}
       <g:availability>${product.stock_quantity > 0 ? 'in_stock' : 'out_of_stock'}</g:availability>
       <g:condition>new</g:condition>
       <g:identifier_exists>${(product.mpn || product.gtin || brandName) ? 'true' : 'false'}</g:identifier_exists>${brandName ? `

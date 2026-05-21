@@ -129,7 +129,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { label: 'MRP', val: p.mrp },
-                { label: p.has_variants ? 'From' : 'Sale Price', val: p.has_variants ? p.variant_min_price : p.sale_price },
+                { label: p.has_variants ? 'From' : 'Sale Price', val: p.has_variants ? p.variant_min_price : p.price_ex_gst },
                 { label: 'Base Price', val: p.has_variants ? null : p.base_price },
               ].map(({ label, val }) => val != null && (
                 <div key={label}>
@@ -215,7 +215,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
                     <tr key={v.id} className="hover:bg-surface-secondary/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">{v.variant_name}</td>
                       <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">{v.sku || '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground">{v.sale_price ? formatINR(Number(v.sale_price)) : v.price ? formatINR(Number(v.price)) : '—'}</td>
+                      <td className="px-4 py-3 text-right text-foreground">{v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : v.price ? formatINR(Number(v.price)) : '—'}</td>
                       <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{v.mrp ? formatINR(Number(v.mrp)) : '—'}</td>
                       <td className={`px-4 py-3 text-right font-semibold ${vStockColor}`}>{vStock}</td>
                       <td className="px-4 py-3 text-center">
