@@ -11,6 +11,7 @@ interface Review {
   title: string | null
   comment: string
   is_verified_purchase: boolean
+  image_urls: string[]
   created_at: string
   users: {
     first_name: string
@@ -85,8 +86,25 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const [hoverRating, setHoverRating] = useState(0)
   const [title, setTitle] = useState('')
   const [comment, setComment] = useState('')
+  const [images, setImages] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   useEffect(() => { fetchReviews() }, [productId])
+
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []).slice(0, 3)
+    setImages(files)
+    setImagePreviews(files.map(f => URL.createObjectURL(f)))
+  }
+
+  function removeImage(idx: number) {
+    setImages(prev => prev.filter((_, i) => i !== idx))
+    setImagePreviews(prev => {
+      URL.revokeObjectURL(prev[idx])
+      return prev.filter((_, i) => i !== idx)
+    })
+  }
 
   const fetchReviews = async () => {
     try {
@@ -111,11 +129,14 @@ export default function ProductReviews({ productId, productName }: ProductReview
     if (!comment.trim()) { showToast('Please write a comment', 'warning'); return }
     setIsSubmitting(true)
     try {
-      const res = await fetch('/api/reviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, rating, title: title.trim() || null, comment: comment.trim() }),
-      })
+      const fd = new FormData()
+      fd.append('productId', productId)
+      fd.append('rating', String(rating))
+      fd.append('comment', comment.trim())
+      if (title.trim()) fd.append('title', title.trim())
+      for (const img of images) fd.append('images', img)
+
+      const res = await fetch('/api/reviews', { method: 'POST', body: fd })
       const data = await res.json()
       if (res.ok) {
         showToast(data.message || 'Review submitted!', 'success')
@@ -123,6 +144,8 @@ export default function ProductReviews({ productId, productName }: ProductReview
         setRating(5)
         setTitle('')
         setComment('')
+        setImages([])
+        setImagePreviews([])
         fetchReviews()
       } else {
         showToast(data.error || 'Failed to submit review', 'error')
@@ -241,6 +264,36 @@ export default function ProductReviews({ productId, productName }: ProductReview
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                Photos <span className="text-foreground-muted font-normal">(optional, up to 3)</span>
+              </label>
+              <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-2 border border-dashed border-border-secondary rounded-lg text-sm text-foreground-secondary hover:border-accent-500 hover:text-accent-500 transition-colors">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 12V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25v13.5A2.25 2.25 0 0118.75 21H5.25A2.25 2.25 0 013 18.75V12zm10.5-1.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                </svg>
+                Add photos
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={handleImageChange} />
+              </label>
+              {imagePreviews.length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {imagePreviews.map((src, idx) => (
+                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-secondary">
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(idx)}
+                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center text-xs leading-none hover:bg-black/80"
+                        aria-label="Remove"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2 pt-1">
               <button
                 type="submit"
@@ -311,9 +364,45 @@ export default function ProductReviews({ productId, productName }: ProductReview
                   <p className="font-semibold text-sm text-foreground mb-1">{review.title}</p>
                 )}
                 <p className="text-sm text-foreground-secondary leading-relaxed whitespace-pre-wrap">{review.comment}</p>
+                {review.image_urls?.length > 0 && (
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    {review.image_urls.map((url, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setLightboxUrl(url)}
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-border-secondary hover:border-accent-500 transition-colors shrink-0"
+                      >
+                        <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="max-w-full max-h-full rounded-lg object-contain shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center bg-black/60 text-white rounded-full hover:bg-black/80 text-xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
       )}
     </div>
