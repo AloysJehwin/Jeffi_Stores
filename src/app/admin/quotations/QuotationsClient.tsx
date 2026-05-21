@@ -9,6 +9,7 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import HoverCard from '@/components/ui/HoverCard'
+import Toggle from '@/components/ui/Toggle'
 
 interface Quotation {
   id: string
@@ -792,11 +793,7 @@ export default function QuotationsClient() {
         <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-foreground">Buyer (Bill to)</h2>
-            <label className="flex items-center gap-2 text-xs text-foreground-secondary cursor-pointer select-none">
-              <input type="checkbox" checked={buyerSame} onChange={e => setBuyerSame(e.target.checked)}
-                disabled={isFinal} className="w-3.5 h-3.5 accent-secondary-500" />
-              Same as consignee
-            </label>
+            <Toggle checked={buyerSame} onChange={setBuyerSame} disabled={isFinal} label="Same as consignee" size="sm" />
           </div>
           {buyerSame ? (
             <p className="text-foreground-secondary text-xs py-4 text-center">Using same address as consignee</p>
