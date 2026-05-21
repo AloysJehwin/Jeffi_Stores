@@ -72,7 +72,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       'quote_date', 'status',
       'consignee_name', 'consignee_addr1', 'consignee_addr2', 'consignee_city', 'consignee_state', 'consignee_gstin',
       'consignee_phone', 'consignee_pincode', 'consignee_email',
-      'buyer_same', 'buyer_name', 'buyer_addr1', 'buyer_addr2', 'buyer_city', 'buyer_state', 'buyer_gstin', 'notes',
+      'buyer_same', 'buyer_name', 'buyer_addr1', 'buyer_addr2', 'buyer_city', 'buyer_state', 'buyer_gstin',
+      'buyer_phone', 'buyer_pincode', 'buyer_email', 'notes',
     ]
     for (const field of textFields) {
       if (field in fields) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -117,6 +117,11 @@ export default function InvoicesClient() {
   const [postalCode, setPostalCode] = useState('')
   const [buyerGstin, setBuyerGstin] = useState('')
   const [paymentMode, setPaymentMode] = useState('cash')
+
+  const [custSearch, setCustSearch] = useState('')
+  const [custResults, setCustResults] = useState<any[]>([])
+  const [showCustDrop, setShowCustDrop] = useState(false)
+  const custTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [invoiceDate, setInvoiceDate] = useState('')
   const [notes, setNotes] = useState('')
   const [creditWarning, setCreditWarning] = useState<{ outstanding: number; creditLimit: number } | null>(null)
@@ -204,6 +209,31 @@ export default function InvoicesClient() {
     }
   }
 
+  function searchCustomers(q: string) {
+    setCustSearch(q)
+    if (custTimer.current) clearTimeout(custTimer.current)
+    if (q.length < 2) { setCustResults([]); setShowCustDrop(false); return }
+    custTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setCustResults(data.results || [])
+      setShowCustDrop(true)
+    }, 300)
+  }
+
+  function selectCustomer(c: any) {
+    setCustomerName(c.addr_name || c.full_name || '')
+    setCustomerPhone((c.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10))
+    setCustomerEmail(c.email || '')
+    setAddressLine1(c.address_line1 || '')
+    setAddressLine2(c.address_line2 || '')
+    setCity(c.city || '')
+    setState(c.state || '')
+    setPostalCode(c.postal_code || '')
+    setBuyerGstin(c.gst_number || '')
+    setCustSearch(''); setCustResults([]); setShowCustDrop(false)
+  }
+
   function resetForm() {
     setCustomerName(''); setCustomerPhone(''); setCustomerEmail('')
     setAddressLine1(''); setAddressLine2(''); setCity(''); setState(''); setPostalCode('')
@@ -211,6 +241,7 @@ export default function InvoicesClient() {
     setItems([newLineItem()]); setFormError('')
     setEditId(null)
     setEditIsDraft(false)
+    setCustSearch(''); setCustResults([]); setShowCustDrop(false)
   }
 
   async function openEdit(inv: Invoice) {
@@ -447,6 +478,23 @@ export default function InvoicesClient() {
 
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
             <h2 className="text-sm font-semibold text-foreground mb-3">Customer Details</h2>
+            <div className="relative mb-3">
+              <input
+                type="text" value={custSearch} onChange={e => searchCustomers(e.target.value)}
+                placeholder="Search existing customer…" className={inputCls}
+              />
+              {showCustDrop && custResults.length > 0 && (
+                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {custResults.map(c => (
+                    <button key={c.id} onClick={() => selectCustomer(c)}
+                      className="w-full text-left px-3 py-2 hover:bg-surface-secondary transition-colors">
+                      <p className="text-sm font-medium text-foreground">{c.company_name || c.full_name}</p>
+                      <p className="text-xs text-foreground-secondary">{c.city}, {c.state}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Customer Name <span className="text-red-500">*</span></label>
@@ -454,32 +502,32 @@ export default function InvoicesClient() {
                   className={inputCls} placeholder="Full name" />
               </div>
               <div>
-                <label className={labelCls}>Phone</label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none">+91</span>
-                  <input type="tel" inputMode="numeric" maxLength={10} value={customerPhone} onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    onBlur={async () => {
-                      if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
-                      const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
-                      const json = await res.json()
-                      if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
-                        setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
-                      } else {
-                        setCreditWarning(null)
-                      }
-                    }}
-                    className={inputCls + ' rounded-l-none'} placeholder="XXXXXXXXXX" />
-                </div>
-              </div>
-              <div>
-                <label className={labelCls}>Email</label>
-                <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
-                  className={inputCls} placeholder="customer@example.com" />
-              </div>
-              <div>
                 <label className={labelCls}>Buyer GSTIN</label>
                 <input type="text" value={buyerGstin} onChange={e => setBuyerGstin(e.target.value.toUpperCase())} maxLength={15}
                   className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Phone &amp; Email</label>
+                <div className="flex gap-2">
+                  <div className="flex flex-1 min-w-0">
+                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
+                    <input type="tel" inputMode="numeric" maxLength={10} value={customerPhone}
+                      onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onBlur={async () => {
+                        if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
+                        const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
+                        const json = await res.json()
+                        if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
+                          setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
+                        } else {
+                          setCreditWarning(null)
+                        }
+                      }}
+                      className={inputCls + ' rounded-l-none min-w-0'} placeholder="XXXXXXXXXX" />
+                  </div>
+                  <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
+                    className={inputCls + ' flex-1 min-w-0'} placeholder="customer@example.com" />
+                </div>
               </div>
               {isEdit && (
                 <div>
