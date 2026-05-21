@@ -29,7 +29,7 @@ export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
   useEffect(() => {
     try {
       const stored: RecentProduct[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-      setProducts(stored.filter(p => p.id !== excludeId))
+      setProducts(stored.filter(p => p.id !== excludeId).slice(0, 6))
     } catch {}
   }, [excludeId])
 
