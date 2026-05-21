@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const computedItems = items.map((item: any) => ({
       ...item,
-      amount: Number(item.quantity) * Number(item.rate) * (1 - (Number(item.discount_pct) || 0) / 100),
+      amount: Number(item.quantity) * Number(item.rate),
     }))
     const totals = calcTotals(computedItems)
 

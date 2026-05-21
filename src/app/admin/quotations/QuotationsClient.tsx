@@ -319,8 +319,8 @@ export default function QuotationsClient() {
             quantity: i.quantity,
             unit: i.unit,
             rate: rateExGst,
-            discount_pct: i.discount_pct,
-            amount: (Number(i.quantity) || 0) * rateExGst * (1 - (i.discount_pct || 0) / 100),
+            discount_pct: 0,
+            amount: (Number(i.quantity) || 0) * rateExGst,
             product_id: i.product_id || null,
             variant_id: i.variant_id || null,
           }
