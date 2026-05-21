@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -85,6 +85,7 @@ export default function InvoicesClient() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '')
   const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
   const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
@@ -117,6 +118,11 @@ export default function InvoicesClient() {
   const [postalCode, setPostalCode] = useState('')
   const [buyerGstin, setBuyerGstin] = useState('')
   const [paymentMode, setPaymentMode] = useState('cash')
+
+  const [custSearch, setCustSearch] = useState('')
+  const [custResults, setCustResults] = useState<any[]>([])
+  const [showCustDrop, setShowCustDrop] = useState(false)
+  const custTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [invoiceDate, setInvoiceDate] = useState('')
   const [notes, setNotes] = useState('')
   const [creditWarning, setCreditWarning] = useState<{ outstanding: number; creditLimit: number } | null>(null)
@@ -204,6 +210,31 @@ export default function InvoicesClient() {
     }
   }
 
+  function searchCustomers(q: string) {
+    setCustSearch(q)
+    if (custTimer.current) clearTimeout(custTimer.current)
+    if (q.length < 2) { setCustResults([]); setShowCustDrop(false); return }
+    custTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setCustResults(data.results || [])
+      setShowCustDrop(true)
+    }, 300)
+  }
+
+  function selectCustomer(c: any) {
+    setCustomerName(c.addr_name || c.full_name || '')
+    setCustomerPhone((c.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10))
+    setCustomerEmail(c.email || '')
+    setAddressLine1(c.address_line1 || '')
+    setAddressLine2(c.address_line2 || '')
+    setCity(c.city || '')
+    setState(c.state || '')
+    setPostalCode(c.postal_code || '')
+    setBuyerGstin(c.gst_number || '')
+    setCustSearch(''); setCustResults([]); setShowCustDrop(false)
+  }
+
   function resetForm() {
     setCustomerName(''); setCustomerPhone(''); setCustomerEmail('')
     setAddressLine1(''); setAddressLine2(''); setCity(''); setState(''); setPostalCode('')
@@ -211,6 +242,7 @@ export default function InvoicesClient() {
     setItems([newLineItem()]); setFormError('')
     setEditId(null)
     setEditIsDraft(false)
+    setCustSearch(''); setCustResults([]); setShowCustDrop(false)
   }
 
   async function openEdit(inv: Invoice) {
@@ -281,9 +313,26 @@ export default function InvoicesClient() {
     }
   }
 
+  async function sendInvoiceEmail(inv: Invoice) {
+    setSendingEmailId(inv.id)
+    try {
+      const res = await fetch(`/api/admin/invoices/${inv.id}/resend-email`, { method: 'POST', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send email')
+      showToast('Email sent successfully', 'success')
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setSendingEmailId(null)
+    }
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!customerName.trim()) { setFormError('Customer name is required'); return }
+    if (!addressLine1.trim()) { setFormError('Address line 1 is required'); return }
+    if (!city.trim()) { setFormError('City is required'); return }
+    if (!customerPhone.trim()) { setFormError('Phone number is required'); return }
     if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
       setFormError('All items need a name and price'); return
     }
@@ -327,6 +376,9 @@ export default function InvoicesClient() {
     e.preventDefault()
     if (!editId) return
     if (!customerName.trim()) { setFormError('Customer name is required'); return }
+    if (!addressLine1.trim()) { setFormError('Address line 1 is required'); return }
+    if (!city.trim()) { setFormError('City is required'); return }
+    if (!customerPhone.trim()) { setFormError('Phone number is required'); return }
     if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
       setFormError('All items need a name and price'); return
     }
@@ -369,6 +421,9 @@ export default function InvoicesClient() {
     e.preventDefault()
     if (!editId) return
     if (!customerName.trim()) { setFormError('Customer name is required'); return }
+    if (!addressLine1.trim()) { setFormError('Address line 1 is required'); return }
+    if (!city.trim()) { setFormError('City is required'); return }
+    if (!customerPhone.trim()) { setFormError('Phone number is required'); return }
     if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
       setFormError('All items need a name and price'); return
     }
@@ -447,6 +502,23 @@ export default function InvoicesClient() {
 
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
             <h2 className="text-sm font-semibold text-foreground mb-3">Customer Details</h2>
+            <div className="relative mb-3">
+              <input
+                type="text" value={custSearch} onChange={e => searchCustomers(e.target.value)}
+                placeholder="Search existing customer…" className={inputCls}
+              />
+              {showCustDrop && custResults.length > 0 && (
+                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {custResults.map(c => (
+                    <button key={c.id} onClick={() => selectCustomer(c)}
+                      className="w-full text-left px-3 py-2 hover:bg-surface-secondary transition-colors">
+                      <p className="text-sm font-medium text-foreground">{c.company_name || c.full_name}</p>
+                      <p className="text-xs text-foreground-secondary">{c.city}, {c.state}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Customer Name <span className="text-red-500">*</span></label>
@@ -454,32 +526,32 @@ export default function InvoicesClient() {
                   className={inputCls} placeholder="Full name" />
               </div>
               <div>
-                <label className={labelCls}>Phone</label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none">+91</span>
-                  <input type="tel" inputMode="numeric" maxLength={10} value={customerPhone} onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    onBlur={async () => {
-                      if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
-                      const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
-                      const json = await res.json()
-                      if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
-                        setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
-                      } else {
-                        setCreditWarning(null)
-                      }
-                    }}
-                    className={inputCls + ' rounded-l-none'} placeholder="XXXXXXXXXX" />
-                </div>
-              </div>
-              <div>
-                <label className={labelCls}>Email</label>
-                <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
-                  className={inputCls} placeholder="customer@example.com" />
-              </div>
-              <div>
                 <label className={labelCls}>Buyer GSTIN</label>
                 <input type="text" value={buyerGstin} onChange={e => setBuyerGstin(e.target.value.toUpperCase())} maxLength={15}
                   className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelCls}>Phone &amp; Email</label>
+                <div className="flex gap-2">
+                  <div className="flex flex-1 min-w-0">
+                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
+                    <input type="tel" inputMode="numeric" maxLength={10} value={customerPhone}
+                      onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onBlur={async () => {
+                        if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
+                        const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
+                        const json = await res.json()
+                        if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
+                          setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
+                        } else {
+                          setCreditWarning(null)
+                        }
+                      }}
+                      className={inputCls + ' rounded-l-none min-w-0'} placeholder="XXXXXXXXXX" />
+                  </div>
+                  <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
+                    className={inputCls + ' flex-1 min-w-0'} placeholder="customer@example.com" />
+                </div>
               </div>
               {isEdit && (
                 <div>
@@ -849,14 +921,32 @@ export default function InvoicesClient() {
                             </svg>
                           </a>
                           <a
-                            href={`/admin/orders/${inv.id}`}
-                            title="View Order"
+                            href={`/admin/invoices/${inv.id}`}
+                            title="View Invoice"
                             className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           </a>
+                          {inv.customer_email && (
+                            <button
+                              onClick={() => sendInvoiceEmail(inv)}
+                              disabled={sendingEmailId === inv.id}
+                              title={`Send email to ${inv.customer_email}`}
+                              className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-blue-500 transition-colors disabled:opacity-40"
+                            >
+                              {sendingEmailId === inv.id ? (
+                                <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                              )}
+                            </button>
+                          )}
                           {inv.source === 'offline' && inv.status !== 'cancelled' && (
                             <button
                               onClick={() => openEdit(inv)}
@@ -970,11 +1060,20 @@ export default function InvoicesClient() {
                       PDF
                     </a>
                     <a
-                      href={`/admin/orders/${inv.id}`}
+                      href={`/admin/invoices/${inv.id}`}
                       className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                     >
-                      View Order
+                      View Invoice
                     </a>
+                    {inv.customer_email && (
+                      <button
+                        onClick={() => sendInvoiceEmail(inv)}
+                        disabled={sendingEmailId === inv.id}
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium disabled:opacity-50"
+                      >
+                        {sendingEmailId === inv.id ? 'Sending…' : 'Send Email'}
+                      </button>
+                    )}
                     {inv.source === 'offline' && inv.status !== 'cancelled' && (
                       <button
                         onClick={() => openEdit(inv)}

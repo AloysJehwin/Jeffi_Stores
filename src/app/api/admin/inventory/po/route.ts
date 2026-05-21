@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       `SELECT
          po.id, po.po_number, po.status, po.order_date, po.expected_date,
          po.subtotal, po.tax_amount, po.total_amount, po.notes, po.created_at,
-         s.id AS supplier_id, s.name AS supplier_name,
+         s.id AS supplier_id, s.name AS supplier_name, s.email AS supplier_email,
          COUNT(poi.id)::int AS item_count
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id

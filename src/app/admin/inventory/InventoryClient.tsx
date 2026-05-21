@@ -7,6 +7,7 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import HoverCard from '@/components/ui/HoverCard'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
+import { useToast } from '@/contexts/ToastContext'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -261,6 +262,7 @@ function SuppliersTab() {
 
 type PO = {
   id: string; po_number: string; supplier_id: string; supplier_name: string
+  supplier_email: string | null
   status: string; order_date: string; expected_date: string | null
   item_count: number; total_amount: string
 }
@@ -272,6 +274,7 @@ type POItem = {
 }
 
 function POTab({ initialPO }: { initialPO?: string }) {
+  const { showToast } = useToast()
   const [pos, setPOs] = useState<PO[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -288,6 +291,21 @@ function POTab({ initialPO }: { initialPO?: string }) {
   const [receiveSaving, setReceiveSaving] = useState(false)
   const [poSortCol, setPoSortCol] = useState<string | undefined>(undefined)
   const [poSortDir, setPoSortDir] = useState<SortDir | undefined>(undefined)
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
+
+  async function sendPOEmail(po: PO) {
+    setSendingEmailId(po.id)
+    try {
+      const res = await fetch(`/api/admin/inventory/po/${po.id}/resend-email`, { method: 'POST', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to send email')
+      showToast('Purchase order email sent', 'success')
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setSendingEmailId(null)
+    }
+  }
 
   const PO_SORT_KEYS: Record<string, keyof PO> = {
     po_number: 'po_number', supplier: 'supplier_name', date: 'order_date',
@@ -621,6 +639,25 @@ function POTab({ initialPO }: { initialPO?: string }) {
                         )}
                         {['sent', 'partial'].includes(po.status) && (
                           <button className="text-xs text-green-600 dark:text-green-400 hover:underline font-medium" onClick={() => openReceive(po.id)}>Receive</button>
+                        )}
+                        {po.supplier_email && (
+                          <button
+                            onClick={() => sendPOEmail(po)}
+                            disabled={sendingEmailId === po.id}
+                            title={`Send email to ${po.supplier_email}`}
+                            className="p-1 text-foreground-secondary hover:text-secondary-500 transition-colors disabled:opacity-50"
+                          >
+                            {sendingEmailId === po.id ? (
+                              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                            )}
+                          </button>
                         )}
                         {po.status === 'draft' && (
                           <button className="text-xs text-red-500 hover:underline font-medium" onClick={() => cancelPO(po.id)}>Cancel</button>
