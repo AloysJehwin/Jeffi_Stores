@@ -851,7 +851,7 @@ export default function InvoicesClient() {
                     >
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <a
-                          href={`/admin/invoices/${inv.id}`}
+                          href={inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`}
                           className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 hover:underline"
                         >
                           {inv.invoice_number}
@@ -924,8 +924,8 @@ export default function InvoicesClient() {
                                 </svg>
                               </a>
                               <a
-                                href={`/admin/cash-sale`}
-                                title="View in Cash Sales"
+                                href={`/admin/cash-sale/${inv.id}`}
+                                title="View Sale"
                                 className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1035,7 +1035,7 @@ export default function InvoicesClient() {
                   <div className="flex items-start justify-between gap-2">
                     <div onClick={e => e.stopPropagation()}>
                       <a
-                        href={`/admin/invoices/${inv.id}`}
+                        href={inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`}
                         className="font-mono font-semibold text-sm text-accent-500 hover:underline"
                       >
                         {inv.invoice_number}
@@ -1090,10 +1090,10 @@ export default function InvoicesClient() {
                           Receipt PDF
                         </a>
                         <a
-                          href={`/admin/cash-sale`}
+                          href={`/admin/cash-sale/${inv.id}`}
                           className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                         >
-                          Cash Sales
+                          View Sale
                         </a>
                       </>
                     ) : (
