@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 interface Review {
   id: string
@@ -266,7 +267,7 @@ export default function AdminReviewsPage() {
                         onClick={() => setLightboxUrl(url)}
                         className="w-20 h-20 rounded-lg overflow-hidden border border-border-secondary hover:border-accent-500 transition-colors shrink-0"
                       >
-                        <img src={review.image_thumbnail_urls?.[idx] || url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        <ImgWithSkeleton src={review.image_thumbnail_urls?.[idx] || url} alt="" className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>
@@ -320,11 +321,10 @@ export default function AdminReviewsPage() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
           onClick={() => setLightboxUrl(null)}
         >
-          <img
+          <ImgWithSkeleton
             src={lightboxUrl}
             alt=""
             className="max-w-full max-h-full rounded-lg object-contain shadow-2xl"
-            onClick={e => e.stopPropagation()}
           />
           <button
             type="button"
