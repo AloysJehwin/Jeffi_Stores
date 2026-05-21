@@ -688,7 +688,7 @@ export default function QuotationsClient() {
                           </button>
                         )}
                         {q.status === 'final' && q.converted_order_id && (
-                          <a href={`/admin/orders/${q.converted_order_id}`} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
+                          <a href={`/admin/invoices/${q.converted_order_id}`} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
                             Invoiced ↗
                           </a>
                         )}
@@ -752,7 +752,7 @@ export default function QuotationsClient() {
             </button>
           )}
           {convertedOrderId && (
-            <a href={`/admin/orders/${convertedOrderId}`}
+            <a href={`/admin/invoices/${convertedOrderId}`}
               className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap">
               View Invoice →
             </a>
