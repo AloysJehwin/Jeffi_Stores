@@ -69,6 +69,7 @@ const PAYMENT_COLORS: Record<string, string> = {
 const SOURCE_COLORS: Record<string, string> = {
   online: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   offline: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  cash_sale: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
 }
 
 export default function InvoicesClient() {
@@ -702,7 +703,7 @@ export default function InvoicesClient() {
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <AdminSelect value={sourceFilter} onChange={v => { setSourceFilter(v); syncUrl({ source: v }) }} placeholder="All Sources"
-            options={[{ value: 'online', label: 'Online' }, { value: 'offline', label: 'Offline' }]} />
+            options={[{ value: 'online', label: 'Online' }, { value: 'offline', label: 'Offline' }, { value: 'cash_sale', label: 'Cash Sale' }]} />
           <AdminSelect value={paymentFilter} onChange={v => { setPaymentFilter(v); syncUrl({ payment: v }) }} placeholder="All Payments"
             options={[
               { value: 'paid', label: 'Paid' }, { value: 'unpaid', label: 'Unpaid' },
@@ -888,8 +889,8 @@ export default function InvoicesClient() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
-                            {inv.source === 'offline' ? 'Offline' : 'Online'}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
+                            {inv.source === 'offline' ? 'Offline' : inv.source === 'cash_sale' ? 'Cash Sale' : 'Online'}
                           </span>
                           {inv.status === 'cancelled' && (
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
@@ -909,6 +910,31 @@ export default function InvoicesClient() {
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          {inv.source === 'cash_sale' ? (
+                            <>
+                              <a
+                                href={`/api/admin/cash-sale/${inv.id}/receipt`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Download Receipt PDF"
+                                className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              </a>
+                              <a
+                                href={`/admin/cash-sale`}
+                                title="View in Cash Sales"
+                                className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </a>
+                            </>
+                          ) : (
+                            <>
                           <a
                             href={`/api/orders/${inv.id}/invoice`}
                             target="_blank"
@@ -989,6 +1015,8 @@ export default function InvoicesClient() {
                               </button>
                             )
                           )}
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1037,7 +1065,7 @@ export default function InvoicesClient() {
                       {inv.payment_status}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
-                      {inv.source === 'offline' ? 'Offline' : 'Online'}
+                      {inv.source === 'offline' ? 'Offline' : inv.source === 'cash_sale' ? 'Cash Sale' : 'Online'}
                     </span>
                     {inv.status === 'cancelled' && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
@@ -1051,6 +1079,25 @@ export default function InvoicesClient() {
                     )}
                   </div>
                   <div className="flex gap-4 pt-1 border-t border-border-default" onClick={e => e.stopPropagation()}>
+                    {inv.source === 'cash_sale' ? (
+                      <>
+                        <a
+                          href={`/api/admin/cash-sale/${inv.id}/receipt`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-secondary-500 dark:text-secondary-300 font-medium hover:underline"
+                        >
+                          Receipt PDF
+                        </a>
+                        <a
+                          href={`/admin/cash-sale`}
+                          className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+                        >
+                          Cash Sales
+                        </a>
+                      </>
+                    ) : (
+                      <>
                     <a
                       href={`/api/orders/${inv.id}/invoice`}
                       target="_blank"
@@ -1110,6 +1157,8 @@ export default function InvoicesClient() {
                         </button>
                       )
                     )}
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1167,7 +1216,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
               {inv.payment_status}
             </span>
             <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${SOURCE_COLORS[inv.source] || ''}`}>
-              {inv.source === 'offline' ? 'Offline' : 'Online'}
+              {inv.source === 'offline' ? 'Offline' : inv.source === 'cash_sale' ? 'Cash Sale' : 'Online'}
             </span>
             {inv.irn && (
               <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
@@ -1219,6 +1268,19 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
 
           {/* Downloads */}
           <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
+            {inv.source === 'cash_sale' ? (
+              <a
+                href={`/api/admin/cash-sale/${inv.id}/receipt`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Receipt PDF
+              </a>
+            ) : (
             <a
               href={`/api/orders/${inv.id}/invoice`}
               target="_blank"
@@ -1230,6 +1292,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
               </svg>
               Invoice PDF
             </a>
+            )}
           </div>
         </div>
       </div>

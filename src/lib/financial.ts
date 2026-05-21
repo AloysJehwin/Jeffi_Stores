@@ -211,23 +211,40 @@ export async function getPayables(filters: {
 export async function getPLReport(from: string, to: string): Promise<{ monthly: PLMonth[]; totals: PLTotals }> {
   const rows = await queryMany<any>(`
     SELECT
-      TO_CHAR(DATE_TRUNC('month', o.created_at), 'YYYY-MM') AS month,
-      COALESCE(SUM(o.total_amount), 0) AS revenue,
-      COALESCE(SUM(o.tax_amount), 0) AS tax_collected,
+      TO_CHAR(DATE_TRUNC('month', src.created_at), 'YYYY-MM') AS month,
+      COALESCE(SUM(src.total_amount), 0) AS revenue,
+      COALESCE(SUM(src.tax_amount), 0) AS tax_collected,
       COUNT(*)::int AS order_count,
-      COALESCE(SUM(
+      COALESCE(SUM(src.cogs), 0) AS cogs
+    FROM (
+      SELECT
+        o.created_at,
+        o.total_amount,
+        o.tax_amount,
         (SELECT COALESCE(SUM(oi.quantity * COALESCE(pv.cost_price, p.cost_price, 0)), 0)
          FROM order_items oi
          JOIN products p ON p.id = oi.product_id
          LEFT JOIN product_variants pv ON pv.id = oi.variant_id
-         WHERE oi.order_id = o.id)
-      ), 0) AS cogs
-    FROM orders o
-    WHERE o.payment_status = 'paid'
-      AND o.created_at >= $1
-      AND o.created_at <= $2
-    GROUP BY DATE_TRUNC('month', o.created_at)
-    ORDER BY DATE_TRUNC('month', o.created_at)
+         WHERE oi.order_id = o.id) AS cogs
+      FROM orders o
+      WHERE o.payment_status = 'paid'
+        AND o.created_at >= $1
+        AND o.created_at <= $2
+
+      UNION ALL
+
+      SELECT
+        cs.created_at,
+        cs.total_amount,
+        cs.tax_amount,
+        0 AS cogs
+      FROM cash_sales cs
+      WHERE cs.payment_status = 'paid'
+        AND cs.created_at >= $1
+        AND cs.created_at <= $2
+    ) src
+    GROUP BY DATE_TRUNC('month', src.created_at)
+    ORDER BY DATE_TRUNC('month', src.created_at)
   `, [from, to + ' 23:59:59'])
 
   const monthly: PLMonth[] = (rows || []).map(r => {
@@ -266,9 +283,15 @@ export async function getCashflow(from: string, to: string): Promise<{ monthly: 
       SELECT
         TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
         COALESCE(SUM(total_amount), 0) AS cash_in
-      FROM orders
-      WHERE payment_status = 'paid'
-        AND created_at >= $1 AND created_at <= $2
+      FROM (
+        SELECT created_at, total_amount FROM orders
+        WHERE payment_status = 'paid'
+          AND created_at >= $1 AND created_at <= $2
+        UNION ALL
+        SELECT created_at, total_amount FROM cash_sales
+        WHERE payment_status = 'paid'
+          AND created_at >= $1 AND created_at <= $2
+      ) src
       GROUP BY DATE_TRUNC('month', created_at)
       ORDER BY DATE_TRUNC('month', created_at)
     `, [from, to + ' 23:59:59']),

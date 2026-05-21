@@ -79,6 +79,29 @@ export async function GET(request: NextRequest) {
         FROM orders o
         LEFT JOIN users u ON u.id = o.user_id
         WHERE o.payment_status = 'paid'
+
+        UNION ALL
+
+        SELECT
+          cs.id,
+          'inflow' AS direction,
+          (cs.created_at AT TIME ZONE 'UTC')::date::text AS txn_date,
+          cs.total_amount AS amount,
+          cs.customer_name AS party,
+          COALESCE(cs.invoice_number, cs.sale_number) AS txn_ref,
+          cs.payment_mode AS method,
+          NULL AS reference,
+          NULL AS payout_id,
+          NULL AS payout_status,
+          cs.notes,
+          cs.created_at,
+          NULL::uuid AS expense_id,
+          NULL::uuid AS user_id,
+          'cash_sale' AS source,
+          cs.invoice_number,
+          NULL::uuid AS supplier_id
+        FROM cash_sales cs
+        WHERE cs.payment_status = 'paid'
       ) txn
       ${where}
       ORDER BY txn_date DESC, created_at DESC
