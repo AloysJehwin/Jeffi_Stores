@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne, withTransaction } from '@/lib/db'
 import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
+import { sendInvoiceFinalizedEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -219,6 +220,12 @@ export async function PATCH(
         movedToDraft: true,
         insufficientItems: result.insufficientItems,
       })
+    }
+
+    if (order.invoice_number && customerEmail) {
+      try {
+        await sendInvoiceFinalizedEmail(customerEmail, customerName, order.invoice_number, totalAmount)
+      } catch (_) {}
     }
 
     return NextResponse.json({ success: true })

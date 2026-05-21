@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne, queryMany, getClient } from '@/lib/db'
 import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
+import { sendPOReceiveNotificationEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const po = await queryOne<any>(
-      `SELECT po.*, s.id AS supplier_id, s.name AS supplier_name FROM purchase_orders po
+      `SELECT po.*, s.id AS supplier_id, s.name AS supplier_name, s.contact_name, s.email AS supplier_email
+       FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        WHERE po.id = $1`,
       [params.id]
@@ -157,6 +159,36 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         } finally {
           expClient.release()
         }
+      }
+
+      if (po?.supplier_email) {
+        try {
+          const grnItemsForEmail = await queryMany<any>(
+            `SELECT gi.quantity_received, gi.unit_cost,
+                    COALESCE(poi.product_name, p.name) AS product_name,
+                    pv.variant_name
+             FROM grn_items gi
+             JOIN purchase_order_items poi ON poi.id = gi.po_item_id
+             LEFT JOIN products p ON p.id = gi.product_id
+             LEFT JOIN product_variants pv ON pv.id = gi.variant_id
+             WHERE gi.grn_id = $1`,
+            [grnId]
+          )
+          await sendPOReceiveNotificationEmail(
+            po.supplier_email,
+            po.contact_name || '',
+            po.supplier_name,
+            po.po_number,
+            grnNumber,
+            newStatus,
+            (grnItemsForEmail || []).map((it: any) => ({
+              product_name: it.product_name,
+              variant_name: it.variant_name,
+              quantity_received: parseFloat(it.quantity_received),
+              unit_cost: parseFloat(it.unit_cost),
+            }))
+          )
+        } catch (_) {}
       }
 
       return NextResponse.json({ success: true, grn_id: grnId, grn_number: grnNumber })
