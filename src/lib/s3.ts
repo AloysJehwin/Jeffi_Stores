@@ -143,6 +143,22 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
   }
 }
 
+export async function uploadReviewImage(file: File, reviewId: string): Promise<string> {
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    throw new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.')
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error('File size exceeds 5MB limit.')
+  }
+  const timestamp = Date.now()
+  const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+  const s3Key = `${KEY_PREFIX}reviews/${reviewId}/${timestamp}-${sanitizedName}`
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const resized = await sharp(buffer).rotate().resize(1200, 1200, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer()
+  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key, Body: resized, ContentType: 'image/jpeg' }))
+  return getS3Url(s3Key)
+}
+
 export async function deleteGalleryImage(s3Key: string, s3ThumbnailKey: string) {
   await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key }))
   if (s3ThumbnailKey) {
