@@ -78,15 +78,18 @@ export async function POST(request: NextRequest) {
     const validImages = imageFiles.filter(f => f && f.size > 0).slice(0, 3)
     if (validImages.length > 0) {
       const urls: string[] = []
+      const thumbnailUrls: string[] = []
       for (const file of validImages) {
-        const url = await uploadReviewImage(file, review.id)
+        const { url, thumbnailUrl } = await uploadReviewImage(file, review.id)
         urls.push(url)
+        thumbnailUrls.push(thumbnailUrl)
       }
       await query(
-        'UPDATE product_reviews SET image_urls = $1 WHERE id = $2',
-        [urls, review.id]
+        'UPDATE product_reviews SET image_urls = $1, image_thumbnail_urls = $2 WHERE id = $3',
+        [urls, thumbnailUrls, review.id]
       )
       review.image_urls = urls
+      review.image_thumbnail_urls = thumbnailUrls
     }
 
     const userDetails = await queryOne(
