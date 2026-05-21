@@ -469,8 +469,8 @@ export default async function ProductDetailPage({
                     href={`/products/${relatedProduct.slug}`}
                     className="group"
                   >
-                    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow">
-                      <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
+                    <div className="flex flex-col h-full bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow">
+                      <div className="relative aspect-square border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
                         {relatedPrimaryImage ? (
                           <>
                             <img
@@ -500,12 +500,12 @@ export default async function ProductDetailPage({
                           </div>
                         )}
                       </div>
-                      <div className="p-4">
-                        <h3 className="font-semibold text-sm text-foreground mb-2 group-hover:text-accent-600 transition-colors line-clamp-2">
+                      <div className="flex flex-col flex-1 p-4">
+                        <h3 className="font-semibold text-sm text-foreground mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 flex-1">
                           {relatedProduct.name}
                         </h3>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                          <span className="text-base font-bold text-primary-600 dark:text-primary-400">
                             {relatedHasVariants ? 'From ' : ''}₹{Number(relatedDisplayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
                           {relatedMrp && relatedMrp > Number(relatedDisplayPrice) && (

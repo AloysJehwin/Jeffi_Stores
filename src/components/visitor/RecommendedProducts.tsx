@@ -50,7 +50,7 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
 
           return (
             <Link key={product.id} href={`/products/${product.slug}`} className="group">
-              <div className="bg-surface rounded-lg border border-border-default overflow-hidden hover:shadow-md transition-shadow">
+              <div className="flex flex-col h-full bg-surface rounded-lg border border-border-default overflow-hidden hover:shadow-md transition-shadow">
                 <div className="relative aspect-square overflow-hidden bg-surface-secondary">
                   {img ? (
                     <img
@@ -71,8 +71,8 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
                     </span>
                   )}
                 </div>
-                <div className="p-2">
-                  <p className="text-xs font-medium text-foreground group-hover:text-accent-600 transition-colors line-clamp-2 leading-tight mb-1">
+                <div className="flex flex-col flex-1 p-2">
+                  <p className="text-xs font-medium text-foreground group-hover:text-accent-600 transition-colors line-clamp-2 leading-tight mb-1 flex-1">
                     {product.name}
                   </p>
                   <p className="text-xs font-bold text-primary-600 dark:text-primary-400">
