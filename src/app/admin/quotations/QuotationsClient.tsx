@@ -273,6 +273,20 @@ export default function QuotationsClient() {
   }
 
   async function save(newStatus?: string) {
+    if (newStatus === 'final') {
+      if (!cName.trim()) { setSaveError('Consignee name is required'); return }
+      if (!cAddr1.trim()) { setSaveError('Consignee address line 1 is required'); return }
+      if (!cCity.trim()) { setSaveError('Consignee city is required'); return }
+      if (!cPhone.trim()) { setSaveError('Consignee phone number is required'); return }
+      if (!buyerSame) {
+        if (!bName.trim()) { setSaveError('Buyer name is required'); return }
+        if (!bAddr1.trim()) { setSaveError('Buyer address line 1 is required'); return }
+        if (!bCity.trim()) { setSaveError('Buyer city is required'); return }
+      }
+      if (items.every(i => !i.product_name.trim() || !i.unit_price)) {
+        setSaveError('At least one line item with a description and price is required'); return
+      }
+    }
     setSaving(true)
     setSaveError('')
     setAutoSaveStatus('saving')

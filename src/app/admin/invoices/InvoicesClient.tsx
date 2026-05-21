@@ -315,6 +315,9 @@ export default function InvoicesClient() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!customerName.trim()) { setFormError('Customer name is required'); return }
+    if (!addressLine1.trim()) { setFormError('Address line 1 is required'); return }
+    if (!city.trim()) { setFormError('City is required'); return }
+    if (!customerPhone.trim()) { setFormError('Phone number is required'); return }
     if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
       setFormError('All items need a name and price'); return
     }
@@ -358,6 +361,9 @@ export default function InvoicesClient() {
     e.preventDefault()
     if (!editId) return
     if (!customerName.trim()) { setFormError('Customer name is required'); return }
+    if (!addressLine1.trim()) { setFormError('Address line 1 is required'); return }
+    if (!city.trim()) { setFormError('City is required'); return }
+    if (!customerPhone.trim()) { setFormError('Phone number is required'); return }
     if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
       setFormError('All items need a name and price'); return
     }
@@ -400,6 +406,9 @@ export default function InvoicesClient() {
     e.preventDefault()
     if (!editId) return
     if (!customerName.trim()) { setFormError('Customer name is required'); return }
+    if (!addressLine1.trim()) { setFormError('Address line 1 is required'); return }
+    if (!city.trim()) { setFormError('City is required'); return }
+    if (!customerPhone.trim()) { setFormError('Phone number is required'); return }
     if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
       setFormError('All items need a name and price'); return
     }
