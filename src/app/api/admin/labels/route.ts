@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       const rows = await queryMany<LabelProduct>(
         `SELECT p.id, p.id AS product_id, NULL AS variant_id,
                 p.name, NULL AS variant_name,
-                p.sku, p.slug, p.mrp, p.sale_price, p.base_price,
+                p.sku, p.slug, p.mrp, p.price_ex_gst, p.base_price,
                 COALESCE(p.gst_percentage, 0) AS gst_percentage,
                 p.gtin, b.name AS brand_name
          FROM products p
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
                 p.name, pv.variant_name,
                 pv.sku, p.slug,
                 COALESCE(pv.mrp, 0) AS mrp,
-                pv.sale_price,
+                pv.price_ex_gst,
                 COALESCE(pv.price, p.base_price) AS base_price,
                 COALESCE(p.gst_percentage, 0) AS gst_percentage,
                 COALESCE(pv.gtin, p.gtin) AS gtin,

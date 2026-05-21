@@ -19,9 +19,9 @@ export async function GET(request: NextRequest) {
     const [products, categories] = await Promise.all([
       queryMany(`
         SELECT
-          p.id, p.name, p.slug, p.base_price, p.sale_price, p.has_variants,
+          p.id, p.name, p.slug, p.base_price, p.price_ex_gst, p.has_variants,
           json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
-          (SELECT MIN(COALESCE(pv.sale_price, pv.price)) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND (pv.price IS NOT NULL OR pv.sale_price IS NOT NULL)) AS variant_min_price,
+          (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price,
           COALESCE(
             (SELECT json_agg(json_build_object('image_url', pi.image_url, 'thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),

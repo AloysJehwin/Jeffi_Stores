@@ -9,7 +9,7 @@ interface LabelEntry {
   variant_name: string | null
   sku: string
   mrp: number | null
-  sale_price: number | null
+  price_ex_gst: number | null
   base_price: number
   gst_percentage: number
   brand_name: string | null
@@ -84,7 +84,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
   const variantName = entry?.variant_name || null
   const sku = entry?.sku || 'SKU-001'
   const brand = entry?.brand_name || null
-  const exGst = entry ? (entry.sale_price ?? entry.base_price) : null
+  const exGst = entry ? (entry.base_price) : null
   const mrp = entry?.mrp ?? null
   const gstPct = entry?.gst_percentage ?? 0
   const gstFactor = 1 + (gstPct || 0) / 100
@@ -463,7 +463,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                         <div className="text-xs text-foreground-muted">{e.sku}</div>
                       </div>
                       <div className="text-xs font-semibold text-primary-500 shrink-0">
-                        Rs. {Number(e.sale_price ?? e.base_price).toFixed(2)}
+                        Rs. {Number(e.base_price).toFixed(2)}
                       </div>
                     </label>
                   ))}

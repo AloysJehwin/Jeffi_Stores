@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, withTransaction } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 
-const VALID_FIELDS = ['base_price', 'mrp', 'sale_price', 'wholesale_price', 'weight_rate', 'length_rate']
-const VARIANT_FIELD_MAP: Record<string, string> = { base_price: 'price', mrp: 'mrp', sale_price: 'sale_price', wholesale_price: 'wholesale_price', weight_rate: 'weight_rate', length_rate: 'length_rate' }
+const VALID_FIELDS = ['base_price', 'mrp', 'price_ex_gst', 'wholeprice_ex_gst', 'weight_rate', 'length_rate']
+const VARIANT_FIELD_MAP: Record<string, string> = { base_price: 'price', mrp: 'mrp', price_ex_gst: 'price_ex_gst', wholeprice_ex_gst: 'wholeprice_ex_gst', weight_rate: 'weight_rate', length_rate: 'length_rate' }
 
 function applyPct(val: number | null, pct: number): number | null {
   if (val == null) return null
@@ -28,12 +28,12 @@ export async function GET(request: NextRequest) {
   const products = await queryMany(`
     SELECT
       p.id, p.name, p.has_variants,
-      p.base_price, p.mrp, p.sale_price, p.wholesale_price, p.weight_rate, p.length_rate,
+      p.base_price, p.mrp, p.price_ex_gst, p.wholeprice_ex_gst, p.weight_rate, p.length_rate,
       COALESCE(
         (SELECT json_agg(json_build_object(
           'id', pv.id, 'variant_name', pv.variant_name,
-          'price', pv.price, 'mrp', pv.mrp, 'sale_price', pv.sale_price,
-          'wholesale_price', pv.wholesale_price, 'weight_rate', pv.weight_rate, 'length_rate', pv.length_rate
+          'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
+          'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'weight_rate', pv.weight_rate, 'length_rate', pv.length_rate
         ) ORDER BY pv.variant_name)
         FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
         '[]'::json
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
   const filteredProductIds: string[] | null = Array.isArray(product_ids) && product_ids.length > 0 ? product_ids : null
 
   const products = await queryMany(
-    `SELECT p.id, p.name, p.has_variants, p.base_price, p.mrp, p.sale_price, p.wholesale_price, p.weight_rate, p.length_rate
+    `SELECT p.id, p.name, p.has_variants, p.base_price, p.mrp, p.price_ex_gst, p.wholeprice_ex_gst, p.weight_rate, p.length_rate
      FROM products p
      WHERE p.category_id = ANY(
        SELECT id FROM categories WHERE id = $1
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
       }
 
       const variants = await client.query(
-        `SELECT id, product_id, variant_name, price, mrp, sale_price, wholesale_price, weight_rate, length_rate
+        `SELECT id, product_id, variant_name, price, mrp, price_ex_gst, wholeprice_ex_gst, weight_rate, length_rate
          FROM product_variants WHERE product_id = ANY($1) AND is_active = true`,
         [productIds]
       )
