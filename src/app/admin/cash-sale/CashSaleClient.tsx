@@ -8,6 +8,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import LineItemsSection, { newLineItem, type LineItem } from '@/components/admin/LineItemsSection'
+import HoverCard from '@/components/ui/HoverCard'
 
 interface CashSale {
   id: string
@@ -549,16 +550,37 @@ export default function CashSaleClient() {
                       onClick={() => setSelectedSale(sale)}
                     >
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        {sale.invoice_number ? (
-                          <a
-                            href={`/admin/invoices/${sale.id}`}
-                            className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 hover:underline"
-                          >
-                            {sale.invoice_number}
-                          </a>
-                        ) : (
-                          <span className="font-mono text-xs text-foreground-muted">—</span>
-                        )}
+                        <HoverCard
+                          trigger={
+                            sale.invoice_number ? (
+                              <a
+                                href={`/admin/cash-sale/${sale.id}`}
+                                className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                              >
+                                {sale.invoice_number}
+                              </a>
+                            ) : (
+                              <span className="font-mono text-xs text-foreground-muted underline decoration-dotted underline-offset-2 cursor-default">—</span>
+                            )
+                          }
+                          align="left"
+                          side="bottom"
+                          width="260px"
+                        >
+                          <div className="p-3 space-y-2">
+                            <p className="font-mono font-semibold text-foreground text-sm">{sale.invoice_number || sale.order_number}</p>
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                              <span className="text-foreground-muted">Customer</span>
+                              <span className="text-foreground font-medium">Walk-in Customer</span>
+                              <span className="text-foreground-muted">Date</span>
+                              <span className="text-foreground">{fmtDate(sale.invoice_date)}</span>
+                              <span className="text-foreground-muted">Total</span>
+                              <span className="text-foreground font-semibold">₹{fmt(parseFloat(sale.total_amount))}</span>
+                              <span className="text-foreground-muted">Payment</span>
+                              <span className={`font-medium ${sale.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>{sale.payment_status}</span>
+                            </div>
+                          </div>
+                        </HoverCard>
                         <div className="text-xs text-foreground-muted mt-0.5 font-mono">{sale.order_number}</div>
                       </td>
                       <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-sm">
@@ -592,7 +614,7 @@ export default function CashSaleClient() {
                             target="_blank"
                             rel="noreferrer"
                             title="Download Receipt PDF"
-                            className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -601,7 +623,7 @@ export default function CashSaleClient() {
                           <a
                             href={`/admin/orders/${sale.id}`}
                             title="View Order"
-                            className="p-1.5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />

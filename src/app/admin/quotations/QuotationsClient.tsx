@@ -6,9 +6,9 @@ import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
-import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
+import HoverCard from '@/components/ui/HoverCard'
 
 interface Quotation {
   id: string
@@ -558,7 +558,7 @@ export default function QuotationsClient() {
                   <SortableHeader label="Consignee" column="consignee" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                   <SortableHeader label="Total" column="total" align="right" options={sortOptions('number')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                   <SortableHeader label="Status" column="status" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
-                  <th className="px-4 py-3 text-center font-semibold text-foreground-secondary text-xs">Actions</th>
+                  <th className="px-4 py-3 text-right font-semibold text-foreground-secondary text-xs">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -568,72 +568,33 @@ export default function QuotationsClient() {
                   <tr><td colSpan={6} className="px-4 py-12 text-center text-foreground-secondary">No quotations found. Create your first one.</td></tr>
                 ) : sortedQuotations.map(q => (
                   <tr key={q.id} className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer" onClick={() => setSelectedQuote(q)}>
-                    <td className="px-4 py-3 font-mono font-semibold text-foreground">
+                    <td className="px-4 py-3 font-mono font-semibold text-foreground" onClick={e => e.stopPropagation()}>
                       <HoverCard
                         trigger={
-                          <span className="cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
+                          <a
+                            href={`/admin/quotations/${q.id}`}
+                            className="text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                          >
                             {q.quote_number}
-                          </span>
+                          </a>
                         }
                         align="left"
                         side="bottom"
-                        width="270px"
+                        width="260px"
                       >
                         <div className="p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <p className="font-semibold text-foreground text-sm">{q.quote_number}</p>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[q.status] || 'bg-gray-100 text-gray-700'}`}>
-                              {q.status === 'final' ? 'Final' : 'Draft'}
-                            </span>
-                          </div>
-                          <div className="text-xs text-foreground-secondary space-y-1">
-                            <div className="flex justify-between gap-4">
-                              <span>Consignee</span>
-                              <span className="text-foreground font-medium">{q.consignee_name || '—'}</span>
-                            </div>
-                            {q.consignee_city && (
-                              <div className="flex justify-between gap-4">
-                                <span>City</span>
-                                <span className="text-foreground">{q.consignee_city}</span>
-                              </div>
-                            )}
-                            {q.consignee_gstin && (
-                              <div className="flex justify-between gap-4">
-                                <span>GSTIN</span>
-                                <span className="font-mono text-foreground">{q.consignee_gstin}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between gap-4">
-                              <span>Total</span>
-                              <span className="font-semibold text-foreground">₹{fmt2(Number(q.total_amount))}</span>
-                            </div>
-                            {(Number(q.cgst_amount) > 0 || Number(q.sgst_amount) > 0) && (
-                              <div className="flex justify-between gap-4">
-                                <span>CGST + SGST</span>
-                                <span className="text-foreground">
-                                  ₹{fmt2(Number(q.cgst_amount))} + ₹{fmt2(Number(q.sgst_amount))}
-                                </span>
-                              </div>
-                            )}
-                            {q.converted_order_id && (
-                              <div className="flex justify-between gap-4">
-                                <span>Converted</span>
-                                <span className="font-medium text-blue-600 dark:text-blue-400">Invoiced</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="pt-1 border-t border-border-default">
-                            <a
-                              href={`/api/admin/quotations/${q.id}/pdf`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-xs text-accent-500 hover:text-accent-600 font-medium"
-                            >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                              </svg>
-                              Download PDF
-                            </a>
+                          <p className="font-mono font-semibold text-foreground text-sm">{q.quote_number}</p>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                            <span className="text-foreground-muted">Customer</span>
+                            <span className="text-foreground font-medium truncate">{q.consignee_name || '—'}</span>
+                            {q.consignee_phone && (<><span className="text-foreground-muted">Phone</span><span className="text-foreground">{q.consignee_phone}</span></>)}
+                            {q.consignee_city && (<><span className="text-foreground-muted">City</span><span className="text-foreground">{q.consignee_city}{q.consignee_state ? `, ${q.consignee_state}` : ''}</span></>)}
+                            <span className="text-foreground-muted">Date</span>
+                            <span className="text-foreground">{fmtDate(q.quote_date)}</span>
+                            <span className="text-foreground-muted">Total</span>
+                            <span className="text-foreground font-semibold">₹{fmt2(Number(q.total_amount))}</span>
+                            <span className="text-foreground-muted">Status</span>
+                            <span className={`font-medium ${q.status === 'final' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>{q.status === 'final' ? 'Final' : 'Draft'}</span>
                           </div>
                         </div>
                       </HoverCard>
@@ -647,17 +608,17 @@ export default function QuotationsClient() {
                       </span>
                     </td>
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center justify-end gap-1">
                         {q.status === 'draft' && (
                           <button onClick={() => openEdit(q.id)} title="Edit"
-                            className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors">
+                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                           </button>
                         )}
                         <a href={`/api/admin/quotations/${q.id}/pdf`} target="_blank" rel="noopener noreferrer" title="Download PDF"
-                          className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors">
+                          className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
@@ -667,7 +628,7 @@ export default function QuotationsClient() {
                             onClick={() => sendQuoteEmail(q.id)}
                             disabled={sendingEmailId === q.id}
                             title={`Send email to ${q.consignee_email}`}
-                            className="p-1.5 text-foreground-secondary hover:text-secondary-500 transition-colors disabled:opacity-50"
+                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-blue-500 transition-colors disabled:opacity-50"
                           >
                             {sendingEmailId === q.id ? (
                               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -688,13 +649,13 @@ export default function QuotationsClient() {
                           </button>
                         )}
                         {q.status === 'final' && q.converted_order_id && (
-                          <a href={`/admin/orders/${q.converted_order_id}`} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
+                          <a href={`/admin/invoices/${q.converted_order_id}`} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
                             Invoiced ↗
                           </a>
                         )}
                         {q.status === 'draft' && (
                           <button onClick={() => deleteQuote(q.id)} title="Delete"
-                            className="p-1.5 text-foreground-secondary hover:text-red-500 transition-colors">
+                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-red-500 transition-colors">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
@@ -752,7 +713,7 @@ export default function QuotationsClient() {
             </button>
           )}
           {convertedOrderId && (
-            <a href={`/admin/orders/${convertedOrderId}`}
+            <a href={`/admin/invoices/${convertedOrderId}`}
               className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap">
               View Invoice →
             </a>
@@ -919,7 +880,11 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
       >
         <div className="flex items-start justify-between p-5 border-b border-border-default">
           <div className="min-w-0 pr-4">
-            <h2 className="text-lg font-bold text-foreground leading-tight font-mono">{q.quote_number}</h2>
+            <h2 className="text-lg font-bold text-foreground leading-tight font-mono">
+              <a href={`/admin/quotations/${q.id}`} className="hover:text-accent-500 hover:underline transition-colors">
+                {q.quote_number}
+              </a>
+            </h2>
             <p className="text-xs text-foreground-muted mt-0.5">
               {new Date(q.quote_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
             </p>
@@ -988,8 +953,11 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
           </div>
 
           {q.converted_order_id && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
               <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Converted to Invoice</span>
+              <a href={`/admin/invoices/${q.converted_order_id}`} className="text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline">
+                View Invoice →
+              </a>
             </div>
           )}
 
@@ -1005,20 +973,16 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
               </svg>
               Download PDF
             </a>
-            {q.view_token && (
-              <a
-                href={`https://quotation.jeffistores.in/${q.view_token}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 text-white transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-                View Quotation
-              </a>
-            )}
+            <a
+              href={`/admin/quotations/${q.id}`}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 text-white transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              View Detail
+            </a>
           </div>
         </div>
       </div>
