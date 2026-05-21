@@ -69,7 +69,7 @@ const PAYMENT_COLORS: Record<string, string> = {
 const SOURCE_COLORS: Record<string, string> = {
   online: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   offline: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  cash_sale: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  cash_sale: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
 }
 
 export default function InvoicesClient() {
@@ -703,7 +703,7 @@ export default function InvoicesClient() {
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <AdminSelect value={sourceFilter} onChange={v => { setSourceFilter(v); syncUrl({ source: v }) }} placeholder="All Sources"
-            options={[{ value: 'online', label: 'Online' }, { value: 'offline', label: 'Offline' }, { value: 'cash_sale', label: 'Cash Sale' }]} />
+            options={[{ value: 'online', label: 'Online' }, { value: 'offline', label: 'Offline' }, { value: 'cash_sale', label: 'Offline (Cash Sale)' }]} />
           <AdminSelect value={paymentFilter} onChange={v => { setPaymentFilter(v); syncUrl({ payment: v }) }} placeholder="All Payments"
             options={[
               { value: 'paid', label: 'Paid' }, { value: 'unpaid', label: 'Unpaid' },
@@ -890,7 +890,7 @@ export default function InvoicesClient() {
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
-                            {inv.source === 'offline' ? 'Offline' : inv.source === 'cash_sale' ? 'Cash Sale' : 'Online'}
+                            {inv.source === 'online' ? 'Online' : 'Offline'}
                           </span>
                           {inv.status === 'cancelled' && (
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
@@ -1065,7 +1065,7 @@ export default function InvoicesClient() {
                       {inv.payment_status}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
-                      {inv.source === 'offline' ? 'Offline' : inv.source === 'cash_sale' ? 'Cash Sale' : 'Online'}
+                      {inv.source === 'online' ? 'Online' : 'Offline'}
                     </span>
                     {inv.status === 'cancelled' && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
@@ -1216,7 +1216,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
               {inv.payment_status}
             </span>
             <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${SOURCE_COLORS[inv.source] || ''}`}>
-              {inv.source === 'offline' ? 'Offline' : inv.source === 'cash_sale' ? 'Cash Sale' : 'Online'}
+              {inv.source === 'online' ? 'Online' : 'Offline'}
             </span>
             {inv.irn && (
               <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
