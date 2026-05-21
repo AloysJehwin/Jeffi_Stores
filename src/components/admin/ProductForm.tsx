@@ -664,11 +664,11 @@ export default function ProductForm({ categories, brands, action, product, produ
             )}
           </div>
 
-          {/* Sale Price — hidden when has variants */}
+          {/* Ex-GST Price — hidden when has variants */}
           {!hasVariants && (
           <div>
             <label htmlFor="price_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Sale Price (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
+              Ex-GST Price (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
             </label>
             <input
               type="number"
@@ -679,7 +679,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               value={salePrice}
               onChange={e => setSalePrice(e.target.value)}
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="Discounted price (optional)"
+              placeholder="Price excluding GST (optional)"
             />
             {inclusivePreview(salePrice, gstRate, gstMode) && (
               <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(salePrice, gstRate, gstMode)}</p>
@@ -1113,7 +1113,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className={inputCls} placeholder="0.00" />
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Sale Price</label>
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
                                   <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => updateVariant(index, 'price_ex_gst', e.target.value)} className={inputCls} placeholder="0.00" />
                                 </div>
                                 <div>
@@ -1230,7 +1230,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                               <th className="text-left py-2 px-2 font-medium text-foreground-secondary whitespace-nowrap">Selling Price *</th>
                               {isWeightOrLength && <th className="text-left py-2 px-2 font-medium text-foreground-secondary whitespace-nowrap">Per Unit Rate</th>}
                               <th className="text-left py-2 px-2 font-medium text-foreground-secondary">MRP</th>
-                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary whitespace-nowrap">Sale Price</th>
+                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary whitespace-nowrap">Ex-GST Price</th>
                               <th className="text-left py-2 px-2 font-medium text-foreground-secondary">Wholesale</th>
                               <th className="text-left py-2 px-2 font-medium text-foreground-secondary">Stock *</th>
                               <th className="text-left py-2 px-2 font-medium text-foreground-secondary">MPN</th>

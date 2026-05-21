@@ -150,11 +150,11 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                   ) : (
                     <div className="flex items-baseline gap-3">
                       <p className="text-xl font-bold text-primary-500">
-                        Rs. {Number(p.price_ex_gst || p.base_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        Rs. {Number(p.base_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </p>
-                      {p.price_ex_gst && p.base_price && Number(p.base_price) > Number(p.price_ex_gst) && (
+                      {p.mrp && Number(p.mrp) > Number(p.base_price) && (
                         <p className="text-sm text-foreground-muted line-through">
-                          Rs. {Number(p.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          Rs. {Number(p.mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                       )}
                     </div>
@@ -225,7 +225,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                           <td className="px-3 py-2 truncate font-medium text-foreground" title={v.variant_name}>{v.variant_name}</td>
                           <td className="px-3 py-2 truncate text-foreground-muted" title={v.sku}>{v.sku || '—'}</td>
                           <td className="px-3 py-2 text-foreground">
-                            Rs. {Number(v.price_ex_gst || v.price || 0).toLocaleString('en-IN')}
+                            Rs. {Number(v.price || 0).toLocaleString('en-IN')}
                           </td>
                           <td className="px-3 py-2 text-foreground">{v.stock_quantity ?? 0}</td>
                           <td className="px-3 py-2">
