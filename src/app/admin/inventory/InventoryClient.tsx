@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Toggle from '@/components/ui/Toggle'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import HoverCard from '@/components/ui/HoverCard'
@@ -184,10 +185,9 @@ function SuppliersTab() {
         </div>
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>
-          <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer py-2.5">
-            <input type="checkbox" checked={showAll} onChange={e => { setShowAll(e.target.checked); setPage(1) }} className="accent-secondary-500 w-4 h-4" />
-            Show inactive
-          </label>
+          <div className="py-2.5">
+            <Toggle checked={showAll} onChange={v => { setShowAll(v); setPage(1) }} label="Show inactive" />
+          </div>
         </div>
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>

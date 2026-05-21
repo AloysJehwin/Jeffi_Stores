@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
+import Toggle from '@/components/ui/Toggle'
 
 interface Category {
   id: string
@@ -164,6 +165,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   const draftKey = productId ? `draft_product_${productId}` : 'draft_product_new'
   const [isActive, setIsActive] = useState<boolean>(product?.is_active ?? true)
+  const [isFeatured, setIsFeatured] = useState<boolean>(product?.is_featured ?? false)
   const [hasDraft, setHasDraft] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -921,47 +923,15 @@ export default function ProductForm({ categories, brands, action, product, produ
 
           {/* Checkboxes */}
           <div className="md:col-span-2 flex flex-wrap gap-4 sm:gap-6">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="is_active"
-                name="is_active"
-                value="true"
-                checked={isActive}
-                onChange={e => setIsActive(e.target.checked)}
-                className="h-4 w-4 text-accent-500 focus:ring-accent-500 border-border-secondary rounded"
-              />
-              <label htmlFor="is_active" className="ml-2 block text-sm text-foreground">
-                Active
-              </label>
+            <div>
+              <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
+              <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
             </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="is_featured"
-                name="is_featured"
-                value="true"
-                defaultChecked={product?.is_featured ?? false}
-                className="h-4 w-4 text-accent-500 focus:ring-accent-500 border-border-secondary rounded"
-              />
-              <label htmlFor="is_featured" className="ml-2 block text-sm text-foreground">
-                Featured Product
-              </label>
+            <div>
+              <input type="hidden" name="is_featured" value={isFeatured ? 'true' : ''} />
+              <Toggle id="is_featured" checked={isFeatured} onChange={setIsFeatured} label="Featured Product" />
             </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="has_variants_toggle"
-                checked={hasVariants}
-                onChange={(e) => setHasVariants(e.target.checked)}
-                className="h-4 w-4 text-accent-500 focus:ring-accent-500 border-border-secondary rounded"
-              />
-              <label htmlFor="has_variants_toggle" className="ml-2 block text-sm text-foreground">
-                This product has variants
-              </label>
-            </div>
+            <Toggle id="has_variants_toggle" checked={hasVariants} onChange={setHasVariants} label="This product has variants" />
           </div>
 
           {/* Variant Management Section */}

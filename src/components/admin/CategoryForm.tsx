@@ -4,6 +4,7 @@ import { useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import AdminSelect from './AdminSelect'
 import * as Icons from 'lucide-react'
+import Toggle from '@/components/ui/Toggle'
 
 const ICON_OPTIONS = [
   'Anchor', 'Anvil', 'Aperture', 'Axe', 'Battery', 'BatteryCharging',
@@ -43,6 +44,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
   const [iconSearch, setIconSearch] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [isActive, setIsActive] = useState<boolean>(category?.is_active ?? true)
   const nameRef = useRef<HTMLInputElement>(null)
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
@@ -273,17 +275,8 @@ export default function CategoryForm({ categories, action, category }: CategoryF
 
           <div className="md:col-span-2">
             <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="is_active"
-                name="is_active"
-                value="true"
-                defaultChecked={category?.is_active ?? true}
-                className="h-4 w-4 text-accent-500 focus:ring-accent-500 border-border-secondary rounded"
-              />
-              <label htmlFor="is_active" className="ml-2 block text-sm text-foreground">
-                Active
-              </label>
+              <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
+              <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
             </div>
           </div>
         </div>

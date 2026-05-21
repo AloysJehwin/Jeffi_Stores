@@ -1,7 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
+import Toggle from '@/components/ui/Toggle'
 
 interface CouponFormProps {
   action: (formData: FormData) => Promise<void>
@@ -30,6 +32,7 @@ const inputClass = 'w-full px-4 py-2 border border-border-secondary rounded-lg b
 const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
 export default function CouponForm({ action, submitLabel, defaultValues: d = {} }: CouponFormProps) {
+  const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
   return (
     <form action={action} className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -140,14 +143,8 @@ export default function CouponForm({ action, submitLabel, defaultValues: d = {} 
       </div>
 
       <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          name="is_active"
-          id="is_active"
-          defaultChecked={d.is_active !== false}
-          className="w-4 h-4 text-accent-600 rounded border-border-secondary"
-        />
-        <label htmlFor="is_active" className="text-sm text-foreground-secondary">Active</label>
+        <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
+        <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
       </div>
 
       <div className="flex gap-3 pt-2">
