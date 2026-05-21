@@ -51,7 +51,11 @@ export async function GET(request: NextRequest) {
     params.push(limit)
 
     const rows = await queryMany(
-      `SELECT id, quote_number, quote_date, status, consignee_name, consignee_email, total_amount, converted_order_id, created_at
+      `SELECT id, quote_number, quote_date, status, consignee_name, consignee_addr1, consignee_addr2,
+              consignee_city, consignee_state, consignee_gstin, consignee_phone, consignee_pincode,
+              consignee_email, buyer_same, buyer_name, buyer_addr1, buyer_addr2, buyer_city, buyer_state,
+              buyer_gstin, subtotal, cgst_amount, sgst_amount, total_amount, converted_order_id,
+              view_token, created_at
        FROM quotations ${where} ORDER BY created_at DESC LIMIT $${i}`,
       params
     )

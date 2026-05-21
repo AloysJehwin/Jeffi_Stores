@@ -40,6 +40,7 @@ interface Quotation {
   sgst_amount: number
   total_amount: number
   converted_order_id: string | null
+  view_token: string | null
   created_at: string
 }
 
@@ -555,7 +556,7 @@ export default function QuotationsClient() {
                   <SortableHeader label="Quote #" column="quote_number" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                   <SortableHeader label="Date" column="date" options={sortOptions('date')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                   <SortableHeader label="Consignee" column="consignee" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
-                  <SortableHeader label="Total" column="total" options={sortOptions('number')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
+                  <SortableHeader label="Total" column="total" align="right" options={sortOptions('number')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                   <SortableHeader label="Status" column="status" options={sortOptions('text')} onSort={handleSort} currentSort={sortCol} currentDir={sortDir} />
                   <th className="px-4 py-3 text-center font-semibold text-foreground-secondary text-xs">Actions</th>
                 </tr>
@@ -661,7 +662,7 @@ export default function QuotationsClient() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
                         </a>
-                        {q.consignee_email && (
+                        {q.status === 'final' && q.consignee_email && (
                           <button
                             onClick={() => sendQuoteEmail(q.id)}
                             disabled={sendingEmailId === q.id}
@@ -966,19 +967,20 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
             )}
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-surface-secondary">
+          <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-surface-secondary">
             <div>
               <p className="text-xs text-foreground-muted">Subtotal</p>
-              <p className="text-sm font-semibold text-foreground">₹{Number(q.subtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              <p className="text-sm font-semibold text-foreground">₹{Number(q.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
             </div>
-            {Number(q.cgst_amount) > 0 && (
-              <div>
-                <p className="text-xs text-foreground-muted">CGST + SGST</p>
-                <p className="text-sm font-semibold text-foreground">
-                  ₹{Number(q.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹{Number(q.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            )}
+            <div>
+              <p className="text-xs text-foreground-muted">CGST + SGST</p>
+              <p className="text-sm font-semibold text-foreground">
+                {(Number(q.cgst_amount) > 0 || Number(q.sgst_amount) > 0)
+                  ? `₹${Number(q.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹${Number(q.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                  : '—'
+                }
+              </p>
+            </div>
             <div>
               <p className="text-xs text-foreground-muted">Total</p>
               <p className="text-sm font-bold text-foreground">₹{Number(q.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
@@ -1001,8 +1003,22 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Quotation PDF
+              Download PDF
             </a>
+            {q.view_token && (
+              <a
+                href={`https://quotation.jeffistores.in/${q.view_token}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 text-white transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View Quotation
+              </a>
+            )}
           </div>
         </div>
       </div>
