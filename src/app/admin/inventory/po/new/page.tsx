@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
+import DatePicker from '@/components/ui/DatePicker'
 
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -180,11 +181,11 @@ export default function NewPOPage() {
             </div>
             <div>
               <label className={labelCls}>Order Date</label>
-              <input type="date" className={inputCls} value={form.order_date} onChange={e => setForm(p => ({ ...p, order_date: e.target.value }))} />
+              <DatePicker value={form.order_date} onChange={v => setForm(p => ({ ...p, order_date: v }))} />
             </div>
             <div>
               <label className={labelCls}>Expected Date</label>
-              <input type="date" className={inputCls} value={form.expected_date} onChange={e => setForm(p => ({ ...p, expected_date: e.target.value }))} />
+              <DatePicker value={form.expected_date} onChange={v => setForm(p => ({ ...p, expected_date: v }))} />
             </div>
             <div>
               <label className={labelCls}>Status</label>

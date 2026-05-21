@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
+import DatePicker from '@/components/ui/DatePicker'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import LineItemsSection, { newLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 import HoverCard from '@/components/ui/HoverCard'
@@ -516,9 +517,9 @@ export default function CashSaleClient() {
             ]}
           />
           <div className="flex items-center gap-2">
-            <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); syncUrl({ from: e.target.value }) }} className={inputCls + ' w-36'} />
+            <DatePicker className="w-36" value={fromDate} onChange={v => { setFromDate(v); syncUrl({ from: v }) }} />
             <span className="text-foreground-secondary text-xs">to</span>
-            <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); syncUrl({ to: e.target.value }) }} className={inputCls + ' w-36'} />
+            <DatePicker className="w-36" value={toDate} onChange={v => { setToDate(v); syncUrl({ to: v }) }} />
           </div>
         </div>
       </div>
