@@ -26,80 +26,6 @@ function statusLabel(status: string) {
   return status.replace(/_/g, ' ')
 }
 
-function OrderPopover({ order }: { order: any }) {
-  const orderNum = order.order_number || order.id.slice(0, 8)
-  const date = new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-  const amount = Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })
-
-  return (
-    <HoverCard
-      trigger={
-        <span className="cursor-default underline decoration-dotted underline-offset-2 text-foreground font-medium hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
-          #{orderNum}
-        </span>
-      }
-      align="left"
-      side="bottom"
-      width="380px"
-    >
-      <div className="p-3 space-y-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold text-foreground text-sm font-mono break-all">#{orderNum}</p>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            order.source === 'offline'
-              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-              : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-          }`}>
-            {order.source === 'offline' ? 'Offline' : 'Online'}
-          </span>
-        </div>
-        <div className="text-xs text-foreground-secondary space-y-1">
-          <div className="flex justify-between">
-            <span>Date</span>
-            <span className="text-foreground">{date}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Amount</span>
-            <span className="font-semibold text-foreground">₹{amount}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Payment</span>
-            <span className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-              {order.payment_status}
-            </span>
-          </div>
-        </div>
-        <div className="pt-1 border-t border-border-default flex flex-col gap-1.5">
-          <a
-            href={`/api/admin/packing-slips/${order.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-accent-500 hover:text-accent-600 font-medium"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            Packing Slip
-          </a>
-          {order.awb_number && (
-          <a
-            href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs text-accent-500 hover:text-accent-600 font-medium"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Shipping Label
-          </a>
-          )}
-        </div>
-      </div>
-    </HoverCard>
-  )
-}
-
 function CustomerPopover({ order }: { order: any }) {
   const name = order.users
     ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest'
@@ -168,8 +94,13 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
           className="hover:bg-surface-secondary cursor-pointer"
           onClick={() => setSelected(order)}
         >
-          <td className="px-6 py-4 whitespace-nowrap">
-            <OrderPopover order={order} />
+          <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+            <a
+              href={`/admin/orders/${order.id}`}
+              className="font-mono font-semibold text-accent-500 hover:text-accent-600 hover:underline"
+            >
+              #{order.order_number || order.id.slice(0, 8)}
+            </a>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
