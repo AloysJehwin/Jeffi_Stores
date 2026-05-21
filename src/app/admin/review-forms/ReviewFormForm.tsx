@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from '@/components/forms/FormsPreview'
+import Toggle from '@/components/ui/Toggle'
 
 interface Coupon {
   id: string
@@ -197,8 +198,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
         </div>
 
         <div className="flex items-center gap-2">
-          <input type="checkbox" id="is_active" checked={isActive} onChange={e => setIsActive(e.target.checked)} className="w-4 h-4 text-accent-600 rounded border-border-secondary" />
-          <label htmlFor="is_active" className="text-sm text-foreground-secondary">Active (form accepts submissions)</label>
+          <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active (form accepts submissions)" />
         </div>
 
         <div>
@@ -231,15 +231,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
                   </select>
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 shrink-0">
-                  <label className="flex items-center gap-1 text-xs text-foreground-secondary cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={field.required}
-                      onChange={e => updateField(field.id, { required: e.target.checked })}
-                      className="w-3.5 h-3.5 accent-accent-500"
-                    />
-                    Req
-                  </label>
+                  <Toggle checked={field.required} onChange={v => updateField(field.id, { required: v })} label="Req" size="sm" />
                   <button type="button" onClick={() => removeField(field.id)} className="text-red-400 hover:text-red-500 text-sm leading-none">✕</button>
                 </div>
               </div>
