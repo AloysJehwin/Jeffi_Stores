@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       [params.id]
     )
 
-    const viewUrl = `https://purchaseorder.jeffistores.com/${po.view_token}`
+    const viewUrl = `https://purchaseorder.jeffistores.in/${po.view_token}`
 
     await sendPurchaseOrderEmail(
       po.supplier_email,

@@ -34,22 +34,22 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-[#1a3a4a] text-white px-6 py-4 flex items-center justify-between">
-        <div>
-          <div className="font-bold text-lg">{tradeName}</div>
-          <div className="text-sm text-gray-300">{settings.business_address}</div>
+      <div className="bg-[#1a3a4a] text-white px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-bold text-lg truncate">{tradeName}</div>
+          <div className="text-sm text-gray-300 truncate">{settings.business_address}</div>
         </div>
         <button
           onClick={handleDownload}
           disabled={downloading}
-          className="bg-white text-[#1a3a4a] font-semibold px-5 py-2 rounded hover:bg-gray-100 disabled:opacity-60 text-sm"
+          className="shrink-0 bg-white text-[#1a3a4a] font-semibold px-4 sm:px-5 py-2 rounded hover:bg-gray-100 disabled:opacity-60 text-sm whitespace-nowrap"
         >
           {downloading ? 'Downloading…' : 'Download PDF'}
         </button>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow p-6">
+      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6">
           <div className="flex justify-between items-start mb-6">
             <div>
               <h1 className="text-xl font-bold text-gray-800">Quotation</h1>
@@ -63,7 +63,7 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <div className="bg-gray-50 rounded p-3 text-sm">
               <div className="font-semibold text-gray-700 mb-1">Consignee</div>
               <div className="text-gray-600">{qt.consignee_name}</div>
@@ -82,29 +82,31 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
             )}
           </div>
 
-          <table className="w-full text-sm mb-4">
-            <thead>
-              <tr className="bg-[#1a3a4a] text-white">
-                <th className="text-left px-3 py-2">Description</th>
-                <th className="text-right px-3 py-2">Qty</th>
-                <th className="text-right px-3 py-2">Rate</th>
-                <th className="text-right px-3 py-2">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item, i) => (
-                <tr key={i} className="border-b border-gray-100">
-                  <td className="px-3 py-2 text-gray-700">
-                    {item.description}
-                    {item.hsn_code && <span className="text-gray-400 text-xs ml-2">HSN: {item.hsn_code}</span>}
-                  </td>
-                  <td className="px-3 py-2 text-right text-gray-600">{item.quantity} {item.unit}</td>
-                  <td className="px-3 py-2 text-right text-gray-600">₹{Number(item.rate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                  <td className="px-3 py-2 text-right text-gray-800 font-medium">₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <table className="w-full text-sm mb-4 min-w-[480px] sm:min-w-0">
+              <thead>
+                <tr className="bg-[#1a3a4a] text-white">
+                  <th className="text-left px-3 py-2">Description</th>
+                  <th className="text-right px-3 py-2">Qty</th>
+                  <th className="text-right px-3 py-2">Rate</th>
+                  <th className="text-right px-3 py-2">Amount</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {items.map((item, i) => (
+                  <tr key={i} className="border-b border-gray-100">
+                    <td className="px-3 py-2 text-gray-700">
+                      {item.description}
+                      {item.hsn_code && <span className="text-gray-400 text-xs ml-2">HSN: {item.hsn_code}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-600">{item.quantity} {item.unit}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">₹{Number(item.rate).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2 text-right text-gray-800 font-medium">₹{Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           <div className="flex justify-end">
             <div className="w-56 text-sm">
