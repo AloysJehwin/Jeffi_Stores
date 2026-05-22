@@ -6,6 +6,22 @@ import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 
+interface VariantImage {
+  id: string
+  image_url: string
+  thumbnail_url: string
+  is_primary: boolean
+}
+
+interface SubVariant {
+  id: string
+  sub_variant_name: string
+  price: number | null
+  mrp: number | null
+  stock_quantity: number
+  is_active: boolean
+}
+
 interface Variant {
   id: string
   variant_name: string
@@ -22,6 +38,9 @@ interface Variant {
   weight_unit?: string | null
   length_rate?: number | null
   length_unit?: string | null
+  sub_variant_type?: string | null
+  variant_images?: VariantImage[]
+  sub_variants?: SubVariant[]
 }
 
 interface ProductActionsProps {
@@ -41,6 +60,7 @@ interface ProductActionsProps {
   weightUnit?: string | null
   lengthRate?: number | null
   lengthUnit?: string | null
+  onVariantChange?: (variant: Variant | null) => void
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -65,6 +85,7 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
   variants, variantType, initialSkuParam,
   weightRate, weightUnit, lengthRate, lengthUnit,
+  onVariantChange,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast, showConfirm } = useToast()
@@ -115,6 +136,10 @@ export default function ProductActions({
     url.searchParams.set('sku', selectedVariant.sku)
     window.history.replaceState(null, '', url.toString())
   }, [selectedVariantId, hasVariants, selectedVariant])
+
+  useEffect(() => {
+    if (onVariantChange) onVariantChange(selectedVariant ?? null)
+  }, [selectedVariantId])
 
   const effectivePrice = hasVariants
     ? (selectedVariant?.price ?? basePrice)
@@ -363,6 +388,29 @@ export default function ProductActions({
               ))}
             </div>
           </div>
+
+          {selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                Select {selectedVariant.sub_variant_type || 'Sub-Variant'}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {selectedVariant.sub_variants.map((sv) => (
+                  <div
+                    key={sv.id}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                      sv.stock_quantity > 0
+                        ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400 cursor-pointer'
+                        : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
+                    }`}
+                  >
+                    {sv.sub_variant_name}
+                    {sv.stock_quantity === 0 && ' (Out of Stock)'}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
