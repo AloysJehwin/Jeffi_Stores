@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { generateVariantSku } from '@/lib/sku'
+import { getS3Url } from '@/lib/s3'
 import ProductForm from '@/components/admin/ProductForm'
 
 async function updateProduct(productId: string, formData: FormData) {
@@ -14,6 +15,7 @@ async function updateProduct(productId: string, formData: FormData) {
   const brandId = formData.get('brand_id') as string
   const hasVariants = formData.get('has_variants') === 'true'
   const variantType = formData.get('variant_type') as string || null
+  const subVariantType = formData.get('sub_variant_type') as string || null
   const basePrice = hasVariants ? 0 : Math.round(parseFloat(formData.get('base_price') as string) * 100) / 100
   const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
   const salePrice = formData.get('price_ex_gst') ? Math.round(parseFloat(formData.get('price_ex_gst') as string) * 100) / 100 : null
@@ -57,17 +59,17 @@ async function updateProduct(productId: string, formData: FormData) {
         gst_percentage = $10, hsn_code = $11, mpn = $12, gtin = $13,
         stock_quantity = $14, low_stock_threshold = $15, weight = $16,
         dimensions = $17, is_active = $18, is_featured = $19, has_variants = $20, variant_type = $21,
-        weight_rate = $22, weight_unit = $23, length_rate = $24, length_unit = $25,
-        weight_grams = $26, package_type = $27, length_cm = $28, breadth_cm = $29, height_cm = $30,
-        cost_price = $31, updated_at = $32
-      WHERE id = $33`,
+        sub_variant_type = $22, weight_rate = $23, weight_unit = $24, length_rate = $25, length_unit = $26,
+        weight_grams = $27, package_type = $28, length_cm = $29, breadth_cm = $30, height_cm = $31,
+        cost_price = $32, updated_at = $33
+      WHERE id = $34`,
       [
         name, slug, description, categoryId,
         brandId || null, basePrice, mrp, salePrice, wholesalePrice,
         gstPercentage, hsnCode, mpn, gtin,
         stockQuantity, lowStockThreshold, weight,
         dimensions, isActive, isFeatured, hasVariants, variantType,
-        weightRate, weightUnit, lengthRate, lengthUnit,
+        subVariantType, weightRate, weightUnit, lengthRate, lengthUnit,
         weightGrams, packageType, lengthCm, breadthCm, heightCm,
         costPrice,
         new Date().toISOString(),
@@ -140,7 +142,7 @@ async function updateProduct(productId: string, formData: FormData) {
               height, display_order, is_primary
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
-              productId, gimg.image_url, gimg.thumbnail_url,
+              productId, gimg.s3_key ? getS3Url(gimg.s3_key) : gimg.image_url, gimg.s3_thumbnail_key ? getS3Url(gimg.s3_thumbnail_key) : gimg.thumbnail_url,
               process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
               gimg.s3_key, gimg.s3_thumbnail_key,
               gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
@@ -218,8 +220,8 @@ async function updateProduct(productId: string, formData: FormData) {
           } else if (variant.id && !variant._isDeleted) {
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, price_ex_gst = $5, wholeprice_ex_gst = $6, stock_quantity = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_rate = $13, weight_unit = $14, length_rate = $15, length_unit = $16, weight_grams = $17, package_type = $18, length_cm = $19, breadth_cm = $20, height_cm = $21
-               WHERE id = $22 AND product_id = $23`,
+              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, price_ex_gst = $5, wholeprice_ex_gst = $6, stock_quantity = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_rate = $13, weight_unit = $14, length_rate = $15, length_unit = $16, weight_grams = $17, package_type = $18, length_cm = $19, breadth_cm = $20, height_cm = $21, sub_variant_type = $22, variant_type = $23
+               WHERE id = $24 AND product_id = $25`,
               [
                 variantSku, variant.variant_name,
                 variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
@@ -242,6 +244,8 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.length_cm ? parseFloat(variant.length_cm) : null,
                 variant.breadth_cm ? parseFloat(variant.breadth_cm) : null,
                 variant.height_cm ? parseFloat(variant.height_cm) : null,
+                variant.sub_variant_type || null,
+                variant.variant_type || null,
                 variant.id, productId,
               ]
             )
@@ -250,8 +254,8 @@ async function updateProduct(productId: string, formData: FormData) {
             if (!isWeightOrLength && !variant.variant_name) continue
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, price_ex_gst, wholeprice_ex_gst, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_rate, weight_unit, length_rate, length_unit, weight_grams, package_type, length_cm, breadth_cm, height_cm, is_active)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, true)`,
+              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, price_ex_gst, wholeprice_ex_gst, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_rate, weight_unit, length_rate, length_unit, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, is_active)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, true)`,
               [
                 productId, variantSku, variant.variant_name,
                 variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
@@ -274,6 +278,8 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.length_cm ? parseFloat(variant.length_cm) : null,
                 variant.breadth_cm ? parseFloat(variant.breadth_cm) : null,
                 variant.height_cm ? parseFloat(variant.height_cm) : null,
+                variant.sub_variant_type || null,
+                variant.variant_type || null,
               ]
             )
           }

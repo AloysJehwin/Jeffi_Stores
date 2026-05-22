@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getAllCategories, getAllBrands } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { generateProductSku, generateVariantSku } from '@/lib/sku'
+import { getS3Url } from '@/lib/s3'
 import ProductForm from '@/components/admin/ProductForm'
 
 async function createProduct(formData: FormData) {
@@ -13,6 +14,7 @@ async function createProduct(formData: FormData) {
   const brandId = formData.get('brand_id') as string
   const hasVariants = formData.get('has_variants') === 'true'
   const variantType = formData.get('variant_type') as string || null
+  const subVariantType = formData.get('sub_variant_type') as string || null
   const basePrice = hasVariants ? 0 : Math.round(parseFloat(formData.get('base_price') as string) * 100) / 100
   const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
   const salePrice = formData.get('price_ex_gst') ? Math.round(parseFloat(formData.get('price_ex_gst') as string) * 100) / 100 : null
@@ -59,15 +61,15 @@ async function createProduct(formData: FormData) {
         name, slug, sku, description, category_id, brand_id,
         base_price, mrp, price_ex_gst, wholeprice_ex_gst, gst_percentage, hsn_code, mpn, gtin,
         stock_quantity, low_stock_threshold, weight, dimensions, is_active, is_featured,
-        has_variants, variant_type, weight_rate, weight_unit, length_rate, length_unit,
+        has_variants, variant_type, sub_variant_type, weight_rate, weight_unit, length_rate, length_unit,
         weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)
       RETURNING *`,
       [
         name, slug, sku, description, categoryId, brandId || null,
         basePrice, mrp, salePrice, wholesalePrice, gstPercentage, hsnCode, mpn, gtin,
         stockQuantity, lowStockThreshold, weight, dimensions, isActive, isFeatured,
-        hasVariants, variantType, weightRate, weightUnit, lengthRate, lengthUnit,
+        hasVariants, variantType, subVariantType, weightRate, weightUnit, lengthRate, lengthUnit,
         weightGrams, packageType, lengthCm, breadthCm, heightCm, costPrice,
       ]
     )
@@ -114,7 +116,7 @@ async function createProduct(formData: FormData) {
               height, display_order, is_primary
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
-              data.id, gimg.image_url, gimg.thumbnail_url,
+              data.id, gimg.s3_key ? getS3Url(gimg.s3_key) : gimg.image_url, gimg.s3_thumbnail_key ? getS3Url(gimg.s3_thumbnail_key) : gimg.thumbnail_url,
               process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
               gimg.s3_key, gimg.s3_thumbnail_key,
               gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
@@ -158,8 +160,8 @@ async function createProduct(formData: FormData) {
           if (!isWeightOrLength && !variant.variant_name) continue
           const variantSku = generateVariantSku(sku, variant.variant_name)
           await query(
-            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, price_ex_gst, wholeprice_ex_gst, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_rate, weight_unit, length_rate, length_unit, weight_grams, package_type, length_cm, breadth_cm, height_cm, is_active)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, true)`,
+            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, price_ex_gst, wholeprice_ex_gst, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_rate, weight_unit, length_rate, length_unit, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, is_active)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, true)`,
             [
               data.id,
               variantSku,
@@ -184,6 +186,8 @@ async function createProduct(formData: FormData) {
               variant.length_cm ? parseFloat(variant.length_cm) : null,
               variant.breadth_cm ? parseFloat(variant.breadth_cm) : null,
               variant.height_cm ? parseFloat(variant.height_cm) : null,
+              variant.sub_variant_type || null,
+              variant.variant_type || null,
             ]
           )
         }
