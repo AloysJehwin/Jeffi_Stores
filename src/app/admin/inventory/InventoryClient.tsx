@@ -9,6 +9,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import HoverCard from '@/components/ui/HoverCard'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import { useToast } from '@/contexts/ToastContext'
+import DatePicker from '@/components/ui/DatePicker'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -847,11 +848,11 @@ function StockTab() {
             </div>
             <div>
               <label className={labelCls}>From</label>
-              <input type="date" className="px-3 py-2.5 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent hover:border-border-default w-36" value={from} onChange={e => { setFrom(e.target.value); setTxPage(1); syncUrl({ ledger_from: e.target.value }) }} />
+              <DatePicker className="w-36" value={from} onChange={v => { setFrom(v); setTxPage(1); syncUrl({ ledger_from: v }) }} />
             </div>
             <div>
               <label className={labelCls}>To</label>
-              <input type="date" className="px-3 py-2.5 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent hover:border-border-default w-36" value={to} onChange={e => { setTo(e.target.value); setTxPage(1); syncUrl({ ledger_to: e.target.value }) }} />
+              <DatePicker className="w-36" value={to} onChange={v => { setTo(v); setTxPage(1); syncUrl({ ledger_to: v }) }} />
             </div>
           </div>
 

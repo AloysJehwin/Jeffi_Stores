@@ -9,6 +9,7 @@ import { useToast } from '@/contexts/ToastContext'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, { newLineItem, type LineItem as LILineItem } from '@/components/admin/LineItemsSection'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
+import DatePicker from '@/components/ui/DatePicker'
 
 interface Invoice {
   id: string
@@ -557,7 +558,7 @@ export default function InvoicesClient() {
               {isEdit && (
                 <div>
                   <label className={labelCls}>Invoice Date</label>
-                  <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} className={inputCls} />
+                  <DatePicker value={invoiceDate} onChange={setInvoiceDate} />
                 </div>
               )}
               <div className="sm:col-span-2">
@@ -710,11 +711,9 @@ export default function InvoicesClient() {
               { value: 'refunded', label: 'Refunded' }, { value: 'failed', label: 'Failed' },
             ]} />
           <div className="flex items-center gap-2">
-            <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); syncUrl({ from: e.target.value }) }}
-              className={inputCls + ' w-36'} />
+            <DatePicker className="w-36" value={fromDate} onChange={v => { setFromDate(v); syncUrl({ from: v }) }} />
             <span className="text-foreground-secondary text-xs">to</span>
-            <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); syncUrl({ to: e.target.value }) }}
-              className={inputCls + ' w-36'} />
+            <DatePicker className="w-36" value={toDate} onChange={v => { setToDate(v); syncUrl({ to: v }) }} />
           </div>
         </div>
       </div>

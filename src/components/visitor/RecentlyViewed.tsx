@@ -12,7 +12,7 @@ interface RecentProduct {
 }
 
 const STORAGE_KEY = 'jeffi_recently_viewed'
-const MAX_ITEMS = 6
+const MAX_ITEMS = 7
 
 export function trackRecentlyViewed(product: RecentProduct) {
   try {
@@ -29,7 +29,7 @@ export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
   useEffect(() => {
     try {
       const stored: RecentProduct[] = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-      setProducts(stored.filter(p => p.id !== excludeId))
+      setProducts(stored.filter(p => p.id !== excludeId).slice(0, 6))
     } catch {}
   }, [excludeId])
 
@@ -41,7 +41,7 @@ export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {products.map(product => (
           <Link key={product.id} href={`/products/${product.slug}`} className="group">
-            <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden hover:border-accent-400 transition-colors">
+            <div className="flex flex-col h-full bg-surface-elevated rounded-lg border border-border-default overflow-hidden hover:border-accent-400 transition-colors">
               <div className="aspect-square bg-surface">
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
@@ -53,8 +53,8 @@ export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
                   </div>
                 )}
               </div>
-              <div className="p-2">
-                <p className="text-xs text-foreground font-medium line-clamp-2 group-hover:text-accent-600 transition-colors">{product.name}</p>
+              <div className="flex flex-col flex-1 p-2">
+                <p className="text-xs text-foreground font-medium line-clamp-2 group-hover:text-accent-600 transition-colors flex-1">{product.name}</p>
                 <p className="text-xs font-semibold text-primary-600 dark:text-primary-400 mt-1">
                   ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>

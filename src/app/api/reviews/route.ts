@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendNewReviewNotification } from '@/lib/email'
+import { uploadReviewImage } from '@/lib/s3'
 
-// Get reviews for a product
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -24,13 +24,11 @@ export async function GET(request: NextRequest) {
     `, [productId])
 
     return NextResponse.json({ reviews: reviews || [] })
-  } catch (error) {
-    console.error('Reviews GET error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 })
   }
 }
 
-// Submit a new review
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateUser(request)
@@ -38,10 +36,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please login to submit a review' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { productId, rating, title, comment } = body
+    const formData = await request.formData()
+    const productId = formData.get('productId') as string
+    const ratingRaw = formData.get('rating') as string
+    const title = formData.get('title') as string | null
+    const comment = formData.get('comment') as string
+    const rating = parseInt(ratingRaw, 10)
 
-    // Validate required fields
     if (!productId || !rating || !comment) {
       return NextResponse.json({ error: 'Product ID, rating, and comment are required' }, { status: 400 })
     }
@@ -50,7 +51,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 })
     }
 
-    // Check if user already reviewed this product
     const existingReview = await queryOne(
       'SELECT id FROM product_reviews WHERE product_id = $1 AND user_id = $2',
       [productId, user.userId]
@@ -60,7 +60,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'You have already reviewed this product' }, { status: 400 })
     }
 
-    // Check if user purchased this product
     const hasPurchased = await queryOne(`
       SELECT oi.id FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
@@ -68,15 +67,31 @@ export async function POST(request: NextRequest) {
       LIMIT 1
     `, [productId, user.userId])
 
-    // Insert review
     const review = await queryOne(
       `INSERT INTO product_reviews (product_id, user_id, rating, title, comment, is_verified_purchase, is_approved)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [productId, user.userId, rating, title || null, comment, !!hasPurchased, false]
+      [productId, user.userId, rating, title?.trim() || null, comment.trim(), !!hasPurchased, false]
     )
 
-    // Get user and product details for email
+    const imageFiles = formData.getAll('images') as File[]
+    const validImages = imageFiles.filter(f => f && f.size > 0).slice(0, 3)
+    if (validImages.length > 0) {
+      const urls: string[] = []
+      const thumbnailUrls: string[] = []
+      for (const file of validImages) {
+        const { url, thumbnailUrl } = await uploadReviewImage(file, review.id)
+        urls.push(url)
+        thumbnailUrls.push(thumbnailUrl)
+      }
+      await query(
+        'UPDATE product_reviews SET image_urls = $1, image_thumbnail_urls = $2 WHERE id = $3',
+        [urls, thumbnailUrls, review.id]
+      )
+      review.image_urls = urls
+      review.image_thumbnail_urls = thumbnailUrls
+    }
+
     const userDetails = await queryOne(
       'SELECT first_name, last_name, email FROM users WHERE id = $1',
       [user.userId]
@@ -87,12 +102,10 @@ export async function POST(request: NextRequest) {
       [productId]
     )
 
-    // Send email notification to admin
     if (userDetails && product) {
       try {
         await sendNewReviewNotification(review, userDetails, product)
-      } catch (emailError) {
-        console.error('Failed to send review notification email:', emailError)
+      } catch {
       }
     }
 
@@ -100,8 +113,7 @@ export async function POST(request: NextRequest) {
       message: 'Review submitted successfully! It will be visible after admin approval.',
       review
     })
-  } catch (error) {
-    console.error('Review POST error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to submit review' }, { status: 500 })
   }
 }

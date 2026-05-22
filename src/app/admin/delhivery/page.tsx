@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
+import DatePicker from '@/components/ui/DatePicker'
 
 type EligibleOrder = {
   id: string
@@ -190,13 +191,7 @@ export default function DelhiveryPickupPage() {
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm text-foreground-secondary">Pickup date</label>
-            <input
-              type="date"
-              value={pickupDate}
-              min={todayIST()}
-              onChange={e => setPickupDate(e.target.value)}
-              className="text-sm border border-border-default rounded-lg px-3 py-1.5 bg-surface text-foreground"
-            />
+            <DatePicker value={pickupDate} min={todayIST()} onChange={setPickupDate} />
           </div>
         </div>
 

@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
+import DatePicker from '@/components/ui/DatePicker'
 
 type Tab = 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow'
 
@@ -108,11 +109,11 @@ function ReceivablesTab() {
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className={labelCls}>From</label>
-            <input type="date" className={inputCls + ' w-36'} value={from} onChange={e => setFrom(e.target.value)} />
+            <DatePicker className="w-36" value={from} onChange={setFrom} />
           </div>
           <div>
             <label className={labelCls}>To</label>
-            <input type="date" className={inputCls + ' w-36'} value={to} onChange={e => setTo(e.target.value)} />
+            <DatePicker className="w-36" value={to} onChange={setTo} />
           </div>
           <div className="flex-1 min-w-[200px]">
             <label className={labelCls}>Search customer / invoice</label>
@@ -338,11 +339,11 @@ function PayablesTab() {
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className={labelCls}>From</label>
-            <input type="date" className={inputCls + ' w-36'} value={from} onChange={e => setFrom(e.target.value)} />
+            <DatePicker className="w-36" value={from} onChange={setFrom} />
           </div>
           <div>
             <label className={labelCls}>To</label>
-            <input type="date" className={inputCls + ' w-36'} value={to} onChange={e => setTo(e.target.value)} />
+            <DatePicker className="w-36" value={to} onChange={setTo} />
           </div>
           <div className="flex-1 min-w-[200px]">
             <label className={labelCls}>Search supplier / bill #</label>
@@ -387,11 +388,11 @@ function PayablesTab() {
             </div>
             <div>
               <label className={labelCls}>Bill Date *</label>
-              <input type="date" className={inputCls} value={addForm.expense_date} onChange={e => setAddForm(f => ({ ...f, expense_date: e.target.value }))} />
+              <DatePicker value={addForm.expense_date} onChange={v => setAddForm(f => ({ ...f, expense_date: v }))} />
             </div>
             <div>
               <label className={labelCls}>Due Date</label>
-              <input type="date" className={inputCls} value={addForm.due_date} onChange={e => setAddForm(f => ({ ...f, due_date: e.target.value }))} />
+              <DatePicker value={addForm.due_date} onChange={v => setAddForm(f => ({ ...f, due_date: v }))} />
             </div>
             <div>
               <label className={labelCls}>Notes</label>
@@ -564,7 +565,7 @@ function PayablesTab() {
                 </div>
                 <div>
                   <label className={labelCls}>Payment Date *</label>
-                  <input type="date" className={inputCls} value={payForm.payment_date} onChange={e => setPayForm(f => ({ ...f, payment_date: e.target.value }))} />
+                  <DatePicker value={payForm.payment_date} onChange={v => setPayForm(f => ({ ...f, payment_date: v }))} />
                 </div>
                 <AdminSelect
                   label="Method"
@@ -649,11 +650,11 @@ function PLTab() {
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className={labelCls}>From</label>
-            <input type="date" className={inputCls + ' w-36'} value={from} onChange={e => setFrom(e.target.value)} />
+            <DatePicker className="w-36" value={from} onChange={setFrom} />
           </div>
           <div>
             <label className={labelCls}>To</label>
-            <input type="date" className={inputCls + ' w-36'} value={to} onChange={e => setTo(e.target.value)} />
+            <DatePicker className="w-36" value={to} onChange={setTo} />
           </div>
           <div className="pb-0.5">
             <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Load'}</button>
@@ -781,11 +782,11 @@ function CashflowTab() {
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className={labelCls}>From</label>
-            <input type="date" className={inputCls + ' w-36'} value={from} onChange={e => setFrom(e.target.value)} />
+            <DatePicker className="w-36" value={from} onChange={setFrom} />
           </div>
           <div>
             <label className={labelCls}>To</label>
-            <input type="date" className={inputCls + ' w-36'} value={to} onChange={e => setTo(e.target.value)} />
+            <DatePicker className="w-36" value={to} onChange={setTo} />
           </div>
           <div className="pb-0.5">
             <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Load'}</button>
@@ -918,11 +919,11 @@ function TransactionsTab() {
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className={labelCls}>From</label>
-            <input type="date" className={inputCls + ' w-36'} value={from} onChange={e => setFrom(e.target.value)} />
+            <DatePicker className="w-36" value={from} onChange={setFrom} />
           </div>
           <div>
             <label className={labelCls}>To</label>
-            <input type="date" className={inputCls + ' w-36'} value={to} onChange={e => setTo(e.target.value)} />
+            <DatePicker className="w-36" value={to} onChange={setTo} />
           </div>
           <div className="w-36">
             <AdminSelect label="Type" value={type} onChange={setType} options={TYPE_OPTIONS} />
