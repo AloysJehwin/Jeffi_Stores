@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { getAllCategories, getAllBrands } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { generateProductSku, generateVariantSku } from '@/lib/sku'
-import { getS3Url } from '@/lib/s3'
 import ProductForm from '@/components/admin/ProductForm'
 
 async function createProduct(formData: FormData) {
@@ -104,11 +103,13 @@ async function createProduct(formData: FormData) {
 
       const newGalleryIds: Record<string, string> = {}
       if (galleryImageRefs.length > 0) {
+        const { copyGalleryImageToProduct } = await import('@/lib/s3')
         const galleryImages = await queryMany(
           `SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`,
           [galleryImageRefs.map(r => r.id)]
         )
         for (const gimg of (galleryImages || [])) {
+          const copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, data.id)
           const inserted = await queryOne<{ id: string }>(
             `INSERT INTO product_images (
               product_id, image_url, thumbnail_url, s3_bucket, s3_key,
@@ -116,9 +117,9 @@ async function createProduct(formData: FormData) {
               height, display_order, is_primary
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
-              data.id, gimg.s3_key ? getS3Url(gimg.s3_key) : gimg.image_url, gimg.s3_thumbnail_key ? getS3Url(gimg.s3_thumbnail_key) : gimg.thumbnail_url,
+              data.id, copied.url, copied.thumbnailUrl,
               process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
-              gimg.s3_key, gimg.s3_thumbnail_key,
+              copied.s3Key, copied.s3ThumbnailKey,
               gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
               gimg.width, gimg.height, 999, false,
             ]
