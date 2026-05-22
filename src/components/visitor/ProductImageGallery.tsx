@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 interface ProductImage {
@@ -13,16 +13,23 @@ interface ProductImage {
 interface ProductImageGalleryProps {
   images: ProductImage[]
   productName: string
+  variantImages?: ProductImage[]
 }
 
-export default function ProductImageGallery({ images, productName }: ProductImageGalleryProps) {
-  const primaryIndex = images.findIndex(img => img.is_primary)
+export default function ProductImageGallery({ images, productName, variantImages }: ProductImageGalleryProps) {
+  const displayImages = (variantImages && variantImages.length > 0) ? variantImages : images
+  const primaryIndex = displayImages.findIndex(img => img.is_primary)
   const [selectedImageIndex, setSelectedImageIndex] = useState(primaryIndex >= 0 ? primaryIndex : 0)
   const [isZoomed, setIsZoomed] = useState(false)
   const [showLightbox, setShowLightbox] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
-  if (!images || images.length === 0) {
+  useEffect(() => {
+    const idx = displayImages.findIndex(img => img.is_primary)
+    setSelectedImageIndex(idx >= 0 ? idx : 0)
+  }, [variantImages])
+
+  if (!displayImages || displayImages.length === 0) {
     return (
       <div className="relative bg-surface-elevated rounded-xl overflow-hidden border border-border-default">
         <div className="w-full h-96 flex items-center justify-center">
@@ -34,7 +41,7 @@ export default function ProductImageGallery({ images, productName }: ProductImag
     )
   }
 
-  const currentImage = images[selectedImageIndex]
+  const currentImage = displayImages[selectedImageIndex]
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isZoomed) return
@@ -47,11 +54,11 @@ export default function ProductImageGallery({ images, productName }: ProductImag
   }
 
   const handleNextImage = () => {
-    setSelectedImageIndex((prev) => (prev + 1) % images.length)
+    setSelectedImageIndex((prev) => (prev + 1) % displayImages.length)
   }
 
   const handlePrevImage = () => {
-    setSelectedImageIndex((prev) => (prev - 1 + images.length) % images.length)
+    setSelectedImageIndex((prev) => (prev - 1 + displayImages.length) % displayImages.length)
   }
 
   return (
@@ -95,9 +102,9 @@ export default function ProductImageGallery({ images, productName }: ProductImag
         </div>
 
         {/* Thumbnail Images */}
-        {images.length > 1 && (
+        {displayImages.length > 1 && (
           <div className="grid grid-cols-4 gap-3">
-            {images.map((image, index) => (
+            {displayImages.map((image, index) => (
               <div
                 key={image.id}
                 onClick={() => setSelectedImageIndex(index)}
@@ -138,7 +145,7 @@ export default function ProductImageGallery({ images, productName }: ProductImag
 
           {/* Image Counter */}
           <div className="absolute top-4 left-4 text-white text-sm bg-black bg-opacity-60 px-4 py-2 rounded-lg z-10">
-            {selectedImageIndex + 1} / {images.length}
+            {selectedImageIndex + 1} / {displayImages.length}
           </div>
 
           {/* Main Image in Lightbox */}
@@ -152,12 +159,12 @@ export default function ProductImageGallery({ images, productName }: ProductImag
             </div>
 
             {/* Navigation Arrows */}
-            {images.length > 1 && (
+            {displayImages.length > 1 && (
               <>
                 <button
                   onClick={handlePrevImage}
                   className="absolute left-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-3 rounded-full transition-all"
-                  disabled={images.length <= 1}
+                  disabled={displayImages.length <= 1}
                 >
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -167,7 +174,7 @@ export default function ProductImageGallery({ images, productName }: ProductImag
                 <button
                   onClick={handleNextImage}
                   className="absolute right-4 top-1/2 -translate-y-1/2 bg-black bg-opacity-60 hover:bg-opacity-80 text-white p-3 rounded-full transition-all"
-                  disabled={images.length <= 1}
+                  disabled={displayImages.length <= 1}
                 >
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -178,9 +185,9 @@ export default function ProductImageGallery({ images, productName }: ProductImag
           </div>
 
           {/* Thumbnail Navigation in Lightbox */}
-          {images.length > 1 && (
+          {displayImages.length > 1 && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-black bg-opacity-60 p-2 rounded-lg max-w-full overflow-x-auto">
-              {images.map((image, index) => (
+              {displayImages.map((image, index) => (
                 <button
                   key={image.id}
                   onClick={(e) => {

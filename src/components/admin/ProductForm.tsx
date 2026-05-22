@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
@@ -41,12 +42,16 @@ interface VariantRow {
   length_cm: string
   breadth_cm: string
   height_cm: string
+  sub_variant_type: string
+  sub_variant_type_on: boolean
+  variant_type: string
   _isDeleted?: boolean
 }
 
 interface VariantGroup {
   pricing_type: 'unit' | 'weight' | 'length'
   unit: string
+  variant_type: string
 }
 
 interface ProductFormProps {
@@ -60,6 +65,18 @@ interface ProductFormProps {
 const WEIGHT_UNITS = ['kg', 'g', 'lb', 'oz']
 const LENGTH_UNITS = ['m', 'cm', 'mm', 'ft', 'in']
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
+const PACKAGE_TYPES = ['flat_poly_auto', 'flat_poly_s', 'flat_poly_m', 'flat_poly_l', 'flat_poly_xl', 'drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
+const PACKAGE_TYPE_LABELS: Record<string, string> = {
+  flat_poly_auto: 'Flat Poly (auto)',
+  flat_poly_s: 'Flat Poly S',
+  flat_poly_m: 'Flat Poly M',
+  flat_poly_l: 'Flat Poly L',
+  flat_poly_xl: 'Flat Poly XL',
+  drill_bit_tube: 'Drill Bit Tube',
+  drill_bit_set_case: 'Drill Bit Set Case',
+  corrugated_box: 'Corrugated Box',
+  long_tube: 'Long Tube / Rod',
+}
 
 const PRICING_TYPE_LABELS: Record<string, string> = {
   unit: 'By Piece / Unit',
@@ -104,6 +121,8 @@ function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string):
     weight_rate: '', weight_unit: 'kg', weight_rate_on: false,
     length_rate: '', length_unit: 'm', length_rate_on: false,
     weight_grams: '', package_type: '', length_cm: '', breadth_cm: '', height_cm: '',
+    sub_variant_type: '', sub_variant_type_on: false,
+    variant_type: '',
   }
 }
 
@@ -137,7 +156,19 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [imageOrder, setImageOrder] = useState<string[]>([])
   const [tempProductId] = useState<string>(productId || `temp-${Date.now()}`)
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
-  const [variantType, setVariantType] = useState(product?.variant_type ?? '')
+  const [variantPopupId, setVariantPopupId] = useState<string | null>(null)
+  const [variantImagesMap, setVariantImagesMap] = useState<Record<string, any[]>>({})
+  const [variantImageUploading, setVariantImageUploading] = useState<Record<string, boolean>>({})
+  const [variantImageError, setVariantImageError] = useState<string | null>(null)
+  const [variantGalleryOpen, setVariantGalleryOpen] = useState(false)
+  const [variantGalleryImages, setVariantGalleryImages] = useState<any[]>([])
+  const [variantGalleryCategories, setVariantGalleryCategories] = useState<any[]>([])
+  const [variantGallerySearch, setVariantGallerySearch] = useState('')
+  const [variantGalleryCategory, setVariantGalleryCategory] = useState('')
+  const [variantGallerySelected, setVariantGallerySelected] = useState<string[]>([])
+  const [variantGalleryLoading, setVariantGalleryLoading] = useState(false)
+  const [subVariantsMap, setSubVariantsMap] = useState<Record<string, any[]>>({})
+  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_ex_gst: string; stock: string; sku: string }>>({})
   const [productPackageType, setProductPackageType] = useState<string>(product?.package_type || 'flat_poly_auto')
   const [weightRate, setWeightRate] = useState(product?.weight_rate != null ? String(product.weight_rate) : '')
   const [weightUnit, setWeightUnit] = useState(product?.weight_unit || 'kg')
@@ -196,6 +227,9 @@ export default function ProductForm({ categories, brands, action, product, produ
         length_cm: v.length_cm != null ? String(v.length_cm) : '',
         breadth_cm: v.breadth_cm != null ? String(v.breadth_cm) : '',
         height_cm: v.height_cm != null ? String(v.height_cm) : '',
+        sub_variant_type: v.sub_variant_type || '',
+        sub_variant_type_on: !!v.sub_variant_type,
+        variant_type: v.variant_type || '',
       }))
     }
     return []
@@ -209,7 +243,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       const pt = v.pricing_type || 'unit'
       if (!seen.has(pt)) {
         seen.add(pt)
-        result.push({ pricing_type: pt as any, unit: v.unit || defaultUnit(pt) })
+        result.push({ pricing_type: pt as any, unit: v.unit || defaultUnit(pt), variant_type: v.variant_type || product?.variant_type || '' })
       }
     }
     return result
@@ -235,7 +269,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       }
       const snapshot = {
         uncontrolled,
-        hasVariants, variantType, variants, groups,
+        hasVariants, variants, groups,
         basePrice, mrp, salePrice, wholesalePrice,
         weightRate, weightUnit, weightEnabled,
         lengthRate, lengthUnit, lengthEnabled,
@@ -246,7 +280,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     }, 1000)
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
   }, [
-    hasVariants, variantType, variants, groups,
+    hasVariants, variants, groups,
     basePrice, mrp, salePrice, wholesalePrice,
     weightRate, weightUnit, weightEnabled,
     lengthRate, lengthUnit, lengthEnabled,
@@ -266,7 +300,6 @@ export default function ProductForm({ categories, brands, action, product, produ
         }
       }
       if (snap.hasVariants !== undefined) setHasVariants(snap.hasVariants)
-      if (snap.variantType !== undefined) setVariantType(snap.variantType)
       if (snap.variants) setVariants(snap.variants)
       if (snap.groups) setGroups(snap.groups)
       if (snap.basePrice !== undefined) setBasePrice(snap.basePrice)
@@ -288,12 +321,13 @@ export default function ProductForm({ categories, brands, action, product, produ
   function discardDraft() {
     localStorage.removeItem(draftKey)
     setHasDraft(false)
+    window.location.reload()
   }
 
   function addGroup(pricing_type: 'unit' | 'weight' | 'length') {
     if (groups.find(g => g.pricing_type === pricing_type)) return
     const unit = defaultUnit(pricing_type)
-    setGroups([...groups, { pricing_type, unit }])
+    setGroups([...groups, { pricing_type, unit, variant_type: '' }])
     setVariants([...variants, emptyVariant(pricing_type, unit)])
   }
 
@@ -310,6 +344,10 @@ export default function ProductForm({ categories, brands, action, product, produ
     setVariants(variants.map(v =>
       v.pricing_type === pricing_type && !v._isDeleted ? { ...v, unit, variant_name: buildVariantName(v.numeric_value, unit, pricing_type) } : v
     ))
+  }
+
+  function updateGroupVariantType(pricing_type: string, variant_type: string) {
+    setGroups(groups.map(g => g.pricing_type === pricing_type ? { ...g, variant_type } : g))
   }
 
   function buildVariantName(numeric_value: string, unit: string, pricing_type: string): string {
@@ -359,6 +397,162 @@ export default function ProductForm({ categories, brands, action, product, produ
     setVariants(updated)
   }
 
+  async function openVariantPopup(variantId: string) {
+    setVariantPopupId(variantId)
+    setVariantImageError(null)
+    if (productId) {
+      if (!variantImagesMap[variantId]) {
+        const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`)
+        if (res.ok) {
+          const data = await res.json()
+          setVariantImagesMap(m => ({ ...m, [variantId]: data.images || [] }))
+        } else {
+          const err = await res.json().catch(() => ({}))
+          setVariantImageError(err.error || `Could not load images (${res.status})`)
+        }
+      }
+      if (!subVariantsMap[variantId]) {
+        const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`)
+        if (res.ok) {
+          const data = await res.json()
+          setSubVariantsMap(m => ({ ...m, [variantId]: data.sub_variants || [] }))
+        } else {
+          setSubVariantsMap(m => ({ ...m, [variantId]: [] }))
+        }
+      }
+    }
+  }
+
+  async function uploadVariantImageFile(variantId: string, file: File) {
+    if (!productId) return
+    setVariantImageError(null)
+    setVariantImageUploading(m => ({ ...m, [variantId]: true }))
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+        method: 'POST',
+        body: fd,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setVariantImagesMap(m => ({ ...m, [variantId]: [...(m[variantId] || []), data.image] }))
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setVariantImageError(err.error || `Upload failed (${res.status})`)
+      }
+    } catch {
+      setVariantImageError('Upload failed — network error')
+    } finally {
+      setVariantImageUploading(m => ({ ...m, [variantId]: false }))
+    }
+  }
+
+  async function deleteVariantImage(variantId: string, imageId: string) {
+    if (!productId) return
+    await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageId }),
+    })
+    setVariantImagesMap(m => ({ ...m, [variantId]: (m[variantId] || []).filter((img: any) => img.id !== imageId) }))
+  }
+
+  async function setVariantImagePrimary(variantId: string, imageId: string) {
+    if (!productId) return
+    await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageId, isPrimary: true }),
+    })
+    setVariantImagesMap(m => ({
+      ...m,
+      [variantId]: (m[variantId] || []).map((img: any) => ({ ...img, is_primary: img.id === imageId })),
+    }))
+  }
+
+  const openVariantGallery = useCallback(async () => {
+    setVariantGalleryOpen(true)
+    setVariantGallerySelected([])
+    setVariantGallerySearch('')
+    setVariantGalleryCategory('')
+    setVariantGalleryLoading(true)
+    try {
+      const [galleryRes, catRes] = await Promise.all([
+        fetch('/api/gallery?limit=100'),
+        fetch('/api/categories'),
+      ])
+      const galleryData = await galleryRes.json()
+      const catData = await catRes.json()
+      setVariantGalleryImages(galleryData.images || [])
+      setVariantGalleryCategories(catData.categories || [])
+    } catch {
+      setVariantGalleryImages([])
+    } finally {
+      setVariantGalleryLoading(false)
+    }
+  }, [])
+
+  async function addVariantImagesFromGallery() {
+    if (!productId || !variantPopupId) return
+    const currentImages = variantImagesMap[variantPopupId] || []
+    const slotsLeft = 5 - currentImages.length
+    const toAdd = variantGallerySelected.slice(0, slotsLeft)
+    setVariantGalleryOpen(false)
+    setVariantGallerySelected([])
+    setVariantImageError(null)
+    for (const galleryImageId of toAdd) {
+      const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/images`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gallery_image_id: galleryImageId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setVariantImagesMap(m => ({ ...m, [variantPopupId]: [...(m[variantPopupId] || []), data.image] }))
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setVariantImageError(err.error || `Failed to add image (${res.status})`)
+        break
+      }
+    }
+  }
+
+  async function addSubVariant(variantId: string) {
+    if (!productId) return
+    const draft = subVariantDrafts[variantId]
+    if (!draft?.name) return
+    const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sub_variant_name: draft.name,
+        price: draft.price ? parseFloat(draft.price) : null,
+        mrp: draft.mrp ? parseFloat(draft.mrp) : null,
+        price_ex_gst: draft.price_ex_gst ? parseFloat(draft.price_ex_gst) : null,
+        mrp_ex_gst: draft.mrp_ex_gst ? parseFloat(draft.mrp_ex_gst) : null,
+        wholeprice_ex_gst: draft.wholeprice_ex_gst ? parseFloat(draft.wholeprice_ex_gst) : null,
+        stock_quantity: draft.stock ? parseInt(draft.stock) : 0,
+        sku: draft.sku || undefined,
+      }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setSubVariantsMap(m => ({ ...m, [variantId]: [...(m[variantId] || []), data.sub_variant] }))
+      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', wholeprice_ex_gst: '', stock: '', sku: '' } }))
+    }
+  }
+
+  async function deleteSubVariant(variantId: string, subId: string) {
+    if (!productId) return
+    await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: subId }),
+    })
+    setSubVariantsMap(m => ({ ...m, [variantId]: (m[variantId] || []).filter((sv: any) => sv.id !== subId) }))
+  }
+
   const activeVariants = variants.filter(v => !v._isDeleted)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -396,16 +590,19 @@ export default function ProductForm({ categories, brands, action, product, produ
       formData.set('cost_price', costPrice || '0')
 
       if (hasVariants) {
-        formData.set('variant_type', variantType)
-        const convertedVariants = variants.map(v => ({
-          ...v,
-          price: toInclusive(v.price, gstRate, gstMode),
-          mrp: toInclusive(v.mrp, gstRate, gstMode),
-          price_ex_gst: toExGst(v.price_ex_gst || v.price, gstRate, gstMode),
-          wholeprice_ex_gst: toExGst(v.wholeprice_ex_gst, gstRate, gstMode),
-          weight_rate: v.weight_rate_on ? toInclusive(v.weight_rate, gstRate, gstMode) : v.weight_rate,
-          length_rate: v.length_rate_on ? toInclusive(v.length_rate, gstRate, gstMode) : v.length_rate,
-        }))
+        const convertedVariants = variants.map(v => {
+          const grp = groups.find(g => g.pricing_type === v.pricing_type)
+          return {
+            ...v,
+            variant_type: grp?.variant_type || v.variant_type || '',
+            price: toInclusive(v.price, gstRate, gstMode),
+            mrp: toInclusive(v.mrp, gstRate, gstMode),
+            price_ex_gst: toExGst(v.price_ex_gst || v.price, gstRate, gstMode),
+            wholeprice_ex_gst: toExGst(v.wholeprice_ex_gst, gstRate, gstMode),
+            weight_rate: v.weight_rate_on ? toInclusive(v.weight_rate, gstRate, gstMode) : v.weight_rate,
+            length_rate: v.length_rate_on ? toInclusive(v.length_rate, gstRate, gstMode) : v.length_rate,
+          }
+        })
         formData.set('variants_json', JSON.stringify(convertedVariants))
       }
 
@@ -425,7 +622,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       <div className="p-4 sm:p-6">
         {hasDraft && (
           <div className="mb-4 px-4 py-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
-            <span className="text-yellow-800 dark:text-yellow-200">Draft auto-saved. Your unsaved changes will be restored next time you open this page.</span>
+            <span className="text-yellow-800 dark:text-yellow-200">You have an auto-saved draft. Click Restore to load it, or Discard to clear it and reload from database.</span>
             <div className="flex gap-3 shrink-0">
               <button type="button" onClick={restoreDraft} className="text-yellow-800 dark:text-yellow-200 font-semibold hover:underline">Restore</button>
               <button type="button" onClick={discardDraft} className="text-yellow-700 dark:text-yellow-300 font-semibold hover:underline">Discard</button>
@@ -939,23 +1136,6 @@ export default function ProductForm({ categories, brands, action, product, produ
             <div className="md:col-span-2 border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50/50 dark:bg-blue-900/20">
               <h3 className="text-sm font-semibold text-foreground mb-4">Product Variants</h3>
 
-              {/* Variant Type label */}
-              <div className="mb-5">
-                <label htmlFor="variant_type_input" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Variant Label *
-                </label>
-                <input
-                  type="text"
-                  id="variant_type_input"
-                  value={variantType}
-                  onChange={(e) => setVariantType(e.target.value)}
-                  className="w-full max-w-xs px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  placeholder="e.g. Size, Pack, Length"
-                  required={hasVariants}
-                />
-                <p className="text-xs text-foreground-muted mt-1">Shown to customers as &quot;Select {variantType || 'Option'}&quot;</p>
-              </div>
-
               {/* Buying Mode Groups */}
               <div className="space-y-6">
                 {groups.length === 0 && (
@@ -1008,6 +1188,16 @@ export default function ProductForm({ categories, brands, action, product, produ
                               >›</button>
                             </div>
                           </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-foreground-muted">Label:</span>
+                            <input
+                              type="text"
+                              value={group.variant_type}
+                              onChange={(e) => updateGroupVariantType(group.pricing_type, e.target.value)}
+                              className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 focus:border-transparent w-28"
+                              placeholder="e.g. Size, Pack"
+                            />
+                          </div>
                         </div>
                       </div>
 
@@ -1058,6 +1248,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   </div>
                                 </div>
                               ) : (
+                                <>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Name *</label>
                                   <input
@@ -1069,6 +1260,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     required
                                   />
                                 </div>
+</>
                               )}
 
                               <div className="grid grid-cols-2 gap-3">
@@ -1179,10 +1371,53 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     {variant.length_rate && <span className="text-xs text-accent-600 dark:text-accent-400">₹{variant.length_rate}/{variant.length_unit}</span>}
                                   </div>
                                 )}
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...variants]
+                                      const row = { ...updated[index] }
+                                      row.sub_variant_type_on = !row.sub_variant_type_on
+                                      if (!row.sub_variant_type_on) row.sub_variant_type = ''
+                                      updated[index] = row
+                                      setVariants(updated)
+                                    }}
+                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                                    role="switch"
+                                    aria-checked={variant.sub_variant_type_on}
+                                  >
+                                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`} />
+                                  </button>
+                                  <span className="text-xs font-medium text-foreground-secondary">Has sub-variants</span>
+                                </div>
+                                {variant.sub_variant_type_on && (
+                                  <div className="flex items-center gap-2 pl-11">
+                                    <span className="text-xs text-foreground-muted">Label</span>
+                                    <input
+                                      type="text"
+                                      value={variant.sub_variant_type}
+                                      onChange={(e) => updateVariant(index, 'sub_variant_type', e.target.value)}
+                                      className="w-32 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs"
+                                      placeholder="e.g. Colour, Finish"
+                                    />
+                                  </div>
+                                )}
                               </div>
                               {product?.sku && variant.variant_name && (
                                 <div className="text-xs font-mono text-foreground-muted">
                                   SKU: {product.sku}-{variant.variant_name.toUpperCase().replace(/[^A-Z0-9]/g, '')}
+                                </div>
+                              )}
+                              {variant.id && (
+                                <div className="pt-2 border-t border-border-default">
+                                  <button
+                                    type="button"
+                                    onClick={() => openVariantPopup(variant.id!)}
+                                    className="text-xs font-medium text-accent-600 dark:text-accent-400 flex items-center gap-1"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h8" /></svg>
+                                    Images & Sub-Variants
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -1190,203 +1425,79 @@ export default function ProductForm({ categories, brands, action, product, produ
                         })}
                       </div>
 
-                      {/* Desktop table */}
-                      <div className="hidden md:block overflow-x-auto">
+                      {/* Desktop table — core columns only; details in expand panel */}
+                      <div className="hidden md:block">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border-secondary bg-surface">
-                              {isWeightOrLength && <th className="text-left py-2 px-2 font-medium text-foreground-secondary whitespace-nowrap">Value ({group.unit}) *</th>}
-                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary">Name *</th>
-                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary whitespace-nowrap">Selling Price *</th>
-                              {isWeightOrLength && <th className="text-left py-2 px-2 font-medium text-foreground-secondary whitespace-nowrap">Per Unit Rate</th>}
-                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary">MRP</th>
-                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary whitespace-nowrap">Ex-GST Price</th>
-                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary">Wholesale</th>
-                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary">Stock *</th>
-                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary">MPN</th>
-                              <th className="text-left py-2 px-2 font-medium text-foreground-secondary">GTIN</th>
-                              {product?.sku && <th className="text-left py-2 px-2 font-medium text-foreground-secondary">SKU</th>}
-                              <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Wt. Rate</th>
-                              <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Len. Rate</th>
-                              <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Ship Wt.(g)</th>
-                              <th className="py-2 px-2 text-left font-medium text-foreground-secondary whitespace-nowrap text-xs">Pkg Type</th>
-                              <th className="py-2 px-2 w-8"></th>
+                              {isWeightOrLength && <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Value ({group.unit}) *</th>}
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Name *</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Price (incl. GST) *</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Ex-GST</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Wholesale</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">MRP</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Stock *</th>
+                              <th className="py-2 px-3 w-16"></th>
                             </tr>
                           </thead>
                           <tbody>
                             {groupVariants.map((variant) => {
                               const index = variants.indexOf(variant)
                               const perUnit = isWeightOrLength ? calcPerUnitRate(variant.price, variant.numeric_value, group.unit) : null
+                              const isExpanded = false
                               return (
-                                <tr key={variant.id || index} className="border-b border-border-default">
+                                <>
+                                <tr key={variant.id || index} className={`border-b border-border-default ${isExpanded ? 'bg-surface-secondary' : 'hover:bg-surface-secondary/40'}`}>
                                   {isWeightOrLength && (
-                                    <td className="py-2 px-2">
-                                      <input
-                                        type="number"
-                                        step="any"
-                                        min="0"
-                                        value={variant.numeric_value}
-                                        onChange={(e) => updateVariant(index, 'numeric_value', e.target.value)}
-                                        className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                        placeholder="e.g. 500"
-                                        required
-                                      />
+                                    <td className="py-2 px-3">
+                                      <input type="number" step="any" min="0" value={variant.numeric_value} onChange={(e) => updateVariant(index, 'numeric_value', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. 500" required />
                                     </td>
                                   )}
-                                  <td className="py-2 px-2">
+                                  <td className="py-2 px-3">
                                     {isWeightOrLength ? (
-                                      <input
-                                        type="text"
-                                        value={variant.variant_name}
-                                        readOnly
-                                        className="w-24 px-2 py-1.5 border border-border-default rounded-lg bg-surface-secondary text-foreground-muted text-sm cursor-default"
-                                        placeholder="Auto"
-                                      />
+                                      <input type="text" value={variant.variant_name} readOnly className="w-24 px-2 py-1.5 border border-border-default rounded-lg bg-surface-secondary text-foreground-muted text-sm cursor-default" placeholder="Auto" />
                                     ) : (
-                                      <input
-                                        type="text"
-                                        value={variant.variant_name}
-                                        onChange={(e) => updateVariant(index, 'variant_name', e.target.value)}
-                                        className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                        placeholder="e.g. M8, Red"
-                                        required
-                                      />
+                                      <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
                                     )}
                                   </td>
-                                  <td className="py-2 px-2">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
-                                      value={variant.price}
-                                      onChange={(e) => updateVariant(index, 'price', e.target.value)}
-                                      className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                      placeholder="0.00"
-                                      required
-                                    />
+                                  <td className="py-2 px-3">
+                                    <div>
+                                      <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => updateVariant(index, 'price', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" required />
+                                      {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
+                                    </div>
                                   </td>
-                                  {isWeightOrLength && (
-                                    <td className="py-2 px-2">
-                                      <span className="text-xs font-medium text-accent-600 dark:text-accent-400 whitespace-nowrap">
-                                        {perUnit || '—'}
-                                      </span>
-                                    </td>
-                                  )}
-                                  <td className="py-2 px-2">
-                                    <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                  <td className="py-2 px-3">
+                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => updateVariant(index, 'price_ex_gst', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
                                   </td>
-                                  <td className="py-2 px-2">
-                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => updateVariant(index, 'price_ex_gst', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                  <td className="py-2 px-3">
+                                    <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
                                   </td>
-                                  <td className="py-2 px-2">
-                                    <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                  <td className="py-2 px-3">
+                                    <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
                                   </td>
-                                  <td className="py-2 px-2">
+                                  <td className="py-2 px-3">
                                     <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0" required />
                                   </td>
-                                  <td className="py-2 px-2">
-                                    <input type="text" value={variant.mpn} onChange={(e) => updateVariant(index, 'mpn', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="Part No." />
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <input type="text" value={variant.gtin} onChange={(e) => updateVariant(index, 'gtin', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="Barcode" />
-                                  </td>
-                                  {product?.sku && (
-                                    <td className="py-2 px-2">
-                                      <span className="text-xs font-mono text-foreground-muted whitespace-nowrap">
-                                        {variant.variant_name
-                                          ? `${product.sku}-${variant.variant_name.toUpperCase().replace(/[^A-Z0-9]/g, '')}`
-                                          : '—'
-                                        }
-                                      </span>
-                                    </td>
-                                  )}
-                                  <td className="py-2 px-2">
-                                    <div className="flex flex-col gap-1">
-                                      <div className="flex items-center gap-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={() => toggleVariantRate(index, 'weight')}
-                                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.weight_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
-                                          role="switch"
-                                          aria-checked={variant.weight_rate_on}
-                                          title="Also sell by weight"
-                                        >
-                                          <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${variant.weight_rate_on ? 'translate-x-3' : 'translate-x-0'}`} />
-                                        </button>
-                                        <span className="text-xs text-foreground-muted whitespace-nowrap">Wt.</span>
-                                        {variant.weight_rate_on && (
-                                          <>
-                                            <input type="number" step="0.01" min="0" value={variant.weight_rate} onChange={(e) => updateVariant(index, 'weight_rate', e.target.value)} className="w-16 px-1.5 py-0.5 border border-border-secondary rounded bg-surface text-foreground focus:ring-1 focus:ring-accent-500 text-xs" placeholder="Rate" required />
-                                            <div className="flex items-center border border-border-secondary rounded bg-surface overflow-hidden">
-                                              <button type="button" onClick={() => { const opts = ['kg','g','lb','oz']; const i = opts.indexOf(variant.weight_unit); updateVariant(index, 'weight_unit', opts[(i - 1 + opts.length) % opts.length]) }} className="px-1 py-0.5 text-foreground-muted hover:text-foreground hover:bg-surface-secondary text-xs leading-none">&lt;</button>
-                                              <span className="px-1 text-xs text-foreground font-medium min-w-[20px] text-center">{variant.weight_unit}</span>
-                                              <button type="button" onClick={() => { const opts = ['kg','g','lb','oz']; const i = opts.indexOf(variant.weight_unit); updateVariant(index, 'weight_unit', opts[(i + 1) % opts.length]) }} className="px-1 py-0.5 text-foreground-muted hover:text-foreground hover:bg-surface-secondary text-xs leading-none">&gt;</button>
-                                            </div>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <div className="flex flex-col gap-1">
-                                      <div className="flex items-center gap-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={() => toggleVariantRate(index, 'length')}
-                                          className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.length_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
-                                          role="switch"
-                                          aria-checked={variant.length_rate_on}
-                                          title="Also sell by length"
-                                        >
-                                          <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${variant.length_rate_on ? 'translate-x-3' : 'translate-x-0'}`} />
-                                        </button>
-                                        <span className="text-xs text-foreground-muted whitespace-nowrap">Len.</span>
-                                        {variant.length_rate_on && (
-                                          <>
-                                            <input type="number" step="0.01" min="0" value={variant.length_rate} onChange={(e) => updateVariant(index, 'length_rate', e.target.value)} className="w-16 px-1.5 py-0.5 border border-border-secondary rounded bg-surface text-foreground focus:ring-1 focus:ring-accent-500 text-xs" placeholder="Rate" required />
-                                            <div className="flex items-center border border-border-secondary rounded bg-surface overflow-hidden">
-                                              <button type="button" onClick={() => { const opts = ['m','cm','mm','ft','in']; const i = opts.indexOf(variant.length_unit); updateVariant(index, 'length_unit', opts[(i - 1 + opts.length) % opts.length]) }} className="px-1 py-0.5 text-foreground-muted hover:text-foreground hover:bg-surface-secondary text-xs leading-none">&lt;</button>
-                                              <span className="px-1 text-xs text-foreground font-medium min-w-[20px] text-center">{variant.length_unit}</span>
-                                              <button type="button" onClick={() => { const opts = ['m','cm','mm','ft','in']; const i = opts.indexOf(variant.length_unit); updateVariant(index, 'length_unit', opts[(i + 1) % opts.length]) }} className="px-1 py-0.5 text-foreground-muted hover:text-foreground hover:bg-surface-secondary text-xs leading-none">&gt;</button>
-                                            </div>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <input
-                                      type="number"
-                                      step="1"
-                                      min="0"
-                                      value={variant.weight_grams}
-                                      onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)}
-                                      className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                      placeholder="g"
-                                    />
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <div className="w-20 flex items-center py-1.5 border border-border-secondary rounded-lg bg-surface overflow-hidden">
-                                      <button type="button" onClick={() => { const opts = ['flat_poly_auto','flat_poly_s','flat_poly_m','flat_poly_l','flat_poly_xl','drill_bit_tube','drill_bit_set_case','corrugated_box','long_tube']; const i = opts.indexOf(variant.package_type || 'flat_poly_auto'); updateVariant(index, 'package_type', opts[(i - 1 + opts.length) % opts.length]) }} className="px-1 text-foreground-muted hover:text-foreground hover:bg-surface-secondary text-xs leading-none shrink-0">&lt;</button>
-                                      <span className="flex-1 text-xs text-foreground font-medium text-center truncate">{({'flat_poly_auto':'Auto','flat_poly_s':'P·S','flat_poly_m':'P·M','flat_poly_l':'P·L','flat_poly_xl':'P·XL','drill_bit_tube':'Tube','drill_bit_set_case':'Set','corrugated_box':'Box','long_tube':'Rod'} as Record<string,string>)[variant.package_type || 'flat_poly_auto'] || 'Auto'}</span>
-                                      <button type="button" onClick={() => { const opts = ['flat_poly_auto','flat_poly_s','flat_poly_m','flat_poly_l','flat_poly_xl','drill_bit_tube','drill_bit_set_case','corrugated_box','long_tube']; const i = opts.indexOf(variant.package_type || 'flat_poly_auto'); updateVariant(index, 'package_type', opts[(i + 1) % opts.length]) }} className="px-1 text-foreground-muted hover:text-foreground hover:bg-surface-secondary text-xs leading-none shrink-0">&gt;</button>
-                                    </div>
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    {(allGroupVariants.filter(v => !v._isDeleted).length > 1) && (
+                                  <td className="py-2 px-3">
+                                    <div className="flex items-center gap-1 justify-end">
                                       <button
                                         type="button"
-                                        onClick={() => removeVariant(index)}
-                                        className="text-red-500 hover:text-red-700 p-1"
-                                        title="Remove variant"
+                                        onClick={() => variant.id ? openVariantPopup(variant.id) : undefined}
+                                        className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors text-foreground-muted hover:text-foreground hover:bg-surface-secondary"
+                                        title="Edit images & sub-variants"
                                       >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h8" /></svg>
+                                        More
                                       </button>
-                                    )}
+                                      {allGroupVariants.filter(v => !v._isDeleted).length > 1 && (
+                                        <button type="button" onClick={() => removeVariant(index)} className="text-red-400 hover:text-red-600 p-1 rounded transition-colors" title="Remove">
+                                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                        </button>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
+                                </>
                               )
                             })}
                           </tbody>
@@ -1445,6 +1556,378 @@ export default function ProductForm({ categories, brands, action, product, produ
           {isSubmitting ? 'Saving...' : product ? 'Update & Publish' : 'Save & Publish'}
         </button>
       </div>
+      {/* Variant Detail Popup */}
+      {variantPopupId && (() => {
+        const popupVariant = variants.find(v => v.id === variantPopupId)
+        if (!popupVariant) return null
+        const popupIndex = variants.indexOf(popupVariant)
+        const navIndex = activeVariants.findIndex(v => v.id === variantPopupId)
+        const prevVariant = navIndex > 0 ? activeVariants[navIndex - 1] : null
+        const nextVariant = navIndex < activeVariants.length - 1 ? activeVariants[navIndex + 1] : null
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setVariantPopupId(null)}>
+            <div className="bg-surface rounded-xl border border-border-default shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
+                <div className="flex items-center gap-2 min-w-0">
+                  <button type="button" onClick={() => prevVariant && setVariantPopupId(prevVariant.id ?? null)} disabled={!prevVariant} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm">&#8249;</button>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold text-foreground truncate">{popupVariant.variant_name || 'Variant Details'}</h3>
+                    <p className="text-xs text-foreground-muted mt-0.5">{navIndex + 1} / {activeVariants.length}</p>
+                  </div>
+                  <button type="button" onClick={() => nextVariant && setVariantPopupId(nextVariant.id ?? null)} disabled={!nextVariant} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm">&#8250;</button>
+                </div>
+                <button type="button" onClick={() => setVariantPopupId(null)} className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-1">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              <div className="p-5 space-y-6">
+                {/* Pricing & Identifiers */}
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Pricing & Identifiers</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
+                      <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} onChange={(e) => updateVariant(popupIndex, 'price_ex_gst', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale</label>
+                      <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_ex_gst} onChange={(e) => updateVariant(popupIndex, 'wholeprice_ex_gst', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
+                      <input type="text" value={popupVariant.mpn} onChange={(e) => updateVariant(popupIndex, 'mpn', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Part No." />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
+                      <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
+                    </div>
+                  </div>
+                  {/* Rate toggles */}
+                  <div className="space-y-2 pt-3">
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => toggleVariantRate(popupIndex, 'weight')} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.weight_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.weight_rate_on}>
+                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.weight_rate_on ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                      <span className="text-xs font-medium text-foreground-secondary">Also sell by weight</span>
+                    </div>
+                    {popupVariant.weight_rate_on && (
+                      <div className="flex items-center gap-2 pl-11">
+                        <span className="text-xs text-foreground-muted">Rate (₹)</span>
+                        <input type="number" step="0.01" min="0" value={popupVariant.weight_rate} onChange={(e) => updateVariant(popupIndex, 'weight_rate', e.target.value)} className="w-24 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 200" />
+                        <span className="text-xs text-foreground-muted">per</span>
+                        <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
+                          <button type="button" onClick={() => { const idx = WEIGHT_UNITS.indexOf(popupVariant.weight_unit || 'kg'); updateVariant(popupIndex, 'weight_unit', WEIGHT_UNITS[(idx - 1 + WEIGHT_UNITS.length) % WEIGHT_UNITS.length]) }} className="px-1.5 py-1 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
+                          <span className="px-1.5 py-1 text-xs font-medium text-foreground min-w-[2rem] text-center border-x border-border-secondary">{popupVariant.weight_unit || 'kg'}</span>
+                          <button type="button" onClick={() => { const idx = WEIGHT_UNITS.indexOf(popupVariant.weight_unit || 'kg'); updateVariant(popupIndex, 'weight_unit', WEIGHT_UNITS[(idx + 1) % WEIGHT_UNITS.length]) }} className="px-1.5 py-1 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => toggleVariantRate(popupIndex, 'length')} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.length_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.length_rate_on}>
+                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.length_rate_on ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                      <span className="text-xs font-medium text-foreground-secondary">Also sell by length</span>
+                    </div>
+                    {popupVariant.length_rate_on && (
+                      <div className="flex items-center gap-2 pl-11">
+                        <span className="text-xs text-foreground-muted">Rate (₹)</span>
+                        <input type="number" step="0.01" min="0" value={popupVariant.length_rate} onChange={(e) => updateVariant(popupIndex, 'length_rate', e.target.value)} className="w-24 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 50" />
+                        <span className="text-xs text-foreground-muted">per</span>
+                        <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
+                          <button type="button" onClick={() => { const idx = LENGTH_UNITS.indexOf(popupVariant.length_unit || 'm'); updateVariant(popupIndex, 'length_unit', LENGTH_UNITS[(idx - 1 + LENGTH_UNITS.length) % LENGTH_UNITS.length]) }} className="px-1.5 py-1 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
+                          <span className="px-1.5 py-1 text-xs font-medium text-foreground min-w-[2rem] text-center border-x border-border-secondary">{popupVariant.length_unit || 'm'}</span>
+                          <button type="button" onClick={() => { const idx = LENGTH_UNITS.indexOf(popupVariant.length_unit || 'm'); updateVariant(popupIndex, 'length_unit', LENGTH_UNITS[(idx + 1) % LENGTH_UNITS.length]) }} className="px-1.5 py-1 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
+                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                      <span className="text-xs font-medium text-foreground-secondary">Has sub-variants</span>
+                    </div>
+                    {popupVariant.sub_variant_type_on && (
+                      <div className="flex items-center gap-2 pl-11">
+                        <span className="text-xs text-foreground-muted">Label</span>
+                        <input type="text" value={popupVariant.sub_variant_type} onChange={(e) => updateVariant(popupIndex, 'sub_variant_type', e.target.value)} className="w-40 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. Colour, Finish" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Shipping */}
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Shipping</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Ship Wt. (g)</label>
+                      <input type="number" step="1" min="0" value={popupVariant.weight_grams} onChange={(e) => updateVariant(popupIndex, 'weight_grams', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Package Type</label>
+                      <div className="w-full flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
+                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx - 1 + PACKAGE_TYPES.length) % PACKAGE_TYPES.length]) }} className="px-1.5 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
+                        <span className="px-1.5 py-1.5 text-xs font-medium text-foreground flex-1 text-center border-x border-border-secondary truncate">{PACKAGE_TYPE_LABELS[popupVariant.package_type || 'flat_poly_auto']}</span>
+                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx + 1) % PACKAGE_TYPES.length]) }} className="px-1.5 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
+                      </div>
+                    </div>
+                  </div>
+                  {['drill_bit_tube','drill_bit_set_case','corrugated_box','long_tube'].includes(popupVariant.package_type || 'flat_poly_auto') && (
+                    <div className="mt-3">
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Dimensions (L × B × H cm)</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <input type="number" step="0.1" min="0" value={popupVariant.length_cm} onChange={(e) => updateVariant(popupIndex, 'length_cm', e.target.value)} className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="L" />
+                        <input type="number" step="0.1" min="0" value={popupVariant.breadth_cm} onChange={(e) => updateVariant(popupIndex, 'breadth_cm', e.target.value)} className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="B" />
+                        <input type="number" step="0.1" min="0" value={popupVariant.height_cm} onChange={(e) => updateVariant(popupIndex, 'height_cm', e.target.value)} className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="H" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Images */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Images (max 5)</p>
+                    {productId && (variantImagesMap[variantPopupId] || []).length < 5 && (
+                      <button
+                        type="button"
+                        onClick={openVariantGallery}
+                        className="px-2.5 py-1 bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        Choose from Gallery
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(variantImagesMap[variantPopupId] || []).map((img: any) => (
+                      <div key={img.id} className="relative group w-16 h-16 rounded border border-border-default overflow-hidden bg-surface">
+                        <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover" />
+                        {img.is_primary && <span className="absolute top-0 left-0 text-[9px] bg-accent-500 text-white px-1 leading-4">★</span>}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                          {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 text-xs leading-none" title="Set primary">★</button>}
+                          <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 text-xs leading-none" title="Delete">✕</button>
+                        </div>
+                      </div>
+                    ))}
+                    {(variantImagesMap[variantPopupId] || []).length < 5 && (
+                      <label className={`w-16 h-16 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${variantImageUploading[variantPopupId] ? 'opacity-50 pointer-events-none' : ''}`}>
+                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVariantImageFile(variantPopupId, f); e.target.value = '' }} />
+                        {variantImageUploading[variantPopupId] ? <svg className="w-4 h-4 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
+                      </label>
+                    )}
+                  </div>
+                  {variantImageError && (
+                    <p className="mt-2 text-xs text-red-500">{variantImageError}</p>
+                  )}
+                </div>
+
+                {variantGalleryOpen && typeof document !== 'undefined' && createPortal(
+                  <div className="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm bg-black/50 p-4">
+                    <div className="bg-surface-elevated rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
+                      <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
+                        <h2 className="text-lg font-semibold text-foreground">Choose from Gallery</h2>
+                        <button
+                          type="button"
+                          onClick={() => { setVariantGalleryOpen(false); setVariantGallerySelected([]) }}
+                          className="text-foreground-muted hover:text-foreground transition-colors text-2xl leading-none"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                      <div className="px-6 py-3 border-b border-border-default flex gap-2 items-center">
+                        <input
+                          type="text"
+                          placeholder="Search by name..."
+                          value={variantGallerySearch}
+                          onChange={e => setVariantGallerySearch(e.target.value)}
+                          className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                        />
+                        <div className="w-48 shrink-0">
+                          <AdminSelect
+                            value={variantGalleryCategory}
+                            onChange={setVariantGalleryCategory}
+                            placeholder="All categories"
+                            options={[
+                              { value: '', label: 'All categories' },
+                              ...variantGalleryCategories.map((c: any) => ({ value: c.id, label: c.name })),
+                            ]}
+                          />
+                        </div>
+                      </div>
+                      <div className="overflow-y-auto flex-1 min-h-0 p-4 pr-3">
+                        {variantGalleryLoading && (
+                          <div className="flex items-center justify-center py-16">
+                            <div className="w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+                        {!variantGalleryLoading && variantGalleryImages.length === 0 && (
+                          <p className="text-center text-foreground-secondary py-16">No images in gallery yet.</p>
+                        )}
+                        {!variantGalleryLoading && variantGalleryImages.length > 0 && (() => {
+                          const q = variantGallerySearch.toLowerCase()
+                          const filtered = variantGalleryImages.filter((g: any) => {
+                            const nameMatch = q ? (g.custom_name || '').toLowerCase().includes(q) : true
+                            const catMatch = variantGalleryCategory ? g.category_id === variantGalleryCategory : true
+                            return nameMatch && catMatch
+                          })
+                          return filtered.length === 0 ? (
+                            <p className="text-center text-foreground-secondary py-16">No images match &ldquo;{variantGallerySearch}&rdquo;</p>
+                          ) : (
+                            <div className="grid grid-cols-4 gap-3 w-full">
+                              {filtered.map((gimg: any) => {
+                                const selIdx = variantGallerySelected.indexOf(gimg.id)
+                                const isSelected = selIdx !== -1
+                                return (
+                                  <button
+                                    key={gimg.id}
+                                    type="button"
+                                    onClick={() => setVariantGallerySelected(prev =>
+                                      prev.includes(gimg.id) ? prev.filter((id: string) => id !== gimg.id) : [...prev, gimg.id]
+                                    )}
+                                    className={`relative rounded-lg overflow-hidden border-2 transition-colors text-left ${isSelected ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-default hover:border-accent-400'}`}
+                                  >
+                                    {isSelected && (
+                                      <div className="absolute top-1 right-1 bg-accent-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold z-10">
+                                        {selIdx + 1}
+                                      </div>
+                                    )}
+                                    <div className="aspect-square">
+                                      <img src={gimg.thumbnail_url || gimg.image_url} alt={gimg.custom_name || gimg.file_name} className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="px-1.5 py-1 bg-surface-secondary">
+                                      <p className="text-xs text-foreground-secondary truncate">{gimg.custom_name || gimg.file_name}</p>
+                                      {gimg.category_name && (
+                                        <p className="text-xs text-accent-500 truncate">{gimg.category_name}</p>
+                                      )}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                      <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => { setVariantGalleryOpen(false); setVariantGallerySelected([]) }}
+                          className="px-4 py-2 text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={addVariantImagesFromGallery}
+                          disabled={variantGallerySelected.length === 0}
+                          className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:bg-surface-secondary disabled:text-foreground-muted text-white rounded-lg text-sm font-semibold transition-colors"
+                        >
+                          {variantGallerySelected.length > 0 ? `Add ${variantGallerySelected.length} Image${variantGallerySelected.length > 1 ? 's' : ''}` : 'Add Images'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>,
+                  document.body
+                )}
+
+                {/* Sub-Variants */}
+                {popupVariant.sub_variant_type_on && (
+                  <div>
+                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
+                      Sub-Variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''}
+                    </p>
+                    {(subVariantsMap[variantPopupId] || []).length > 0 && (
+                      <div className="overflow-x-auto mb-3">
+                      <table className="w-full text-xs whitespace-nowrap">
+                        <thead>
+                          <tr className="text-left text-foreground-muted border-b border-border-default">
+                            <th className="pb-1 pr-2 font-medium">Name</th>
+                            <th className="pb-1 pr-2 font-medium">Price</th>
+                            <th className="pb-1 pr-2 font-medium">MRP</th>
+                            <th className="pb-1 pr-2 font-medium">Ex-GST</th>
+                            <th className="pb-1 pr-2 font-medium">MRP Ex-GST</th>
+                            <th className="pb-1 pr-2 font-medium">Wholesale</th>
+                            <th className="pb-1 pr-2 font-medium">Stock</th>
+                            <th className="pb-1 pr-2 font-medium">SKU</th>
+                            <th className="pb-1"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(subVariantsMap[variantPopupId] || []).map((sv: any) => (
+                            <tr key={sv.id} className="border-b border-border-default last:border-0">
+                              <td className="py-1.5 pr-2">{sv.sub_variant_name}</td>
+                              <td className="py-1.5 pr-2">{sv.price != null ? `₹${sv.price}` : '—'}</td>
+                              <td className="py-1.5 pr-2">{sv.mrp != null ? `₹${sv.mrp}` : '—'}</td>
+                              <td className="py-1.5 pr-2">{sv.price_ex_gst != null ? `₹${sv.price_ex_gst}` : '—'}</td>
+                              <td className="py-1.5 pr-2">{sv.mrp_ex_gst != null ? `₹${sv.mrp_ex_gst}` : '—'}</td>
+                              <td className="py-1.5 pr-2">{sv.wholeprice_ex_gst != null ? `₹${sv.wholeprice_ex_gst}` : '—'}</td>
+                              <td className="py-1.5 pr-2">{sv.stock_quantity}</td>
+                              <td className="py-1.5 pr-2 font-mono text-foreground-muted">{sv.sku}</td>
+                              <td className="py-1.5">
+                                <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none">✕</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      </div>
+                    )}
+                    {(() => {
+                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',wholeprice_ex_gst:'',stock:'',sku:'' }
+                      const setD = (field: string, val: string) => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, [field]: val } }))
+                      const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-xs focus:ring-1 focus:ring-accent-500"
+                      return (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                          <div>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Name *</label>
+                            <input type="text" placeholder="e.g. Red" value={d.name} onChange={(e) => setD('name', e.target.value)} className={`${inputCls} w-full`} />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Price</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={d.price} onChange={(e) => setD('price', e.target.value)} className={`${inputCls} w-full`} />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-foreground-muted mb-0.5">MRP</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp} onChange={(e) => setD('mrp', e.target.value)} className={`${inputCls} w-full`} />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Ex-GST Price</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={d.price_ex_gst} onChange={(e) => setD('price_ex_gst', e.target.value)} className={`${inputCls} w-full`} />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-foreground-muted mb-0.5">MRP Ex-GST</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp_ex_gst} onChange={(e) => setD('mrp_ex_gst', e.target.value)} className={`${inputCls} w-full`} />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={d.wholeprice_ex_gst} onChange={(e) => setD('wholeprice_ex_gst', e.target.value)} className={`${inputCls} w-full`} />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Stock</label>
+                            <input type="number" step="1" min="0" placeholder="0" value={d.stock} onChange={(e) => setD('stock', e.target.value)} className={`${inputCls} w-full`} />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-foreground-muted mb-0.5">SKU (auto)</label>
+                            <input type="text" placeholder="auto" value={d.sku} onChange={(e) => setD('sku', e.target.value)} className={`${inputCls} w-full`} />
+                          </div>
+                          <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
+                            <button type="button" onClick={() => addSubVariant(variantPopupId)} disabled={!d.name} className="px-4 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Add Sub-Variant</button>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              <div className="px-5 py-4 border-t border-border-default flex justify-end">
+                <button type="button" onClick={() => setVariantPopupId(null)} className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Done</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </form>
   )
 }

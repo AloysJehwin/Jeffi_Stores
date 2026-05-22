@@ -143,6 +143,36 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
   }
 }
 
+export async function uploadVariantImage(file: File, variantId: string): Promise<UploadResult> {
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    throw new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.')
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    throw new Error('File size exceeds 5MB limit.')
+  }
+  const buffer = Buffer.from(await file.arrayBuffer())
+  const image = sharp(buffer).rotate()
+  const metadata = await image.metadata()
+  const timestamp = Date.now()
+  const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+  const s3Key = `${KEY_PREFIX}products/variants/${variantId}/${timestamp}-${sanitizedName}`
+  const s3ThumbnailKey = `${KEY_PREFIX}products/variants/${variantId}/thumbnails/${timestamp}-${sanitizedName}`
+  const thumbnailBuffer = await sharp(buffer).rotate().resize(300, 300, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer()
+  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key, Body: buffer, ContentType: file.type }))
+  await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3ThumbnailKey, Body: thumbnailBuffer, ContentType: 'image/jpeg' }))
+  return {
+    url: getS3Url(s3Key),
+    thumbnailUrl: getS3Url(s3ThumbnailKey),
+    s3Key,
+    s3ThumbnailKey,
+    fileName: file.name,
+    fileSize: file.size,
+    mimeType: file.type,
+    width: metadata.width || 0,
+    height: metadata.height || 0,
+  }
+}
+
 export async function uploadReviewImage(file: File, reviewId: string): Promise<{ url: string; thumbnailUrl: string }> {
   if (!ALLOWED_TYPES.includes(file.type)) {
     throw new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.')
