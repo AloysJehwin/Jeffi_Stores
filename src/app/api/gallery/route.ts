@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany, queryOne } from '@/lib/db'
+import { getS3Url } from '@/lib/s3'
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -29,5 +30,11 @@ export async function GET(request: NextRequest) {
     countParams
   )
 
-  return NextResponse.json({ images: images || [], total: parseInt(countRow?.total || '0'), page, limit })
+  const normalized = (images || []).map((img: any) => ({
+    ...img,
+    image_url: img.s3_key ? getS3Url(img.s3_key) : img.image_url,
+    thumbnail_url: img.s3_thumbnail_key ? getS3Url(img.s3_thumbnail_key) : img.thumbnail_url,
+  }))
+
+  return NextResponse.json({ images: normalized, total: parseInt(countRow?.total || '0'), page, limit })
 }
