@@ -1,0 +1,139 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateAdmin } from '@/lib/jwt'
+import { query, queryOne, queryMany } from '@/lib/db'
+import { uploadVariantImage, deleteProductImage, getS3Url } from '@/lib/s3'
+
+const MAX_IMAGES = 5
+
+type Params = { params: { id: string; variantId: string } }
+
+export async function GET(request: NextRequest, { params }: Params) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const images = await queryMany(
+    `SELECT * FROM variant_images WHERE variant_id = $1 ORDER BY display_order ASC, created_at ASC`,
+    [params.variantId]
+  )
+  return NextResponse.json({ images })
+}
+
+export async function POST(request: NextRequest, { params }: Params) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    const variant = await queryOne(
+      `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`,
+      [params.variantId, params.id]
+    )
+    if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
+
+    const existing = await queryMany(
+      `SELECT id FROM variant_images WHERE variant_id = $1`,
+      [params.variantId]
+    )
+    if (existing.length >= MAX_IMAGES) {
+      return NextResponse.json({ error: `Maximum ${MAX_IMAGES} images per variant` }, { status: 400 })
+    }
+
+    const contentType = request.headers.get('content-type') || ''
+    const isPrimary = existing.length === 0
+
+    if (contentType.includes('application/json')) {
+      const body = await request.json()
+      if (!body.gallery_image_id) return NextResponse.json({ error: 'gallery_image_id required' }, { status: 400 })
+      const gimg = await queryOne(
+        `SELECT * FROM gallery_images WHERE id = $1`,
+        [body.gallery_image_id]
+      )
+      if (!gimg) return NextResponse.json({ error: 'Gallery image not found' }, { status: 404 })
+      const imageUrl = gimg.s3_key ? getS3Url(gimg.s3_key) : gimg.image_url
+      const thumbnailUrl = gimg.s3_thumbnail_key ? getS3Url(gimg.s3_thumbnail_key) : gimg.thumbnail_url
+      const image = await queryOne(
+        `INSERT INTO variant_images
+           (variant_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
+            file_name, file_size, mime_type, width, height, display_order, is_primary)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         RETURNING *`,
+        [
+          params.variantId, imageUrl, thumbnailUrl,
+          process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+          gimg.s3_key, gimg.s3_thumbnail_key,
+          gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
+          gimg.width, gimg.height, existing.length, isPrimary,
+        ]
+      )
+      return NextResponse.json({ image })
+    }
+
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+
+    const result = await uploadVariantImage(file, params.variantId)
+
+    const image = await queryOne(
+      `INSERT INTO variant_images
+         (variant_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
+          file_name, file_size, mime_type, width, height, display_order, is_primary)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       RETURNING *`,
+      [
+        params.variantId, result.url, result.thumbnailUrl,
+        process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+        result.s3Key, result.s3ThumbnailKey,
+        result.fileName, result.fileSize, result.mimeType,
+        result.width, result.height, existing.length, isPrimary,
+      ]
+    )
+    return NextResponse.json({ image })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { imageId } = await request.json()
+  if (!imageId) return NextResponse.json({ error: 'imageId required' }, { status: 400 })
+
+  const image = await queryOne(
+    `SELECT * FROM variant_images WHERE id = $1 AND variant_id = $2`,
+    [imageId, params.variantId]
+  )
+  if (!image) return NextResponse.json({ error: 'Image not found' }, { status: 404 })
+
+  if (image.s3_key) {
+    await deleteProductImage(image.s3_key, image.s3_thumbnail_key || '')
+  }
+  await query(`DELETE FROM variant_images WHERE id = $1`, [imageId])
+
+  if (image.is_primary) {
+    await query(
+      `UPDATE variant_images SET is_primary = TRUE
+       WHERE id = (SELECT id FROM variant_images WHERE variant_id = $1 ORDER BY display_order ASC LIMIT 1)`,
+      [params.variantId]
+    )
+  }
+  return NextResponse.json({ success: true })
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { imageId, isPrimary, displayOrder } = await request.json()
+  if (!imageId) return NextResponse.json({ error: 'imageId required' }, { status: 400 })
+
+  if (isPrimary) {
+    await query(`UPDATE variant_images SET is_primary = FALSE WHERE variant_id = $1`, [params.variantId])
+    await query(`UPDATE variant_images SET is_primary = TRUE WHERE id = $1`, [imageId])
+  }
+  if (displayOrder !== undefined) {
+    await query(`UPDATE variant_images SET display_order = $1 WHERE id = $2`, [displayOrder, imageId])
+  }
+  return NextResponse.json({ success: true })
+}

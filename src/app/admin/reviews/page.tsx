@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 interface Review {
   id: string
@@ -11,6 +12,8 @@ interface Review {
   comment: string
   is_verified_purchase: boolean
   is_approved: boolean
+  image_urls: string[]
+  image_thumbnail_urls: string[]
   created_at: string
   users: {
     first_name: string
@@ -34,6 +37,7 @@ export default function AdminReviewsPage() {
   )
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const { showToast } = useToast()
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -253,6 +257,21 @@ export default function AdminReviewsPage() {
                 )}
 
                 <p className="text-foreground-secondary whitespace-pre-wrap text-sm">{review.comment}</p>
+
+                {review.image_urls?.length > 0 && (
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    {review.image_urls.map((url, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setLightboxUrl(url)}
+                        className="w-20 h-20 rounded-lg overflow-hidden border border-border-secondary hover:border-accent-500 transition-colors shrink-0"
+                      >
+                        <ImgWithSkeleton src={review.image_thumbnail_urls?.[idx] || url} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {!review.is_approved && (
@@ -294,6 +313,27 @@ export default function AdminReviewsPage() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <ImgWithSkeleton
+            src={lightboxUrl}
+            alt=""
+            className="max-w-full max-h-full rounded-lg object-contain shadow-2xl"
+          />
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center bg-black/60 text-white rounded-full hover:bg-black/80 text-xl leading-none"
+            aria-label="Close"
+          >
+            ×
+          </button>
         </div>
       )}
     </div>

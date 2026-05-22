@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
+import DatePicker from '@/components/ui/DatePicker'
 
 
 interface Order {
@@ -250,19 +251,9 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
             placeholder="All Statuses"
           />
           <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={fromDate}
-              onChange={e => { setFromDate(e.target.value); syncUrl({ from: e.target.value }) }}
-              className="w-36 px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500"
-            />
+            <DatePicker className="w-36" value={fromDate} onChange={v => { setFromDate(v); syncUrl({ from: v }) }} />
             <span className="text-foreground-secondary text-xs">to</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={e => { setToDate(e.target.value); syncUrl({ to: e.target.value }) }}
-              className="w-36 px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500"
-            />
+            <DatePicker className="w-36" value={toDate} onChange={v => { setToDate(v); syncUrl({ to: v }) }} />
           </div>
         </div>
       </div>

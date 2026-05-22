@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import DatePicker from '@/components/ui/DatePicker'
 
 type Tab = 'gstr1' | 'gstr3b' | 'irn' | 'itc'
 
@@ -181,13 +182,11 @@ export default function GSTPage() {
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <label className="block text-xs text-foreground-secondary mb-1">From</label>
-            <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPreset('custom') }}
-              className="border border-border-default rounded-lg px-3 py-2 text-sm bg-surface text-foreground" />
+            <DatePicker value={from} onChange={v => { setFrom(v); setPreset('custom') }} />
           </div>
           <div>
             <label className="block text-xs text-foreground-secondary mb-1">To</label>
-            <input type="date" value={to} onChange={e => { setTo(e.target.value); setPreset('custom') }}
-              className="border border-border-default rounded-lg px-3 py-2 text-sm bg-surface text-foreground" />
+            <DatePicker value={to} onChange={v => { setTo(v); setPreset('custom') }} />
           </div>
           <button onClick={handleFetch} disabled={loading}
             className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">

@@ -16,7 +16,28 @@ export async function GET(
           '[]'::json
         ) AS product_images,
         COALESCE(
-          (SELECT json_agg(pv ORDER BY pv.variant_name)
+          (SELECT json_agg(
+             json_build_object(
+               'id', pv.id, 'sku', pv.sku, 'variant_name', pv.variant_name,
+               'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
+               'mrp_ex_gst', pv.mrp_ex_gst, 'wholeprice_ex_gst', pv.wholeprice_ex_gst,
+               'stock_quantity', pv.stock_quantity, 'pricing_type', pv.pricing_type,
+               'unit', pv.unit, 'numeric_value', pv.numeric_value,
+               'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
+               'length_rate', pv.length_rate, 'length_unit', pv.length_unit,
+               'attributes', pv.attributes, 'is_active', pv.is_active,
+               'variant_images', COALESCE(
+                 (SELECT json_agg(vi ORDER BY vi.display_order ASC)
+                  FROM variant_images vi WHERE vi.variant_id = pv.id),
+                 '[]'::json
+               ),
+               'sub_variants', COALESCE(
+                 (SELECT json_agg(sv ORDER BY sv.created_at ASC)
+                  FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true),
+                 '[]'::json
+               )
+             ) ORDER BY pv.variant_name
+           )
            FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
           '[]'::json
         ) AS product_variants,
