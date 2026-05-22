@@ -7,6 +7,7 @@ import { hasScope } from '@/lib/scopes'
 import AdminMobileNav from '@/components/admin/AdminMobileNav'
 import AdminSidebarNav from '@/components/admin/AdminSidebarNav'
 import ThemeToggle from '@/components/ThemeToggle'
+import SessionGuard from '@/components/admin/SessionGuard'
 
 export const metadata = {
   title: 'Admin Panel - Jeffi Stores',
@@ -140,6 +141,7 @@ export default async function AdminLayout({
         <main className="flex-1 bg-surface-secondary overflow-y-auto">
           {children}
         </main>
+        <SessionGuard />
       </div>
     </div>
   )

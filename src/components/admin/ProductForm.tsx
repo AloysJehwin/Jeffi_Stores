@@ -45,6 +45,7 @@ interface VariantRow {
   sub_variant_type: string
   sub_variant_type_on: boolean
   variant_type: string
+  use_own_images: boolean
   _isDeleted?: boolean
 }
 
@@ -123,6 +124,7 @@ function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string):
     weight_grams: '', package_type: '', length_cm: '', breadth_cm: '', height_cm: '',
     sub_variant_type: '', sub_variant_type_on: false,
     variant_type: '',
+    use_own_images: false,
   }
 }
 
@@ -230,6 +232,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         sub_variant_type: v.sub_variant_type || '',
         sub_variant_type_on: !!v.sub_variant_type,
         variant_type: v.variant_type || '',
+        use_own_images: !!(v.variant_images && v.variant_images.length > 0),
       }))
     }
     return []
@@ -1379,6 +1382,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       const row = { ...updated[index] }
                                       row.sub_variant_type_on = !row.sub_variant_type_on
                                       if (!row.sub_variant_type_on) row.sub_variant_type = ''
+                                      if (row.sub_variant_type_on) row.use_own_images = true
                                       updated[index] = row
                                       setVariants(updated)
                                     }}
@@ -1643,7 +1647,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
+                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) row.use_own_images = true; updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
                         <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
                       <span className="text-xs font-medium text-foreground-secondary">Has sub-variants</span>
@@ -1689,35 +1693,53 @@ export default function ProductForm({ categories, brands, action, product, produ
                 {/* Images */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Images (max 5)</p>
-                    {productId && (variantImagesMap[variantPopupId] || []).length < 5 && (
+                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Images</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-foreground-secondary">Own images</span>
                       <button
                         type="button"
-                        onClick={openVariantGallery}
-                        className="px-2.5 py-1 bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-xs font-semibold transition-colors"
+                        onClick={() => updateVariant(popupIndex, 'use_own_images', !popupVariant.use_own_images)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.use_own_images ? 'bg-accent-500' : 'bg-border-secondary'}`}
+                        role="switch"
+                        aria-checked={popupVariant.use_own_images}
                       >
-                        Choose from Gallery
+                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${popupVariant.use_own_images ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
-                    )}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(variantImagesMap[variantPopupId] || []).map((img: any) => (
-                      <div key={img.id} className="relative group w-16 h-16 rounded border border-border-default overflow-hidden bg-surface">
-                        <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover" />
-                        {img.is_primary && <span className="absolute top-0 left-0 text-[9px] bg-accent-500 text-white px-1 leading-4">★</span>}
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                          {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 text-xs leading-none" title="Set primary">★</button>}
-                          <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 text-xs leading-none" title="Delete">✕</button>
-                        </div>
+                  {popupVariant.use_own_images ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {(variantImagesMap[variantPopupId] || []).map((img: any) => (
+                          <div key={img.id} className="relative group w-16 h-16 rounded border border-border-default overflow-hidden bg-surface">
+                            <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover" />
+                            {img.is_primary && <span className="absolute top-0 left-0 text-[9px] bg-accent-500 text-white px-1 leading-4">★</span>}
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                              {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 text-xs leading-none" title="Set primary">★</button>}
+                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 text-xs leading-none" title="Delete">✕</button>
+                            </div>
+                          </div>
+                        ))}
+                        {(variantImagesMap[variantPopupId] || []).length < 5 && (
+                          <label className={`w-16 h-16 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${variantImageUploading[variantPopupId] ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVariantImageFile(variantPopupId, f); e.target.value = '' }} />
+                            {variantImageUploading[variantPopupId] ? <svg className="w-4 h-4 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
+                          </label>
+                        )}
                       </div>
-                    ))}
-                    {(variantImagesMap[variantPopupId] || []).length < 5 && (
-                      <label className={`w-16 h-16 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${variantImageUploading[variantPopupId] ? 'opacity-50 pointer-events-none' : ''}`}>
-                        <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVariantImageFile(variantPopupId, f); e.target.value = '' }} />
-                        {variantImageUploading[variantPopupId] ? <svg className="w-4 h-4 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
-                      </label>
-                    )}
-                  </div>
+                      {productId && (variantImagesMap[variantPopupId] || []).length < 5 && (
+                        <button
+                          type="button"
+                          onClick={openVariantGallery}
+                          className="mt-2 px-2.5 py-1 bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          Choose from Gallery
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-foreground-muted italic">Uses product images</p>
+                  )}
                   {variantImageError && (
                     <p className="mt-2 text-xs text-red-500">{variantImageError}</p>
                   )}
