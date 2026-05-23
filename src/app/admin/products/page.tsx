@@ -174,8 +174,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
       </div>
 
       <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div>
-          <table className="w-full divide-y divide-border-default table-fixed">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] divide-y divide-border-default table-fixed">
             <thead className="bg-surface-secondary">
               <tr>
                 <SortableHeader label="Product" column="name" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[25%]" />
