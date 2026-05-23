@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, queryCount, query } from '@/lib/db'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const campaign = await queryOne(
     'SELECT * FROM email_campaigns WHERE id = $1',
@@ -30,6 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const campaign = await queryOne<{ status: string }>('SELECT status FROM email_campaigns WHERE id = $1', [params.id])
   if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -59,6 +62,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const campaign = await queryOne<{ status: string }>('SELECT status FROM email_campaigns WHERE id = $1', [params.id])
   if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany } from '@/lib/db'
 import { generateIRN, cancelIRN, isEInvoiceConfigured, EInvoicePayload, EInvoiceItem } from '@/lib/einvoice'
 
@@ -9,6 +10,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne(`
       SELECT o.*,
@@ -118,6 +120,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne('SELECT irn, irn_status FROM orders WHERE id = $1', [params.id])
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })

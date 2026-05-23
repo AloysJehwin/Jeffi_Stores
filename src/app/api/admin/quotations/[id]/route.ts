@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
 
@@ -15,6 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   try {
     const admin = await authenticateAdmin(_req)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const qt = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [params.id])
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -30,6 +32,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const existing = await queryOne<any>(`SELECT id, status FROM quotations WHERE id = $1`, [params.id])
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -116,6 +119,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const existing = await queryOne<any>(`SELECT id, status FROM quotations WHERE id = $1`, [params.id])
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })

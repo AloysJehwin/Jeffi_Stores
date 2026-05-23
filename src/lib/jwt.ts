@@ -1,9 +1,12 @@
 import { SignJWT, jwtVerify } from 'jose'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { hasScope, getScopeForPath } from './scopes'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-)
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is not set')
+}
+
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 const JWT_EXPIRES_IN = '8h'
 
 export interface JWTPayload {
@@ -71,6 +74,18 @@ export async function authenticateUser(request: NextRequest): Promise<UserJWTPay
   } catch {
     return null
   }
+}
+
+export async function requireAdminScope(
+  request: NextRequest,
+  scope: string | null
+): Promise<AdminJWTPayload | NextResponse> {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (scope && !hasScope(admin.role, admin.scopes, scope)) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+  return admin
 }
 
 export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTPayload | null> {

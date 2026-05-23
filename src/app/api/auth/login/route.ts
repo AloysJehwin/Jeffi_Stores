@@ -4,9 +4,10 @@ import { queryOne, query } from '@/lib/db'
 import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-)
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is not set')
+}
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,12 +61,15 @@ export async function POST(request: NextRequest) {
     cookieStore.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
     })
 
     cookieStore.set('session_id', user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
     })
@@ -74,7 +78,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       message: 'Login successful',
-      token,
       user: {
         id: user.id,
         email: user.email,

@@ -3,9 +3,10 @@ import { SignJWT } from 'jose'
 import { queryOne, query } from '@/lib/db'
 import { cookies } from 'next/headers'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-)
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is not set')
+}
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
 
@@ -92,19 +93,21 @@ export async function POST(request: NextRequest) {
     cookieStore.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
     })
 
     cookieStore.set('session_id', user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
     })
 
     return NextResponse.json({
       message: 'Login successful',
-      token,
       user: {
         id: user.id,
         email: user.email,
@@ -113,7 +116,7 @@ export async function POST(request: NextRequest) {
         phone: user.phone,
       },
     })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Authentication failed' }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 })
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne } from '@/lib/db'
 import { generateQuotationPDF, QuotationBusiness } from '@/lib/quotation-pdf'
 
@@ -7,6 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const qt = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [params.id])
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })

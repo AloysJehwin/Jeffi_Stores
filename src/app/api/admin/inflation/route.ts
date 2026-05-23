@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, withTransaction } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 
 const VALID_FIELDS = ['base_price', 'mrp', 'price_ex_gst', 'wholeprice_ex_gst', 'weight_rate', 'length_rate']
 const VARIANT_FIELD_MAP: Record<string, string> = { base_price: 'price', mrp: 'mrp', price_ex_gst: 'price_ex_gst', wholeprice_ex_gst: 'wholeprice_ex_gst', weight_rate: 'weight_rate', length_rate: 'length_rate' }
@@ -13,6 +14,7 @@ function applyPct(val: number | null, pct: number): number | null {
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'inflation')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const categoryId = searchParams.get('category_id')
@@ -76,6 +78,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'inflation')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const { category_id, category_name, percentage, fields, product_ids } = body

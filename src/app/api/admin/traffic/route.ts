@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'dashboard')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
   const { searchParams } = new URL(req.url)
   const days = Math.min(Math.max(parseInt(searchParams.get('days') || '7'), 1), 90)
 

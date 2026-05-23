@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const supplier = await queryOne<any>(
       `SELECT s.*, COUNT(po.id)::int AS po_count
@@ -29,6 +31,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { name, gstin, contact_name, phone, email, address, payment_terms, notes, is_active, bank_name, account_number, ifsc, upi_id } = body
