@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { jwtVerify } from 'jose'
 import { getUserIdForSession } from '@/lib/guest-user'
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET not set") })())
 
 async function resolveUserId(cookieStore: Awaited<ReturnType<typeof cookies>>) {
   let sessionId = cookieStore.get('session_id')?.value
