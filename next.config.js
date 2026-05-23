@@ -1,3 +1,22 @@
+const ALLOWED_ORIGINS = [
+  'https://jeffistores.in',
+  'https://www.jeffistores.in',
+  'https://admin.jeffistores.in',
+].join(' ')
+
+const CSP = [
+  "default-src 'self'",
+  "img-src 'self' data: blob: https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com https://lh3.googleusercontent.com https://www.google-analytics.com https://www.googletagmanager.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://accounts.google.com https://www.googletagmanager.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "connect-src 'self' https://api.razorpay.com https://oauth2.googleapis.com https://dm9rri2wgl1e.cloudfront.net https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com",
+  "frame-src https://checkout.razorpay.com https://accounts.google.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ')
+
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
@@ -17,6 +36,12 @@ const nextConfig = {
   },
   async headers() {
     return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'Content-Security-Policy', value: CSP },
+        ],
+      },
       {
         source: '/api/gallery/:path*',
         headers: [
@@ -38,4 +63,3 @@ const nextConfig = {
 }
 
 module.exports = nextConfig
-
