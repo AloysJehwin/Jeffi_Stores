@@ -59,3 +59,5 @@ jeffi-stores-*.json
 # Business documents (keep local, don't commit)
 GST Certificate*.pdf
 INV*.pdf
+# pg_dump artifact (regenerate via database/schema/README.md)
+database/schema-live.sql

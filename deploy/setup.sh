@@ -9,7 +9,7 @@ set -euo pipefail
 
 DOMAIN="jeffistores.in"
 APP_DIR="/opt/jeffi-stores"
-REPO_URL="git@github.com:AloysDev/Jeffi_Storess_Site.git"  # UPDATE THIS
+REPO_URL="git@github.com:AloysJehwin/Jeffi_Stores.git"
 
 echo "========================================="
 echo "  Jeffi Stores EC2 Setup"
@@ -161,9 +161,30 @@ echo ">> Waiting for containers to start..."
 sleep 5
 docker compose -f docker-compose.prod.yml ps
 
-# ---- Step 9: Setup cert auto-renewal ----
+# ---- Step 9.5: Apply database migrations ----
+echo ">> Applying database migrations..."
+DB_URL=$(grep -E '^DATABASE_URL=' "$APP_DIR/.env.production" | cut -d'=' -f2-)
+if [ -n "$DB_URL" ] && [ -d "$APP_DIR/database/migrations" ]; then
+    for migration in "$APP_DIR"/database/migrations/*.sql; do
+        if [ -f "$migration" ]; then
+            mig_name=$(basename "$migration")
+            echo ">>   $mig_name"
+            docker run --rm -v "$APP_DIR/database/migrations:/migrations" postgres:15-alpine \
+                psql "$DB_URL" -v ON_ERROR_STOP=0 -f "/migrations/$mig_name" 2>&1 | tail -3 || \
+                echo "!!   $mig_name failed — review manually"
+        fi
+    done
+else
+    echo "!! Skipping migrations (DATABASE_URL not found or migrations dir missing)"
+fi
+
+# ---- Step 10: Setup cert auto-renewal ----
 echo ">> Setting up SSL auto-renewal..."
 (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'docker restart jeffi-nginx'") | crontab -
+
+# ---- Step 11: Nightly Google Merchant Center sync ----
+echo ">> Setting up nightly Merchant Center sync..."
+(crontab -l 2>/dev/null; echo "30 2 * * * curl -sf -X GET https://jeffistores.in/api/admin/merchant/sync -H \"Authorization: Bearer \$CRON_SECRET\" > /var/log/jeffi-merchant-sync.log 2>&1") | crontab -
 
 echo ""
 echo "========================================="
