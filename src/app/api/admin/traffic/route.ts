@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/jwt'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { searchParams } = new URL(req.url)
   const days = Math.min(Math.max(parseInt(searchParams.get('days') || '7'), 1), 90)
 
