@@ -197,6 +197,8 @@ async function createProduct(formData: FormData) {
 
     const { syncProductToSheet } = await import('@/lib/google-sheets')
     syncProductToSheet(data.id).catch(() => {})
+    const { syncProductToMerchant } = await import('@/lib/merchant/sync')
+    syncProductToMerchant(data.id).catch(() => {})
 
     redirect('/admin/products')
   } catch (err: any) {

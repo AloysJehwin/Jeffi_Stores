@@ -161,9 +161,24 @@ echo ">> Waiting for containers to start..."
 sleep 5
 docker compose -f docker-compose.prod.yml ps
 
-# ---- Step 9: Setup cert auto-renewal ----
+# ---- Step 9.5: Apply database migrations ----
+echo ">> Applying database migrations..."
+if [ -f "$APP_DIR/database/migrations/add_merchant_sync_log.sql" ]; then
+    DB_URL=$(grep -E '^DATABASE_URL=' "$APP_DIR/.env.production" | cut -d'=' -f2-)
+    if [ -n "$DB_URL" ]; then
+        docker run --rm -v "$APP_DIR/database/migrations:/migrations" postgres:15-alpine \
+            psql "$DB_URL" -f /migrations/add_merchant_sync_log.sql || \
+            echo "!! Migration failed — apply manually: psql \"\$DATABASE_URL\" -f database/migrations/add_merchant_sync_log.sql"
+    fi
+fi
+
+# ---- Step 10: Setup cert auto-renewal ----
 echo ">> Setting up SSL auto-renewal..."
 (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet --deploy-hook 'docker restart jeffi-nginx'") | crontab -
+
+# ---- Step 10: Nightly Google Merchant Center sync ----
+echo ">> Setting up nightly Merchant Center sync..."
+(crontab -l 2>/dev/null; echo "30 2 * * * curl -sf -X GET https://jeffistoress.com/api/admin/merchant/sync -H \"Authorization: Bearer \$CRON_SECRET\" > /var/log/jeffi-merchant-sync.log 2>&1") | crontab -
 
 echo ""
 echo "========================================="
