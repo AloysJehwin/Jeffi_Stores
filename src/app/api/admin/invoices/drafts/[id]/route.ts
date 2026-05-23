@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction } from '@/lib/db'
 import { isInterState, calculateGST } from '@/lib/gst'
 
@@ -9,6 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(
       `SELECT o.*, a.address_line1, a.address_line2, a.city, a.state, a.postal_code
@@ -31,6 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(`SELECT id, status FROM orders WHERE id = $1`, [params.id])
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
@@ -149,6 +152,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(`SELECT id, status FROM orders WHERE id = $1`, [params.id])
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })

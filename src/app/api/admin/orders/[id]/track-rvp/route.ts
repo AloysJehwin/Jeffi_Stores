@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 
 const TOKEN = process.env.DELHIVERY_API_KEY
@@ -11,6 +12,7 @@ export async function GET(
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const rr = await queryOne<{ rvp_awb_number: string | null }>(
       `SELECT rvp_awb_number FROM return_requests WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`,
