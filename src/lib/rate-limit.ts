@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getRedisClient } from './redis'
 
 export interface RateLimitConfig {
   windowSecs: number
@@ -23,6 +22,8 @@ const TIERS: Array<{ pattern: RegExp; config: RateLimitConfig }> = [
   { pattern: /^\/api\//,                     config: { windowSecs: 10,  max: 60  } },
 ]
 
+const memStore = new Map<string, { count: number; expiry: number }>()
+
 function getClientIp(request: NextRequest): string {
   return (
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -38,6 +39,57 @@ function getTier(pathname: string): RateLimitConfig | null {
   return null
 }
 
+async function redisIncrExpire(key: string, windowSecs: number): Promise<{ count: number; ttl: number } | null> {
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
+  if (!redisUrl || !redisToken) return null
+
+  try {
+    const [incrRes, expireRes] = await Promise.all([
+      fetch(`${redisUrl}/incr/${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${redisToken}` },
+      }),
+      fetch(`${redisUrl}/expire/${encodeURIComponent(key)}/${windowSecs}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${redisToken}` },
+      }),
+    ])
+
+    const incrData = await incrRes.json()
+    const count = incrData.result as number
+
+    if (count === 1) {
+      await expireRes // already fetched, just consume
+    }
+
+    const ttlRes = await fetch(`${redisUrl}/ttl/${encodeURIComponent(key)}`, {
+      headers: { Authorization: `Bearer ${redisToken}` },
+    })
+    const ttlData = await ttlRes.json()
+    const ttl = ttlData.result as number
+
+    return { count, ttl: ttl > 0 ? ttl : windowSecs }
+  } catch {
+    return null
+  }
+}
+
+function memIncrExpire(key: string, windowSecs: number): { count: number; ttl: number } {
+  const now = Date.now()
+  const entry = memStore.get(key)
+
+  if (!entry || now > entry.expiry) {
+    const expiry = now + windowSecs * 1000
+    memStore.set(key, { count: 1, expiry })
+    return { count: 1, ttl: windowSecs }
+  }
+
+  entry.count++
+  const ttl = Math.ceil((entry.expiry - now) / 1000)
+  return { count: entry.count, ttl }
+}
+
 export async function applyRateLimit(request: NextRequest): Promise<NextResponse | null> {
   const { pathname } = request.nextUrl
   const config = getTier(pathname)
@@ -47,31 +99,22 @@ export async function applyRateLimit(request: NextRequest): Promise<NextResponse
   const pathKey = pathname.split('/').slice(0, 4).join('/')
   const key = `rl:${ip}:${pathKey}`
 
-  try {
-    const redis = getRedisClient()
-    const count = await redis.incr(key)
-    if (count === 1) {
-      await (redis as any).expire(key, config.windowSecs)
-    }
+  const result = (await redisIncrExpire(key, config.windowSecs)) ?? memIncrExpire(key, config.windowSecs)
 
-    if (count > config.max) {
-      const ttl = await redis.ttl(key)
-      return NextResponse.json(
-        { error: 'Too many requests. Please slow down.' },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': String(ttl > 0 ? ttl : config.windowSecs),
-            'X-RateLimit-Limit': String(config.max),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + (ttl > 0 ? ttl : config.windowSecs)),
-          },
-        }
-      )
-    }
-
-    return null
-  } catch {
-    return null
+  if (result.count > config.max) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please slow down.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(result.ttl),
+          'X-RateLimit-Limit': String(config.max),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + result.ttl),
+        },
+      }
+    )
   }
+
+  return null
 }
