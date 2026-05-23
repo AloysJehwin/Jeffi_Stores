@@ -173,7 +173,36 @@ jobs:
     runs-on: ubuntu-latest
     needs: [docker]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      deployments: write
     steps:
+      - name: Create deployment
+        id: create_deployment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const dep = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+              environment: 'production',
+              description: 'EC2 rolling deploy to jeffistores.in',
+              auto_merge: false,
+              required_contexts: [],
+              transient_environment: false,
+              production_environment: true,
+            });
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: dep.data.id,
+              state: 'in_progress',
+              environment_url: 'https://jeffistores.in',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+            return dep.data.id;
+
       - name: Get EC2 public IP
         id: ec2
         env:
@@ -233,6 +262,35 @@ jobs:
 
             echo "── Status ──"
             docker compose -f docker-compose.prod.yml ps
+
+      - name: Mark deployment success
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.create_deployment.outputs.result }},
+              state: 'success',
+              environment_url: 'https://jeffistores.in',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: 'Deployed to EC2 successfully',
+            });
+
+      - name: Mark deployment failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ steps.create_deployment.outputs.result }},
+              state: 'failure',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: 'EC2 deploy failed — check logs',
+            });
 
   # ────────────────────────────────────────────────────────
   # Stage 5 — DB migrations  (main only, gate: deploy + new .sql files)
