@@ -53,6 +53,11 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
               text-align: center;
               margin-bottom: 30px;
             }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
             .otp-box {
               background-color: #2563eb;
               color: white;
@@ -158,6 +163,11 @@ export async function sendWelcomeEmail(email: string, name: string) {
               text-align: center;
               margin-bottom: 30px;
             }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
             .button {
               display: inline-block;
               background-color: #f97316;
@@ -252,6 +262,11 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
             .header {
               text-align: center;
               margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
             }
             .order-box {
               background-color: #e3f2fd;
@@ -608,6 +623,11 @@ export async function sendOrderStatusUpdate(
               text-align: center;
               margin-bottom: 30px;
             }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
             .status-badge {
               background-color: ${statusInfo.color};
               color: white;
@@ -801,6 +821,11 @@ export async function sendPaymentStatusUpdate(
               text-align: center;
               margin-bottom: 30px;
             }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
+            }
             .payment-badge {
               background-color: ${paymentInfo.color};
               color: white;
@@ -979,6 +1004,11 @@ export async function sendAdminCertificateEmail(
             .header {
               text-align: center;
               margin-bottom: 30px;
+            }
+            .logo {
+              font-size: 28px;
+              font-weight: bold;
+              color: #2563eb;
             }
             .credential-box {
               background-color: #1e293b;
@@ -1381,6 +1411,7 @@ export async function sendAdminContactEmail(
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
             .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
             .header { text-align: center; padding-bottom: 20px; border-bottom: 3px solid #f97316; margin-bottom: 30px; }
+            .logo { font-size: 28px; font-weight: bold; color: #f97316; }
             .message-box { background-color: #fff; border-left: 4px solid #f97316; padding: 20px; border-radius: 4px; margin: 20px 0; white-space: pre-wrap; }
             .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 13px; }
           </style>
@@ -1433,6 +1464,7 @@ export async function sendSupportEscalationEmail(
         body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
         .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
         .header{background:#f97316;padding:24px;text-align:center}
+        .logo{font-size:24px;font-weight:bold;color:#fff}
         .body{padding:28px}
         .info-box{background:#fff7ed;border-left:4px solid #f97316;padding:16px;border-radius:4px;margin:20px 0}
         .cta{display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;margin-top:16px}
@@ -1481,6 +1513,7 @@ export async function sendAgentConnectedEmail(
         body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
         .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
         .header{background:#f97316;padding:24px;text-align:center}
+        .logo{font-size:24px;font-weight:bold;color:#fff}
         .body{padding:28px}
         .info-box{background:#fff7ed;border-left:4px solid #f97316;padding:16px;border-radius:4px;margin:20px 0}
         .cta{display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:15px;margin-top:16px}
@@ -1578,6 +1611,7 @@ export async function sendReturnStatusEmail(
         body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
         .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
         .header{background:#5a8a00;padding:24px;text-align:center}
+        .logo{font-size:24px;font-weight:bold;color:#fff}
         .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
@@ -1616,7 +1650,8 @@ export async function sendPaymentRetryEmail(
 <style>
   body{margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
   .wrap{max-width:600px;margin:32px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-  .hdr{background:#1a3a4a;padding:20px 32px;text-align:center}
+  .hdr{background:#1a3a4a;padding:20px 32px}
+  .hdr a{color:#fff;font-size:20px;font-weight:700;text-decoration:none}
   .body{padding:32px}
   .badge{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;margin:20px 0;text-align:center}
   .badge p{margin:0;color:#dc2626;font-weight:700;font-size:18px}
@@ -1674,6 +1709,7 @@ export async function sendInvoiceFinalizedEmail(
             body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
             .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
             .header{background:#1a3a4a;padding:24px;text-align:center}
+            .logo{font-size:22px;font-weight:bold;color:#fff}
             .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
             .box{background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;border-radius:4px;margin:20px 0}
             .btn{display:inline-block;background:#1a3a4a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
@@ -1740,6 +1776,7 @@ export async function sendPurchaseOrderEmail(
             body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
             .container{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
             .header{background:#1a3a4a;padding:24px;text-align:center}
+            .logo{font-size:22px;font-weight:bold;color:#fff}
             .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
             .box{background:#eff6ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
             .btn{display:inline-block;background:#1a3a4a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
@@ -1814,6 +1851,7 @@ export async function sendPOReceiveNotificationEmail(
             body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
             .container{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
             .header{background:#1a3a4a;padding:24px;text-align:center}
+            .logo{font-size:22px;font-weight:bold;color:#fff}
             .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
             .box{background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;border-radius:4px;margin:20px 0}
             table{width:100%;border-collapse:collapse;margin-top:16px}
@@ -1878,6 +1916,7 @@ export async function sendQuotationFinalizedEmail(
             body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
             .container{max-width:560px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
             .header{background:#1a3a4a;padding:24px;text-align:center}
+            .logo{font-size:22px;font-weight:bold;color:#fff}
             .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
             .box{background:#f0f9ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
             .btn{display:inline-block;background:#1a3a4a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}

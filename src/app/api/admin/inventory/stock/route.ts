@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { getStockLedger, getStockValuation, logStockMovement } from '@/lib/inventory'
 import { getClient } from '@/lib/db'
 
@@ -9,6 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const view = searchParams.get('view') || 'ledger'
@@ -39,6 +41,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { product_id, variant_id, sub_variant_id, new_quantity, notes } = await request.json()
     if (!product_id || new_quantity == null) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })

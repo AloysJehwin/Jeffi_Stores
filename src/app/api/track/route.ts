@@ -17,10 +17,11 @@ export async function POST(req: NextRequest) {
 
     let userId: string | null = null
     try {
-      const token = cookies().get('user_token')?.value
+      const cookieStore = await cookies()
+      const token = cookieStore.get('auth_token')?.value
       if (token) {
         const payload = await verifyToken(token) as any
-        userId = payload?.userId || payload?.id || null
+        userId = payload?.userId || null
       }
     } catch {}
 

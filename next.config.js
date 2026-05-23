@@ -45,17 +45,19 @@ const nextConfig = {
       {
         source: '/api/gallery/:path*',
         headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Origin', value: ALLOWED_ORIGINS },
           { key: 'Access-Control-Allow-Methods', value: 'GET,POST,DELETE,OPTIONS' },
           { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization' },
+          { key: 'Vary', value: 'Origin' },
         ],
       },
       {
         source: '/api/categories',
         headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Origin', value: ALLOWED_ORIGINS },
           { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS' },
           { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization' },
+          { key: 'Vary', value: 'Origin' },
         ],
       },
     ]

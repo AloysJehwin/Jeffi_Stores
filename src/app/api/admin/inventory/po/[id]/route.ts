@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, query } from '@/lib/db'
 import { sendPurchaseOrderEmail } from '@/lib/email'
 
@@ -9,6 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const po = await queryOne<any>(
       `SELECT po.*, s.name AS supplier_name, s.gstin AS supplier_gstin,
@@ -43,6 +45,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { status, expected_date, notes } = body
