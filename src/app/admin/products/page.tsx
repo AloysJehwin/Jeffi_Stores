@@ -9,6 +9,7 @@ import DownloadAdButton from '@/components/admin/DownloadAdButton'
 import ProductsTableClient from '@/components/admin/ProductsTableClient'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
+import MerchantSyncStatus from '@/components/admin/MerchantSyncStatus'
 
 const PAGE_SIZE = 25
 
@@ -76,6 +77,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
           Add New Product
         </Link>
       </div>
+
+      <MerchantSyncStatus />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
@@ -174,8 +177,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
       </div>
 
       <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div>
-          <table className="w-full divide-y divide-border-default table-fixed">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] divide-y divide-border-default table-fixed">
             <thead className="bg-surface-secondary">
               <tr>
                 <SortableHeader label="Product" column="name" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[25%]" />

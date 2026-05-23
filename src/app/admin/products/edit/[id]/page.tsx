@@ -292,6 +292,8 @@ async function updateProduct(productId: string, formData: FormData) {
 
     const { syncProductToSheet } = await import('@/lib/google-sheets')
     syncProductToSheet(productId).catch(() => {})
+    const { syncProductToMerchant } = await import('@/lib/merchant/sync')
+    syncProductToMerchant(productId).catch(() => {})
 
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
