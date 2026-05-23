@@ -49,7 +49,7 @@ interface CartContextType {
   cartItems: CartItem[]
   cartCount: number
   isLoading: boolean
-  addToCart: (productId: string, quantity?: number, variantId?: string, buyMode?: string, buyUnit?: string) => Promise<void>
+  addToCart: (productId: string, quantity?: number, variantId?: string, buyMode?: string, buyUnit?: string, subVariantId?: string) => Promise<void>
   removeFromCart: (cartItemId: string) => Promise<void>
   updateQuantity: (cartItemId: string, quantity: number) => Promise<void>
   refreshCart: () => Promise<void>
@@ -95,12 +95,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
-  const addToCart = async (productId: string, quantity = 1, variantId?: string, buyMode = 'unit', buyUnit?: string) => {
+  const addToCart = async (productId: string, quantity = 1, variantId?: string, buyMode = 'unit', buyUnit?: string, subVariantId?: string) => {
     try {
       const response = await fetch('/api/cart', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, quantity, variantId: variantId || null, buyMode, buyUnit: buyUnit || null }),
+        body: JSON.stringify({ productId, quantity, variantId: variantId || null, buyMode, buyUnit: buyUnit || null, subVariantId: subVariantId || null }),
         credentials: 'include',
       })
 

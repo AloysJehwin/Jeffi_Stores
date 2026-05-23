@@ -40,23 +40,33 @@ export async function PATCH(request: NextRequest) {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { product_id, variant_id, new_quantity, notes } = await request.json()
+    const { product_id, variant_id, sub_variant_id, new_quantity, notes } = await request.json()
     if (!product_id || new_quantity == null) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
     const client = await getClient()
     try {
       await client.query('BEGIN')
 
-      const cur = variant_id
-        ? await client.query<{ inventory_quantity: number }>(
-            'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variant_id])
-        : await client.query<{ inventory_quantity: number }>(
-            'SELECT inventory_quantity FROM products WHERE id = $1', [product_id])
+      let currentQty: number
+      if (sub_variant_id) {
+        const cur = await client.query<{ stock_quantity: number }>(
+          'SELECT stock_quantity FROM product_sub_variants WHERE id = $1', [sub_variant_id])
+        currentQty = parseFloat(cur.rows[0]?.stock_quantity as any) || 0
+      } else if (variant_id) {
+        const cur = await client.query<{ inventory_quantity: number }>(
+          'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variant_id])
+        currentQty = parseFloat(cur.rows[0]?.inventory_quantity as any) || 0
+      } else {
+        const cur = await client.query<{ inventory_quantity: number }>(
+          'SELECT inventory_quantity FROM products WHERE id = $1', [product_id])
+        currentQty = parseFloat(cur.rows[0]?.inventory_quantity as any) || 0
+      }
 
-      const currentQty = parseFloat(cur.rows[0]?.inventory_quantity as any) || 0
       const change = new_quantity - currentQty
 
-      if (variant_id) {
+      if (sub_variant_id) {
+        await client.query('UPDATE product_sub_variants SET stock_quantity = $1 WHERE id = $2', [new_quantity, sub_variant_id])
+      } else if (variant_id) {
         await client.query('UPDATE product_variants SET inventory_quantity = $1 WHERE id = $2', [new_quantity, variant_id])
       } else {
         await client.query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [new_quantity, product_id])
