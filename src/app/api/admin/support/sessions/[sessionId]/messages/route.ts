@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne } from '@/lib/db'
 import { sendAgentConnectedEmail } from '@/lib/email'
 
@@ -9,9 +10,8 @@ export async function GET(
 ) {
   try {
     const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const messages = await queryMany(
       `SELECT id, sender, message, created_at FROM support_messages
@@ -31,9 +31,8 @@ export async function POST(
 ) {
   try {
     const admin = await authenticateAdmin(request)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const session = await queryOne<{ id: string; admin_name: string | null; user_id: string }>(
       `SELECT id, admin_name, user_id FROM support_sessions WHERE id = $1 AND status = 'open'`,

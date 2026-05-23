@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { name } = await request.json()
     if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })

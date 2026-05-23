@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany } from '@/lib/db'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const form = await queryOne('SELECT * FROM review_forms WHERE id = $1', [params.id])
   if (!form) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -14,6 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const fields = ['title', 'slug', 'description', 'template_type', 'google_review_url', 'coupon_id', 'is_active', 'custom_fields']
@@ -41,6 +44,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   await queryOne('DELETE FROM review_forms WHERE id = $1', [params.id])
   return NextResponse.json({ success: true })

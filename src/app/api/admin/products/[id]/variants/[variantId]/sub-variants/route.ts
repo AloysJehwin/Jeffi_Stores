@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { generateVariantSku } from '@/lib/sku'
 
@@ -8,6 +9,7 @@ type Params = { params: { id: string; variantId: string } }
 export async function GET(request: NextRequest, { params }: Params) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rows = await queryMany(
     `SELECT * FROM product_sub_variants WHERE variant_id = $1 ORDER BY created_at ASC`,
@@ -19,6 +21,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function POST(request: NextRequest, { params }: Params) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const variant = await queryOne(
     `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`,
@@ -48,6 +51,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 export async function PUT(request: NextRequest, { params }: Params) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const { id, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, wholeprice_ex_gst, stock_quantity, attributes, is_active } = body
@@ -75,6 +79,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { id } = await request.json()
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })

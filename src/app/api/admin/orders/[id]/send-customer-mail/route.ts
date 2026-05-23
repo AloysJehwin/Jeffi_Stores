@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 import { sendAdminContactEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { subject, body } = await request.json()
   if (!subject?.trim() || !body?.trim()) {

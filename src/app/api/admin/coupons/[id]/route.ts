@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany } from '@/lib/db'
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'coupons')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const fields = ['code', 'description', 'discount_type', 'discount_value', 'min_purchase_amount', 'max_discount_amount', 'usage_limit', 'usage_limit_per_user', 'valid_from', 'valid_until', 'is_active']
@@ -33,6 +35,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'coupons')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const inUse = await queryOne('SELECT id FROM review_forms WHERE coupon_id = $1 LIMIT 1', [params.id])
   if (inUse) return NextResponse.json({ error: 'Coupon is used by a review form — remove it from the form first' }, { status: 409 })

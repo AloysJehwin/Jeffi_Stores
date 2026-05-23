@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { generateBulkPackingSlipPDF, loadStoreSettings, PackingSlipOrder } from '@/lib/packing-slip-pdf'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'packing_slips')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { order_ids } = await request.json()
   if (!Array.isArray(order_ids) || order_ids.length === 0) {
