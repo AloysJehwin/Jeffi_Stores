@@ -60,7 +60,7 @@ async function redisIncrExpire(key: string, windowSecs: number): Promise<{ count
     const count = incrData.result as number
 
     if (count === 1) {
-      await expireRes // already fetched, just consume
+      await expireRes
     }
 
     const ttlRes = await fetch(`${redisUrl}/ttl/${encodeURIComponent(key)}`, {
