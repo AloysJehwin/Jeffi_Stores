@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { generatePackingSlipPDF, loadStoreSettings, PackingSlipOrder } from '@/lib/packing-slip-pdf'
 
 async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
@@ -31,6 +32,7 @@ async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'packing_slips')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const [order, store] = await Promise.all([fetchOrder(params.id), loadStoreSettings()])
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })

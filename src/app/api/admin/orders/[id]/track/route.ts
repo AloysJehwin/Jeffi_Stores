@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 
@@ -30,6 +31,7 @@ export async function GET(
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<{
       awb_number: string | null; status: string

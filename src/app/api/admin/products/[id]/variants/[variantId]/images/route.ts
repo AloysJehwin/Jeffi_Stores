@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { uploadVariantImage, deleteProductImage, getS3Url } from '@/lib/s3'
 
@@ -10,6 +11,7 @@ type Params = { params: { id: string; variantId: string } }
 export async function GET(request: NextRequest, { params }: Params) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const images = await queryMany(
     `SELECT * FROM variant_images WHERE variant_id = $1 ORDER BY display_order ASC, created_at ASC`,
@@ -21,6 +23,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function POST(request: NextRequest, { params }: Params) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   try {
     const variant = await queryOne(
@@ -96,6 +99,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 export async function DELETE(request: NextRequest, { params }: Params) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { imageId } = await request.json()
   if (!imageId) return NextResponse.json({ error: 'imageId required' }, { status: 400 })
@@ -124,6 +128,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 export async function PATCH(request: NextRequest, { params }: Params) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { imageId, isPrimary, displayOrder } = await request.json()
   if (!imageId) return NextResponse.json({ error: 'imageId required' }, { status: 400 })

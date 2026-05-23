@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { jwtVerify } from 'jose'
 import { queryMany, queryCount } from '@/lib/db'
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET not set") })())
 
 const PAGE_SIZE = 10
 

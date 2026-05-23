@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, withTransaction } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 
 const VARIANT_FIELD_MAP: Record<string, string> = {
   base_price: 'price',
@@ -14,6 +15,7 @@ const VARIANT_FIELD_MAP: Record<string, string> = {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'inflation')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { log_id } = await request.json()
   if (!log_id) return NextResponse.json({ error: 'log_id required' }, { status: 400 })

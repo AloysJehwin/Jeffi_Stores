@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
 import { buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause, buildSearchClause } from '@/lib/search'
+import { authenticateAdmin } from '@/lib/jwt'
 
 export const dynamic = 'force-dynamic'
 
@@ -275,6 +276,9 @@ const handlers: Record<string, (q: string) => Promise<SuggestItem[]>> = {
 }
 
 export async function GET(request: NextRequest) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
     const q = request.nextUrl.searchParams.get('q')?.trim() || ''
     const type = request.nextUrl.searchParams.get('type') || ''

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { suggestIcon } from '@/lib/iconSuggest'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'categories')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { name } = await req.json()
   if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })

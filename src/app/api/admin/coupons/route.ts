@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryMany, queryCount } from '@/lib/db'
 import { buildSearchClause } from '@/lib/search'
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'coupons')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const search = searchParams.get('search') || ''
@@ -42,6 +44,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'coupons')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const { code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active } = body

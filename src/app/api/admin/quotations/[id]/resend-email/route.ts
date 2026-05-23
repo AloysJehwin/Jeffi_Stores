@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
 
@@ -9,6 +10,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const qt = await queryOne<any>(
       `SELECT consignee_email, consignee_name, quote_number, total_amount, view_token FROM quotations WHERE id = $1`,
