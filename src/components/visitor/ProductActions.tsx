@@ -120,6 +120,7 @@ export default function ProductActions({
     }
     return modeVariants[0]?.id ?? variants[0].id
   })
+  const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
 
   const hasVariants = variants.length > 0
   const selectedVariant = variants.find(v => v.id === selectedVariantId)
@@ -129,6 +130,10 @@ export default function ProductActions({
     const first = variants.filter(v => (v.pricing_type || 'unit') === selectedMode)[0]
     if (first) setSelectedVariantId(first.id)
   }, [selectedMode])
+
+  useEffect(() => {
+    setSelectedSubVariantId(null)
+  }, [selectedVariantId])
 
   useEffect(() => {
     if (!hasVariants || !selectedVariant) return
@@ -141,16 +146,20 @@ export default function ProductActions({
     if (onVariantChange) onVariantChange(selectedVariant ?? null)
   }, [selectedVariantId])
 
+  const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
+
   const effectivePrice = hasVariants
-    ? (selectedVariant?.price ?? basePrice)
+    ? (selectedSubVariant?.price != null ? Number(selectedSubVariant.price) : (selectedVariant?.price ?? basePrice))
     : (salePrice ?? basePrice)
   const effectiveMrp = hasVariants
-    ? (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp)
+    ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))
     : mrp
   const effectiveWholesalePrice = hasVariants
     ? (selectedVariant?.wholeprice_ex_gst != null ? Number(selectedVariant.wholeprice_ex_gst) : wholesalePrice)
     : wholesalePrice
-  const effectiveStock = hasVariants ? (selectedVariant?.stock_quantity ?? 0) : stockQuantity
+  const effectiveStock = hasVariants
+    ? (selectedSubVariant ? selectedSubVariant.stock_quantity : (selectedVariant?.stock_quantity ?? 0))
+    : stockQuantity
 
   const mrpDiscount = effectiveMrp && effectiveMrp > effectivePrice
     ? Math.round(((effectiveMrp - effectivePrice) / effectiveMrp) * 100)
@@ -244,7 +253,11 @@ export default function ProductActions({
         showToast('Enter a valid quantity', 'error')
         return
       }
-      await addToCart(productId, finalQty, selectedVariantId || undefined, buyMode, currentUnit || undefined)
+      if (selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && !selectedSubVariantId) {
+        showToast(`Please select a ${selectedVariant.sub_variant_type || 'sub-variant'}`, 'error')
+        return
+      }
+      await addToCart(productId, finalQty, selectedVariantId || undefined, buyMode, currentUnit || undefined, selectedSubVariantId || undefined)
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')
@@ -258,6 +271,11 @@ export default function ProductActions({
     const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
     if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
       showToast('Enter a valid quantity', 'error')
+      setIsBuyingNow(false)
+      return
+    }
+    if (selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && !selectedSubVariantId) {
+      showToast(`Please select a ${selectedVariant.sub_variant_type || 'sub-variant'}`, 'error')
       setIsBuyingNow(false)
       return
     }
@@ -277,6 +295,8 @@ export default function ProductActions({
     })
     if (selectedVariantId) params.set('variantId', selectedVariantId)
     if (selectedVariant) params.set('variantName', selectedVariant.variant_name)
+    if (selectedSubVariantId) params.set('subVariantId', selectedSubVariantId)
+    if (selectedSubVariant) params.set('subVariantName', selectedSubVariant.sub_variant_name)
     if (currentUnit) params.set('buyUnit', currentUnit)
     router.push(`/checkout/review?${params.toString()}`)
   }
@@ -396,17 +416,22 @@ export default function ProductActions({
               </label>
               <div className="flex flex-wrap gap-2">
                 {selectedVariant.sub_variants.map((sv) => (
-                  <div
+                  <button
                     key={sv.id}
+                    type="button"
+                    disabled={sv.stock_quantity === 0}
+                    onClick={() => setSelectedSubVariantId(sv.id)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                      sv.stock_quantity > 0
-                        ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400 cursor-pointer'
-                        : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
+                      selectedSubVariantId === sv.id
+                        ? 'bg-accent-500 text-white border-accent-500'
+                        : sv.stock_quantity > 0
+                          ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
+                          : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
                     }`}
                   >
                     {sv.sub_variant_name}
                     {sv.stock_quantity === 0 && ' (Out of Stock)'}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>

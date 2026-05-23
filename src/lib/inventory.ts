@@ -156,6 +156,8 @@ export async function getStockValuation() {
       COALESCE(p.inventory_quantity, 0) * ROUND(COALESCE(p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS stock_value,
       NULL::uuid AS variant_id,
       NULL AS variant_name,
+      NULL::uuid AS sub_variant_id,
+      NULL AS sub_variant_name,
       FALSE AS has_variants,
       p.category_id,
       c.name AS category_name,
@@ -173,6 +175,8 @@ export async function getStockValuation() {
       COALESCE(pv.inventory_quantity, 0) * ROUND(COALESCE(pv.price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS stock_value,
       pv.id AS variant_id,
       pv.variant_name,
+      NULL::uuid AS sub_variant_id,
+      NULL AS sub_variant_name,
       TRUE AS has_variants,
       p.category_id,
       c.name AS category_name,
@@ -182,7 +186,29 @@ export async function getStockValuation() {
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN brands b ON b.id = p.brand_id
     WHERE p.is_active = TRUE AND pv.is_active = TRUE
-    ORDER BY name, variant_name
+      AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = TRUE)
+    UNION ALL
+    SELECT
+      p.id, p.name, p.sku, sv.stock_quantity AS inventory_quantity,
+      COALESCE(p.gst_percentage, 0) AS gst_percentage,
+      COALESCE(sv.price, pv.price, p.base_price, 0) AS selling_price,
+      ROUND(COALESCE(sv.price, pv.price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS cost_price,
+      COALESCE(sv.stock_quantity, 0) * ROUND(COALESCE(sv.price, pv.price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS stock_value,
+      pv.id AS variant_id,
+      pv.variant_name,
+      sv.id AS sub_variant_id,
+      sv.sub_variant_name,
+      TRUE AS has_variants,
+      p.category_id,
+      c.name AS category_name,
+      b.name AS brand_name
+    FROM product_sub_variants sv
+    JOIN product_variants pv ON pv.id = sv.variant_id
+    JOIN products p ON p.id = pv.product_id
+    LEFT JOIN categories c ON c.id = p.category_id
+    LEFT JOIN brands b ON b.id = p.brand_id
+    WHERE p.is_active = TRUE AND pv.is_active = TRUE AND sv.is_active = TRUE
+    ORDER BY name, variant_name, sub_variant_name
   `)
 
   const totalValue = (products || []).reduce((sum, r) => sum + parseFloat(r.stock_value || '0'), 0)

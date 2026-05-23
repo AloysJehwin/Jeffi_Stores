@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { productId, quantity = 1, variantId, buyMode = 'unit', buyUnit } = body
+    const { productId, quantity = 1, variantId, buyMode = 'unit', buyUnit, subVariantId } = body
 
     const cookieStore = await cookies()
     const { userId } = await resolveUserId(cookieStore)
@@ -81,7 +81,23 @@ export async function POST(request: NextRequest) {
 
     let priceAtAddition: number
 
-    if (variantId) {
+    if (subVariantId) {
+      const subVariant = await queryOne(
+        'SELECT id, price FROM product_sub_variants WHERE id = $1 AND is_active = true',
+        [subVariantId]
+      )
+      if (!subVariant) return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
+      if (variantId) {
+        const variant = await queryOne(
+          'SELECT id, price FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
+          [variantId, productId]
+        )
+        if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
+        priceAtAddition = subVariant.price ?? variant.price ?? product.base_price
+      } else {
+        priceAtAddition = subVariant.price ?? product.base_price
+      }
+    } else if (variantId) {
       const variant = await queryOne(
         'SELECT id, price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
         [variantId, productId]
@@ -105,8 +121,8 @@ export async function POST(request: NextRequest) {
     }
 
     const existingItem = await queryOne(
-      'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3 AND buy_mode = $4',
-      [userId, productId, variantId || null, buyMode]
+      'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3 AND sub_variant_id IS NOT DISTINCT FROM $4 AND buy_mode = $5',
+      [userId, productId, variantId || null, subVariantId || null, buyMode]
     )
 
     if (existingItem) {
@@ -116,8 +132,8 @@ export async function POST(request: NextRequest) {
     }
 
     await query(
-      'INSERT INTO cart_items (user_id, product_id, variant_id, quantity, price_at_addition, buy_mode, buy_unit) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [userId, productId, variantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
+      'INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [userId, productId, variantId || null, subVariantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
     )
     return NextResponse.json({ message: 'Item added to cart' })
   } catch {

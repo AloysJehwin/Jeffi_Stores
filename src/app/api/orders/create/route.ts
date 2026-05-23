@@ -22,9 +22,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { shippingAddress, notes, paymentMethod, couponId, discountAmount: rawDiscount, shippingAmount: rawShipping } = body
+    const { shippingAddress, notes, paymentMethod, couponId, shippingAmount: rawShipping } = body
     const isRazorpayPayment = paymentMethod === 'razorpay'
-    const appliedDiscount = typeof rawDiscount === 'number' && rawDiscount > 0 ? rawDiscount : 0
     const appliedShipping = typeof rawShipping === 'number' && rawShipping > 0 ? Math.round(rawShipping * 100) / 100 : 0
 
     const existingUnpaidOrder = await queryOne(
@@ -92,6 +91,48 @@ export async function POST(request: NextRequest) {
       const gstRate = parseFloat(item.products.gst_percentage || '0')
       return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
     }, 0)
+
+    let appliedDiscount = 0
+    if (couponId) {
+      const coupon = await queryOne<{
+        id: string; discount_type: string; discount_value: number;
+        min_purchase_amount: number | null; max_discount_amount: number | null;
+        usage_limit: number | null; usage_limit_per_user: number | null;
+        times_used: number; valid_from: string | null; valid_until: string | null; is_active: boolean
+      }>(`SELECT * FROM coupons WHERE id = $1`, [couponId])
+
+      if (coupon && coupon.is_active) {
+        const now = new Date()
+        const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null
+        const validUntil = coupon.valid_until ? new Date(coupon.valid_until) : null
+        const withinWindow = (!validFrom || validFrom <= now) && (!validUntil || validUntil >= now)
+        const underGlobalLimit = coupon.usage_limit === null || coupon.times_used < coupon.usage_limit
+
+        let underPerUserLimit = true
+        if (coupon.usage_limit_per_user !== null) {
+          const usage = await queryOne<{ cnt: string }>(
+            `SELECT COUNT(*) AS cnt FROM coupon_usage WHERE coupon_id = $1 AND user_id = $2`,
+            [coupon.id, userId]
+          )
+          underPerUserLimit = !usage || parseInt(usage.cnt) < coupon.usage_limit_per_user
+        }
+
+        const meetsMinPurchase = coupon.min_purchase_amount === null || subtotal >= coupon.min_purchase_amount
+
+        if (withinWindow && underGlobalLimit && underPerUserLimit && meetsMinPurchase) {
+          if (coupon.discount_type === 'percentage') {
+            appliedDiscount = (subtotal * Number(coupon.discount_value)) / 100
+            if (coupon.max_discount_amount !== null) {
+              appliedDiscount = Math.min(appliedDiscount, Number(coupon.max_discount_amount))
+            }
+          } else {
+            appliedDiscount = Number(coupon.discount_value)
+          }
+          appliedDiscount = Math.min(appliedDiscount, subtotal)
+          appliedDiscount = Math.round(appliedDiscount * 100) / 100
+        }
+      }
+    }
 
     const total = subtotal - appliedDiscount + appliedShipping
 

@@ -345,8 +345,9 @@ export default function DelhiveryTracking({
       </div>
 
       {tracking.status && (
-        <p className="text-sm text-foreground leading-relaxed"
-           dangerouslySetInnerHTML={{ __html: tracking.status.replace(/<br\s*\/?>/gi, ' ') }} />
+        <p className="text-sm text-foreground leading-relaxed">
+          {tracking.status.replace(/<br\s*\/?>/gi, ' ')}
+        </p>
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
