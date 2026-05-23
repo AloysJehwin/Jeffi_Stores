@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { NextRequest } from 'next/server'
+import { authenticateAdmin } from '@/lib/jwt'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   try {
     const { searchParams } = new URL(request.url)
     const token = searchParams.get('token')
