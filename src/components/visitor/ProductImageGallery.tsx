@@ -18,15 +18,13 @@ interface ProductImageGalleryProps {
 
 export default function ProductImageGallery({ images, productName, variantImages }: ProductImageGalleryProps) {
   const displayImages = (variantImages && variantImages.length > 0) ? variantImages : images
-  const primaryIndex = displayImages.findIndex(img => img.is_primary)
-  const [selectedImageIndex, setSelectedImageIndex] = useState(primaryIndex >= 0 ? primaryIndex : 0)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [isZoomed, setIsZoomed] = useState(false)
   const [showLightbox, setShowLightbox] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
-    const idx = displayImages.findIndex(img => img.is_primary)
-    setSelectedImageIndex(idx >= 0 ? idx : 0)
+    setSelectedImageIndex(0)
   }, [variantImages])
 
   if (!displayImages || displayImages.length === 0) {
