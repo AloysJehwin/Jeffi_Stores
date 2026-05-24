@@ -500,9 +500,6 @@ export default function ProductForm({ categories, brands, action, product, produ
           const data = await res.json()
           const loaded = data.sub_variants || []
           setSubVariantsMap(m => ({ ...m, [variantId]: loaded }))
-          if (loaded.length > 0) {
-            setVariants(prev => prev.map(v => v.id === variantId ? { ...v, sub_variant_type_on: true } : v))
-          }
         } else {
           setSubVariantsMap(m => ({ ...m, [variantId]: [] }))
         }
@@ -1214,7 +1211,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               step="1"
               min="0"
               defaultValue={product?.weight_grams ?? ''}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="e.g., 500"
             />
           </div>
@@ -2010,9 +2007,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     </div>
                   ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Price (incl. GST)</label>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Price (incl)</label>
                       <div className="relative">
                         <input type="number" step="0.01" min="0" value={popupVariant.price} readOnly={popupVariant.priceLockSide === 'incl'} onChange={(e) => {
                           const v = e.target.value
@@ -2033,7 +2030,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Price (Ex)</label>
                       <div className="relative">
                         <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} readOnly={popupVariant.priceLockSide === 'excl'} onChange={(e) => {
                           const v = e.target.value
@@ -2054,7 +2051,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (incl. GST)</label>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">MRP (incl)</label>
                       <div className="relative">
                         <input type="number" step="0.01" min="0" value={popupVariant.mrp} readOnly={popupVariant.mrpLockSide === 'incl'} onChange={(e) => {
                           const v = e.target.value
@@ -2073,7 +2070,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (Ex. GST)</label>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">MRP (Ex)</label>
                       <div className="relative">
                         <input type="number" step="0.01" min="0" value={popupVariant.mrp_ex_gst} readOnly={popupVariant.mrpLockSide === 'excl'} onChange={(e) => {
                           const v = e.target.value
@@ -2092,7 +2089,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (incl. GST)</label>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Wholesale (incl)</label>
                       <div className="relative">
                         <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_incl} readOnly={popupVariant.wholesaleLockSide === 'incl'} onChange={(e) => {
                           const v = e.target.value
@@ -2111,7 +2108,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (Ex. GST)</label>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Wholesale (Ex)</label>
                       <div className="relative">
                         <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_ex_gst} readOnly={popupVariant.wholesaleLockSide === 'excl'} onChange={(e) => {
                           const v = e.target.value
@@ -2385,7 +2382,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 )}
 
                 {/* Sub-Variants */}
-                {(popupVariant.sub_variant_type_on || (subVariantsMap[variantPopupId] || []).length > 0) && (
+                {popupVariant.sub_variant_type_on && (
                   <div>
                     <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
                       Sub-Variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''}
