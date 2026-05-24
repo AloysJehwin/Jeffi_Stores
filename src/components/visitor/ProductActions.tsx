@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/contexts/AuthContext'
@@ -16,6 +16,7 @@ interface VariantImage {
 interface SubVariant {
   id: string
   sub_variant_name: string
+  sku?: string | null
   price: number | null
   mrp: number | null
   stock_quantity: number
@@ -38,6 +39,7 @@ interface Variant {
   weight_unit?: string | null
   length_rate?: number | null
   length_unit?: string | null
+  variant_type?: string | null
   sub_variant_type?: string | null
   variant_images?: VariantImage[]
   sub_variants?: SubVariant[]
@@ -104,8 +106,10 @@ export default function ProductActions({
   const [selectedMode, setSelectedMode] = useState<string>(() => {
     if (variants.length === 0) return 'unit'
     if (initialSkuParam) {
-      const match = variants.find(v => v.sku === initialSkuParam)
-      if (match) return match.pricing_type || 'unit'
+      const variantMatch = variants.find(v => v.sku === initialSkuParam)
+      if (variantMatch) return variantMatch.pricing_type || 'unit'
+      const subMatch = variants.find(v => v.sub_variants?.some(sv => sv.sku === initialSkuParam))
+      if (subMatch) return subMatch.pricing_type || 'unit'
     }
     return pricingTypes[0] || 'unit'
   })
@@ -115,12 +119,31 @@ export default function ProductActions({
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() => {
     if (variants.length === 0) return null
     if (initialSkuParam) {
-      const match = variants.find(v => v.sku === initialSkuParam)
-      if (match) return match.id
+      const variantMatch = variants.find(v => v.sku === initialSkuParam)
+      if (variantMatch) return variantMatch.id
+      const subMatch = variants.find(v => v.sub_variants?.some(sv => sv.sku === initialSkuParam))
+      if (subMatch) return subMatch.id
     }
     return modeVariants[0]?.id ?? variants[0].id
   })
-  const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
+  const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(() => {
+    if (initialSkuParam) {
+      for (const v of variants) {
+        const sv = v.sub_variants?.find(s => s.sku === initialSkuParam)
+        if (sv) return sv.id
+      }
+    }
+    const initialVariant = variants.find(v => {
+      if (initialSkuParam && v.sku === initialSkuParam) return true
+      return false
+    }) || variants.filter(v => (v.pricing_type || 'unit') === (variants[0]?.pricing_type || 'unit'))[0] || variants[0]
+    const subs = initialVariant?.sub_variants || []
+    if (subs.length > 0) {
+      const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
+      return firstActive?.id ?? null
+    }
+    return null
+  })
 
   const hasVariants = variants.length > 0
   const selectedVariant = variants.find(v => v.id === selectedVariantId)
@@ -131,16 +154,30 @@ export default function ProductActions({
     if (first) setSelectedVariantId(first.id)
   }, [selectedMode])
 
+  const subVariantInitFromUrl = useRef(true)
   useEffect(() => {
-    setSelectedSubVariantId(null)
+    if (subVariantInitFromUrl.current) {
+      subVariantInitFromUrl.current = false
+      return
+    }
+    const v = variants.find(x => x.id === selectedVariantId)
+    const subs = v?.sub_variants || []
+    if (subs.length > 0) {
+      const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
+      setSelectedSubVariantId(firstActive?.id ?? null)
+    } else {
+      setSelectedSubVariantId(null)
+    }
   }, [selectedVariantId])
 
   useEffect(() => {
     if (!hasVariants || !selectedVariant) return
     const url = new URL(window.location.href)
-    url.searchParams.set('sku', selectedVariant.sku)
+    const sub = selectedVariant.sub_variants?.find(s => s.id === selectedSubVariantId)
+    const skuToShow = sub?.sku || selectedVariant.sku
+    url.searchParams.set('sku', skuToShow)
     window.history.replaceState(null, '', url.toString())
-  }, [selectedVariantId, hasVariants, selectedVariant])
+  }, [selectedVariantId, selectedSubVariantId, hasVariants, selectedVariant])
 
   useEffect(() => {
     if (onVariantChange) onVariantChange(selectedVariant ?? null)
@@ -384,8 +421,8 @@ export default function ProductActions({
           <div>
             <label className="block text-sm font-medium text-foreground-secondary mb-2">
               {hasMultipleModes
-                ? (selectedMode === 'unit' ? 'Select Variant' : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`)
-                : `Select ${variantType || 'Variant'}`}
+                ? (selectedMode === 'unit' ? `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}` : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`)
+                : `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}`}
             </label>
             <div className="flex flex-wrap gap-2">
               {modeVariants.map((variant) => (

@@ -149,7 +149,7 @@ export async function getStockLedger(filters: {
 export async function getStockValuation() {
   const products = await queryMany<any>(`
     SELECT
-      p.id, p.name, p.sku, p.inventory_quantity,
+      p.id, p.name, p.sku, p.sku AS row_sku, p.inventory_quantity,
       COALESCE(p.gst_percentage, 0) AS gst_percentage,
       COALESCE(p.base_price, 0) AS selling_price,
       ROUND(COALESCE(p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS cost_price,
@@ -168,7 +168,7 @@ export async function getStockValuation() {
     WHERE p.has_variants = FALSE AND p.is_active = TRUE
     UNION ALL
     SELECT
-      p.id, p.name, p.sku, pv.inventory_quantity,
+      p.id, p.name, p.sku, pv.sku AS row_sku, pv.inventory_quantity,
       COALESCE(p.gst_percentage, 0) AS gst_percentage,
       COALESCE(pv.price, p.base_price, 0) AS selling_price,
       ROUND(COALESCE(pv.price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS cost_price,
@@ -189,11 +189,11 @@ export async function getStockValuation() {
       AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = TRUE)
     UNION ALL
     SELECT
-      p.id, p.name, p.sku, sv.stock_quantity AS inventory_quantity,
+      p.id, p.name, p.sku, sv.sku AS row_sku, sv.inventory_quantity,
       COALESCE(p.gst_percentage, 0) AS gst_percentage,
       COALESCE(sv.price, pv.price, p.base_price, 0) AS selling_price,
       ROUND(COALESCE(sv.price, pv.price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS cost_price,
-      COALESCE(sv.stock_quantity, 0) * ROUND(COALESCE(sv.price, pv.price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS stock_value,
+      COALESCE(sv.inventory_quantity, 0) * ROUND(COALESCE(sv.price, pv.price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS stock_value,
       pv.id AS variant_id,
       pv.variant_name,
       sv.id AS sub_variant_id,

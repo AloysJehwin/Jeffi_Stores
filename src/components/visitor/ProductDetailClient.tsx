@@ -16,6 +16,7 @@ interface ProductImage {
 interface SubVariant {
   id: string
   sub_variant_name: string
+  sku?: string | null
   price: number | null
   mrp: number | null
   stock_quantity: number
