@@ -57,11 +57,28 @@ async function updateProduct(productId: string, formData: FormData) {
       [productId]
     )
     let newSku: string | null = null
-    if (existing && existing.category_id !== categoryId) {
-      try {
-        newSku = (await generateProductSku(categoryId || null)).toUpperCase()
-      } catch {
-        newSku = null
+    if (existing) {
+      const categoryChanged = existing.category_id !== categoryId
+      let prefixStale = false
+      if (categoryId) {
+        const cat = await queryOne<{ sku_prefix: string | null; name: string }>(
+          'SELECT sku_prefix, name FROM categories WHERE id = $1',
+          [categoryId]
+        )
+        if (cat) {
+          const expectedPrefix = (cat.sku_prefix
+            || cat.name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, '')
+            || 'PRD').toUpperCase()
+          const currentPrefix = (existing.sku || '').split('-')[0].toUpperCase()
+          if (currentPrefix !== expectedPrefix) prefixStale = true
+        }
+      }
+      if (categoryChanged || prefixStale) {
+        try {
+          newSku = (await generateProductSku(categoryId || null)).toUpperCase()
+        } catch {
+          newSku = null
+        }
       }
     }
 
