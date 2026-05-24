@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
-import { generateVariantSku } from '@/lib/sku'
+import { generateProductSku, generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 
 async function updateProduct(productId: string, formData: FormData) {
@@ -52,6 +52,19 @@ async function updateProduct(productId: string, formData: FormData) {
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
   try {
+    const existing = await queryOne<{ category_id: string | null; sku: string }>(
+      'SELECT category_id, sku FROM products WHERE id = $1',
+      [productId]
+    )
+    let newSku: string | null = null
+    if (existing && existing.category_id !== categoryId) {
+      try {
+        newSku = (await generateProductSku(categoryId || null)).toUpperCase()
+      } catch {
+        newSku = null
+      }
+    }
+
     const setClauses: string[] = [
       'name = $1', 'slug = $2', 'description = $3', 'category_id = $4',
       'brand_id = $5', 'base_price = $6', 'mrp = $7', 'mrp_ex_gst = $8',
@@ -74,6 +87,10 @@ async function updateProduct(productId: string, formData: FormData) {
       costPrice,
       new Date().toISOString(),
     ]
+    if (newSku) {
+      setClauses.push(`sku = $${params.length + 1}`)
+      params.push(newSku)
+    }
     if (!hasVariants) {
       setClauses.push(`mpn = $${params.length + 1}`, `gtin = $${params.length + 2}`)
       params.push(mpn, gtin)
