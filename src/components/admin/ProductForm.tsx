@@ -159,7 +159,17 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [tempProductId] = useState<string>(productId || `temp-${Date.now()}`)
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantPopupId, setVariantPopupId] = useState<string | null>(null)
-  const [variantImagesMap, setVariantImagesMap] = useState<Record<string, any[]>>({})
+  const [variantImagesMap, setVariantImagesMap] = useState<Record<string, any[]>>(() => {
+    const init: Record<string, any[]> = {}
+    if (product?.product_variants) {
+      for (const v of product.product_variants) {
+        if (v.id && Array.isArray(v.variant_images) && v.variant_images.length > 0) {
+          init[v.id] = v.variant_images
+        }
+      }
+    }
+    return init
+  })
   const [variantImageUploading, setVariantImageUploading] = useState<Record<string, boolean>>({})
   const [variantImageError, setVariantImageError] = useState<string | null>(null)
   const [variantGalleryOpen, setVariantGalleryOpen] = useState(false)
@@ -207,12 +217,20 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
     if (product?.product_variants && product.product_variants.length > 0) {
-      return product.product_variants.map((v: any) => ({
+      const rate = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
+      const deriveExGst = (priceVal: any) => priceVal != null ? String(Math.round(Number(priceVal) / (1 + rate / 100) * 100) / 100) : ''
+      const deriveIncl = (exVal: any) => exVal != null ? String(Math.round(Number(exVal) * (1 + rate / 100) * 100) / 100) : ''
+      return product.product_variants.map((v: any) => {
+        const hasPrice = v.price != null
+        const hasPriceEx = v.price_ex_gst != null
+        const price = hasPrice ? String(v.price) : (hasPriceEx ? deriveIncl(v.price_ex_gst) : '')
+        const priceEx = hasPriceEx ? String(v.price_ex_gst) : (hasPrice ? deriveExGst(v.price) : '')
+        return ({
         id: v.id,
         variant_name: v.variant_name,
-        price: v.price != null ? String(v.price) : '',
+        price,
         mrp: v.mrp != null ? String(v.mrp) : '',
-        price_ex_gst: v.price_ex_gst != null ? String(v.price_ex_gst) : '',
+        price_ex_gst: priceEx,
         wholeprice_ex_gst: v.wholeprice_ex_gst != null ? String(v.wholeprice_ex_gst) : '',
         stock_quantity: String(v.stock_quantity || 0),
         mpn: v.mpn || '',
@@ -235,7 +253,8 @@ export default function ProductForm({ categories, brands, action, product, produ
         sub_variant_type_on: !!v.sub_variant_type,
         variant_type: v.variant_type || '',
         use_own_images: !!(v.variant_images && v.variant_images.length > 0),
-      }))
+      })
+      })
     }
     return []
   })
@@ -1275,7 +1294,15 @@ export default function ProductForm({ categories, brands, action, product, produ
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price {gstMode === 'exclusive' ? '(excl. GST) *' : '*'}</label>
-                                  <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => updateVariant(index, 'price', e.target.value)} className={inputCls} placeholder="0.00" required />
+                                  <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => {
+                                    const v = e.target.value
+                                    const n = parseFloat(v)
+                                    const updated = [...variants]
+                                    updated[index] = { ...updated[index], price: v }
+                                    if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                                    else if (v === '') updated[index].price_ex_gst = ''
+                                    setVariants(updated)
+                                  }} className={inputCls} placeholder="0.00" required />
                                   {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
                                   {inclusivePreview(variant.price, gstRate, gstMode) && <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{inclusivePreview(variant.price, gstRate, gstMode)}</p>}
                                 </div>
@@ -1285,7 +1312,15 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
-                                  <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => updateVariant(index, 'price_ex_gst', e.target.value)} className={inputCls} placeholder="0.00" />
+                                  <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => {
+                                    const v = e.target.value
+                                    const n = parseFloat(v)
+                                    const updated = [...variants]
+                                    updated[index] = { ...updated[index], price_ex_gst: v }
+                                    if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                                    else if (v === '') updated[index].price = ''
+                                    setVariants(updated)
+                                  }} className={inputCls} placeholder="0.00" />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale</label>
@@ -1472,12 +1507,28 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   </td>
                                   <td className="py-2 px-3">
                                     <div>
-                                      <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => updateVariant(index, 'price', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" required />
+                                      <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => {
+                                        const v = e.target.value
+                                        const n = parseFloat(v)
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], price: v }
+                                        if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                                        else if (v === '') updated[index].price_ex_gst = ''
+                                        setVariants(updated)
+                                      }} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" required />
                                       {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
                                     </div>
                                   </td>
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => updateVariant(index, 'price_ex_gst', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => {
+                                      const v = e.target.value
+                                      const n = parseFloat(v)
+                                      const updated = [...variants]
+                                      updated[index] = { ...updated[index], price_ex_gst: v }
+                                      if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                                      else if (v === '') updated[index].price = ''
+                                      setVariants(updated)
+                                    }} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
                                   </td>
                                   <td className="py-2 px-3">
                                     <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
@@ -1576,7 +1627,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         const nextVariant = navIndex < activeVariants.length - 1 ? activeVariants[navIndex + 1] : null
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setVariantPopupId(null)}>
-            <div className="bg-surface rounded-xl border border-border-default shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-surface rounded-xl border border-border-default shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1596,7 +1647,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 {/* Pricing & Identifiers */}
                 <div>
                   <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Pricing & Identifiers</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Price (incl. GST)</label>
                       <input type="number" step="0.01" min="0" value={popupVariant.price} onChange={(e) => {
