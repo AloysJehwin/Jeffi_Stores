@@ -30,6 +30,7 @@ const getProductBySlug = cache(async (slug: string) => {
              'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
              'length_rate', pv.length_rate, 'length_unit', pv.length_unit,
              'sub_variant_type', pv.sub_variant_type,
+             'variant_type', pv.variant_type,
              'variant_images', COALESCE(
                (SELECT json_agg(vi ORDER BY vi.display_order)
                 FROM variant_images vi WHERE vi.variant_id = pv.id),

@@ -39,6 +39,7 @@ interface Variant {
   weight_unit?: string | null
   length_rate?: number | null
   length_unit?: string | null
+  variant_type?: string | null
   sub_variant_type?: string | null
   variant_images?: VariantImage[]
   sub_variants?: SubVariant[]
@@ -420,8 +421,8 @@ export default function ProductActions({
           <div>
             <label className="block text-sm font-medium text-foreground-secondary mb-2">
               {hasMultipleModes
-                ? (selectedMode === 'unit' ? 'Select Variant' : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`)
-                : `Select ${variantType || 'Variant'}`}
+                ? (selectedMode === 'unit' ? `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}` : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`)
+                : `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}`}
             </label>
             <div className="flex flex-wrap gap-2">
               {modeVariants.map((variant) => (

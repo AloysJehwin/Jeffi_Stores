@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 interface Review {
   id: string
@@ -402,15 +403,18 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 </p>
                 <label className="flex items-center gap-2 text-sm">
                   <span className="text-foreground-muted">Sort by</span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => { setSortBy(e.target.value as any); setVisibleCount(5) }}
-                    className="bg-surface border border-border-secondary rounded-lg px-2.5 py-1.5 text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  >
-                    <option value="recent">Most recent</option>
-                    <option value="highest">Highest rated</option>
-                    <option value="lowest">Lowest rated</option>
-                  </select>
+                  <div className="w-40">
+                    <AdminSelect
+                      value={sortBy}
+                      onChange={(val) => { setSortBy(val as any); setVisibleCount(5) }}
+                      options={[
+                        { value: 'recent', label: 'Most recent' },
+                        { value: 'highest', label: 'Highest rated' },
+                        { value: 'lowest', label: 'Lowest rated' },
+                      ]}
+                      sm
+                    />
+                  </div>
                 </label>
               </div>
               {visibleReviews.map((review) => {
