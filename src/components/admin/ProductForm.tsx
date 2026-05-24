@@ -154,6 +154,11 @@ function inclToEx(inclVal: string, rate: number): string {
   return String(Math.round(n / (1 + rate / 100) * 100) / 100)
 }
 
+function sumSubVariantStock(svs: any[] | undefined): number {
+  if (!svs || svs.length === 0) return 0
+  return svs.reduce((acc, sv) => acc + (Number(sv.stock_quantity) || 0), 0)
+}
+
 function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: () => void; title?: string }) {
   return (
     <button type="button" onClick={onClick} title={title} className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-foreground-muted hover:text-accent-600 transition-colors" tabIndex={-1}>
@@ -691,9 +696,11 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (hasVariants) {
         const convertedVariants = variants.map(v => {
           const grp = groups.find(g => g.pricing_type === v.pricing_type)
+          const stockQty = v.sub_variant_type_on ? String(sumSubVariantStock(subVariantsMap[v.id || ''])) : v.stock_quantity
           return {
             ...v,
             variant_type: grp?.variant_type || v.variant_type || '',
+            stock_quantity: stockQty,
             price: v.price,
             mrp: v.mrp,
             mrp_ex_gst: v.mrp_ex_gst,
@@ -1440,8 +1447,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <p className="text-xs text-foreground-secondary">Pricing managed by sub-variants. Open this variant to add or edit sub-variants.</p>
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock *</label>
-                                      <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className={inputCls} placeholder="0" required />
+                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock (from sub-variants)</label>
+                                      <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="0" />
                                     </div>
                                     <div>
                                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
@@ -1570,8 +1577,12 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   </div>
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock *</label>
-                                  <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className={inputCls} placeholder="0" required />
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">{variant.sub_variant_type_on ? 'Stock (sum)' : 'Stock *'}</label>
+                                  {variant.sub_variant_type_on ? (
+                                    <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="0" />
+                                  ) : (
+                                    <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className={inputCls} placeholder="0" required />
+                                  )}
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
@@ -1882,7 +1893,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     </>
                                   )}
                                   <td className="py-2 px-3">
-                                    <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0" required />
+                                    {variant.sub_variant_type_on ? (
+                                      <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="0" title="Sum of sub-variants" />
+                                    ) : (
+                                      <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0" required />
+                                    )}
                                   </td>
                                   <td className="py-2 px-3">
                                     <div className="flex items-center gap-1 justify-end">
@@ -2195,14 +2210,14 @@ export default function ProductForm({ categories, brands, action, product, produ
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Ship Wt. (g)</label>
-                      <input type="number" step="1" min="0" value={popupVariant.weight_grams} onChange={(e) => updateVariant(popupIndex, 'weight_grams', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 500" />
+                      <input type="number" step="1" min="0" value={popupVariant.weight_grams} onChange={(e) => updateVariant(popupIndex, 'weight_grams', e.target.value)} className="w-full h-9 px-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 500" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Package Type</label>
-                      <div className="w-full flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
-                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx - 1 + PACKAGE_TYPES.length) % PACKAGE_TYPES.length]) }} className="px-1.5 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
-                        <span className="px-1.5 py-1.5 text-xs font-medium text-foreground flex-1 text-center border-x border-border-secondary truncate">{PACKAGE_TYPE_LABELS[popupVariant.package_type || 'flat_poly_auto']}</span>
-                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx + 1) % PACKAGE_TYPES.length]) }} className="px-1.5 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
+                      <div className="w-full h-9 flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
+                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx - 1 + PACKAGE_TYPES.length) % PACKAGE_TYPES.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
+                        <span className="h-full px-2 text-sm font-medium text-foreground flex-1 text-center border-x border-border-secondary truncate flex items-center justify-center">{PACKAGE_TYPE_LABELS[popupVariant.package_type || 'flat_poly_auto']}</span>
+                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx + 1) % PACKAGE_TYPES.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
                       </div>
                     </div>
                   </div>
