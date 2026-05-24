@@ -1021,44 +1021,6 @@ function StockTab() {
                 <SummaryCard label="Total SKUs" value={String(filteredValRows.length)} sub={filteredValRows.length !== allValRows.length ? `of ${allValRows.length} total` : 'across all products'} />
                 <SummaryCard label="In Stock" value={String(filteredValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="SKUs with stock > 0" />
               </div>
-              {editingId && (
-                <div className="bg-surface-elevated rounded-xl border border-secondary-200 dark:border-secondary-800/40 p-4 flex flex-wrap gap-4 items-end">
-                  <div>
-                    <p className="text-xs font-medium text-foreground-secondary mb-1">Adjust Stock Quantity</p>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.001"
-                      autoFocus
-                      value={editQty}
-                      onChange={e => setEditQty(e.target.value)}
-                      className="w-32 px-3 py-2 rounded-lg border border-secondary-500 bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-[160px]">
-                    <p className="text-xs font-medium text-foreground-secondary mb-1">Note (optional)</p>
-                    <input
-                      type="text"
-                      placeholder="Reason for adjustment"
-                      value={editNotes}
-                      onChange={e => setEditNotes(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => { const p = valSlice.find(r => (r.variant_id || r.id) === editingId); if (p) saveEdit(p) }}
-                      disabled={editSaving || editQty === ''}
-                      className="px-4 py-2 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 text-white disabled:opacity-50 transition-colors"
-                    >
-                      {editSaving ? 'Saving…' : 'Save'}
-                    </button>
-                    <button onClick={cancelEdit} className="px-4 py-2 rounded-lg text-sm font-medium border border-border-default hover:bg-surface-secondary text-foreground transition-colors">
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
               <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1125,9 +1087,22 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell">{p.row_sku || p.sku || '—'}</td>
                             <td className="px-4 py-3 text-right">
-                              <span className={`font-medium ${parseFloat(p.inventory_quantity || '0') === 0 ? 'text-red-600 dark:text-red-400' : parseFloat(p.inventory_quantity || '0') <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
-                                {parseFloat(p.inventory_quantity || '0')}
-                              </span>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.001"
+                                  autoFocus
+                                  value={editQty}
+                                  onChange={e => setEditQty(e.target.value)}
+                                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
+                                  className="w-20 px-2 py-1 rounded border border-secondary-500 bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 text-right"
+                                />
+                              ) : (
+                                <span className={`font-medium ${parseFloat(p.inventory_quantity || '0') === 0 ? 'text-red-600 dark:text-red-400' : parseFloat(p.inventory_quantity || '0') <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
+                                  {parseFloat(p.inventory_quantity || '0')}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
                             <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
@@ -1135,24 +1110,52 @@ function StockTab() {
                             <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'))}</td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1">
-                                <Link
-                                  href={`/admin/products/${p.id}`}
-                                  title="View Product"
-                                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                  </svg>
-                                </Link>
-                                <button
-                                  onClick={() => isEditing ? cancelEdit() : startEdit(p)}
-                                  title={isEditing ? 'Cancel edit' : 'Adjust stock'}
-                                  className={`p-1.5 rounded-lg transition-colors ${isEditing ? 'hover:bg-surface-secondary text-secondary-500 hover:text-secondary-600' : 'hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500'}`}
-                                >
-                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
+                                {isEditing ? (
+                                  <>
+                                    <input
+                                      type="text"
+                                      placeholder="Note (optional)"
+                                      value={editNotes}
+                                      onChange={e => setEditNotes(e.target.value)}
+                                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
+                                      className="hidden lg:block w-32 px-2 py-1 rounded border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500"
+                                    />
+                                    <button
+                                      onClick={() => saveEdit(p)}
+                                      disabled={editSaving || editQty === ''}
+                                      title="Save"
+                                      className="px-2 py-1 rounded text-xs font-medium bg-secondary-500 hover:bg-secondary-600 text-white disabled:opacity-50 transition-colors"
+                                    >
+                                      {editSaving ? '…' : 'Save'}
+                                    </button>
+                                    <button onClick={cancelEdit} title="Cancel" className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary transition-colors">
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Link
+                                      href={`/admin/products/${p.id}`}
+                                      title="View Product"
+                                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                      </svg>
+                                    </Link>
+                                    <button
+                                      onClick={() => startEdit(p)}
+                                      title="Adjust stock"
+                                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </td>
                           </tr>
