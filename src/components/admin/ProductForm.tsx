@@ -149,6 +149,18 @@ function inclusivePreview(val: string, rate: number, mode: 'inclusive' | 'exclus
   return `= ₹${(Math.round(n * (1 + rate / 100) * 100) / 100).toFixed(2)} incl. GST`
 }
 
+function previewIncl(val: string, rate: number): string | null {
+  const n = parseFloat(val)
+  if (!val || isNaN(n) || n <= 0 || rate <= 0) return null
+  return `= ₹${(Math.round(n * (1 + rate / 100) * 100) / 100).toFixed(2)} incl.`
+}
+
+function previewExcl(val: string, rate: number): string | null {
+  const n = parseFloat(val)
+  if (!val || isNaN(n) || n <= 0 || rate <= 0) return null
+  return `= ₹${(Math.round(n / (1 + rate / 100) * 100) / 100).toFixed(2)} ex. GST`
+}
+
 export default function ProductForm({ categories, brands, action, product, productId }: ProductFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -796,8 +808,8 @@ export default function ProductForm({ categories, brands, action, product, produ
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Maximum Retail Price"
             />
-            {inclusivePreview(mrp, gstRate, gstMode) && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(mrp, gstRate, gstMode)}</p>
+            {previewExcl(mrp, gstRate) && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{previewExcl(mrp, gstRate)}</p>
             )}
           </div>
           )}
@@ -820,8 +832,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                 className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 placeholder={gstMode === 'exclusive' ? 'Price excl. GST' : 'Price incl. GST'}
               />
-              {inclusivePreview(basePrice, gstRate, gstMode)
-                ? <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(basePrice, gstRate, gstMode)}</p>
+              {previewExcl(basePrice, gstRate)
+                ? <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{previewExcl(basePrice, gstRate)}</p>
                 : <p className="text-xs text-foreground-muted mt-1">GST-inclusive price the customer pays</p>
               }
             </div>
@@ -908,8 +920,8 @@ export default function ProductForm({ categories, brands, action, product, produ
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Price excluding GST (optional)"
             />
-            {inclusivePreview(salePrice, gstRate, gstMode) && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(salePrice, gstRate, gstMode)}</p>
+            {previewIncl(salePrice, gstRate) && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{previewIncl(salePrice, gstRate)}</p>
             )}
           </div>
           )}
@@ -931,8 +943,8 @@ export default function ProductForm({ categories, brands, action, product, produ
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Bulk price (optional)"
             />
-            {inclusivePreview(wholesalePrice, gstRate, gstMode) && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(wholesalePrice, gstRate, gstMode)}</p>
+            {previewIncl(wholesalePrice, gstRate) && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{previewIncl(wholesalePrice, gstRate)}</p>
             )}
           </div>
           )}
@@ -1292,6 +1304,22 @@ export default function ProductForm({ categories, brands, action, product, produ
                               )}
 
                               <div className="grid grid-cols-2 gap-3">
+                                {variant.sub_variant_type_on ? (
+                                  <>
+                                    <div className="col-span-2 rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-2.5">
+                                      <p className="text-xs text-foreground-secondary">Pricing managed by sub-variants. Open this variant to add or edit sub-variants.</p>
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock *</label>
+                                      <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className={inputCls} placeholder="0" required />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
+                                      <input type="text" value={variant.mpn} onChange={(e) => updateVariant(index, 'mpn', e.target.value)} className={inputCls} placeholder="Part No." />
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price {gstMode === 'exclusive' ? '(excl. GST) *' : '*'}</label>
                                   <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => {
@@ -1304,11 +1332,12 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     setVariants(updated)
                                   }} className={inputCls} placeholder="0.00" required />
                                   {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
-                                  {inclusivePreview(variant.price, gstRate, gstMode) && <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{inclusivePreview(variant.price, gstRate, gstMode)}</p>}
+                                  {previewExcl(variant.price, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(variant.price, gstRate)}</p>}
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP {gstMode === 'exclusive' ? '(excl.)' : ''}</label>
                                   <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className={inputCls} placeholder="0.00" />
+                                  {previewExcl(variant.mrp, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(variant.mrp, gstRate)}</p>}
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
@@ -1321,10 +1350,12 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     else if (v === '') updated[index].price = ''
                                     setVariants(updated)
                                   }} className={inputCls} placeholder="0.00" />
+                                  {previewIncl(variant.price_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(variant.price_ex_gst, gstRate)}</p>}
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale</label>
                                   <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className={inputCls} placeholder="0.00" />
+                                  {previewIncl(variant.wholeprice_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(variant.wholeprice_ex_gst, gstRate)}</p>}
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock *</label>
@@ -1334,6 +1365,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
                                   <input type="text" value={variant.mpn} onChange={(e) => updateVariant(index, 'mpn', e.target.value)} className={inputCls} placeholder="Part No." />
                                 </div>
+                                  </>
+                                )}
                               </div>
                               <div>
                                 <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
@@ -1423,7 +1456,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       const row = { ...updated[index] }
                                       row.sub_variant_type_on = !row.sub_variant_type_on
                                       if (!row.sub_variant_type_on) row.sub_variant_type = ''
-                                      if (row.sub_variant_type_on) row.use_own_images = true
+                                      if (row.sub_variant_type_on) {
+                                        row.use_own_images = true
+                                        row.price = ''
+                                        row.price_ex_gst = ''
+                                        row.mrp = ''
+                                        row.wholeprice_ex_gst = ''
+                                      }
                                       updated[index] = row
                                       setVariants(updated)
                                     }}
@@ -1505,6 +1544,12 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
                                     )}
                                   </td>
+                                  {variant.sub_variant_type_on ? (
+                                    <td className="py-2 px-3" colSpan={4}>
+                                      <span className="text-xs text-foreground-muted italic">Pricing managed by sub-variants</span>
+                                    </td>
+                                  ) : (
+                                    <>
                                   <td className="py-2 px-3">
                                     <div>
                                       <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => {
@@ -1517,6 +1562,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         setVariants(updated)
                                       }} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" required />
                                       {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
+                                      {previewExcl(variant.price, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(variant.price, gstRate)}</p>}
                                     </div>
                                   </td>
                                   <td className="py-2 px-3">
@@ -1529,13 +1575,18 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       else if (v === '') updated[index].price = ''
                                       setVariants(updated)
                                     }} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    {previewIncl(variant.price_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(variant.price_ex_gst, gstRate)}</p>}
                                   </td>
                                   <td className="py-2 px-3">
                                     <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    {previewIncl(variant.wholeprice_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(variant.wholeprice_ex_gst, gstRate)}</p>}
                                   </td>
                                   <td className="py-2 px-3">
                                     <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    {previewExcl(variant.mrp, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(variant.mrp, gstRate)}</p>}
                                   </td>
+                                    </>
+                                  )}
                                   <td className="py-2 px-3">
                                     <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0" required />
                                   </td>
@@ -1647,36 +1698,57 @@ export default function ProductForm({ categories, brands, action, product, produ
                 {/* Pricing & Identifiers */}
                 <div>
                   <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Pricing & Identifiers</p>
+                  {popupVariant.sub_variant_type_on ? (
+                    <div className="rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-3 space-y-3">
+                      <p className="text-xs text-foreground-secondary">Pricing is managed at the sub-variant level for this variant. Use the Sub-variants section below to set prices.</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
+                          <input type="text" value={popupVariant.mpn} onChange={(e) => updateVariant(popupIndex, 'mpn', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Part No." />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
+                          <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Price (incl. GST)</label>
                       <input type="number" step="0.01" min="0" value={popupVariant.price} onChange={(e) => {
                         const v = e.target.value
                         const n = parseFloat(v)
-                        updateVariant(popupIndex, 'price', v)
-                        if (!isNaN(n) && n > 0 && gstRate > 0) updateVariant(popupIndex, 'price_ex_gst', String(Math.round(n / (1 + gstRate / 100) * 100) / 100))
+                        const updated = [...variants]
+                        updated[popupIndex] = { ...updated[popupIndex], price: v }
+                        if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                        else if (v === '') updated[popupIndex].price_ex_gst = ''
+                        setVariants(updated)
                       }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      {previewExcl(popupVariant.price, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(popupVariant.price, gstRate)}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
                       <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} onChange={(e) => {
                         const v = e.target.value
                         const n = parseFloat(v)
-                        updateVariant(popupIndex, 'price_ex_gst', v)
-                        if (!isNaN(n) && n > 0 && gstRate > 0) updateVariant(popupIndex, 'price', String(Math.round(n * (1 + gstRate / 100) * 100) / 100))
+                        const updated = [...variants]
+                        updated[popupIndex] = { ...updated[popupIndex], price_ex_gst: v }
+                        if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                        else if (v === '') updated[popupIndex].price = ''
+                        setVariants(updated)
                       }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      {previewIncl(popupVariant.price_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(popupVariant.price_ex_gst, gstRate)}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (incl. GST)</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.mrp} onChange={(e) => {
-                        const v = e.target.value
-                        const n = parseFloat(v)
-                        updateVariant(popupIndex, 'mrp', v)
-                      }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      <input type="number" step="0.01" min="0" value={popupVariant.mrp} onChange={(e) => updateVariant(popupIndex, 'mrp', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      {previewExcl(popupVariant.mrp, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(popupVariant.mrp, gstRate)}</p>}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale</label>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (ex. GST)</label>
                       <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_ex_gst} onChange={(e) => updateVariant(popupIndex, 'wholeprice_ex_gst', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      {previewIncl(popupVariant.wholeprice_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(popupVariant.wholeprice_ex_gst, gstRate)}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
@@ -1687,6 +1759,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
                     </div>
                   </div>
+                  )}
                   {/* Rate toggles */}
                   <div className="space-y-2 pt-3">
                     <div className="flex items-center gap-2">
@@ -1726,7 +1799,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) row.use_own_images = true; updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
+                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) { row.use_own_images = true; row.price = ''; row.price_ex_gst = ''; row.mrp = ''; row.wholeprice_ex_gst = '' } updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
                         <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
                       <span className="text-xs font-medium text-foreground-secondary">Has sub-variants</span>
