@@ -37,7 +37,7 @@ function StarRow({ rating, interactive = false, onRate, hoverRating, onHover, si
   const dim = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-7 h-7' : 'w-5 h-5'
   const active = interactive ? (hoverRating || rating) : rating
   return (
-    <div className="flex gap-0.5">
+    <div className="flex gap-0.5" onMouseLeave={() => interactive && onHover?.(0)}>
       {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}
@@ -45,7 +45,6 @@ function StarRow({ rating, interactive = false, onRate, hoverRating, onHover, si
           disabled={!interactive}
           onClick={() => interactive && onRate?.(star)}
           onMouseEnter={() => interactive && onHover?.(star)}
-          onMouseLeave={() => interactive && onHover?.(0)}
           className={interactive ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default pointer-events-none'}
           tabIndex={interactive ? 0 : -1}
           aria-label={interactive ? `Rate ${star} star${star > 1 ? 's' : ''}` : undefined}
@@ -59,11 +58,11 @@ function StarRow({ rating, interactive = false, onRate, hoverRating, onHover, si
   )
 }
 
-function RatingBar({ star, count, total }: { star: number; count: number; total: number }) {
+function RatingBar({ star, count, total, isActive, onClick }: { star: number; count: number; total: number; isActive: boolean; onClick: () => void }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-3 text-right text-foreground-muted">{star}</span>
+    <button type="button" onClick={onClick} className={`w-full flex items-center gap-2 text-xs px-1 py-0.5 rounded transition-colors ${isActive ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface-secondary'} ${count === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} disabled={count === 0}>
+      <span className={`w-3 text-right ${isActive ? 'text-accent-600 dark:text-accent-400 font-semibold' : 'text-foreground-muted'}`}>{star}</span>
       <svg className="w-3.5 h-3.5 text-yellow-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
         <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
       </svg>
@@ -71,7 +70,7 @@ function RatingBar({ star, count, total }: { star: number; count: number; total:
         <div className="h-full bg-yellow-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
       <span className="w-6 text-foreground-muted">{count}</span>
-    </div>
+    </button>
   )
 }
 
@@ -91,6 +90,16 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [filterStar, setFilterStar] = useState<number | null>(null)
+  const [sortBy, setSortBy] = useState<'recent' | 'highest' | 'lowest' | 'helpful'>('recent')
+  const [visibleCount, setVisibleCount] = useState(5)
+
+  useEffect(() => {
+    if (!lightboxUrl) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxUrl(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [lightboxUrl])
 
   useEffect(() => { fetchReviews() }, [productId])
 
@@ -169,6 +178,17 @@ export default function ProductReviews({ productId, productName }: ProductReview
     count: reviews.filter(r => r.rating === star).length,
   }))
 
+  const filteredReviews = filterStar
+    ? reviews.filter(r => r.rating === filterStar)
+    : reviews
+  const sortedReviews = [...filteredReviews].sort((a, b) => {
+    if (sortBy === 'highest') return b.rating - a.rating || (new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    if (sortBy === 'lowest') return a.rating - b.rating || (new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+  const visibleReviews = sortedReviews.slice(0, visibleCount)
+  const hasMore = sortedReviews.length > visibleCount
+
   return (
     <div className="mt-10 sm:mt-14">
       {/* Section header */}
@@ -213,9 +233,25 @@ export default function ProductReviews({ productId, productName }: ProductReview
               </div>
               <div className="space-y-1.5">
                 {ratingCounts.map(({ star, count }) => (
-                  <RatingBar key={star} star={star} count={count} total={reviews.length} />
+                  <RatingBar
+                    key={star}
+                    star={star}
+                    count={count}
+                    total={reviews.length}
+                    isActive={filterStar === star}
+                    onClick={() => { setFilterStar(filterStar === star ? null : star); setVisibleCount(5) }}
+                  />
                 ))}
               </div>
+              {filterStar && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterStar(null); setVisibleCount(5) }}
+                  className="text-xs text-accent-600 dark:text-accent-400 hover:underline mt-2"
+                >
+                  Clear filter
+                </button>
+              )}
             </div>
           ) : (
             <div className="bg-surface-elevated border border-border-default rounded-xl p-5 shadow-sm flex flex-col items-center gap-3 text-center">
@@ -358,7 +394,26 @@ export default function ProductReviews({ productId, productName }: ProductReview
             </div>
           ) : (
             <div className="space-y-4">
-              {reviews.map((review) => {
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-sm text-foreground-muted">
+                  {filterStar
+                    ? `Showing ${sortedReviews.length} ${sortedReviews.length === 1 ? 'review' : 'reviews'} with ${filterStar} star${filterStar > 1 ? 's' : ''}`
+                    : `${reviews.length} ${reviews.length === 1 ? 'review' : 'reviews'}`}
+                </p>
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-foreground-muted">Sort by</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => { setSortBy(e.target.value as any); setVisibleCount(5) }}
+                    className="bg-surface border border-border-secondary rounded-lg px-2.5 py-1.5 text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  >
+                    <option value="recent">Most recent</option>
+                    <option value="highest">Highest rated</option>
+                    <option value="lowest">Lowest rated</option>
+                  </select>
+                </label>
+              </div>
+              {visibleReviews.map((review) => {
                 const initials = `${review.users.first_name?.[0] || ''}${review.users.last_name?.[0] || ''}`.toUpperCase() || '?'
                 return (
                   <div key={review.id} className="bg-surface-elevated border border-border-default rounded-xl p-4 sm:p-5">
@@ -408,6 +463,27 @@ export default function ProductReviews({ productId, productName }: ProductReview
                   </div>
                 )
               })}
+              {visibleReviews.length === 0 && (
+                <div className="bg-surface-elevated border border-border-default rounded-xl py-10 flex flex-col items-center gap-2">
+                  <p className="text-sm text-foreground-muted">No {filterStar}-star reviews</p>
+                  <button
+                    type="button"
+                    onClick={() => { setFilterStar(null); setVisibleCount(5) }}
+                    className="text-sm text-accent-600 dark:text-accent-400 hover:underline"
+                  >
+                    Clear filter
+                  </button>
+                </div>
+              )}
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount(c => c + 5)}
+                  className="w-full py-3 rounded-xl border border-border-secondary text-sm font-semibold text-foreground hover:bg-surface-secondary transition-colors"
+                >
+                  Show more reviews ({sortedReviews.length - visibleCount} remaining)
+                </button>
+              )}
             </div>
           )}
         </div>
