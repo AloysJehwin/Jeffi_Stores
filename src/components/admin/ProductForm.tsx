@@ -192,6 +192,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   })
   const [variantImageUploading, setVariantImageUploading] = useState<Record<string, boolean>>({})
   const [variantImageError, setVariantImageError] = useState<string | null>(null)
+  const variantImageDragIndex = useRef<number | null>(null)
+  const variantImageDragOverIndex = useRef<number | null>(null)
   const [variantGalleryOpen, setVariantGalleryOpen] = useState(false)
   const [variantGalleryImages, setVariantGalleryImages] = useState<any[]>([])
   const [variantGalleryCategories, setVariantGalleryCategories] = useState<any[]>([])
@@ -572,6 +574,25 @@ export default function ProductForm({ categories, brands, action, product, produ
       ...m,
       [variantId]: (m[variantId] || []).map((img: any) => ({ ...img, is_primary: img.id === imageId })),
     }))
+  }
+
+  async function reorderVariantImages(variantId: string, fromIndex: number, toIndex: number) {
+    if (!productId || fromIndex === toIndex) return
+    const current = variantImagesMap[variantId] || []
+    if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) return
+    const next = [...current]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    setVariantImagesMap(m => ({ ...m, [variantId]: next }))
+    await Promise.all(
+      next.map((img: any, idx: number) =>
+        fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId: img.id, displayOrder: idx }),
+        }),
+      ),
+    )
   }
 
   const openVariantGallery = useCallback(async () => {
@@ -2263,10 +2284,29 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </div>
                   {popupVariant.use_own_images ? (
                     <>
+                      {(variantImagesMap[variantPopupId] || []).length > 1 && (
+                        <p className="text-xs text-foreground-muted mb-2">Drag to reorder · First image is shown first on the product page</p>
+                      )}
                       <div className="flex flex-wrap gap-2">
-                        {(variantImagesMap[variantPopupId] || []).map((img: any) => (
-                          <div key={img.id} className="relative group w-16 h-16 rounded border border-border-default overflow-hidden bg-surface">
-                            <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover" />
+                        {(variantImagesMap[variantPopupId] || []).map((img: any, imgIdx: number) => (
+                          <div
+                            key={img.id}
+                            className="relative group w-16 h-16 rounded border border-border-default overflow-hidden bg-surface cursor-grab active:cursor-grabbing"
+                            draggable
+                            onDragStart={() => { variantImageDragIndex.current = imgIdx }}
+                            onDragEnter={() => { variantImageDragOverIndex.current = imgIdx }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDragEnd={() => {
+                              const from = variantImageDragIndex.current
+                              const to = variantImageDragOverIndex.current
+                              variantImageDragIndex.current = null
+                              variantImageDragOverIndex.current = null
+                              if (from === null || to === null || from === to) return
+                              reorderVariantImages(variantPopupId, from, to)
+                            }}
+                          >
+                            <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
+                            <span className="absolute top-0 right-0 text-[9px] bg-black/60 text-white px-1 leading-4 font-bold">{imgIdx + 1}</span>
                             {img.is_primary && <span className="absolute top-0 left-0 text-[9px] bg-accent-500 text-white px-1 leading-4">★</span>}
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                               {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 text-xs leading-none" title="Set primary">★</button>}
