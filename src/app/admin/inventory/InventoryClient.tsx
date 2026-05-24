@@ -769,7 +769,7 @@ function StockTab() {
   const filteredValRows = allValRows.filter(p => {
     if (valSearch.trim()) {
       const q = valSearch.toLowerCase()
-      if (!(p.name || '').toLowerCase().includes(q) && !(p.sku || '').toLowerCase().includes(q) && !(p.variant_name || '').toLowerCase().includes(q) && !(p.sub_variant_name || '').toLowerCase().includes(q)) return false
+      if (!(p.name || '').toLowerCase().includes(q) && !(p.sku || '').toLowerCase().includes(q) && !(p.row_sku || '').toLowerCase().includes(q) && !(p.variant_name || '').toLowerCase().includes(q) && !(p.sub_variant_name || '').toLowerCase().includes(q)) return false
     }
     if (valCategory && p.category_name !== valCategory) return false
     if (valBrand && p.brand_name !== valBrand) return false
@@ -1100,7 +1100,7 @@ function StockTab() {
                                 <div className="p-3 space-y-2">
                                   <p className="text-sm font-semibold text-foreground leading-tight">{p.name}</p>
                                   {p.variant_name && <p className="text-xs text-foreground-secondary">{p.variant_name}{p.sub_variant_name ? ` / ${p.sub_variant_name}` : ''}</p>}
-                                  {p.sku && <p className="text-xs font-mono text-foreground-muted">{p.sku}</p>}
+                                  {(p.row_sku || p.sku) && <p className="text-xs font-mono text-foreground-muted">{p.row_sku || p.sku}</p>}
                                   <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Stock</span>
@@ -1123,7 +1123,7 @@ function StockTab() {
                                 ? (p.sub_variant_name ? `${p.variant_name} / ${p.sub_variant_name}` : p.variant_name)
                                 : '—'}
                             </td>
-                            <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell">{p.sku || '—'}</td>
+                            <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell">{p.row_sku || p.sku || '—'}</td>
                             <td className="px-4 py-3 text-right">
                               <span className={`font-medium ${parseFloat(p.inventory_quantity || '0') === 0 ? 'text-red-600 dark:text-red-400' : parseFloat(p.inventory_quantity || '0') <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
                                 {parseFloat(p.inventory_quantity || '0')}

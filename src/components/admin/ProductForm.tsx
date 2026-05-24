@@ -1091,7 +1091,7 @@ export default function ProductForm({ categories, brands, action, product, produ
             <>
               <div>
                 <label htmlFor="stock_quantity" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Stock Quantity *
+                  Listed Stock *
                 </label>
                 <input
                   type="number"
@@ -1103,6 +1103,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                   placeholder="0"
                 />
+                <p className="text-xs text-foreground-muted mt-1">Display stock shown to customers. Inventory is managed separately under Inventory.</p>
               </div>
 
               <div>
@@ -1447,7 +1448,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <p className="text-xs text-foreground-secondary">Pricing managed by sub-variants. Open this variant to add or edit sub-variants.</p>
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock (from sub-variants)</label>
+                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Listed Stock (from sub-variants)</label>
                                       <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="0" />
                                     </div>
                                     <div>
@@ -1577,7 +1578,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   </div>
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">{variant.sub_variant_type_on ? 'Stock (sum)' : 'Stock *'}</label>
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">{variant.sub_variant_type_on ? 'Listed Stock (sum)' : 'Listed Stock *'}</label>
                                   {variant.sub_variant_type_on ? (
                                     <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="0" />
                                   ) : (
@@ -1747,7 +1748,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Wholesale (Ex)</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">MRP (incl)</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">MRP (Ex)</th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Stock *</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Listed Stock *</th>
                               <th className="py-2 px-3 w-16"></th>
                             </tr>
                           </thead>
@@ -2419,7 +2420,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                             <th className="pb-1 pr-2 font-medium">MRP Ex-GST</th>
                             <th className="pb-1 pr-2 font-medium">Wholesale (incl)</th>
                             <th className="pb-1 pr-2 font-medium">Wholesale (Ex)</th>
-                            <th className="pb-1 pr-2 font-medium">Stock</th>
+                            <th className="pb-1 pr-2 font-medium">Listed Stock</th>
                             <th className="pb-1 pr-2 font-medium">SKU</th>
                             <th className="pb-1"></th>
                           </tr>
@@ -2556,7 +2557,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                             }} className={`${inputCls} w-full`} />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Stock</label>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Listed Stock</label>
                             <input type="number" step="1" min="0" placeholder="0" value={d.stock} onChange={(e) => setD('stock', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div>

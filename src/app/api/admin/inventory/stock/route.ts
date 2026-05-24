@@ -52,9 +52,9 @@ export async function PATCH(request: NextRequest) {
 
       let currentQty: number
       if (sub_variant_id) {
-        const cur = await client.query<{ stock_quantity: number }>(
-          'SELECT stock_quantity FROM product_sub_variants WHERE id = $1', [sub_variant_id])
-        currentQty = parseFloat(cur.rows[0]?.stock_quantity as any) || 0
+        const cur = await client.query<{ inventory_quantity: number }>(
+          'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1', [sub_variant_id])
+        currentQty = parseFloat(cur.rows[0]?.inventory_quantity as any) || 0
       } else if (variant_id) {
         const cur = await client.query<{ inventory_quantity: number }>(
           'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variant_id])
@@ -68,7 +68,7 @@ export async function PATCH(request: NextRequest) {
       const change = new_quantity - currentQty
 
       if (sub_variant_id) {
-        await client.query('UPDATE product_sub_variants SET stock_quantity = $1 WHERE id = $2', [new_quantity, sub_variant_id])
+        await client.query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [new_quantity, sub_variant_id])
       } else if (variant_id) {
         await client.query('UPDATE product_variants SET inventory_quantity = $1 WHERE id = $2', [new_quantity, variant_id])
       } else {
