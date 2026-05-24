@@ -102,6 +102,17 @@ export default function ProductReviews({ productId, productName }: ProductReview
     return () => window.removeEventListener('keydown', onKey)
   }, [lightboxUrl])
 
+  useEffect(() => {
+    if (!showForm) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowForm(false) }
+    window.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [showForm])
+
   useEffect(() => { fetchReviews() }, [productId])
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -222,7 +233,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
       <div className="flex flex-col lg:flex-row gap-6 items-start">
 
         {/* Left column — rating summary + write review */}
-        <div className="w-full lg:w-64 lg:shrink-0 space-y-4">
+        <div className="w-full lg:w-64 lg:shrink-0 lg:sticky lg:top-24 lg:self-start space-y-4">
           {reviews.length > 0 ? (
             <div className="bg-surface-elevated border border-border-default rounded-xl p-4 sm:p-5 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
@@ -275,107 +286,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
             </div>
           )}
 
-          {/* Write Review Form */}
-          {showForm && (
-            <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-foreground">Your Review</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="p-1 text-foreground-muted hover:text-foreground rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Rating</label>
-                  <StarRow rating={rating} interactive onRate={setRating} hoverRating={hoverRating} onHover={setHoverRating} size="lg" />
-                  <p className="text-xs text-foreground-muted mt-1">
-                    {['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][hoverRating || rating]}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-                    Title <span className="text-foreground-muted font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Summarise your experience"
-                    maxLength={255}
-                    className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Review <span className="text-red-500">*</span></label>
-                  <textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Share details about the product quality, delivery, or any tips for other buyers…"
-                    rows={4}
-                    required
-                    className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent resize-none text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-                    Photos <span className="text-foreground-muted font-normal">(optional, up to 3)</span>
-                  </label>
-                  <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-2 border border-dashed border-border-secondary rounded-lg text-sm text-foreground-secondary hover:border-accent-500 hover:text-accent-500 transition-colors">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 12V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25v13.5A2.25 2.25 0 0118.75 21H5.25A2.25 2.25 0 013 18.75V12zm10.5-1.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                    </svg>
-                    Add photos
-                    <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={handleImageChange} />
-                  </label>
-                  {imagePreviews.length > 0 && (
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      {imagePreviews.map((src, idx) => (
-                        <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-secondary">
-                          <img src={src} alt="" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(idx)}
-                            className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center text-xs leading-none hover:bg-black/80"
-                            aria-label="Remove"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isSubmitting && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                    {isSubmitting ? 'Submitting…' : 'Submit Review'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="px-5 py-2.5 rounded-lg text-sm font-semibold text-foreground-secondary bg-surface-secondary hover:bg-border-default transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
+          {/* Write Review Form moved to modal overlay below */}
         </div>
 
         {/* Right column — reviews list */}
@@ -430,6 +341,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                           <span className="font-semibold text-sm text-foreground">
                             {review.users.first_name} {review.users.last_name}
                           </span>
+                          <StarRow rating={review.rating} size="sm" />
                           {review.is_verified_purchase && (
                             <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-2 py-0.5 rounded-full font-medium">
                               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -442,7 +354,6 @@ export default function ProductReviews({ productId, productName }: ProductReview
                             {new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
                         </div>
-                        <StarRow rating={review.rating} size="sm" />
                       </div>
                     </div>
 
@@ -493,6 +404,117 @@ export default function ProductReviews({ productId, productName }: ProductReview
         </div>
 
       </div>
+
+      {/* Write Review Modal */}
+      {showForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto"
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            className="bg-surface-elevated rounded-xl border border-border-default shadow-2xl w-full max-w-lg my-8 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border-default sticky top-0 bg-surface-elevated z-10">
+              <h3 className="text-base font-bold text-foreground">Write a Review</h3>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="p-1 text-foreground-muted hover:text-foreground rounded-lg transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Rating</label>
+                <StarRow rating={rating} interactive onRate={setRating} hoverRating={hoverRating} onHover={setHoverRating} size="lg" />
+                <p className="text-xs text-foreground-muted mt-1">
+                  {['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][hoverRating || rating]}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                  Title <span className="text-foreground-muted font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Summarise your experience"
+                  maxLength={255}
+                  className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Review <span className="text-red-500">*</span></label>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Share details about the product quality, delivery, or any tips for other buyers…"
+                  rows={5}
+                  required
+                  className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent resize-none text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                  Photos <span className="text-foreground-muted font-normal">(optional, up to 3)</span>
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-2 border border-dashed border-border-secondary rounded-lg text-sm text-foreground-secondary hover:border-accent-500 hover:text-accent-500 transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 12V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25v13.5A2.25 2.25 0 0118.75 21H5.25A2.25 2.25 0 013 18.75V12zm10.5-1.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                  </svg>
+                  Add photos
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={handleImageChange} />
+                </label>
+                {imagePreviews.length > 0 && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {imagePreviews.map((src, idx) => (
+                      <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-secondary">
+                        <img src={src} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center text-xs leading-none hover:bg-black/80"
+                          aria-label="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2 sticky bottom-0 bg-surface-elevated">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSubmitting && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {isSubmitting ? 'Submitting…' : 'Submit Review'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-5 py-2.5 rounded-lg text-sm font-semibold text-foreground-secondary bg-surface-secondary hover:bg-border-default transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {lightboxUrl && (
         <div
