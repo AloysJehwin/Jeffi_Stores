@@ -25,6 +25,7 @@ interface VariantRow {
   mrp: string
   price_ex_gst: string
   wholeprice_ex_gst: string
+  wholeprice_incl: string
   priceLockSide?: 'incl' | 'excl' | null
   mrpLockSide?: 'incl' | 'excl' | null
   wholesaleLockSide?: 'incl' | 'excl' | null
@@ -119,7 +120,7 @@ function defaultUnit(pricing_type: string): string {
 
 function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string): VariantRow {
   return {
-    variant_name: '', price: '', mrp: '', price_ex_gst: '', wholeprice_ex_gst: '',
+    variant_name: '', price: '', mrp: '', price_ex_gst: '', wholeprice_ex_gst: '', wholeprice_incl: '',
     stock_quantity: '0', mpn: '', gtin: '',
     pricing_type, unit, numeric_value: '',
     weight_rate: '', weight_unit: 'kg', weight_rate_on: false,
@@ -202,9 +203,9 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [variantGallerySelected, setVariantGallerySelected] = useState<string[]>([])
   const [variantGalleryLoading, setVariantGalleryLoading] = useState(false)
   const [subVariantsMap, setSubVariantsMap] = useState<Record<string, any[]>>({})
-  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_ex_gst: string; stock: string; sku: string }>>({})
+  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; stock: string; sku: string }>>({})
   const [subVariantEditId, setSubVariantEditId] = useState<string | null>(null)
-  const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_ex_gst: string; stock: string; sku: string } | null>(null)
+  const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; stock: string; sku: string } | null>(null)
   const [productPackageType, setProductPackageType] = useState<string>(product?.package_type || 'flat_poly_auto')
   const [weightRate, setWeightRate] = useState(product?.weight_rate != null ? String(product.weight_rate) : '')
   const [weightUnit, setWeightUnit] = useState(product?.weight_unit || 'kg')
@@ -278,6 +279,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         mrp: v.mrp != null ? String(v.mrp) : '',
         price_ex_gst: priceEx,
         wholeprice_ex_gst: v.wholeprice_ex_gst != null ? String(v.wholeprice_ex_gst) : '',
+        wholeprice_incl: v.wholeprice_ex_gst != null ? exToIncl(String(v.wholeprice_ex_gst), rate) : '',
         priceLockSide,
         mrpLockSide,
         wholesaleLockSide,
@@ -599,6 +601,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (!productId) return
     const draft = subVariantDrafts[variantId]
     if (!draft?.name) return
+    const wholeEx = draft.wholeprice_incl ? inclToEx(draft.wholeprice_incl, gstRate) : ''
     const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -608,7 +611,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         mrp: draft.mrp ? parseFloat(draft.mrp) : null,
         price_ex_gst: draft.price_ex_gst ? parseFloat(draft.price_ex_gst) : null,
         mrp_ex_gst: draft.mrp_ex_gst ? parseFloat(draft.mrp_ex_gst) : null,
-        wholeprice_ex_gst: draft.wholeprice_ex_gst ? parseFloat(draft.wholeprice_ex_gst) : null,
+        wholeprice_ex_gst: wholeEx ? parseFloat(wholeEx) : null,
         stock_quantity: draft.stock ? parseInt(draft.stock) : 0,
         sku: draft.sku || undefined,
       }),
@@ -616,7 +619,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (res.ok) {
       const data = await res.json()
       setSubVariantsMap(m => ({ ...m, [variantId]: [...(m[variantId] || []), data.sub_variant] }))
-      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', wholeprice_ex_gst: '', stock: '', sku: '' } }))
+      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', wholeprice_incl: '', stock: '', sku: '' } }))
     }
   }
 
@@ -675,7 +678,7 @@ export default function ProductForm({ categories, brands, action, product, produ
             price: toInclusive(v.price, gstRate, gstMode),
             mrp: toInclusive(v.mrp, gstRate, gstMode),
             price_ex_gst: toExGst(v.price_ex_gst || v.price, gstRate, gstMode),
-            wholeprice_ex_gst: v.wholeprice_ex_gst,
+            wholeprice_ex_gst: v.wholeprice_incl ? inclToEx(v.wholeprice_incl, gstRate) : '',
             weight_rate: v.weight_rate_on ? toInclusive(v.weight_rate, gstRate, gstMode) : v.weight_rate,
             length_rate: v.length_rate_on ? toInclusive(v.length_rate, gstRate, gstMode) : v.length_rate,
           }
@@ -1420,7 +1423,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (incl. GST)</label>
-                                  <input type="number" step="0.01" min="0" value={exToIncl(variant.wholeprice_ex_gst, gstRate)} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', inclToEx(e.target.value, gstRate))} className={inputCls} placeholder="0.00" />
+                                  <input type="number" step="0.01" min="0" value={variant.wholeprice_incl} onChange={(e) => updateVariant(index, 'wholeprice_incl', e.target.value)} className={inputCls} placeholder="0.00" />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock *</label>
@@ -1527,6 +1530,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         row.price_ex_gst = ''
                                         row.mrp = ''
                                         row.wholeprice_ex_gst = ''
+                                        row.wholeprice_incl = ''
                                       }
                                       updated[index] = row
                                       setVariants(updated)
@@ -1657,7 +1661,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     </div>
                                   </td>
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={exToIncl(variant.wholeprice_ex_gst, gstRate)} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', inclToEx(e.target.value, gstRate))} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    <input type="number" step="0.01" min="0" value={variant.wholeprice_incl} onChange={(e) => updateVariant(index, 'wholeprice_incl', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
                                   </td>
                                   <td className="py-2 px-3">
                                     <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
@@ -1839,7 +1843,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (incl. GST)</label>
-                      <input type="number" step="0.01" min="0" value={exToIncl(popupVariant.wholeprice_ex_gst, gstRate)} onChange={(e) => updateVariant(popupIndex, 'wholeprice_ex_gst', inclToEx(e.target.value, gstRate))} className="w-full px-2 py-1.5 pr-7 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_incl} onChange={(e) => updateVariant(popupIndex, 'wholeprice_incl', e.target.value)} className="w-full px-2 py-1.5 pr-7 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
@@ -1890,7 +1894,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) { row.use_own_images = true; row.price = ''; row.price_ex_gst = ''; row.mrp = ''; row.wholeprice_ex_gst = '' } updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
+                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) { row.use_own_images = true; row.price = ''; row.price_ex_gst = ''; row.mrp = ''; row.wholeprice_ex_gst = ''; row.wholeprice_incl = '' } updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
                         <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
                       <span className="text-xs font-medium text-foreground-secondary">Has sub-variants</span>
@@ -2129,28 +2133,36 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1 pr-1"><input type="text" value={ed.name} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, name: e.target.value }))} className={`${svInputCls} w-20`} /></td>
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price} onChange={e => {
                                     const v = e.target.value; const n = parseFloat(v)
-                                    setSubVariantEditDraft(d => d && ({ ...d, price: v, price_ex_gst: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n / (1 + gstRate / 100) * 100) / 100) : d.price_ex_gst }))
+                                    setSubVariantEditDraft(d => d && ({ ...d, price: v, price_ex_gst: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n / (1 + gstRate / 100) * 100) / 100) : (v === '' ? '' : d.price_ex_gst) }))
                                   }} className={svInputCls} /></td>
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, mrp: e.target.value }))} className={svInputCls} /></td>
+                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp} onChange={e => {
+                                    const v = e.target.value; const n = parseFloat(v)
+                                    setSubVariantEditDraft(d => d && ({ ...d, mrp: v, mrp_ex_gst: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n / (1 + gstRate / 100) * 100) / 100) : (v === '' ? '' : d.mrp_ex_gst) }))
+                                  }} className={svInputCls} /></td>
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price_ex_gst} onChange={e => {
                                     const v = e.target.value; const n = parseFloat(v)
-                                    setSubVariantEditDraft(d => d && ({ ...d, price_ex_gst: v, price: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n * (1 + gstRate / 100) * 100) / 100) : d.price }))
+                                    setSubVariantEditDraft(d => d && ({ ...d, price_ex_gst: v, price: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n * (1 + gstRate / 100) * 100) / 100) : (v === '' ? '' : d.price) }))
                                   }} className={svInputCls} /></td>
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp_ex_gst} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: e.target.value }))} className={svInputCls} /></td>
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={exToIncl(ed.wholeprice_ex_gst, gstRate)} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, wholeprice_ex_gst: inclToEx(e.target.value, gstRate) }))} className={svInputCls} /></td>
+                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp_ex_gst} onChange={e => {
+                                    const v = e.target.value; const n = parseFloat(v)
+                                    setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n * (1 + gstRate / 100) * 100) / 100) : (v === '' ? '' : d.mrp) }))
+                                  }} className={svInputCls} /></td>
+                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.wholeprice_incl} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, wholeprice_incl: e.target.value }))} className={svInputCls} /></td>
                                   <td className="py-1 pr-1"><input type="number" step="1" min="0" value={ed.stock} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, stock: e.target.value }))} className={svInputCls} /></td>
                                   <td className="py-1 pr-1"><input type="text" value={ed.sku} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, sku: e.target.value }))} className={`${svInputCls} w-20`} /></td>
                                   <td className="py-1 pl-1 flex items-center gap-1">
                                     <button type="button" onClick={async () => {
                                       if (!ed) return
+                                      const wholeEx = ed.wholeprice_incl ? inclToEx(ed.wholeprice_incl, gstRate) : ''
+                                      const wholeExNum = wholeEx ? parseFloat(wholeEx) : null
                                       const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`, {
                                         method: 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: ed.wholeprice_ex_gst ? parseFloat(ed.wholeprice_ex_gst) : null, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || null }),
+                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: wholeExNum, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || null }),
                                       })
                                       if (res.ok) {
                                         const updated = await res.json()
-                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: ed.wholeprice_ex_gst ? parseFloat(ed.wholeprice_ex_gst) : null, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || s.sku }) : s) }))
+                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: wholeExNum, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || s.sku }) : s) }))
                                       }
                                       setSubVariantEditId(null); setSubVariantEditDraft(null)
                                     }} className="text-green-500 hover:text-green-700 leading-none font-bold text-sm">✓</button>
@@ -2166,7 +2178,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1.5 pr-2">{sv.stock_quantity}</td>
                                   <td className="py-1.5 pr-2 font-mono text-foreground-muted">{sv.sku}</td>
                                   <td className="py-1.5 flex items-center gap-2">
-                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', wholeprice_ex_gst: sv.wholeprice_ex_gst != null ? String(sv.wholeprice_ex_gst) : '', stock: String(sv.stock_quantity ?? 0), sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
+                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', wholeprice_incl: sv.wholeprice_ex_gst != null ? exToIncl(String(sv.wholeprice_ex_gst), gstRate) : '', stock: String(sv.stock_quantity ?? 0), sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
                                     <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none">✕</button>
                                   </td>
                                 </>)}
@@ -2178,7 +2190,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     {(() => {
-                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',wholeprice_ex_gst:'',stock:'',sku:'' }
+                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',wholeprice_incl:'',stock:'',sku:'' }
                       const setD = (field: string, val: string) => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, [field]: val } }))
                       const setDCalc = (field: string, val: string) => {
                         const n = parseFloat(val)
@@ -2186,6 +2198,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                         if (!isNaN(n) && n > 0 && gstRate > 0) {
                           if (field === 'price') next.price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
                           if (field === 'price_ex_gst') next.price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                          if (field === 'mrp') next.mrp_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                          if (field === 'mrp_ex_gst') next.mrp = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                        } else if (val === '') {
+                          if (field === 'price') next.price_ex_gst = ''
+                          if (field === 'price_ex_gst') next.price = ''
+                          if (field === 'mrp') next.mrp_ex_gst = ''
+                          if (field === 'mrp_ex_gst') next.mrp = ''
                         }
                         setSubVariantDrafts(m => ({ ...m, [variantPopupId]: next }))
                       }
@@ -2202,7 +2221,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">MRP</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp} onChange={(e) => setD('mrp', e.target.value)} className={`${inputCls} w-full`} />
+                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp} onChange={(e) => setDCalc('mrp', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">Ex-GST Price</label>
@@ -2210,11 +2229,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">MRP Ex-GST</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp_ex_gst} onChange={(e) => setD('mrp_ex_gst', e.target.value)} className={`${inputCls} w-full`} />
+                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp_ex_gst} onChange={(e) => setDCalc('mrp_ex_gst', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">Wholesale (incl. GST)</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={exToIncl(d.wholeprice_ex_gst, gstRate)} onChange={(e) => setD('wholeprice_ex_gst', inclToEx(e.target.value, gstRate))} className={`${inputCls} w-full`} />
+                            <input type="number" step="0.01" placeholder="0.00" value={d.wholeprice_incl} onChange={(e) => setD('wholeprice_incl', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">Stock</label>
