@@ -132,6 +132,15 @@ export default function ProductActions({
         if (sv) return sv.id
       }
     }
+    const initialVariant = variants.find(v => {
+      if (initialSkuParam && v.sku === initialSkuParam) return true
+      return false
+    }) || variants.filter(v => (v.pricing_type || 'unit') === (variants[0]?.pricing_type || 'unit'))[0] || variants[0]
+    const subs = initialVariant?.sub_variants || []
+    if (subs.length > 0) {
+      const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
+      return firstActive?.id ?? null
+    }
     return null
   })
 
@@ -150,7 +159,14 @@ export default function ProductActions({
       subVariantInitFromUrl.current = false
       return
     }
-    setSelectedSubVariantId(null)
+    const v = variants.find(x => x.id === selectedVariantId)
+    const subs = v?.sub_variants || []
+    if (subs.length > 0) {
+      const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
+      setSelectedSubVariantId(firstActive?.id ?? null)
+    } else {
+      setSelectedSubVariantId(null)
+    }
   }, [selectedVariantId])
 
   useEffect(() => {
