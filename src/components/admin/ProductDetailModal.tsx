@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useState } from 'react'
+import React, { useEffect, useCallback, useState } from 'react'
 import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
@@ -220,21 +220,45 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">
-                      {variants.map((v: any) => (
-                        <tr key={v.id} className="hover:bg-surface-secondary">
-                          <td className="px-3 py-2 truncate font-medium text-foreground" title={v.variant_name}>{v.variant_name}</td>
-                          <td className="px-3 py-2 truncate text-foreground-muted" title={v.sku}>{v.sku || '—'}</td>
-                          <td className="px-3 py-2 text-foreground">
-                            Rs. {Number(v.price || 0).toLocaleString('en-IN')}
-                          </td>
-                          <td className="px-3 py-2 text-foreground">{v.stock_quantity ?? 0}</td>
-                          <td className="px-3 py-2">
-                            <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${v.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
-                              {v.is_active ? 'Active' : 'Off'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {variants.map((v: any) => {
+                        const subs: any[] = v.sub_variants || []
+                        const hasSubs = subs.length > 0
+                        const vStock = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
+                        const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
+                        return (
+                          <React.Fragment key={v.id}>
+                            <tr className="hover:bg-surface-secondary">
+                              <td className="px-3 py-2 truncate font-medium text-foreground" title={v.variant_name}>
+                                {v.variant_name}
+                                {hasSubs && <span className="ml-1.5 text-[10px] font-normal text-foreground-muted">({subs.length} sub)</span>}
+                              </td>
+                              <td className="px-3 py-2 truncate text-foreground-muted" title={v.sku}>{v.sku || '—'}</td>
+                              <td className="px-3 py-2 text-foreground">
+                                {hasSubs ? `From Rs. ${vMinPrice.toLocaleString('en-IN')}` : `Rs. ${Number(v.price || 0).toLocaleString('en-IN')}`}
+                              </td>
+                              <td className="px-3 py-2 text-foreground">{vStock}</td>
+                              <td className="px-3 py-2">
+                                <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${v.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
+                                  {v.is_active ? 'Active' : 'Off'}
+                                </span>
+                              </td>
+                            </tr>
+                            {hasSubs && subs.map((sv: any) => (
+                              <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 text-xs">
+                                <td className="px-3 py-1.5 pl-6 truncate text-foreground-secondary" title={sv.sub_variant_name}>↳ {sv.sub_variant_name}</td>
+                                <td className="px-3 py-1.5 truncate text-foreground-muted" title={sv.sku}>{sv.sku || '—'}</td>
+                                <td className="px-3 py-1.5 text-foreground">{sv.price ? `Rs. ${Number(sv.price).toLocaleString('en-IN')}` : '—'}</td>
+                                <td className="px-3 py-1.5 text-foreground">{sv.stock_quantity ?? 0}</td>
+                                <td className="px-3 py-1.5">
+                                  <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${sv.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
+                                    {sv.is_active ? 'Active' : 'Off'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
