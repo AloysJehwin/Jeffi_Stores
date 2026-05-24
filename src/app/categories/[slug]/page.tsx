@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
+import Pagination from '@/components/ui/Pagination'
+
+const PAGE_SIZE = 24
 
 async function getCategoryBySlug(slug: string) {
   return queryOne(
@@ -18,10 +21,17 @@ async function getSubcategories(parentId: string) {
   )
 }
 
-async function getCategoryProducts(categoryId: string, subcategoryIds: string[]) {
+async function getCategoryProducts(categoryId: string, subcategoryIds: string[], page: number) {
   const allCategoryIds = [categoryId, ...subcategoryIds]
+  const offset = (page - 1) * PAGE_SIZE
 
-  return queryMany(`
+  const countRow = await queryOne<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM products WHERE category_id = ANY($1) AND is_active = true`,
+    [allCategoryIds]
+  )
+  const total = Number(countRow?.total ?? 0)
+
+  const products = await queryMany(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
       json_build_object('id', b.id, 'name', b.name) AS brands,
@@ -37,13 +47,18 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[])
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.category_id = ANY($1) AND p.is_active = true
     ORDER BY p.created_at DESC
-  `, [allCategoryIds])
+    LIMIT $2 OFFSET $3
+  `, [allCategoryIds, PAGE_SIZE, offset])
+
+  return { products, total, totalPages: Math.ceil(total / PAGE_SIZE) }
 }
 
 export default async function CategoryDetailPage({
   params,
+  searchParams,
 }: {
   params: { slug: string }
+  searchParams: { [key: string]: string | string[] | undefined }
 }) {
   const category = await getCategoryBySlug(params.slug)
 
@@ -51,10 +66,14 @@ export default async function CategoryDetailPage({
     notFound()
   }
 
+  const pageParam = typeof searchParams.page === 'string' ? searchParams.page : '1'
+  const page = Math.max(1, parseInt(pageParam, 10) || 1)
+
   const subcategories = await getSubcategories(category.id)
-  const products = await getCategoryProducts(
+  const { products, total, totalPages } = await getCategoryProducts(
     category.id,
-    subcategories.map(sub => sub.id)
+    subcategories.map(sub => sub.id),
+    page,
   )
 
   return (
@@ -113,11 +132,17 @@ export default async function CategoryDetailPage({
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-foreground">
-              Products ({products.length})
+              Products ({total})
             </h2>
+            {totalPages > 1 && (
+              <p className="text-sm text-foreground-muted">
+                Page {page} of {totalPages}
+              </p>
+            )}
           </div>
 
           {products.length > 0 ? (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {products.map((product) => {
                 const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
@@ -205,6 +230,12 @@ export default async function CategoryDetailPage({
                 )
               })}
             </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              buildHref={(p) => p > 1 ? `/categories/${params.slug}?page=${p}` : `/categories/${params.slug}`}
+            />
+            </>
           ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
               <svg className="mx-auto h-24 w-24 text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
