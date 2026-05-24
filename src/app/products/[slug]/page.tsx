@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { cache } from 'react'
 import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/db'
+import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import ProductDetailClient from '@/components/visitor/ProductDetailClient'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
@@ -29,6 +30,7 @@ const getProductBySlug = cache(async (slug: string) => {
              'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
              'length_rate', pv.length_rate, 'length_unit', pv.length_unit,
              'sub_variant_type', pv.sub_variant_type,
+             'variant_type', pv.variant_type,
              'variant_images', COALESCE(
                (SELECT json_agg(vi ORDER BY vi.display_order)
                 FROM variant_images vi WHERE vi.variant_id = pv.id),
@@ -43,7 +45,9 @@ const getProductBySlug = cache(async (slug: string) => {
          )
          FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
         '[]'::json
-      ) AS product_variants
+      ) AS product_variants,
+      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+      ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -60,7 +64,9 @@ export async function generateMetadata({
   if (!product) return { title: 'Product Not Found' }
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-  const displayPrice = product.base_price
+  const displayPrice = product.has_variants && product.variant_min_price
+    ? product.variant_min_price
+    : (product.base_price || 0)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
 
   return {
@@ -143,8 +149,8 @@ async function getRelatedProducts(productId: string, categoryId: string) {
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
       ) AS product_images,
-      COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
-      (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price
+      ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
+      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -173,7 +179,9 @@ export default async function ProductDetailPage({
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
   const hasVariants = product.has_variants && product.product_variants?.length > 0
-  const displayPrice = product.base_price
+  const displayPrice = hasVariants && product.variant_min_price
+    ? product.variant_min_price
+    : (product.base_price || 0)
   const mrp = product.mrp ? Number(product.mrp) : null
   const mrpDiscount = mrp && mrp > Number(displayPrice)
     ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, queryOne } from '@/lib/db'
 import { buildProductSearchClause, buildProductSearchRank, buildSearchRank } from '@/lib/search'
+import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 
 const PAGE_SIZE = 21
 
@@ -79,11 +80,8 @@ export async function GET(request: NextRequest) {
            FROM product_images pi WHERE pi.product_id = p.id),
           '[]'::json
         ) AS product_images,
-        COALESCE(
-          (SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
-          0
-        ) AS variant_stock_total,
-        (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price
+        ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
+        ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN categories pc ON c.parent_category_id = pc.id

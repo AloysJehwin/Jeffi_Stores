@@ -23,8 +23,13 @@ interface VariantRow {
   variant_name: string
   price: string
   mrp: string
+  mrp_ex_gst: string
   price_ex_gst: string
   wholeprice_ex_gst: string
+  wholeprice_incl: string
+  priceLockSide?: 'incl' | 'excl' | null
+  mrpLockSide?: 'incl' | 'excl' | null
+  wholesaleLockSide?: 'incl' | 'excl' | null
   stock_quantity: string
   mpn: string
   gtin: string
@@ -116,7 +121,8 @@ function defaultUnit(pricing_type: string): string {
 
 function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string): VariantRow {
   return {
-    variant_name: '', price: '', mrp: '', price_ex_gst: '', wholeprice_ex_gst: '',
+    id: `temp-${Math.random().toString(36).slice(2, 11)}`,
+    variant_name: '', price: '', mrp: '', mrp_ex_gst: '', price_ex_gst: '', wholeprice_ex_gst: '', wholeprice_incl: '',
     stock_quantity: '0', mpn: '', gtin: '',
     pricing_type, unit, numeric_value: '',
     weight_rate: '', weight_unit: 'kg', weight_rate_on: false,
@@ -128,25 +134,39 @@ function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string):
   }
 }
 
-function toInclusive(val: string, rate: number, mode: 'inclusive' | 'exclusive'): string {
-  const n = parseFloat(val)
-  if (!val || isNaN(n)) return val
-  if (mode === 'exclusive') return String(Math.round(n * (1 + rate / 100) * 100) / 100)
-  return val
+function lockedInputCls(baseCls: string, isLocked: boolean): string {
+  return isLocked ? `${baseCls} bg-surface-secondary text-foreground-muted cursor-not-allowed` : baseCls
 }
 
-function toExGst(val: string, rate: number, mode: 'inclusive' | 'exclusive'): string {
-  const n = parseFloat(val)
-  if (!val || isNaN(n)) return val
-  const incl = mode === 'exclusive' ? n * (1 + rate / 100) : n
-  return String(Math.round(incl / (1 + rate / 100) * 100) / 100)
+function exToIncl(exVal: string, rate: number): string {
+  if (!exVal) return ''
+  const n = parseFloat(exVal)
+  if (isNaN(n) || n < 0) return ''
+  if (rate <= 0) return exVal
+  return (Math.round(n * (1 + rate / 100) * 100) / 100).toFixed(2)
 }
 
-function inclusivePreview(val: string, rate: number, mode: 'inclusive' | 'exclusive'): string | null {
-  if (mode !== 'exclusive') return null
-  const n = parseFloat(val)
-  if (!val || isNaN(n) || n <= 0) return null
-  return `= ₹${(Math.round(n * (1 + rate / 100) * 100) / 100).toFixed(2)} incl. GST`
+function inclToEx(inclVal: string, rate: number): string {
+  if (!inclVal) return ''
+  const n = parseFloat(inclVal)
+  if (isNaN(n) || n < 0) return ''
+  if (rate <= 0) return inclVal
+  return String(Math.round(n / (1 + rate / 100) * 100) / 100)
+}
+
+function sumSubVariantStock(svs: any[] | undefined): number {
+  if (!svs || svs.length === 0) return 0
+  return svs.reduce((acc, sv) => acc + (Number(sv.stock_quantity) || 0), 0)
+}
+
+function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: () => void; title?: string }) {
+  return (
+    <button type="button" onClick={onClick} title={title} className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-foreground-muted hover:text-accent-600 transition-colors" tabIndex={-1}>
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    </button>
+  )
 }
 
 export default function ProductForm({ categories, brands, action, product, productId }: ProductFormProps) {
@@ -159,9 +179,21 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [tempProductId] = useState<string>(productId || `temp-${Date.now()}`)
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantPopupId, setVariantPopupId] = useState<string | null>(null)
-  const [variantImagesMap, setVariantImagesMap] = useState<Record<string, any[]>>({})
+  const [variantImagesMap, setVariantImagesMap] = useState<Record<string, any[]>>(() => {
+    const init: Record<string, any[]> = {}
+    if (product?.product_variants) {
+      for (const v of product.product_variants) {
+        if (v.id && Array.isArray(v.variant_images) && v.variant_images.length > 0) {
+          init[v.id] = v.variant_images
+        }
+      }
+    }
+    return init
+  })
   const [variantImageUploading, setVariantImageUploading] = useState<Record<string, boolean>>({})
   const [variantImageError, setVariantImageError] = useState<string | null>(null)
+  const variantImageDragIndex = useRef<number | null>(null)
+  const variantImageDragOverIndex = useRef<number | null>(null)
   const [variantGalleryOpen, setVariantGalleryOpen] = useState(false)
   const [variantGalleryImages, setVariantGalleryImages] = useState<any[]>([])
   const [variantGalleryCategories, setVariantGalleryCategories] = useState<any[]>([])
@@ -169,34 +201,70 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [variantGalleryCategory, setVariantGalleryCategory] = useState('')
   const [variantGallerySelected, setVariantGallerySelected] = useState<string[]>([])
   const [variantGalleryLoading, setVariantGalleryLoading] = useState(false)
-  const [subVariantsMap, setSubVariantsMap] = useState<Record<string, any[]>>({})
-  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_ex_gst: string; stock: string; sku: string }>>({})
+  const [subVariantsMap, setSubVariantsMap] = useState<Record<string, any[]>>(() => {
+    const init: Record<string, any[]> = {}
+    if (product?.product_variants) {
+      for (const v of product.product_variants) {
+        if (v.id && Array.isArray(v.sub_variants) && v.sub_variants.length > 0) {
+          init[v.id] = v.sub_variants
+        }
+      }
+    }
+    return init
+  })
+  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; wholeprice_ex_gst: string; stock: string; sku: string }>>({})
   const [subVariantEditId, setSubVariantEditId] = useState<string | null>(null)
-  const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_ex_gst: string; stock: string; sku: string } | null>(null)
+  const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; wholeprice_ex_gst: string; stock: string; sku: string } | null>(null)
   const [productPackageType, setProductPackageType] = useState<string>(product?.package_type || 'flat_poly_auto')
   const [weightRate, setWeightRate] = useState(product?.weight_rate != null ? String(product.weight_rate) : '')
   const [weightUnit, setWeightUnit] = useState(product?.weight_unit || 'kg')
-  const [weightEnabled, setWeightEnabled] = useState(product?.weight_rate != null)
+  const [weightEnabled, setWeightEnabled] = useState(product?.weight_rate != null && Number(product?.weight_rate) > 0)
   const [lengthRate, setLengthRate] = useState(product?.length_rate != null ? String(product.length_rate) : '')
   const [lengthUnit, setLengthUnit] = useState(product?.length_unit || 'm')
-  const [lengthEnabled, setLengthEnabled] = useState(product?.length_rate != null)
-  const gstModeKey = `gstMode:${productId || 'new'}`
-  const [gstMode, setGstMode] = useState<'inclusive' | 'exclusive'>(() => {
-    if (typeof window === 'undefined') return 'inclusive'
-    return (localStorage.getItem(gstModeKey) as 'inclusive' | 'exclusive') || 'inclusive'
-  })
-
-  function changeGstMode(mode: 'inclusive' | 'exclusive') {
-    localStorage.setItem(gstModeKey, mode)
-    setGstMode(mode)
-  }
+  const [lengthEnabled, setLengthEnabled] = useState(product?.length_rate != null && Number(product?.length_rate) > 0)
   const [gstRate, setGstRate] = useState<number>(product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18)
 
-  const [basePrice, setBasePrice] = useState(product?.base_price != null ? String(product.base_price) : '')
+  const [basePrice, setBasePrice] = useState(() => {
+    if (product?.base_price != null) return String(product.base_price)
+    if (product?.price_ex_gst != null) {
+      const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
+      return String(Math.round(Number(product.price_ex_gst) * (1 + r / 100) * 100) / 100)
+    }
+    return ''
+  })
   const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '')
   const [mrp, setMrp] = useState(product?.mrp != null ? String(product.mrp) : '')
-  const [salePrice, setSalePrice] = useState(product?.price_ex_gst != null ? String(product.price_ex_gst) : '')
-  const [wholesalePrice, setWholesalePrice] = useState(product?.wholeprice_ex_gst != null ? String(product.wholeprice_ex_gst) : '')
+  const [mrpExGst, setMrpExGst] = useState(() => {
+    if (product?.mrp_ex_gst != null) return String(product.mrp_ex_gst)
+    if (product?.mrp != null) {
+      const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
+      return r > 0 ? String(Math.round(Number(product.mrp) / (1 + r / 100) * 100) / 100) : String(product.mrp)
+    }
+    return ''
+  })
+  const [topMrpLockSide, setTopMrpLockSide] = useState<'incl' | 'excl' | null>(
+    product?.mrp != null ? 'excl' : (product?.mrp_ex_gst != null ? 'incl' : null)
+  )
+  const [salePrice, setSalePrice] = useState(() => {
+    if (product?.price_ex_gst != null) return String(product.price_ex_gst)
+    if (product?.base_price != null) {
+      const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
+      return String(Math.round(Number(product.base_price) / (1 + r / 100) * 100) / 100)
+    }
+    return ''
+  })
+  const [wholesalePrice, setWholesalePrice] = useState(() => {
+    if (product?.wholeprice_ex_gst == null) return ''
+    const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
+    return String(Math.round(Number(product.wholeprice_ex_gst) * (1 + r / 100) * 100) / 100)
+  })
+  const [wholesalePriceEx, setWholesalePriceEx] = useState(product?.wholeprice_ex_gst != null ? String(product.wholeprice_ex_gst) : '')
+  const [topWholesaleLockSide, setTopWholesaleLockSide] = useState<'incl' | 'excl' | null>(
+    product?.wholeprice_ex_gst != null ? 'incl' : null
+  )
+  const [topPriceLockSide, setTopPriceLockSide] = useState<'incl' | 'excl' | null>(
+    product?.base_price != null ? 'excl' : (product?.price_ex_gst != null ? 'incl' : null)
+  )
 
   const draftKey = productId ? `draft_product_${productId}` : 'draft_product_new'
   const [isActive, setIsActive] = useState<boolean>(product?.is_active ?? true)
@@ -207,13 +275,31 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
     if (product?.product_variants && product.product_variants.length > 0) {
-      return product.product_variants.map((v: any) => ({
+      const rate = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
+      const deriveExGst = (priceVal: any) => priceVal != null ? String(Math.round(Number(priceVal) / (1 + rate / 100) * 100) / 100) : ''
+      const deriveIncl = (exVal: any) => exVal != null ? String(Math.round(Number(exVal) * (1 + rate / 100) * 100) / 100) : ''
+      return product.product_variants.map((v: any) => {
+        const hasPrice = v.price != null
+        const hasPriceEx = v.price_ex_gst != null
+        const price = hasPrice ? String(v.price) : (hasPriceEx ? deriveIncl(v.price_ex_gst) : '')
+        const priceEx = hasPriceEx ? String(v.price_ex_gst) : (hasPrice ? deriveExGst(v.price) : '')
+        const priceLockSide: 'incl' | 'excl' | null = hasPrice ? 'excl' : (hasPriceEx ? 'incl' : null)
+        const hasMrp = v.mrp != null
+        const hasMrpEx = v.mrp_ex_gst != null
+        const mrpLockSide: 'incl' | 'excl' | null = hasMrp ? 'excl' : (hasMrpEx ? 'incl' : null)
+        const wholesaleLockSide: 'incl' | 'excl' | null = v.wholeprice_ex_gst != null ? 'incl' : null
+        return ({
         id: v.id,
         variant_name: v.variant_name,
-        price: v.price != null ? String(v.price) : '',
-        mrp: v.mrp != null ? String(v.mrp) : '',
-        price_ex_gst: v.price_ex_gst != null ? String(v.price_ex_gst) : '',
+        price,
+        mrp: hasMrp ? String(v.mrp) : '',
+        mrp_ex_gst: hasMrpEx ? String(v.mrp_ex_gst) : (hasMrp ? inclToEx(String(v.mrp), rate) : ''),
+        price_ex_gst: priceEx,
         wholeprice_ex_gst: v.wholeprice_ex_gst != null ? String(v.wholeprice_ex_gst) : '',
+        wholeprice_incl: v.wholeprice_ex_gst != null ? exToIncl(String(v.wholeprice_ex_gst), rate) : '',
+        priceLockSide,
+        mrpLockSide,
+        wholesaleLockSide,
         stock_quantity: String(v.stock_quantity || 0),
         mpn: v.mpn || '',
         gtin: v.gtin || '',
@@ -222,20 +308,21 @@ export default function ProductForm({ categories, brands, action, product, produ
         numeric_value: v.numeric_value != null ? String(v.numeric_value) : '',
         weight_rate: v.weight_rate != null ? String(v.weight_rate) : '',
         weight_unit: v.weight_unit || 'kg',
-        weight_rate_on: v.weight_rate != null,
+        weight_rate_on: v.weight_rate != null && Number(v.weight_rate) > 0,
         length_rate: v.length_rate != null ? String(v.length_rate) : '',
         length_unit: v.length_unit || 'm',
-        length_rate_on: v.length_rate != null,
+        length_rate_on: v.length_rate != null && Number(v.length_rate) > 0,
         weight_grams: v.weight_grams != null ? String(v.weight_grams) : '',
         package_type: v.package_type || '',
         length_cm: v.length_cm != null ? String(v.length_cm) : '',
         breadth_cm: v.breadth_cm != null ? String(v.breadth_cm) : '',
         height_cm: v.height_cm != null ? String(v.height_cm) : '',
         sub_variant_type: v.sub_variant_type || '',
-        sub_variant_type_on: !!v.sub_variant_type,
+        sub_variant_type_on: !!v.sub_variant_type || (Array.isArray(v.sub_variants) && v.sub_variants.length > 0),
         variant_type: v.variant_type || '',
         use_own_images: !!(v.variant_images && v.variant_images.length > 0),
-      }))
+      })
+      })
     }
     return []
   })
@@ -275,10 +362,11 @@ export default function ProductForm({ categories, brands, action, product, produ
       const snapshot = {
         uncontrolled,
         hasVariants, variants, groups,
-        basePrice, mrp, salePrice, wholesalePrice,
+        basePrice, mrp, mrpExGst, salePrice, wholesalePrice, wholesalePriceEx, costPrice,
+        topPriceLockSide, topMrpLockSide, topWholesaleLockSide,
         weightRate, weightUnit, weightEnabled,
         lengthRate, lengthUnit, lengthEnabled,
-        gstRate, gstMode, isActive,
+        gstRate, isActive,
       }
       localStorage.setItem(draftKey, JSON.stringify(snapshot))
       setHasDraft(true)
@@ -286,10 +374,11 @@ export default function ProductForm({ categories, brands, action, product, produ
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
   }, [
     hasVariants, variants, groups,
-    basePrice, mrp, salePrice, wholesalePrice,
+    basePrice, mrp, mrpExGst, salePrice, wholesalePrice, wholesalePriceEx, costPrice,
+    topPriceLockSide, topMrpLockSide, topWholesaleLockSide,
     weightRate, weightUnit, weightEnabled,
     lengthRate, lengthUnit, lengthEnabled,
-    gstRate, gstMode, isActive, draftKey,
+    gstRate, isActive, draftKey,
   ])
 
   function restoreDraft() {
@@ -309,8 +398,14 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (snap.groups) setGroups(snap.groups)
       if (snap.basePrice !== undefined) setBasePrice(snap.basePrice)
       if (snap.mrp !== undefined) setMrp(snap.mrp)
+      if (snap.mrpExGst !== undefined) setMrpExGst(snap.mrpExGst)
       if (snap.salePrice !== undefined) setSalePrice(snap.salePrice)
       if (snap.wholesalePrice !== undefined) setWholesalePrice(snap.wholesalePrice)
+      if (snap.wholesalePriceEx !== undefined) setWholesalePriceEx(snap.wholesalePriceEx)
+      if (snap.costPrice !== undefined) setCostPrice(snap.costPrice)
+      if (snap.topPriceLockSide !== undefined) setTopPriceLockSide(snap.topPriceLockSide)
+      if (snap.topMrpLockSide !== undefined) setTopMrpLockSide(snap.topMrpLockSide)
+      if (snap.topWholesaleLockSide !== undefined) setTopWholesaleLockSide(snap.topWholesaleLockSide)
       if (snap.weightRate !== undefined) setWeightRate(snap.weightRate)
       if (snap.weightUnit !== undefined) setWeightUnit(snap.weightUnit)
       if (snap.weightEnabled !== undefined) setWeightEnabled(snap.weightEnabled)
@@ -318,7 +413,6 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (snap.lengthUnit !== undefined) setLengthUnit(snap.lengthUnit)
       if (snap.lengthEnabled !== undefined) setLengthEnabled(snap.lengthEnabled)
       if (snap.gstRate !== undefined) setGstRate(snap.gstRate)
-      if (snap.gstMode !== undefined) setGstMode(snap.gstMode)
       if (snap.isActive !== undefined) setIsActive(snap.isActive)
     } catch {}
   }
@@ -405,7 +499,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   async function openVariantPopup(variantId: string) {
     setVariantPopupId(variantId)
     setVariantImageError(null)
-    if (productId) {
+    const isTemp = variantId.startsWith('temp-')
+    if (productId && !isTemp) {
       if (!variantImagesMap[variantId]) {
         const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`)
         if (res.ok) {
@@ -422,9 +517,6 @@ export default function ProductForm({ categories, brands, action, product, produ
           const data = await res.json()
           const loaded = data.sub_variants || []
           setSubVariantsMap(m => ({ ...m, [variantId]: loaded }))
-          if (loaded.length > 0) {
-            setVariants(prev => prev.map(v => v.id === variantId ? { ...v, sub_variant_type_on: true } : v))
-          }
         } else {
           setSubVariantsMap(m => ({ ...m, [variantId]: [] }))
         }
@@ -434,6 +526,10 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function uploadVariantImageFile(variantId: string, file: File) {
     if (!productId) return
+    if (variantId.startsWith('temp-')) {
+      setVariantImageError('Save the product first to upload variant images.')
+      return
+    }
     setVariantImageError(null)
     setVariantImageUploading(m => ({ ...m, [variantId]: true }))
     try {
@@ -478,6 +574,25 @@ export default function ProductForm({ categories, brands, action, product, produ
       ...m,
       [variantId]: (m[variantId] || []).map((img: any) => ({ ...img, is_primary: img.id === imageId })),
     }))
+  }
+
+  async function reorderVariantImages(variantId: string, fromIndex: number, toIndex: number) {
+    if (!productId || fromIndex === toIndex) return
+    const current = variantImagesMap[variantId] || []
+    if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) return
+    const next = [...current]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    setVariantImagesMap(m => ({ ...m, [variantId]: next }))
+    await Promise.all(
+      next.map((img: any, idx: number) =>
+        fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId: img.id, displayOrder: idx }),
+        }),
+      ),
+    )
   }
 
   const openVariantGallery = useCallback(async () => {
@@ -528,9 +643,17 @@ export default function ProductForm({ categories, brands, action, product, produ
   }
 
   async function addSubVariant(variantId: string) {
-    if (!productId) return
+    if (!productId) {
+      setVariantImageError('Save the product first to add sub-variants.')
+      return
+    }
+    if (variantId.startsWith('temp-')) {
+      setVariantImageError('Save the product first to add sub-variants for this variant.')
+      return
+    }
     const draft = subVariantDrafts[variantId]
     if (!draft?.name) return
+    const wholeEx = draft.wholeprice_ex_gst || (draft.wholeprice_incl ? inclToEx(draft.wholeprice_incl, gstRate) : '')
     const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -540,7 +663,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         mrp: draft.mrp ? parseFloat(draft.mrp) : null,
         price_ex_gst: draft.price_ex_gst ? parseFloat(draft.price_ex_gst) : null,
         mrp_ex_gst: draft.mrp_ex_gst ? parseFloat(draft.mrp_ex_gst) : null,
-        wholeprice_ex_gst: draft.wholeprice_ex_gst ? parseFloat(draft.wholeprice_ex_gst) : null,
+        wholeprice_ex_gst: wholeEx ? parseFloat(wholeEx) : null,
         stock_quantity: draft.stock ? parseInt(draft.stock) : 0,
         sku: draft.sku || undefined,
       }),
@@ -548,12 +671,13 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (res.ok) {
       const data = await res.json()
       setSubVariantsMap(m => ({ ...m, [variantId]: [...(m[variantId] || []), data.sub_variant] }))
-      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', wholeprice_ex_gst: '', stock: '', sku: '' } }))
+      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', wholeprice_incl: '', wholeprice_ex_gst: '', stock: '', sku: '' } }))
     }
   }
 
   async function deleteSubVariant(variantId: string, subId: string) {
     if (!productId) return
+    if (variantId.startsWith('temp-')) return
     await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -587,29 +711,34 @@ export default function ProductForm({ categories, brands, action, product, produ
       formData.set('length_unit', lengthEnabled ? lengthUnit : '')
 
       if (!hasVariants) {
-        formData.set('base_price', toInclusive(basePrice, gstRate, gstMode))
-        formData.set('mrp', toInclusive(mrp, gstRate, gstMode))
-        formData.set('price_ex_gst', toExGst(salePrice, gstRate, gstMode))
-        formData.set('wholeprice_ex_gst', toExGst(wholesalePrice, gstRate, gstMode))
+        formData.set('base_price', basePrice || '')
+        formData.set('mrp', mrp || '')
+        formData.set('mrp_ex_gst', mrpExGst || '')
+        formData.set('price_ex_gst', salePrice || '')
+        formData.set('wholeprice_ex_gst', wholesalePriceEx || inclToEx(wholesalePrice, gstRate))
       } else {
-        formData.set('mrp', toInclusive(mrp, gstRate, gstMode))
-        formData.set('price_ex_gst', toExGst(salePrice, gstRate, gstMode))
-        formData.set('wholeprice_ex_gst', toExGst(wholesalePrice, gstRate, gstMode))
+        formData.set('mrp', mrp || '')
+        formData.set('mrp_ex_gst', mrpExGst || '')
+        formData.set('price_ex_gst', salePrice || '')
+        formData.set('wholeprice_ex_gst', wholesalePriceEx || inclToEx(wholesalePrice, gstRate))
       }
       formData.set('cost_price', costPrice || '0')
 
       if (hasVariants) {
         const convertedVariants = variants.map(v => {
           const grp = groups.find(g => g.pricing_type === v.pricing_type)
+          const stockQty = v.sub_variant_type_on ? String(sumSubVariantStock(subVariantsMap[v.id || ''])) : v.stock_quantity
           return {
             ...v,
             variant_type: grp?.variant_type || v.variant_type || '',
-            price: toInclusive(v.price, gstRate, gstMode),
-            mrp: toInclusive(v.mrp, gstRate, gstMode),
-            price_ex_gst: toExGst(v.price_ex_gst || v.price, gstRate, gstMode),
-            wholeprice_ex_gst: toExGst(v.wholeprice_ex_gst, gstRate, gstMode),
-            weight_rate: v.weight_rate_on ? toInclusive(v.weight_rate, gstRate, gstMode) : v.weight_rate,
-            length_rate: v.length_rate_on ? toInclusive(v.length_rate, gstRate, gstMode) : v.length_rate,
+            stock_quantity: stockQty,
+            price: v.price,
+            mrp: v.mrp,
+            mrp_ex_gst: v.mrp_ex_gst,
+            price_ex_gst: v.price_ex_gst || (v.price ? inclToEx(v.price, gstRate) : ''),
+            wholeprice_ex_gst: v.wholeprice_ex_gst || (v.wholeprice_incl ? inclToEx(v.wholeprice_incl, gstRate) : ''),
+            weight_rate: v.weight_rate_on ? v.weight_rate : '',
+            length_rate: v.length_rate_on ? v.length_rate : '',
           }
         })
         formData.set('variants_json', JSON.stringify(convertedVariants))
@@ -762,24 +891,61 @@ export default function ProductForm({ categories, brands, action, product, produ
 
           {/* MRP — hidden when has variants */}
           {!hasVariants && (
-          <div>
-            <label htmlFor="mrp" className="block text-sm font-medium text-foreground-secondary mb-2">
-              MRP (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
-            </label>
-            <input
-              type="number"
-              id="mrp"
-              name="mrp"
-              step="0.01"
-              min="0"
-              value={mrp}
-              onChange={e => setMrp(e.target.value)}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="Maximum Retail Price"
-            />
-            {inclusivePreview(mrp, gstRate, gstMode) && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(mrp, gstRate, gstMode)}</p>
-            )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="mrp" className="block text-sm font-medium text-foreground-secondary mb-2">
+                MRP (incl. GST)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  id="mrp"
+                  name="mrp"
+                  step="0.01"
+                  min="0"
+                  value={mrp}
+                  readOnly={topMrpLockSide === 'incl'}
+                  onChange={e => {
+                    const v = e.target.value
+                    setMrp(v)
+                    setTopMrpLockSide(v === '' ? null : 'excl')
+                    setMrpExGst(v ? inclToEx(v, gstRate) : '')
+                  }}
+                  className={`w-full px-4 py-2 ${topMrpLockSide === 'incl' ? 'pr-9 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent`}
+                  placeholder="Maximum Retail Price"
+                />
+                {topMrpLockSide === 'incl' && (
+                  <UnlockBtn onClick={() => { setMrp(''); setMrpExGst(''); setTopMrpLockSide(null) }} />
+                )}
+              </div>
+            </div>
+            <div>
+              <label htmlFor="mrp_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
+                MRP (Ex. GST)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  id="mrp_ex_gst"
+                  name="mrp_ex_gst"
+                  step="0.01"
+                  min="0"
+                  value={mrpExGst}
+                  readOnly={topMrpLockSide === 'excl'}
+                  onChange={e => {
+                    const v = e.target.value
+                    setMrpExGst(v)
+                    setTopMrpLockSide(v === '' ? null : 'incl')
+                    setMrp(v ? exToIncl(v, gstRate) : '')
+                  }}
+                  className={`w-full px-4 py-2 ${topMrpLockSide === 'excl' ? 'pr-9 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent`}
+                  placeholder="0.00"
+                />
+                {topMrpLockSide === 'excl' && (
+                  <UnlockBtn onClick={() => { setMrp(''); setMrpExGst(''); setTopMrpLockSide(null) }} />
+                )}
+              </div>
+            </div>
           </div>
           )}
 
@@ -787,24 +953,34 @@ export default function ProductForm({ categories, brands, action, product, produ
           {!hasVariants && (
             <div>
               <label htmlFor="base_price" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Selling Price (Rs.) * {gstMode === 'exclusive' ? '(excl. GST)' : '(incl. GST)'}
+                Selling Price (Rs.) * (incl. GST)
               </label>
-              <input
-                type="number"
-                id="base_price"
-                name="base_price"
-                required={!hasVariants}
-                step="0.01"
-                min="0"
-                value={basePrice}
-                onChange={e => setBasePrice(e.target.value)}
-                className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                placeholder={gstMode === 'exclusive' ? 'Price excl. GST' : 'Price incl. GST'}
-              />
-              {inclusivePreview(basePrice, gstRate, gstMode)
-                ? <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(basePrice, gstRate, gstMode)}</p>
-                : <p className="text-xs text-foreground-muted mt-1">GST-inclusive price the customer pays</p>
-              }
+              <div className="relative">
+                <input
+                  type="number"
+                  id="base_price"
+                  name="base_price"
+                  required={!hasVariants}
+                  step="0.01"
+                  min="0"
+                  value={basePrice}
+                  readOnly={topPriceLockSide === 'incl'}
+                  onChange={e => {
+                    const v = e.target.value
+                    const n = parseFloat(v)
+                    setBasePrice(v)
+                    setTopPriceLockSide(v === '' ? null : 'excl')
+                    if (!isNaN(n) && n > 0 && gstRate > 0) setSalePrice(String(Math.round(n / (1 + gstRate / 100) * 100) / 100))
+                    else if (v === '') setSalePrice('')
+                  }}
+                  className={`w-full px-4 py-2 ${topPriceLockSide === 'incl' ? 'pr-9 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent`}
+                  placeholder="Price incl. GST"
+                />
+                {topPriceLockSide === 'incl' && (
+                  <UnlockBtn onClick={() => { setBasePrice(''); setSalePrice(''); setTopPriceLockSide(null) }} />
+                )}
+              </div>
+              <p className="text-xs text-foreground-muted mt-1">GST-inclusive price the customer pays</p>
             </div>
           )}
 
@@ -845,76 +1021,99 @@ export default function ProductForm({ categories, brands, action, product, produ
                   ]}
                 />
               </div>
-              <div className="pb-0.5">
-                <p className="text-xs font-medium text-foreground-secondary mb-1.5">Price entry mode</p>
-                <div className="flex rounded-lg border border-border-secondary overflow-hidden text-xs font-medium">
-                  <button
-                    type="button"
-                    onClick={() => changeGstMode('inclusive')}
-                    className={`px-3 py-1.5 transition-colors ${gstMode === 'inclusive' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-elevated'}`}
-                  >
-                    GST Inclusive
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => changeGstMode('exclusive')}
-                    className={`px-3 py-1.5 transition-colors ${gstMode === 'exclusive' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-elevated'}`}
-                  >
-                    GST Exclusive
-                  </button>
-                </div>
-              </div>
             </div>
-            {gstMode === 'exclusive' && gstRate > 0 && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1.5">
-                Prices will be converted to inclusive before saving (×{(1 + gstRate / 100).toFixed(2)})
-              </p>
-            )}
           </div>
 
           {/* Ex-GST Price — hidden when has variants */}
           {!hasVariants && (
           <div>
             <label htmlFor="price_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Ex-GST Price (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
+              Ex-GST Price (Rs.)
             </label>
-            <input
-              type="number"
-              id="price_ex_gst"
-              name="price_ex_gst"
-              step="0.01"
-              min="0"
-              value={salePrice}
-              onChange={e => setSalePrice(e.target.value)}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="Price excluding GST (optional)"
-            />
-            {inclusivePreview(salePrice, gstRate, gstMode) && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(salePrice, gstRate, gstMode)}</p>
-            )}
+            <div className="relative">
+              <input
+                type="number"
+                id="price_ex_gst"
+                name="price_ex_gst"
+                step="0.01"
+                min="0"
+                value={salePrice}
+                readOnly={topPriceLockSide === 'excl'}
+                onChange={e => {
+                  const v = e.target.value
+                  const n = parseFloat(v)
+                  setSalePrice(v)
+                  setTopPriceLockSide(v === '' ? null : 'incl')
+                  if (!isNaN(n) && n > 0 && gstRate > 0) setBasePrice(String(Math.round(n * (1 + gstRate / 100) * 100) / 100))
+                  else if (v === '') setBasePrice('')
+                }}
+                className={`w-full px-4 py-2 ${topPriceLockSide === 'excl' ? 'pr-9 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent`}
+                placeholder="Price excluding GST (optional)"
+              />
+              {topPriceLockSide === 'excl' && (
+                <UnlockBtn onClick={() => { setBasePrice(''); setSalePrice(''); setTopPriceLockSide(null) }} />
+              )}
+            </div>
           </div>
           )}
 
           {/* Wholesale Price — hidden when has variants */}
           {!hasVariants && (
-          <div>
-            <label htmlFor="wholeprice_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Wholesale Price (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
-            </label>
-            <input
-              type="number"
-              id="wholeprice_ex_gst"
-              name="wholeprice_ex_gst"
-              step="0.01"
-              min="0"
-              value={wholesalePrice}
-              onChange={e => setWholesalePrice(e.target.value)}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="Bulk price (optional)"
-            />
-            {inclusivePreview(wholesalePrice, gstRate, gstMode) && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{inclusivePreview(wholesalePrice, gstRate, gstMode)}</p>
-            )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="wholeprice_incl" className="block text-sm font-medium text-foreground-secondary mb-2">
+                Wholesale (incl. GST)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  id="wholeprice_incl"
+                  name="wholeprice_incl"
+                  step="0.01"
+                  min="0"
+                  value={wholesalePrice}
+                  readOnly={topWholesaleLockSide === 'incl'}
+                  onChange={e => {
+                    const v = e.target.value
+                    setWholesalePrice(v)
+                    setTopWholesaleLockSide(v === '' ? null : 'excl')
+                    setWholesalePriceEx(v ? inclToEx(v, gstRate) : '')
+                  }}
+                  className={`w-full px-4 py-2 ${topWholesaleLockSide === 'incl' ? 'pr-9 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent`}
+                  placeholder="Bulk price (optional)"
+                />
+                {topWholesaleLockSide === 'incl' && (
+                  <UnlockBtn onClick={() => { setWholesalePrice(''); setWholesalePriceEx(''); setTopWholesaleLockSide(null) }} />
+                )}
+              </div>
+            </div>
+            <div>
+              <label htmlFor="wholeprice_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
+                Wholesale (Ex. GST)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  id="wholeprice_ex_gst"
+                  name="wholeprice_ex_gst"
+                  step="0.01"
+                  min="0"
+                  value={wholesalePriceEx}
+                  readOnly={topWholesaleLockSide === 'excl'}
+                  onChange={e => {
+                    const v = e.target.value
+                    setWholesalePriceEx(v)
+                    setTopWholesaleLockSide(v === '' ? null : 'incl')
+                    setWholesalePrice(v ? exToIncl(v, gstRate) : '')
+                  }}
+                  className={`w-full px-4 py-2 ${topWholesaleLockSide === 'excl' ? 'pr-9 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent`}
+                  placeholder="0.00"
+                />
+                {topWholesaleLockSide === 'excl' && (
+                  <UnlockBtn onClick={() => { setWholesalePrice(''); setWholesalePriceEx(''); setTopWholesaleLockSide(null) }} />
+                )}
+              </div>
+            </div>
           </div>
           )}
 
@@ -923,7 +1122,7 @@ export default function ProductForm({ categories, brands, action, product, produ
             <>
               <div>
                 <label htmlFor="stock_quantity" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Stock Quantity *
+                  Listed Stock *
                 </label>
                 <input
                   type="number"
@@ -935,6 +1134,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                   placeholder="0"
                 />
+                <p className="text-xs text-foreground-muted mt-1">Display stock shown to customers. Inventory is managed separately under Inventory.</p>
               </div>
 
               <div>
@@ -1050,7 +1250,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               step="1"
               min="0"
               defaultValue={product?.weight_grams ?? ''}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="e.g., 500"
             />
           </div>
@@ -1273,32 +1473,155 @@ export default function ProductForm({ categories, brands, action, product, produ
                               )}
 
                               <div className="grid grid-cols-2 gap-3">
+                                {variant.sub_variant_type_on ? (
+                                  <>
+                                    <div className="col-span-2 rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-2.5">
+                                      <p className="text-xs text-foreground-secondary">Pricing managed by sub-variants. Open this variant to add or edit sub-variants.</p>
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Listed Stock (from sub-variants)</label>
+                                      <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="0" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
+                                      <input type="text" value={variant.mpn} onChange={(e) => updateVariant(index, 'mpn', e.target.value)} className={inputCls} placeholder="Part No." />
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price {gstMode === 'exclusive' ? '(excl. GST) *' : '*'}</label>
-                                  <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => updateVariant(index, 'price', e.target.value)} className={inputCls} placeholder="0.00" required />
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price (incl. GST) *</label>
+                                  <div className="relative">
+                                    <input type="number" step="0.01" min="0" value={variant.price} readOnly={variant.priceLockSide === 'incl'} onChange={(e) => {
+                                      const v = e.target.value
+                                      const n = parseFloat(v)
+                                      const updated = [...variants]
+                                      updated[index] = { ...updated[index], price: v, priceLockSide: v === '' ? null : 'excl' }
+                                      if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                                      else if (v === '') updated[index].price_ex_gst = ''
+                                      setVariants(updated)
+                                    }} className={`${lockedInputCls(inputCls, variant.priceLockSide === 'incl')} ${variant.priceLockSide === 'incl' ? 'pr-7' : ''}`} placeholder="0.00" required />
+                                    {variant.priceLockSide === 'incl' && (
+                                      <UnlockBtn onClick={() => {
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                        setVariants(updated)
+                                      }} />
+                                    )}
+                                  </div>
                                   {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
-                                  {inclusivePreview(variant.price, gstRate, gstMode) && <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{inclusivePreview(variant.price, gstRate, gstMode)}</p>}
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP {gstMode === 'exclusive' ? '(excl.)' : ''}</label>
-                                  <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className={inputCls} placeholder="0.00" />
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (incl. GST)</label>
+                                  <div className="relative">
+                                    <input type="number" step="0.01" min="0" value={variant.mrp} readOnly={variant.mrpLockSide === 'incl'} onChange={(e) => {
+                                      const v = e.target.value
+                                      const updated = [...variants]
+                                      updated[index] = { ...updated[index], mrp: v, mrpLockSide: v === '' ? null : 'excl' }
+                                      updated[index].mrp_ex_gst = v ? inclToEx(v, gstRate) : ''
+                                      setVariants(updated)
+                                    }} className={`${lockedInputCls(inputCls, variant.mrpLockSide === 'incl')} ${variant.mrpLockSide === 'incl' ? 'pr-7' : ''}`} placeholder="0.00" />
+                                    {variant.mrpLockSide === 'incl' && (
+                                      <UnlockBtn onClick={() => {
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], mrp: '', mrp_ex_gst: '', mrpLockSide: null }
+                                        setVariants(updated)
+                                      }} />
+                                    )}
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (Ex. GST)</label>
+                                  <div className="relative">
+                                    <input type="number" step="0.01" min="0" value={variant.mrp_ex_gst} readOnly={variant.mrpLockSide === 'excl'} onChange={(e) => {
+                                      const v = e.target.value
+                                      const updated = [...variants]
+                                      updated[index] = { ...updated[index], mrp_ex_gst: v, mrpLockSide: v === '' ? null : 'incl' }
+                                      updated[index].mrp = v ? exToIncl(v, gstRate) : ''
+                                      setVariants(updated)
+                                    }} className={`${lockedInputCls(inputCls, variant.mrpLockSide === 'excl')} ${variant.mrpLockSide === 'excl' ? 'pr-7' : ''}`} placeholder="0.00" />
+                                    {variant.mrpLockSide === 'excl' && (
+                                      <UnlockBtn onClick={() => {
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], mrp: '', mrp_ex_gst: '', mrpLockSide: null }
+                                        setVariants(updated)
+                                      }} />
+                                    )}
+                                  </div>
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
-                                  <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => updateVariant(index, 'price_ex_gst', e.target.value)} className={inputCls} placeholder="0.00" />
+                                  <div className="relative">
+                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly={variant.priceLockSide === 'excl'} onChange={(e) => {
+                                      const v = e.target.value
+                                      const n = parseFloat(v)
+                                      const updated = [...variants]
+                                      updated[index] = { ...updated[index], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
+                                      if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                                      else if (v === '') updated[index].price = ''
+                                      setVariants(updated)
+                                    }} className={`${lockedInputCls(inputCls, variant.priceLockSide === 'excl')} ${variant.priceLockSide === 'excl' ? 'pr-7' : ''}`} placeholder="0.00" />
+                                    {variant.priceLockSide === 'excl' && (
+                                      <UnlockBtn onClick={() => {
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                        setVariants(updated)
+                                      }} />
+                                    )}
+                                  </div>
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale</label>
-                                  <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className={inputCls} placeholder="0.00" />
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (incl. GST)</label>
+                                  <div className="relative">
+                                    <input type="number" step="0.01" min="0" value={variant.wholeprice_incl} readOnly={variant.wholesaleLockSide === 'incl'} onChange={(e) => {
+                                      const v = e.target.value
+                                      const updated = [...variants]
+                                      updated[index] = { ...updated[index], wholeprice_incl: v, wholesaleLockSide: v === '' ? null : 'excl' }
+                                      updated[index].wholeprice_ex_gst = v ? inclToEx(v, gstRate) : ''
+                                      setVariants(updated)
+                                    }} className={`${lockedInputCls(inputCls, variant.wholesaleLockSide === 'incl')} ${variant.wholesaleLockSide === 'incl' ? 'pr-7' : ''}`} placeholder="0.00" />
+                                    {variant.wholesaleLockSide === 'incl' && (
+                                      <UnlockBtn onClick={() => {
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], wholeprice_incl: '', wholeprice_ex_gst: '', wholesaleLockSide: null }
+                                        setVariants(updated)
+                                      }} />
+                                    )}
+                                  </div>
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock *</label>
-                                  <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className={inputCls} placeholder="0" required />
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (Ex. GST)</label>
+                                  <div className="relative">
+                                    <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} readOnly={variant.wholesaleLockSide === 'excl'} onChange={(e) => {
+                                      const v = e.target.value
+                                      const updated = [...variants]
+                                      updated[index] = { ...updated[index], wholeprice_ex_gst: v, wholesaleLockSide: v === '' ? null : 'incl' }
+                                      updated[index].wholeprice_incl = v ? exToIncl(v, gstRate) : ''
+                                      setVariants(updated)
+                                    }} className={`${lockedInputCls(inputCls, variant.wholesaleLockSide === 'excl')} ${variant.wholesaleLockSide === 'excl' ? 'pr-7' : ''}`} placeholder="0.00" />
+                                    {variant.wholesaleLockSide === 'excl' && (
+                                      <UnlockBtn onClick={() => {
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], wholeprice_incl: '', wholeprice_ex_gst: '', wholesaleLockSide: null }
+                                        setVariants(updated)
+                                      }} />
+                                    )}
+                                  </div>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">{variant.sub_variant_type_on ? 'Listed Stock (sum)' : 'Listed Stock *'}</label>
+                                  {variant.sub_variant_type_on ? (
+                                    <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="0" />
+                                  ) : (
+                                    <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className={inputCls} placeholder="0" required />
+                                  )}
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
                                   <input type="text" value={variant.mpn} onChange={(e) => updateVariant(index, 'mpn', e.target.value)} className={inputCls} placeholder="Part No." />
                                 </div>
+                                  </>
+                                )}
                               </div>
                               <div>
                                 <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
@@ -1388,7 +1711,15 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       const row = { ...updated[index] }
                                       row.sub_variant_type_on = !row.sub_variant_type_on
                                       if (!row.sub_variant_type_on) row.sub_variant_type = ''
-                                      if (row.sub_variant_type_on) row.use_own_images = true
+                                      if (row.sub_variant_type_on) {
+                                        row.use_own_images = true
+                                        row.price = ''
+                                        row.price_ex_gst = ''
+                                        row.mrp = ''
+                                        row.mrp_ex_gst = ''
+                                        row.wholeprice_ex_gst = ''
+                                        row.wholeprice_incl = ''
+                                      }
                                       updated[index] = row
                                       setVariants(updated)
                                     }}
@@ -1444,9 +1775,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Name *</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Price (incl. GST) *</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Ex-GST</th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Wholesale</th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">MRP</th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Stock *</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Wholesale (incl)</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Wholesale (Ex)</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">MRP (incl)</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">MRP (Ex)</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Listed Stock *</th>
                               <th className="py-2 px-3 w-16"></th>
                             </tr>
                           </thead>
@@ -1470,23 +1803,133 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
                                     )}
                                   </td>
+                                  {variant.sub_variant_type_on ? (
+                                    <td className="py-2 px-3" colSpan={6}>
+                                      <span className="text-xs text-foreground-muted italic">Pricing managed by sub-variants</span>
+                                    </td>
+                                  ) : (
+                                    <>
                                   <td className="py-2 px-3">
-                                    <div>
-                                      <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => updateVariant(index, 'price', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" required />
+                                    <div className="relative w-28">
+                                      <input type="number" step="0.01" min="0" value={variant.price} readOnly={variant.priceLockSide === 'incl'} onChange={(e) => {
+                                        const v = e.target.value
+                                        const n = parseFloat(v)
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], price: v, priceLockSide: v === '' ? null : 'excl' }
+                                        if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                                        else if (v === '') updated[index].price_ex_gst = ''
+                                        setVariants(updated)
+                                      }} className={`w-28 px-2 py-1.5 ${variant.priceLockSide === 'incl' ? 'pr-6 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm`} placeholder="0.00" required />
+                                      {variant.priceLockSide === 'incl' && (
+                                        <UnlockBtn onClick={() => {
+                                          const updated = [...variants]
+                                          updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                          setVariants(updated)
+                                        }} />
+                                      )}
                                       {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
                                     </div>
                                   </td>
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => updateVariant(index, 'price_ex_gst', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    <div className="relative w-28">
+                                      <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly={variant.priceLockSide === 'excl'} onChange={(e) => {
+                                        const v = e.target.value
+                                        const n = parseFloat(v)
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
+                                        if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                                        else if (v === '') updated[index].price = ''
+                                        setVariants(updated)
+                                      }} className={`w-28 px-2 py-1.5 ${variant.priceLockSide === 'excl' ? 'pr-6 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm`} placeholder="0.00" />
+                                      {variant.priceLockSide === 'excl' && (
+                                        <UnlockBtn onClick={() => {
+                                          const updated = [...variants]
+                                          updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                          setVariants(updated)
+                                        }} />
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    <div className="relative w-28">
+                                      <input type="number" step="0.01" min="0" value={variant.wholeprice_incl} readOnly={variant.wholesaleLockSide === 'incl'} onChange={(e) => {
+                                        const v = e.target.value
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], wholeprice_incl: v, wholesaleLockSide: v === '' ? null : 'excl' }
+                                        updated[index].wholeprice_ex_gst = v ? inclToEx(v, gstRate) : ''
+                                        setVariants(updated)
+                                      }} className={`w-28 px-2 py-1.5 ${variant.wholesaleLockSide === 'incl' ? 'pr-6 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm`} placeholder="0.00" />
+                                      {variant.wholesaleLockSide === 'incl' && (
+                                        <UnlockBtn onClick={() => {
+                                          const updated = [...variants]
+                                          updated[index] = { ...updated[index], wholeprice_incl: '', wholeprice_ex_gst: '', wholesaleLockSide: null }
+                                          setVariants(updated)
+                                        }} />
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
+                                    <div className="relative w-28">
+                                      <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} readOnly={variant.wholesaleLockSide === 'excl'} onChange={(e) => {
+                                        const v = e.target.value
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], wholeprice_ex_gst: v, wholesaleLockSide: v === '' ? null : 'incl' }
+                                        updated[index].wholeprice_incl = v ? exToIncl(v, gstRate) : ''
+                                        setVariants(updated)
+                                      }} className={`w-28 px-2 py-1.5 ${variant.wholesaleLockSide === 'excl' ? 'pr-6 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm`} placeholder="0.00" />
+                                      {variant.wholesaleLockSide === 'excl' && (
+                                        <UnlockBtn onClick={() => {
+                                          const updated = [...variants]
+                                          updated[index] = { ...updated[index], wholeprice_incl: '', wholeprice_ex_gst: '', wholesaleLockSide: null }
+                                          setVariants(updated)
+                                        }} />
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="py-2 px-3">
-                                    <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0" required />
+                                    <div className="relative w-28">
+                                      <input type="number" step="0.01" min="0" value={variant.mrp} readOnly={variant.mrpLockSide === 'incl'} onChange={(e) => {
+                                        const v = e.target.value
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], mrp: v, mrpLockSide: v === '' ? null : 'excl' }
+                                        updated[index].mrp_ex_gst = v ? inclToEx(v, gstRate) : ''
+                                        setVariants(updated)
+                                      }} className={`w-28 px-2 py-1.5 ${variant.mrpLockSide === 'incl' ? 'pr-7 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm`} placeholder="0.00" />
+                                      {variant.mrpLockSide === 'incl' && (
+                                        <UnlockBtn onClick={() => {
+                                          const updated = [...variants]
+                                          updated[index] = { ...updated[index], mrp: '', mrp_ex_gst: '', mrpLockSide: null }
+                                          setVariants(updated)
+                                        }} />
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <div className="relative w-28">
+                                      <input type="number" step="0.01" min="0" value={variant.mrp_ex_gst} readOnly={variant.mrpLockSide === 'excl'} onChange={(e) => {
+                                        const v = e.target.value
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], mrp_ex_gst: v, mrpLockSide: v === '' ? null : 'incl' }
+                                        updated[index].mrp = v ? exToIncl(v, gstRate) : ''
+                                        setVariants(updated)
+                                      }} className={`w-28 px-2 py-1.5 ${variant.mrpLockSide === 'excl' ? 'pr-7 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm`} placeholder="0.00" />
+                                      {variant.mrpLockSide === 'excl' && (
+                                        <UnlockBtn onClick={() => {
+                                          const updated = [...variants]
+                                          updated[index] = { ...updated[index], mrp: '', mrp_ex_gst: '', mrpLockSide: null }
+                                          setVariants(updated)
+                                        }} />
+                                      )}
+                                    </div>
+                                  </td>
+                                    </>
+                                  )}
+                                  <td className="py-2 px-3">
+                                    {variant.sub_variant_type_on ? (
+                                      <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="0" title="Sum of sub-variants" />
+                                    ) : (
+                                      <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0" required />
+                                    )}
                                   </td>
                                   <td className="py-2 px-3">
                                     <div className="flex items-center gap-1 justify-end">
@@ -1576,7 +2019,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         const nextVariant = navIndex < activeVariants.length - 1 ? activeVariants[navIndex + 1] : null
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setVariantPopupId(null)}>
-            <div className="bg-surface rounded-xl border border-border-default shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-surface rounded-xl border border-border-default shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1596,36 +2039,139 @@ export default function ProductForm({ categories, brands, action, product, produ
                 {/* Pricing & Identifiers */}
                 <div>
                   <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Pricing & Identifiers</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {popupVariant.sub_variant_type_on ? (
+                    <div className="rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-3 space-y-3">
+                      <p className="text-xs text-foreground-secondary">Pricing is managed at the sub-variant level for this variant. Use the Sub-variants section below to set prices.</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
+                          <input type="text" value={popupVariant.mpn} onChange={(e) => updateVariant(popupIndex, 'mpn', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Part No." />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
+                          <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Price (incl. GST)</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.price} onChange={(e) => {
-                        const v = e.target.value
-                        const n = parseFloat(v)
-                        updateVariant(popupIndex, 'price', v)
-                        if (!isNaN(n) && n > 0 && gstRate > 0) updateVariant(popupIndex, 'price_ex_gst', String(Math.round(n / (1 + gstRate / 100) * 100) / 100))
-                      }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Price (incl)</label>
+                      <div className="relative">
+                        <input type="number" step="0.01" min="0" value={popupVariant.price} readOnly={popupVariant.priceLockSide === 'incl'} onChange={(e) => {
+                          const v = e.target.value
+                          const n = parseFloat(v)
+                          const updated = [...variants]
+                          updated[popupIndex] = { ...updated[popupIndex], price: v, priceLockSide: v === '' ? null : 'excl' }
+                          if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                          else if (v === '') updated[popupIndex].price_ex_gst = ''
+                          setVariants(updated)
+                        }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.priceLockSide === 'incl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                        {popupVariant.priceLockSide === 'incl' && (
+                          <UnlockBtn onClick={() => {
+                            const updated = [...variants]
+                            updated[popupIndex] = { ...updated[popupIndex], price: '', price_ex_gst: '', priceLockSide: null }
+                            setVariants(updated)
+                          }} />
+                        )}
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} onChange={(e) => {
-                        const v = e.target.value
-                        const n = parseFloat(v)
-                        updateVariant(popupIndex, 'price_ex_gst', v)
-                        if (!isNaN(n) && n > 0 && gstRate > 0) updateVariant(popupIndex, 'price', String(Math.round(n * (1 + gstRate / 100) * 100) / 100))
-                      }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Price (Ex)</label>
+                      <div className="relative">
+                        <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} readOnly={popupVariant.priceLockSide === 'excl'} onChange={(e) => {
+                          const v = e.target.value
+                          const n = parseFloat(v)
+                          const updated = [...variants]
+                          updated[popupIndex] = { ...updated[popupIndex], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
+                          if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                          else if (v === '') updated[popupIndex].price = ''
+                          setVariants(updated)
+                        }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.priceLockSide === 'excl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                        {popupVariant.priceLockSide === 'excl' && (
+                          <UnlockBtn onClick={() => {
+                            const updated = [...variants]
+                            updated[popupIndex] = { ...updated[popupIndex], price: '', price_ex_gst: '', priceLockSide: null }
+                            setVariants(updated)
+                          }} />
+                        )}
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (incl. GST)</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.mrp} onChange={(e) => {
-                        const v = e.target.value
-                        const n = parseFloat(v)
-                        updateVariant(popupIndex, 'mrp', v)
-                      }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">MRP (incl)</label>
+                      <div className="relative">
+                        <input type="number" step="0.01" min="0" value={popupVariant.mrp} readOnly={popupVariant.mrpLockSide === 'incl'} onChange={(e) => {
+                          const v = e.target.value
+                          const updated = [...variants]
+                          updated[popupIndex] = { ...updated[popupIndex], mrp: v, mrpLockSide: v === '' ? null : 'excl' }
+                          updated[popupIndex].mrp_ex_gst = v ? inclToEx(v, gstRate) : ''
+                          setVariants(updated)
+                        }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.mrpLockSide === 'incl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                        {popupVariant.mrpLockSide === 'incl' && (
+                          <UnlockBtn onClick={() => {
+                            const updated = [...variants]
+                            updated[popupIndex] = { ...updated[popupIndex], mrp: '', mrp_ex_gst: '', mrpLockSide: null }
+                            setVariants(updated)
+                          }} />
+                        )}
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_ex_gst} onChange={(e) => updateVariant(popupIndex, 'wholeprice_ex_gst', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">MRP (Ex)</label>
+                      <div className="relative">
+                        <input type="number" step="0.01" min="0" value={popupVariant.mrp_ex_gst} readOnly={popupVariant.mrpLockSide === 'excl'} onChange={(e) => {
+                          const v = e.target.value
+                          const updated = [...variants]
+                          updated[popupIndex] = { ...updated[popupIndex], mrp_ex_gst: v, mrpLockSide: v === '' ? null : 'incl' }
+                          updated[popupIndex].mrp = v ? exToIncl(v, gstRate) : ''
+                          setVariants(updated)
+                        }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.mrpLockSide === 'excl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                        {popupVariant.mrpLockSide === 'excl' && (
+                          <UnlockBtn onClick={() => {
+                            const updated = [...variants]
+                            updated[popupIndex] = { ...updated[popupIndex], mrp: '', mrp_ex_gst: '', mrpLockSide: null }
+                            setVariants(updated)
+                          }} />
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Wholesale (incl)</label>
+                      <div className="relative">
+                        <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_incl} readOnly={popupVariant.wholesaleLockSide === 'incl'} onChange={(e) => {
+                          const v = e.target.value
+                          const updated = [...variants]
+                          updated[popupIndex] = { ...updated[popupIndex], wholeprice_incl: v, wholesaleLockSide: v === '' ? null : 'excl' }
+                          updated[popupIndex].wholeprice_ex_gst = v ? inclToEx(v, gstRate) : ''
+                          setVariants(updated)
+                        }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.wholesaleLockSide === 'incl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                        {popupVariant.wholesaleLockSide === 'incl' && (
+                          <UnlockBtn onClick={() => {
+                            const updated = [...variants]
+                            updated[popupIndex] = { ...updated[popupIndex], wholeprice_incl: '', wholeprice_ex_gst: '', wholesaleLockSide: null }
+                            setVariants(updated)
+                          }} />
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Wholesale (Ex)</label>
+                      <div className="relative">
+                        <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_ex_gst} readOnly={popupVariant.wholesaleLockSide === 'excl'} onChange={(e) => {
+                          const v = e.target.value
+                          const updated = [...variants]
+                          updated[popupIndex] = { ...updated[popupIndex], wholeprice_ex_gst: v, wholesaleLockSide: v === '' ? null : 'incl' }
+                          updated[popupIndex].wholeprice_incl = v ? exToIncl(v, gstRate) : ''
+                          setVariants(updated)
+                        }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.wholesaleLockSide === 'excl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                        {popupVariant.wholesaleLockSide === 'excl' && (
+                          <UnlockBtn onClick={() => {
+                            const updated = [...variants]
+                            updated[popupIndex] = { ...updated[popupIndex], wholeprice_incl: '', wholeprice_ex_gst: '', wholesaleLockSide: null }
+                            setVariants(updated)
+                          }} />
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
@@ -1636,6 +2182,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
                     </div>
                   </div>
+                  )}
                   {/* Rate toggles */}
                   <div className="space-y-2 pt-3">
                     <div className="flex items-center gap-2">
@@ -1675,7 +2222,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) row.use_own_images = true; updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
+                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) { row.use_own_images = true; row.price = ''; row.price_ex_gst = ''; row.mrp = ''; row.mrp_ex_gst = ''; row.wholeprice_ex_gst = ''; row.wholeprice_incl = '' } updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
                         <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
                       <span className="text-xs font-medium text-foreground-secondary">Has sub-variants</span>
@@ -1695,14 +2242,14 @@ export default function ProductForm({ categories, brands, action, product, produ
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Ship Wt. (g)</label>
-                      <input type="number" step="1" min="0" value={popupVariant.weight_grams} onChange={(e) => updateVariant(popupIndex, 'weight_grams', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 500" />
+                      <input type="number" step="1" min="0" value={popupVariant.weight_grams} onChange={(e) => updateVariant(popupIndex, 'weight_grams', e.target.value)} className="w-full h-9 px-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 500" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Package Type</label>
-                      <div className="w-full flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
-                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx - 1 + PACKAGE_TYPES.length) % PACKAGE_TYPES.length]) }} className="px-1.5 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
-                        <span className="px-1.5 py-1.5 text-xs font-medium text-foreground flex-1 text-center border-x border-border-secondary truncate">{PACKAGE_TYPE_LABELS[popupVariant.package_type || 'flat_poly_auto']}</span>
-                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx + 1) % PACKAGE_TYPES.length]) }} className="px-1.5 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
+                      <div className="w-full h-9 flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
+                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx - 1 + PACKAGE_TYPES.length) % PACKAGE_TYPES.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
+                        <span className="h-full px-2 text-sm font-medium text-foreground flex-1 text-center border-x border-border-secondary truncate flex items-center justify-center">{PACKAGE_TYPE_LABELS[popupVariant.package_type || 'flat_poly_auto']}</span>
+                        <button type="button" onClick={() => { const idx = PACKAGE_TYPES.indexOf(popupVariant.package_type || 'flat_poly_auto'); updateVariant(popupIndex, 'package_type', PACKAGE_TYPES[(idx + 1) % PACKAGE_TYPES.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
                       </div>
                     </div>
                   </div>
@@ -1737,19 +2284,64 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </div>
                   {popupVariant.use_own_images ? (
                     <>
+                      {(variantImagesMap[variantPopupId] || []).length > 1 && (
+                        <p className="text-xs text-foreground-muted mb-2">
+                          <span className="hidden sm:inline">Drag</span><span className="sm:hidden">Use ◀ ▶</span> to reorder · First image is shown first on the product page
+                        </p>
+                      )}
                       <div className="flex flex-wrap gap-2">
-                        {(variantImagesMap[variantPopupId] || []).map((img: any) => (
-                          <div key={img.id} className="relative group w-16 h-16 rounded border border-border-default overflow-hidden bg-surface">
-                            <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover" />
-                            {img.is_primary && <span className="absolute top-0 left-0 text-[9px] bg-accent-500 text-white px-1 leading-4">★</span>}
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                              {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 text-xs leading-none" title="Set primary">★</button>}
-                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 text-xs leading-none" title="Delete">✕</button>
+                        {(variantImagesMap[variantPopupId] || []).map((img: any, imgIdx: number, arr: any[]) => (
+                          <div
+                            key={img.id}
+                            className="relative group w-20 h-20 sm:w-16 sm:h-16 rounded border border-border-default overflow-hidden bg-surface cursor-grab active:cursor-grabbing select-none"
+                            draggable
+                            onDragStart={() => { variantImageDragIndex.current = imgIdx }}
+                            onDragEnter={() => { variantImageDragOverIndex.current = imgIdx }}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDragEnd={() => {
+                              const from = variantImageDragIndex.current
+                              const to = variantImageDragOverIndex.current
+                              variantImageDragIndex.current = null
+                              variantImageDragOverIndex.current = null
+                              if (from === null || to === null || from === to) return
+                              reorderVariantImages(variantPopupId, from, to)
+                            }}
+                          >
+                            <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
+                            <span className="absolute top-0 right-0 text-[10px] sm:text-[9px] bg-black/60 text-white px-1 leading-4 font-bold">{imgIdx + 1}</span>
+                            {img.is_primary && <span className="absolute top-0 left-0 text-[10px] sm:text-[9px] bg-accent-500 text-white px-1 leading-4">★</span>}
+                            {arr.length > 1 && (
+                              <div className="absolute inset-x-0 bottom-0 flex justify-between px-0.5 pb-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => imgIdx > 0 && reorderVariantImages(variantPopupId, imgIdx, imgIdx - 1)}
+                                  disabled={imgIdx === 0}
+                                  className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30"
+                                  title="Move left"
+                                  aria-label="Move image left"
+                                >
+                                  ◀
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => imgIdx < arr.length - 1 && reorderVariantImages(variantPopupId, imgIdx, imgIdx + 1)}
+                                  disabled={imgIdx === arr.length - 1}
+                                  className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30"
+                                  title="Move right"
+                                  aria-label="Move image right"
+                                >
+                                  ▶
+                                </button>
+                              </div>
+                            )}
+                            <div className="absolute inset-x-0 top-4 bottom-6 sm:inset-0 sm:top-0 sm:bottom-0 bg-black/50 sm:bg-black/0 sm:group-hover:bg-black/50 transition-opacity flex items-center justify-center gap-1">
+                              {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 text-base sm:text-xs leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Set primary">★</button>}
+                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 text-base sm:text-xs leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Delete">✕</button>
                             </div>
                           </div>
                         ))}
                         {(variantImagesMap[variantPopupId] || []).length < 5 && (
-                          <label className={`w-16 h-16 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${variantImageUploading[variantPopupId] ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <label className={`w-20 h-20 sm:w-16 sm:h-16 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${variantImageUploading[variantPopupId] ? 'opacity-50 pointer-events-none' : ''}`}>
                             <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVariantImageFile(variantPopupId, f); e.target.value = '' }} />
                             {variantImageUploading[variantPopupId] ? <svg className="w-4 h-4 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
                           </label>
@@ -1882,11 +2474,16 @@ export default function ProductForm({ categories, brands, action, product, produ
                 )}
 
                 {/* Sub-Variants */}
-                {(popupVariant.sub_variant_type_on || (subVariantsMap[variantPopupId] || []).length > 0) && (
+                {popupVariant.sub_variant_type_on && (
                   <div>
                     <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
                       Sub-Variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''}
                     </p>
+                    {variantPopupId.startsWith('temp-') && (
+                      <div className="mb-3 rounded-lg border border-dashed border-amber-400/60 bg-amber-50 dark:bg-amber-900/20 p-3">
+                        <p className="text-xs text-amber-700 dark:text-amber-300">Save the product first to add sub-variants for this variant.</p>
+                      </div>
+                    )}
                     {(subVariantsMap[variantPopupId] || []).length > 0 && (
                       <div className="overflow-x-auto mb-3">
                       <table className="w-full text-xs whitespace-nowrap">
@@ -1897,8 +2494,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                             <th className="pb-1 pr-2 font-medium">MRP</th>
                             <th className="pb-1 pr-2 font-medium">Ex-GST</th>
                             <th className="pb-1 pr-2 font-medium">MRP Ex-GST</th>
-                            <th className="pb-1 pr-2 font-medium">Wholesale</th>
-                            <th className="pb-1 pr-2 font-medium">Stock</th>
+                            <th className="pb-1 pr-2 font-medium">Wholesale (incl)</th>
+                            <th className="pb-1 pr-2 font-medium">Wholesale (Ex)</th>
+                            <th className="pb-1 pr-2 font-medium">Listed Stock</th>
                             <th className="pb-1 pr-2 font-medium">SKU</th>
                             <th className="pb-1"></th>
                           </tr>
@@ -1914,28 +2512,43 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1 pr-1"><input type="text" value={ed.name} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, name: e.target.value }))} className={`${svInputCls} w-20`} /></td>
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price} onChange={e => {
                                     const v = e.target.value; const n = parseFloat(v)
-                                    setSubVariantEditDraft(d => d && ({ ...d, price: v, price_ex_gst: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n / (1 + gstRate / 100) * 100) / 100) : d.price_ex_gst }))
+                                    setSubVariantEditDraft(d => d && ({ ...d, price: v, price_ex_gst: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n / (1 + gstRate / 100) * 100) / 100) : (v === '' ? '' : d.price_ex_gst) }))
                                   }} className={svInputCls} /></td>
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, mrp: e.target.value }))} className={svInputCls} /></td>
+                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp} onChange={e => {
+                                    const v = e.target.value; const n = parseFloat(v)
+                                    setSubVariantEditDraft(d => d && ({ ...d, mrp: v, mrp_ex_gst: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n / (1 + gstRate / 100) * 100) / 100) : (v === '' ? '' : d.mrp_ex_gst) }))
+                                  }} className={svInputCls} /></td>
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price_ex_gst} onChange={e => {
                                     const v = e.target.value; const n = parseFloat(v)
-                                    setSubVariantEditDraft(d => d && ({ ...d, price_ex_gst: v, price: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n * (1 + gstRate / 100) * 100) / 100) : d.price }))
+                                    setSubVariantEditDraft(d => d && ({ ...d, price_ex_gst: v, price: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n * (1 + gstRate / 100) * 100) / 100) : (v === '' ? '' : d.price) }))
                                   }} className={svInputCls} /></td>
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp_ex_gst} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: e.target.value }))} className={svInputCls} /></td>
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.wholeprice_ex_gst} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, wholeprice_ex_gst: e.target.value }))} className={svInputCls} /></td>
+                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.mrp_ex_gst} onChange={e => {
+                                    const v = e.target.value; const n = parseFloat(v)
+                                    setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: (!isNaN(n) && n > 0 && gstRate > 0) ? String(Math.round(n * (1 + gstRate / 100) * 100) / 100) : (v === '' ? '' : d.mrp) }))
+                                  }} className={svInputCls} /></td>
+                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.wholeprice_incl} onChange={e => {
+                                    const v = e.target.value
+                                    setSubVariantEditDraft(d => d && ({ ...d, wholeprice_incl: v, wholeprice_ex_gst: v ? inclToEx(v, gstRate) : '' }))
+                                  }} className={svInputCls} /></td>
+                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.wholeprice_ex_gst} onChange={e => {
+                                    const v = e.target.value
+                                    setSubVariantEditDraft(d => d && ({ ...d, wholeprice_ex_gst: v, wholeprice_incl: v ? exToIncl(v, gstRate) : '' }))
+                                  }} className={svInputCls} /></td>
                                   <td className="py-1 pr-1"><input type="number" step="1" min="0" value={ed.stock} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, stock: e.target.value }))} className={svInputCls} /></td>
                                   <td className="py-1 pr-1"><input type="text" value={ed.sku} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, sku: e.target.value }))} className={`${svInputCls} w-20`} /></td>
                                   <td className="py-1 pl-1 flex items-center gap-1">
                                     <button type="button" onClick={async () => {
                                       if (!ed) return
+                                      const wholeEx = ed.wholeprice_ex_gst || (ed.wholeprice_incl ? inclToEx(ed.wholeprice_incl, gstRate) : '')
+                                      const wholeExNum = wholeEx ? parseFloat(wholeEx) : null
                                       const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`, {
                                         method: 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: ed.wholeprice_ex_gst ? parseFloat(ed.wholeprice_ex_gst) : null, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || null }),
+                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: wholeExNum, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || null }),
                                       })
                                       if (res.ok) {
                                         const updated = await res.json()
-                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: ed.wholeprice_ex_gst ? parseFloat(ed.wholeprice_ex_gst) : null, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || s.sku }) : s) }))
+                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: wholeExNum, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || s.sku }) : s) }))
                                       }
                                       setSubVariantEditId(null); setSubVariantEditDraft(null)
                                     }} className="text-green-500 hover:text-green-700 leading-none font-bold text-sm">✓</button>
@@ -1947,11 +2560,12 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1.5 pr-2">{sv.mrp != null ? `₹${sv.mrp}` : '—'}</td>
                                   <td className="py-1.5 pr-2">{sv.price_ex_gst != null ? `₹${sv.price_ex_gst}` : '—'}</td>
                                   <td className="py-1.5 pr-2">{sv.mrp_ex_gst != null ? `₹${sv.mrp_ex_gst}` : '—'}</td>
+                                  <td className="py-1.5 pr-2">{sv.wholeprice_ex_gst != null ? `₹${exToIncl(String(sv.wholeprice_ex_gst), gstRate) || sv.wholeprice_ex_gst}` : '—'}</td>
                                   <td className="py-1.5 pr-2">{sv.wholeprice_ex_gst != null ? `₹${sv.wholeprice_ex_gst}` : '—'}</td>
                                   <td className="py-1.5 pr-2">{sv.stock_quantity}</td>
                                   <td className="py-1.5 pr-2 font-mono text-foreground-muted">{sv.sku}</td>
                                   <td className="py-1.5 flex items-center gap-2">
-                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', wholeprice_ex_gst: sv.wholeprice_ex_gst != null ? String(sv.wholeprice_ex_gst) : '', stock: String(sv.stock_quantity ?? 0), sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
+                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', wholeprice_incl: sv.wholeprice_ex_gst != null ? exToIncl(String(sv.wholeprice_ex_gst), gstRate) : '', wholeprice_ex_gst: sv.wholeprice_ex_gst != null ? String(sv.wholeprice_ex_gst) : '', stock: String(sv.stock_quantity ?? 0), sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
                                     <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none">✕</button>
                                   </td>
                                 </>)}
@@ -1963,7 +2577,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     {(() => {
-                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',wholeprice_ex_gst:'',stock:'',sku:'' }
+                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',wholeprice_incl:'',wholeprice_ex_gst:'',stock:'',sku:'' }
                       const setD = (field: string, val: string) => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, [field]: val } }))
                       const setDCalc = (field: string, val: string) => {
                         const n = parseFloat(val)
@@ -1971,6 +2585,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                         if (!isNaN(n) && n > 0 && gstRate > 0) {
                           if (field === 'price') next.price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
                           if (field === 'price_ex_gst') next.price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                          if (field === 'mrp') next.mrp_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                          if (field === 'mrp_ex_gst') next.mrp = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                        } else if (val === '') {
+                          if (field === 'price') next.price_ex_gst = ''
+                          if (field === 'price_ex_gst') next.price = ''
+                          if (field === 'mrp') next.mrp_ex_gst = ''
+                          if (field === 'mrp_ex_gst') next.mrp = ''
                         }
                         setSubVariantDrafts(m => ({ ...m, [variantPopupId]: next }))
                       }
@@ -1987,7 +2608,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">MRP</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp} onChange={(e) => setD('mrp', e.target.value)} className={`${inputCls} w-full`} />
+                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp} onChange={(e) => setDCalc('mrp', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">Ex-GST Price</label>
@@ -1995,14 +2616,24 @@ export default function ProductForm({ categories, brands, action, product, produ
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">MRP Ex-GST</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp_ex_gst} onChange={(e) => setD('mrp_ex_gst', e.target.value)} className={`${inputCls} w-full`} />
+                            <input type="number" step="0.01" placeholder="0.00" value={d.mrp_ex_gst} onChange={(e) => setDCalc('mrp_ex_gst', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale</label>
-                            <input type="number" step="0.01" placeholder="0.00" value={d.wholeprice_ex_gst} onChange={(e) => setD('wholeprice_ex_gst', e.target.value)} className={`${inputCls} w-full`} />
+                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale (incl. GST)</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={d.wholeprice_incl} onChange={(e) => {
+                              const v = e.target.value
+                              setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, wholeprice_incl: v, wholeprice_ex_gst: v ? inclToEx(v, gstRate) : '' } }))
+                            }} className={`${inputCls} w-full`} />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Stock</label>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale (Ex. GST)</label>
+                            <input type="number" step="0.01" placeholder="0.00" value={d.wholeprice_ex_gst} onChange={(e) => {
+                              const v = e.target.value
+                              setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, wholeprice_ex_gst: v, wholeprice_incl: v ? exToIncl(v, gstRate) : '' } }))
+                            }} className={`${inputCls} w-full`} />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Listed Stock</label>
                             <input type="number" step="1" min="0" placeholder="0" value={d.stock} onChange={(e) => setD('stock', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div>
@@ -2010,7 +2641,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                             <input type="text" placeholder="auto" value={d.sku} onChange={(e) => setD('sku', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
-                            <button type="button" onClick={() => addSubVariant(variantPopupId)} disabled={!d.name} className="px-4 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Add Sub-Variant</button>
+                            <button type="button" onClick={() => addSubVariant(variantPopupId)} disabled={!d.name || variantPopupId.startsWith('temp-')} className="px-4 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Add Sub-Variant</button>
                           </div>
                         </div>
                       )

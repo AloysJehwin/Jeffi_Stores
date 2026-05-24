@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import HoverCard from '@/components/ui/HoverCard'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -211,15 +212,55 @@ export default function ProductDetailClient({ id }: { id: string }) {
               </thead>
               <tbody className="divide-y divide-border-default">
                 {variants.map((v: any) => {
-                  const vStock = Number(v.stock_quantity || 0)
+                  const subVariants: any[] = v.sub_variants || []
+                  const hasSubs = subVariants.length > 0
+                  const vStock = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
                   const vStockColor = vStock === 0 ? 'text-red-600 dark:text-red-400' : vStock <= (v.low_stock_threshold || 3) ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
+                  const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
                   return (
-                    <tr key={v.id} className="hover:bg-surface-secondary/50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-foreground">{v.variant_name}</td>
+                    <React.Fragment key={v.id}>
+                    <tr className="hover:bg-surface-secondary/50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        {hasSubs ? (
+                          <HoverCard
+                            trigger={
+                              <span className="cursor-help">
+                                {v.variant_name}
+                                <span className="ml-2 text-xs font-normal text-foreground-muted underline decoration-dotted">({subVariants.length} sub-variants)</span>
+                              </span>
+                            }
+                            align="left"
+                            side="bottom"
+                            width="320px"
+                          >
+                            <div className="p-3 space-y-2">
+                              <p className="text-sm font-semibold text-foreground">{v.variant_name}</p>
+                              <div className="border-t border-border-default pt-2 space-y-1.5">
+                                {subVariants.map((sv: any) => (
+                                  <div key={sv.id} className="flex items-center justify-between gap-3 text-xs">
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="font-medium text-foreground truncate">{sv.sub_variant_name}</span>
+                                      {sv.sku && <span className="font-mono text-foreground-muted text-[10px]">{sv.sku}</span>}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-right shrink-0">
+                                      <span className="text-foreground-secondary">{sv.price ? formatINR(Number(sv.price)) : '—'}</span>
+                                      <span className={`font-medium ${Number(sv.stock_quantity || 0) === 0 ? 'text-red-600' : Number(sv.stock_quantity || 0) <= 3 ? 'text-orange-600' : 'text-foreground'}`}>
+                                        Stock: {Number(sv.stock_quantity || 0)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </HoverCard>
+                        ) : (
+                          v.variant_name
+                        )}
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">{v.sku || '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground">{v.price ? formatINR(Number(v.price)) : '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{v.mrp ? formatINR(Number(v.mrp)) : '—'}</td>
+                      <td className="px-4 py-3 text-right text-foreground">{vMinPrice > 0 ? (hasSubs ? `From ${formatINR(vMinPrice)}` : formatINR(vMinPrice)) : '—'}</td>
+                      <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : '—'}</td>
+                      <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.mrp ? formatINR(Number(v.mrp)) : '—'}</td>
                       <td className={`px-4 py-3 text-right font-semibold ${vStockColor}`}>{vStock}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${v.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-secondary'}`}>
@@ -227,6 +268,26 @@ export default function ProductDetailClient({ id }: { id: string }) {
                         </span>
                       </td>
                     </tr>
+                    {hasSubs && subVariants.map((sv: any) => {
+                      const svStock = Number(sv.stock_quantity || 0)
+                      const svStockColor = svStock === 0 ? 'text-red-600 dark:text-red-400' : svStock <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
+                      return (
+                        <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 transition-colors">
+                          <td className="px-4 py-2 pl-10 text-sm text-foreground-secondary">↳ {sv.sub_variant_name}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-foreground-muted hidden sm:table-cell">{sv.sku || '—'}</td>
+                          <td className="px-4 py-2 text-right text-sm text-foreground">{sv.price ? formatINR(Number(sv.price)) : '—'}</td>
+                          <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.price_ex_gst ? formatINR(Number(sv.price_ex_gst)) : '—'}</td>
+                          <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.mrp ? formatINR(Number(sv.mrp)) : '—'}</td>
+                          <td className={`px-4 py-2 text-right text-sm font-medium ${svStockColor}`}>{svStock}</td>
+                          <td className="px-4 py-2 text-center">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${sv.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-secondary'}`}>
+                              {sv.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    </React.Fragment>
                   )
                 })}
               </tbody>

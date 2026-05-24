@@ -176,6 +176,15 @@ export default function ImageUpload({
     notifyChange(updated)
   }
 
+  function moveImage(from: number, to: number) {
+    if (from === to || from < 0 || to < 0 || from >= images.length || to >= images.length) return
+    const updated = [...images]
+    const [moved] = updated.splice(from, 1)
+    updated.splice(to, 0, moved)
+    setImages(updated)
+    notifyChange(updated)
+  }
+
   const openGallery = useCallback(async () => {
     setShowGallery(true)
     setSelectedGalleryIds([])
@@ -277,7 +286,9 @@ export default function ImageUpload({
 
       {images.length > 0 && (
         <div>
-          <p className="text-xs text-foreground-muted mb-2">Drag to reorder · First image is shown first on the product page</p>
+          <p className="text-xs text-foreground-muted mb-2">
+            <span className="hidden sm:inline">Drag</span><span className="sm:hidden">Use ◀ ▶</span> to reorder · First image is shown first on the product page
+          </p>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {images.map((image, index) => (
               <div
@@ -298,12 +309,36 @@ export default function ImageUpload({
                 <div className="absolute top-2 right-2 bg-black/50 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
                   {index + 1}
                 </div>
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                {images.length > 1 && (
+                  <div className="absolute inset-x-2 bottom-2 flex justify-between sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
+                    <button
+                      type="button"
+                      onClick={() => moveImage(index, index - 1)}
+                      disabled={index === 0}
+                      className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 text-white text-xs leading-none disabled:opacity-30"
+                      title="Move left"
+                      aria-label="Move image left"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveImage(index, index + 1)}
+                      disabled={index === images.length - 1}
+                      className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 text-white text-xs leading-none disabled:opacity-30"
+                      title="Move right"
+                      aria-label="Move image right"
+                    >
+                      ▶
+                    </button>
+                  </div>
+                )}
+                <div className="absolute inset-x-0 top-8 bottom-12 sm:inset-0 bg-black bg-opacity-40 sm:bg-opacity-0 sm:group-hover:bg-opacity-40 transition-opacity rounded-lg flex items-center justify-center gap-2">
                   {!image.isPrimary && (
                     <button
                       type="button"
                       onClick={() => handleSetPrimary(index)}
-                      className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-white text-foreground-secondary rounded text-xs font-semibold hover:bg-surface-secondary transition-all"
+                      className="px-3 py-1 bg-white text-foreground-secondary rounded text-xs font-semibold hover:bg-surface-secondary transition-all sm:opacity-0 sm:group-hover:opacity-100"
                     >
                       Set Primary
                     </button>
@@ -311,7 +346,7 @@ export default function ImageUpload({
                   <button
                     type="button"
                     onClick={() => handleRemoveImage(index)}
-                    className="opacity-0 group-hover:opacity-100 px-3 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-all"
+                    className="px-3 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                   >
                     Remove
                   </button>

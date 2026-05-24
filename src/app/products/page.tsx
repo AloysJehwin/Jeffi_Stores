@@ -5,6 +5,7 @@ import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import Pagination from '@/components/ui/Pagination'
 
 const PAGE_SIZE = 21
 
@@ -90,8 +91,24 @@ async function getProducts(searchParams: any) {
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
       ) AS product_images,
-      COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
-      (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price
+      COALESCE((SELECT SUM(
+        CASE
+          WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+          THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+          ELSE pv.stock_quantity
+        END
+      ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
+      (SELECT MIN(price) FROM (
+        SELECT pv.price
+        FROM product_variants pv
+        WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+        UNION ALL
+        SELECT sv.price
+        FROM product_sub_variants sv
+        JOIN product_variants pv ON pv.id = sv.variant_id
+        WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
+      ) AS combined_prices) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
@@ -470,60 +487,11 @@ export default async function ProductsPage({
                 </div>
 
                 {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-8 mb-4">
-                    <Link
-                      href={buildPageUrl(searchParams, page - 1)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium text-sm transition-colors ${
-                        page <= 1
-                          ? 'border-border-default text-foreground-muted pointer-events-none opacity-40'
-                          : 'border-border-secondary text-foreground-secondary hover:bg-surface-secondary'
-                      }`}
-                      aria-disabled={page <= 1}
-                    >
-                      ← Previous
-                    </Link>
-
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1)
-                        .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                        .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                          if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
-                          acc.push(p)
-                          return acc
-                        }, [])
-                        .map((item, idx) =>
-                          item === 'ellipsis' ? (
-                            <span key={`ellipsis-${idx}`} className="px-2 text-foreground-muted">…</span>
-                          ) : (
-                            <Link
-                              key={item}
-                              href={buildPageUrl(searchParams, item)}
-                              className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                                item === page
-                                  ? 'bg-accent-500 text-white'
-                                  : 'text-foreground-secondary hover:bg-surface-secondary border border-border-secondary'
-                              }`}
-                            >
-                              {item}
-                            </Link>
-                          )
-                        )}
-                    </div>
-
-                    <Link
-                      href={buildPageUrl(searchParams, page + 1)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border font-medium text-sm transition-colors ${
-                        page >= totalPages
-                          ? 'border-border-default text-foreground-muted pointer-events-none opacity-40'
-                          : 'border-border-secondary text-foreground-secondary hover:bg-surface-secondary'
-                      }`}
-                      aria-disabled={page >= totalPages}
-                    >
-                      Next →
-                    </Link>
-                  </div>
-                )}
+                <Pagination
+                  page={page}
+                  totalPages={totalPages}
+                  buildHref={(p) => buildPageUrl(searchParams, p)}
+                />
               </>
             ) : (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">

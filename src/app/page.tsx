@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { queryMany } from '@/lib/db'
+import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
@@ -16,8 +17,8 @@ async function getFeaturedProducts() {
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
       ) AS product_images,
-      COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
-      (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price
+      ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
+      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -138,16 +139,16 @@ export default async function HomePage() {
                 <Link
                   key={category.id}
                   href={`/categories/${category.slug}`}
-                  className="group"
+                  className="group h-full"
                 >
-                  <div className="flex flex-col items-center text-center gap-2 p-3 rounded-xl bg-surface-elevated border border-border-default hover:border-primary-400 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
-                    <div className="w-11 h-11 sm:w-14 sm:h-14 bg-primary-50 dark:bg-primary-900/20 rounded-xl flex items-center justify-center group-hover:bg-primary-100 transition-colors">
+                  <div className="flex flex-col items-center text-center gap-2 p-3 rounded-xl bg-surface-elevated border border-border-default hover:border-primary-400 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full">
+                    <div className="w-11 h-11 sm:w-14 sm:h-14 bg-primary-50 dark:bg-primary-900/20 rounded-xl flex items-center justify-center group-hover:bg-primary-100 transition-colors shrink-0">
                       <CategoryIcon
                         categoryName={category.name}
                         className="w-6 h-6 sm:w-7 sm:h-7 text-primary-600 dark:text-primary-400"
                       />
                     </div>
-                    <span className="text-xs font-semibold text-foreground group-hover:text-primary-600 transition-colors leading-tight">
+                    <span className="text-xs font-semibold text-foreground group-hover:text-primary-600 transition-colors leading-tight line-clamp-2 flex items-center justify-center min-h-[2.25rem]">
                       {category.name}
                     </span>
                   </div>

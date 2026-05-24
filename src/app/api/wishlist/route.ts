@@ -3,6 +3,7 @@ import { query, queryMany } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { cookies } from 'next/headers'
 import { getUserIdForSession } from '@/lib/guest-user'
+import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 
 async function resolveUserId(request: NextRequest): Promise<string> {
   const auth = await authenticateUser(request)
@@ -24,8 +25,8 @@ export async function GET(request: NextRequest) {
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'mrp', p.mrp, 'has_variants', p.has_variants,
           'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
-          'variant_stock_total', COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0),
-          'variant_min_price', (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL),
+          'variant_stock_total', ${VARIANT_STOCK_TOTAL_SQL},
+          'variant_min_price', ${VARIANT_MIN_PRICE_SQL},
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),

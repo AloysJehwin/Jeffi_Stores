@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 interface Review {
   id: string
@@ -37,7 +38,7 @@ function StarRow({ rating, interactive = false, onRate, hoverRating, onHover, si
   const dim = size === 'sm' ? 'w-4 h-4' : size === 'lg' ? 'w-7 h-7' : 'w-5 h-5'
   const active = interactive ? (hoverRating || rating) : rating
   return (
-    <div className="flex gap-0.5">
+    <div className="flex gap-0.5" onMouseLeave={() => interactive && onHover?.(0)}>
       {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}
@@ -45,7 +46,6 @@ function StarRow({ rating, interactive = false, onRate, hoverRating, onHover, si
           disabled={!interactive}
           onClick={() => interactive && onRate?.(star)}
           onMouseEnter={() => interactive && onHover?.(star)}
-          onMouseLeave={() => interactive && onHover?.(0)}
           className={interactive ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default pointer-events-none'}
           tabIndex={interactive ? 0 : -1}
           aria-label={interactive ? `Rate ${star} star${star > 1 ? 's' : ''}` : undefined}
@@ -59,11 +59,11 @@ function StarRow({ rating, interactive = false, onRate, hoverRating, onHover, si
   )
 }
 
-function RatingBar({ star, count, total }: { star: number; count: number; total: number }) {
+function RatingBar({ star, count, total, isActive, onClick }: { star: number; count: number; total: number; isActive: boolean; onClick: () => void }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-3 text-right text-foreground-muted">{star}</span>
+    <button type="button" onClick={onClick} className={`w-full flex items-center gap-2 text-xs px-1 py-0.5 rounded transition-colors ${isActive ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface-secondary'} ${count === 0 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} disabled={count === 0}>
+      <span className={`w-3 text-right ${isActive ? 'text-accent-600 dark:text-accent-400 font-semibold' : 'text-foreground-muted'}`}>{star}</span>
       <svg className="w-3.5 h-3.5 text-yellow-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
         <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
       </svg>
@@ -71,7 +71,7 @@ function RatingBar({ star, count, total }: { star: number; count: number; total:
         <div className="h-full bg-yellow-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
       </div>
       <span className="w-6 text-foreground-muted">{count}</span>
-    </div>
+    </button>
   )
 }
 
@@ -91,6 +91,27 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [filterStar, setFilterStar] = useState<number | null>(null)
+  const [sortBy, setSortBy] = useState<'recent' | 'highest' | 'lowest' | 'helpful'>('recent')
+  const [visibleCount, setVisibleCount] = useState(5)
+
+  useEffect(() => {
+    if (!lightboxUrl) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxUrl(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [lightboxUrl])
+
+  useEffect(() => {
+    if (!showForm) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowForm(false) }
+    window.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [showForm])
 
   useEffect(() => { fetchReviews() }, [productId])
 
@@ -169,6 +190,17 @@ export default function ProductReviews({ productId, productName }: ProductReview
     count: reviews.filter(r => r.rating === star).length,
   }))
 
+  const filteredReviews = filterStar
+    ? reviews.filter(r => r.rating === filterStar)
+    : reviews
+  const sortedReviews = [...filteredReviews].sort((a, b) => {
+    if (sortBy === 'highest') return b.rating - a.rating || (new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    if (sortBy === 'lowest') return a.rating - b.rating || (new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+  const visibleReviews = sortedReviews.slice(0, visibleCount)
+  const hasMore = sortedReviews.length > visibleCount
+
   return (
     <div className="mt-10 sm:mt-14">
       {/* Section header */}
@@ -177,32 +209,84 @@ export default function ProductReviews({ productId, productName }: ProductReview
           <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-0.5">What buyers say</p>
           <h2 className="text-xl sm:text-2xl font-extrabold text-foreground">Customer Reviews</h2>
         </div>
-        {!showForm && (
-          <button
-            onClick={() => {
-              if (!user) {
-                showToast('Please login to write a review', 'warning')
-                router.push(`/login?redirect=/products/${productName.toLowerCase().replace(/\s+/g, '-')}`)
-                return
-              }
-              setShowForm(true)
-            }}
-            className="self-start sm:self-auto inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Write a Review
-          </button>
-        )}
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          {reviews.length > 0 && (
+            <label className="hidden sm:flex items-center gap-2 text-sm">
+              <span className="text-foreground-muted">Sort by</span>
+              <div className="w-40">
+                <AdminSelect
+                  value={sortBy}
+                  onChange={(val) => { setSortBy(val as any); setVisibleCount(5) }}
+                  options={[
+                    { value: 'recent', label: 'Most recent' },
+                    { value: 'highest', label: 'Highest rated' },
+                    { value: 'lowest', label: 'Lowest rated' },
+                  ]}
+                  sm
+                />
+              </div>
+            </label>
+          )}
+          {!showForm && (
+            <button
+              onClick={() => {
+                if (!user) {
+                  showToast('Please login to write a review', 'warning')
+                  router.push(`/login?redirect=/products/${productName.toLowerCase().replace(/\s+/g, '-')}`)
+                  return
+                }
+                setShowForm(true)
+              }}
+              className="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Write a Review
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Two-column layout: left = rating summary, right = review list */}
+      {!isLoading && reviews.length === 0 ? (
+        <div className="bg-surface-elevated border border-border-default rounded-xl p-8 sm:p-12 flex flex-col items-center gap-4 text-center">
+          <div className="w-16 h-16 rounded-full bg-surface-secondary flex items-center justify-center">
+            <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-base font-semibold text-foreground">No reviews yet</p>
+            <p className="text-sm text-foreground-muted mt-1">Be the first to share your experience with this product.</p>
+          </div>
+          <div className="flex gap-0.5 opacity-30">
+            {[1,2,3,4,5].map(s => (
+              <svg key={s} className="w-6 h-6 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+            ))}
+          </div>
+        </div>
+      ) : (
       <div className="flex flex-col lg:flex-row gap-6 items-start">
 
         {/* Left column — rating summary + write review */}
-        <div className="w-full lg:w-64 lg:shrink-0 space-y-4">
-          {reviews.length > 0 ? (
+        <div className="w-full lg:w-64 lg:shrink-0 lg:sticky lg:top-24 lg:self-start space-y-4">
+          {isLoading ? (
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-5 shadow-sm animate-pulse">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-surface-secondary rounded" />
+                <div className="flex-1">
+                  <div className="h-3 bg-surface-secondary rounded w-24 mb-2" />
+                  <div className="h-2 bg-surface-secondary rounded w-16" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                {[1,2,3,4,5].map(i => <div key={i} className="h-2 bg-surface-secondary rounded" />)}
+              </div>
+            </div>
+          ) : reviews.length > 0 ? (
             <div className="bg-surface-elevated border border-border-default rounded-xl p-4 sm:p-5 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-5xl font-black text-foreground leading-none">{avgDisplay}</span>
@@ -213,9 +297,25 @@ export default function ProductReviews({ productId, productName }: ProductReview
               </div>
               <div className="space-y-1.5">
                 {ratingCounts.map(({ star, count }) => (
-                  <RatingBar key={star} star={star} count={count} total={reviews.length} />
+                  <RatingBar
+                    key={star}
+                    star={star}
+                    count={count}
+                    total={reviews.length}
+                    isActive={filterStar === star}
+                    onClick={() => { setFilterStar(filterStar === star ? null : star); setVisibleCount(5) }}
+                  />
                 ))}
               </div>
+              {filterStar && (
+                <button
+                  type="button"
+                  onClick={() => { setFilterStar(null); setVisibleCount(5) }}
+                  className="text-xs text-accent-600 dark:text-accent-400 hover:underline mt-2"
+                >
+                  Clear filter
+                </button>
+              )}
             </div>
           ) : (
             <div className="bg-surface-elevated border border-border-default rounded-xl p-5 shadow-sm flex flex-col items-center gap-3 text-center">
@@ -238,107 +338,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
             </div>
           )}
 
-          {/* Write Review Form */}
-          {showForm && (
-            <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-foreground">Your Review</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="p-1 text-foreground-muted hover:text-foreground rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-2">Rating</label>
-                  <StarRow rating={rating} interactive onRate={setRating} hoverRating={hoverRating} onHover={setHoverRating} size="lg" />
-                  <p className="text-xs text-foreground-muted mt-1">
-                    {['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][hoverRating || rating]}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-                    Title <span className="text-foreground-muted font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Summarise your experience"
-                    maxLength={255}
-                    className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Review <span className="text-red-500">*</span></label>
-                  <textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Share details about the product quality, delivery, or any tips for other buyers…"
-                    rows={4}
-                    required
-                    className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent resize-none text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
-                    Photos <span className="text-foreground-muted font-normal">(optional, up to 3)</span>
-                  </label>
-                  <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-2 border border-dashed border-border-secondary rounded-lg text-sm text-foreground-secondary hover:border-accent-500 hover:text-accent-500 transition-colors">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 12V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25v13.5A2.25 2.25 0 0118.75 21H5.25A2.25 2.25 0 013 18.75V12zm10.5-1.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                    </svg>
-                    Add photos
-                    <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={handleImageChange} />
-                  </label>
-                  {imagePreviews.length > 0 && (
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      {imagePreviews.map((src, idx) => (
-                        <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-secondary">
-                          <img src={src} alt="" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(idx)}
-                            className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center text-xs leading-none hover:bg-black/80"
-                            aria-label="Remove"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isSubmitting && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                    {isSubmitting ? 'Submitting…' : 'Submit Review'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowForm(false)}
-                    className="px-5 py-2.5 rounded-lg text-sm font-semibold text-foreground-secondary bg-surface-secondary hover:bg-border-default transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
+          {/* Write Review Form moved to modal overlay below */}
         </div>
 
         {/* Right column — reviews list */}
@@ -358,7 +358,34 @@ export default function ProductReviews({ productId, productName }: ProductReview
             </div>
           ) : (
             <div className="space-y-4">
-              {reviews.map((review) => {
+              {filterStar && (
+                <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-foreground-muted bg-accent-50 dark:bg-accent-900/20 px-3 py-2 rounded-lg">
+                  <span>Showing {sortedReviews.length} {sortedReviews.length === 1 ? 'review' : 'reviews'} with {filterStar} star{filterStar > 1 ? 's' : ''}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setFilterStar(null); setVisibleCount(5) }}
+                    className="text-accent-600 dark:text-accent-400 hover:underline font-medium"
+                  >
+                    Clear filter
+                  </button>
+                </div>
+              )}
+              <label className="sm:hidden flex items-center gap-2 text-sm">
+                <span className="text-foreground-muted">Sort by</span>
+                <div className="flex-1">
+                  <AdminSelect
+                    value={sortBy}
+                    onChange={(val) => { setSortBy(val as any); setVisibleCount(5) }}
+                    options={[
+                      { value: 'recent', label: 'Most recent' },
+                      { value: 'highest', label: 'Highest rated' },
+                      { value: 'lowest', label: 'Lowest rated' },
+                    ]}
+                    sm
+                  />
+                </div>
+              </label>
+              {visibleReviews.map((review) => {
                 const initials = `${review.users.first_name?.[0] || ''}${review.users.last_name?.[0] || ''}`.toUpperCase() || '?'
                 return (
                   <div key={review.id} className="bg-surface-elevated border border-border-default rounded-xl p-4 sm:p-5">
@@ -371,6 +398,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                           <span className="font-semibold text-sm text-foreground">
                             {review.users.first_name} {review.users.last_name}
                           </span>
+                          <StarRow rating={review.rating} size="sm" />
                           {review.is_verified_purchase && (
                             <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-2 py-0.5 rounded-full font-medium">
                               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
@@ -383,7 +411,6 @@ export default function ProductReviews({ productId, productName }: ProductReview
                             {new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
                         </div>
-                        <StarRow rating={review.rating} size="sm" />
                       </div>
                     </div>
 
@@ -408,11 +435,144 @@ export default function ProductReviews({ productId, productName }: ProductReview
                   </div>
                 )
               })}
+              {visibleReviews.length === 0 && (
+                <div className="bg-surface-elevated border border-border-default rounded-xl py-10 flex flex-col items-center gap-2">
+                  <p className="text-sm text-foreground-muted">No {filterStar}-star reviews</p>
+                  <button
+                    type="button"
+                    onClick={() => { setFilterStar(null); setVisibleCount(5) }}
+                    className="text-sm text-accent-600 dark:text-accent-400 hover:underline"
+                  >
+                    Clear filter
+                  </button>
+                </div>
+              )}
+              {hasMore && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount(c => c + 5)}
+                  className="w-full py-3 rounded-xl border border-border-secondary text-sm font-semibold text-foreground hover:bg-surface-secondary transition-colors"
+                >
+                  Show more reviews ({sortedReviews.length - visibleCount} remaining)
+                </button>
+              )}
             </div>
           )}
         </div>
 
       </div>
+      )}
+
+      {/* Write Review Modal */}
+      {showForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto"
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            className="bg-surface-elevated rounded-xl border border-border-default shadow-2xl w-full max-w-lg my-8 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border-default sticky top-0 bg-surface-elevated z-10">
+              <h3 className="text-base font-bold text-foreground">Write a Review</h3>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="p-1 text-foreground-muted hover:text-foreground rounded-lg transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Rating</label>
+                <StarRow rating={rating} interactive onRate={setRating} hoverRating={hoverRating} onHover={setHoverRating} size="lg" />
+                <p className="text-xs text-foreground-muted mt-1">
+                  {['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][hoverRating || rating]}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                  Title <span className="text-foreground-muted font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Summarise your experience"
+                  maxLength={255}
+                  className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Review <span className="text-red-500">*</span></label>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Share details about the product quality, delivery, or any tips for other buyers…"
+                  rows={5}
+                  required
+                  className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent resize-none text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                  Photos <span className="text-foreground-muted font-normal">(optional, up to 3)</span>
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-2 border border-dashed border-border-secondary rounded-lg text-sm text-foreground-secondary hover:border-accent-500 hover:text-accent-500 transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 12V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25v13.5A2.25 2.25 0 0118.75 21H5.25A2.25 2.25 0 013 18.75V12zm10.5-1.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                  </svg>
+                  Add photos
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={handleImageChange} />
+                </label>
+                {imagePreviews.length > 0 && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {imagePreviews.map((src, idx) => (
+                      <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-secondary">
+                        <img src={src} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center text-xs leading-none hover:bg-black/80"
+                          aria-label="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2 sticky bottom-0 bg-surface-elevated">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {isSubmitting && <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {isSubmitting ? 'Submitting…' : 'Submit Review'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-5 py-2.5 rounded-lg text-sm font-semibold text-foreground-secondary bg-surface-secondary hover:bg-border-default transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {lightboxUrl && (
         <div

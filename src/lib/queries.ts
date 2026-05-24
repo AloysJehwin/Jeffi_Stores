@@ -2,6 +2,30 @@ import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
 
+export const VARIANT_STOCK_TOTAL_SQL = `
+  COALESCE((SELECT SUM(
+    CASE
+      WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+      THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+      ELSE pv.stock_quantity
+    END
+  ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0)
+`
+
+export const VARIANT_MIN_PRICE_SQL = `
+  (SELECT MIN(price) FROM (
+    SELECT pv.price
+    FROM product_variants pv
+    WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+    UNION ALL
+    SELECT sv.price
+    FROM product_sub_variants sv
+    JOIN product_variants pv ON pv.id = sv.variant_id
+    WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
+  ) AS combined_prices)
+`
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
     const [
@@ -75,9 +99,26 @@ export async function getAllProducts() {
         '[]'::json
       ) AS product_images,
       COALESCE(
-        (SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+        (SELECT SUM(
+          CASE
+            WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+            THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+            ELSE pv.stock_quantity
+          END
+        ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
         0
-      ) AS variant_stock_total
+      ) AS variant_stock_total,
+      (SELECT MIN(price) FROM (
+        SELECT pv.price
+        FROM product_variants pv
+        WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+        UNION ALL
+        SELECT sv.price
+        FROM product_sub_variants sv
+        JOIN product_variants pv ON pv.id = sv.variant_id
+        WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
+      ) AS combined_prices) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
@@ -99,15 +140,67 @@ export async function getProduct(id: string) {
         '[]'::json
       ) AS product_images,
       COALESCE(
-        (SELECT json_agg(pv ORDER BY pv.variant_name)
+        (SELECT json_agg(
+          jsonb_build_object(
+            'id', pv.id, 'sku', pv.sku, 'variant_name', pv.variant_name,
+            'price', pv.price, 'mrp', pv.mrp, 'mrp_ex_gst', pv.mrp_ex_gst, 'price_ex_gst', pv.price_ex_gst,
+            'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'stock_quantity', pv.stock_quantity,
+            'mpn', pv.mpn, 'gtin', pv.gtin, 'pricing_type', pv.pricing_type,
+            'unit', pv.unit, 'numeric_value', pv.numeric_value,
+            'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
+            'length_rate', pv.length_rate, 'length_unit', pv.length_unit,
+            'weight_grams', pv.weight_grams, 'package_type', pv.package_type,
+            'length_cm', pv.length_cm, 'breadth_cm', pv.breadth_cm, 'height_cm', pv.height_cm,
+            'sub_variant_type', pv.sub_variant_type, 'variant_type', pv.variant_type,
+            'is_active', pv.is_active,
+            'variant_images', COALESCE(
+              (SELECT json_agg(vi ORDER BY vi.display_order)
+               FROM variant_images vi WHERE vi.variant_id = pv.id),
+              '[]'::json
+            ),
+            'sub_variants', COALESCE(
+              (SELECT json_agg(
+                jsonb_build_object(
+                  'id', sv.id, 'sub_variant_name', sv.sub_variant_name, 'sku', sv.sku,
+                  'price', sv.price, 'mrp', sv.mrp, 'mrp_ex_gst', sv.mrp_ex_gst,
+                  'price_ex_gst', sv.price_ex_gst, 'wholeprice_ex_gst', sv.wholeprice_ex_gst,
+                  'stock_quantity', sv.stock_quantity, 'inventory_quantity', sv.inventory_quantity,
+                  'is_active', sv.is_active
+                )
+                ORDER BY sv.sub_variant_name
+              )
+               FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true),
+              '[]'::json
+            ),
+            'sub_variant_min_price', (SELECT MIN(sv.price) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.price IS NOT NULL),
+            'sub_variant_stock_total', COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+          )
+          ORDER BY pv.variant_name
+        )
          FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
         '[]'::json
       ) AS product_variants,
       COALESCE(
-        (SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+        (SELECT SUM(
+          CASE
+            WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+            THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+            ELSE pv.stock_quantity
+          END
+        ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
         0
       ) AS variant_stock_total,
-      (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price
+      (SELECT MIN(price) FROM (
+        SELECT pv.price
+        FROM product_variants pv
+        WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+        UNION ALL
+        SELECT sv.price
+        FROM product_sub_variants sv
+        JOIN product_variants pv ON pv.id = sv.variant_id
+        WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
+      ) AS combined_prices) AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -325,10 +418,26 @@ export async function getFilteredProducts(filters: {
           '[]'::json
         ) AS product_images,
         COALESCE(
-          (SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+          (SELECT SUM(
+            CASE
+              WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+              THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+              ELSE pv.stock_quantity
+            END
+          ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
           0
         ) AS variant_stock_total,
-        (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price
+        (SELECT MIN(price) FROM (
+          SELECT pv.price
+          FROM product_variants pv
+          WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+          UNION ALL
+          SELECT sv.price
+          FROM product_sub_variants sv
+          JOIN product_variants pv ON pv.id = sv.variant_id
+          WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
+        ) AS combined_prices) AS variant_min_price
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN categories pc ON c.parent_category_id = pc.id

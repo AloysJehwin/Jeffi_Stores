@@ -1,7 +1,11 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
+import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
+import Pagination from '@/components/ui/Pagination'
+
+const PAGE_SIZE = 24
 
 async function getCategoryBySlug(slug: string) {
   return queryOne(
@@ -17,10 +21,17 @@ async function getSubcategories(parentId: string) {
   )
 }
 
-async function getCategoryProducts(categoryId: string, subcategoryIds: string[]) {
+async function getCategoryProducts(categoryId: string, subcategoryIds: string[], page: number) {
   const allCategoryIds = [categoryId, ...subcategoryIds]
+  const offset = (page - 1) * PAGE_SIZE
 
-  return queryMany(`
+  const countRow = await queryOne<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM products WHERE category_id = ANY($1) AND is_active = true`,
+    [allCategoryIds]
+  )
+  const total = Number(countRow?.total ?? 0)
+
+  const products = await queryMany(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
       json_build_object('id', b.id, 'name', b.name) AS brands,
@@ -29,20 +40,25 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[])
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
       ) AS product_images,
-      COALESCE((SELECT SUM(pv.stock_quantity) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
-      (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price
+      ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
+      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.category_id = ANY($1) AND p.is_active = true
     ORDER BY p.created_at DESC
-  `, [allCategoryIds])
+    LIMIT $2 OFFSET $3
+  `, [allCategoryIds, PAGE_SIZE, offset])
+
+  return { products, total, totalPages: Math.ceil(total / PAGE_SIZE) }
 }
 
 export default async function CategoryDetailPage({
   params,
+  searchParams,
 }: {
   params: { slug: string }
+  searchParams: { [key: string]: string | string[] | undefined }
 }) {
   const category = await getCategoryBySlug(params.slug)
 
@@ -50,10 +66,14 @@ export default async function CategoryDetailPage({
     notFound()
   }
 
+  const pageParam = typeof searchParams.page === 'string' ? searchParams.page : '1'
+  const page = Math.max(1, parseInt(pageParam, 10) || 1)
+
   const subcategories = await getSubcategories(category.id)
-  const products = await getCategoryProducts(
+  const { products, total, totalPages } = await getCategoryProducts(
     category.id,
-    subcategories.map(sub => sub.id)
+    subcategories.map(sub => sub.id),
+    page,
   )
 
   return (
@@ -87,18 +107,18 @@ export default async function CategoryDetailPage({
         {subcategories.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-bold text-foreground mb-4">Subcategories</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-3">
               {subcategories.map((subcategory) => (
                 <Link
                   key={subcategory.id}
                   href={`/categories/${subcategory.slug}`}
-                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 hover:shadow-md hover:border-accent-500 transition-all group"
+                  className="bg-surface-elevated rounded-xl shadow-sm border border-border-default p-2 sm:p-3 hover:shadow-md hover:border-accent-500 transition-all group h-full"
                 >
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-accent-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:bg-accent-200 transition-colors">
-                      <CategoryIcon iconName={subcategory.icon_name} categoryName={subcategory.name} className="w-6 h-6 text-accent-600 group-hover:text-accent-700" />
+                  <div className="flex flex-col items-center text-center gap-1.5">
+                    <div className="w-9 h-9 sm:w-11 sm:h-11 bg-accent-100 rounded-lg flex items-center justify-center group-hover:bg-accent-200 transition-colors shrink-0">
+                      <CategoryIcon iconName={subcategory.icon_name} categoryName={subcategory.name} className="w-5 h-5 sm:w-6 sm:h-6 text-accent-600 group-hover:text-accent-700" />
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
+                    <h3 className="text-[11px] sm:text-xs font-semibold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors leading-tight line-clamp-2 flex items-center justify-center min-h-[2rem]">
                       {subcategory.name}
                     </h3>
                   </div>
@@ -112,11 +132,17 @@ export default async function CategoryDetailPage({
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-foreground">
-              Products ({products.length})
+              Products ({total})
             </h2>
+            {totalPages > 1 && (
+              <p className="text-sm text-foreground-muted">
+                Page {page} of {totalPages}
+              </p>
+            )}
           </div>
 
           {products.length > 0 ? (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {products.map((product) => {
                 const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
@@ -204,6 +230,12 @@ export default async function CategoryDetailPage({
                 )
               })}
             </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              buildHref={(p) => p > 1 ? `/categories/${params.slug}?page=${p}` : `/categories/${params.slug}`}
+            />
+            </>
           ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
               <svg className="mx-auto h-24 w-24 text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
