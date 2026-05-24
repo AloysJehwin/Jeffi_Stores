@@ -31,7 +31,7 @@ export const STORED_DIMS_REQUIRED: PackageType[] = [
 export const VOLUMETRIC_DIVISOR_CM3_PER_GRAM = 5
 export const CARTON_MAX_WEIGHT_GRAMS = 30000
 
-const LONG_ITEM_THRESHOLD_MM = 120
+const LONG_ITEM_THRESHOLD_MM = 100
 
 export interface StoredDims {
   length_cm: number | null
@@ -166,6 +166,30 @@ function finalizeCarton(c: CartonAccumulator): Carton {
   }
 }
 
+const PACKING_VOID_FACTOR = 1.35
+const MAX_CARTON_DIM_CM = 60
+
+function deriveBulkCartonDims(
+  unitDims: PackedDims,
+  unitCount: number,
+  isLongShape: boolean,
+): PackedDims {
+  if (unitCount <= 1) return unitDims
+  const unitVolume = unitDims.length_cm * unitDims.breadth_cm * unitDims.height_cm
+  const totalVolume = unitVolume * unitCount * PACKING_VOID_FACTOR
+
+  if (isLongShape) {
+    const longSide = Math.min(MAX_CARTON_DIM_CM, Math.max(unitDims.length_cm, unitDims.length_cm + 2))
+    const crossSection = totalVolume / longSide
+    const side = Math.max(8, Math.ceil(Math.sqrt(crossSection)))
+    return { length_cm: Math.ceil(longSide), breadth_cm: side, height_cm: side }
+  }
+
+  const cubeSide = Math.cbrt(totalVolume)
+  const dim = Math.max(15, Math.min(MAX_CARTON_DIM_CM, Math.ceil(cubeSide)))
+  return { length_cm: dim, breadth_cm: dim, height_cm: dim }
+}
+
 export function packIntoCartons(
   items: ShipmentItem[],
   maxCartonWeightGrams = CARTON_MAX_WEIGHT_GRAMS,
@@ -173,17 +197,20 @@ export function packIntoCartons(
   const cartons: Carton[] = []
 
   for (const item of items) {
-    const dims = resolvePackedDims(item)
+    const unitDims = resolvePackedDims(item)
+    const effectivePt = inferEffectivePackageType(item)
+    const isLongShape = effectivePt === 'long_tube' || effectivePt === 'drill_bit_tube'
     const perUnitWeight = item.weightGrams
     let remaining = item.quantity
 
     while (remaining > 0) {
       const unitsThatFit = Math.max(1, Math.floor(maxCartonWeightGrams / Math.max(1, perUnitWeight)))
       const take = Math.min(remaining, unitsThatFit)
+      const cartonDims = deriveBulkCartonDims(unitDims, take, isLongShape)
       const acc: CartonAccumulator = {
-        maxL: dims.length_cm,
-        maxB: dims.breadth_cm,
-        totalH: dims.height_cm * take,
+        maxL: cartonDims.length_cm,
+        maxB: cartonDims.breadth_cm,
+        totalH: cartonDims.height_cm,
         weightGrams: perUnitWeight * take,
       }
       cartons.push(finalizeCarton(acc))
