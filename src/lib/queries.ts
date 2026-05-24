@@ -2,6 +2,30 @@ import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
 
+export const VARIANT_STOCK_TOTAL_SQL = `
+  COALESCE((SELECT SUM(
+    CASE
+      WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+      THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+      ELSE pv.stock_quantity
+    END
+  ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0)
+`
+
+export const VARIANT_MIN_PRICE_SQL = `
+  (SELECT MIN(price) FROM (
+    SELECT pv.price
+    FROM product_variants pv
+    WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+    UNION ALL
+    SELECT sv.price
+    FROM product_sub_variants sv
+    JOIN product_variants pv ON pv.id = sv.variant_id
+    WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
+  ) AS combined_prices)
+`
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
     const [

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
 import { buildProductSearchClause, buildProductSearchRank, buildSearchClause } from '@/lib/search'
+import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
         SELECT
           p.id, p.name, p.slug, p.base_price, p.price_ex_gst, p.has_variants,
           json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
-          (SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL) AS variant_min_price,
+          ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
           COALESCE(
             (SELECT json_agg(json_build_object('image_url', pi.image_url, 'thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),
