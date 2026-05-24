@@ -88,18 +88,18 @@ export default async function CategoryDetailPage({
         {subcategories.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-bold text-foreground mb-4">Subcategories</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-3">
               {subcategories.map((subcategory) => (
                 <Link
                   key={subcategory.id}
                   href={`/categories/${subcategory.slug}`}
-                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 hover:shadow-md hover:border-accent-500 transition-all group"
+                  className="bg-surface-elevated rounded-xl shadow-sm border border-border-default p-2 sm:p-3 hover:shadow-md hover:border-accent-500 transition-all group h-full"
                 >
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-accent-100 rounded-full flex items-center justify-center mx-auto mb-2 group-hover:bg-accent-200 transition-colors">
-                      <CategoryIcon iconName={subcategory.icon_name} categoryName={subcategory.name} className="w-6 h-6 text-accent-600 group-hover:text-accent-700" />
+                  <div className="flex flex-col items-center text-center gap-1.5">
+                    <div className="w-9 h-9 sm:w-11 sm:h-11 bg-accent-100 rounded-lg flex items-center justify-center group-hover:bg-accent-200 transition-colors shrink-0">
+                      <CategoryIcon iconName={subcategory.icon_name} categoryName={subcategory.name} className="w-5 h-5 sm:w-6 sm:h-6 text-accent-600 group-hover:text-accent-700" />
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
+                    <h3 className="text-[11px] sm:text-xs font-semibold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors leading-tight line-clamp-2 flex items-center justify-center min-h-[2rem]">
                       {subcategory.name}
                     </h3>
                   </div>
