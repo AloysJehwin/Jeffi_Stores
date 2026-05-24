@@ -199,7 +199,17 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [variantGalleryCategory, setVariantGalleryCategory] = useState('')
   const [variantGallerySelected, setVariantGallerySelected] = useState<string[]>([])
   const [variantGalleryLoading, setVariantGalleryLoading] = useState(false)
-  const [subVariantsMap, setSubVariantsMap] = useState<Record<string, any[]>>({})
+  const [subVariantsMap, setSubVariantsMap] = useState<Record<string, any[]>>(() => {
+    const init: Record<string, any[]> = {}
+    if (product?.product_variants) {
+      for (const v of product.product_variants) {
+        if (v.id && Array.isArray(v.sub_variants) && v.sub_variants.length > 0) {
+          init[v.id] = v.sub_variants
+        }
+      }
+    }
+    return init
+  })
   const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; wholeprice_ex_gst: string; stock: string; sku: string }>>({})
   const [subVariantEditId, setSubVariantEditId] = useState<string | null>(null)
   const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; wholeprice_ex_gst: string; stock: string; sku: string } | null>(null)
@@ -306,7 +316,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         breadth_cm: v.breadth_cm != null ? String(v.breadth_cm) : '',
         height_cm: v.height_cm != null ? String(v.height_cm) : '',
         sub_variant_type: v.sub_variant_type || '',
-        sub_variant_type_on: !!v.sub_variant_type,
+        sub_variant_type_on: !!v.sub_variant_type || (Array.isArray(v.sub_variants) && v.sub_variants.length > 0),
         variant_type: v.variant_type || '',
         use_own_images: !!(v.variant_images && v.variant_images.length > 0),
       })
