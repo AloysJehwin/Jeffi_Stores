@@ -1371,48 +1371,52 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   </>
                                 ) : (
                                   <>
-                                <div className="relative">
+                                <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price (incl. GST) *</label>
-                                  <input type="number" step="0.01" min="0" value={variant.price} readOnly={variant.priceLockSide === 'incl'} onChange={(e) => {
-                                    const v = e.target.value
-                                    const n = parseFloat(v)
-                                    const updated = [...variants]
-                                    updated[index] = { ...updated[index], price: v, priceLockSide: v === '' ? null : 'excl' }
-                                    if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
-                                    else if (v === '') updated[index].price_ex_gst = ''
-                                    setVariants(updated)
-                                  }} className={lockedInputCls(inputCls, variant.priceLockSide === 'incl')} placeholder="0.00" required />
-                                  {variant.priceLockSide === 'incl' && (
-                                    <UnlockBtn onClick={() => {
+                                  <div className="relative">
+                                    <input type="number" step="0.01" min="0" value={variant.price} readOnly={variant.priceLockSide === 'incl'} onChange={(e) => {
+                                      const v = e.target.value
+                                      const n = parseFloat(v)
                                       const updated = [...variants]
-                                      updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                      updated[index] = { ...updated[index], price: v, priceLockSide: v === '' ? null : 'excl' }
+                                      if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                                      else if (v === '') updated[index].price_ex_gst = ''
                                       setVariants(updated)
-                                    }} />
-                                  )}
+                                    }} className={`${lockedInputCls(inputCls, variant.priceLockSide === 'incl')} ${variant.priceLockSide === 'incl' ? 'pr-7' : ''}`} placeholder="0.00" required />
+                                    {variant.priceLockSide === 'incl' && (
+                                      <UnlockBtn onClick={() => {
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                        setVariants(updated)
+                                      }} />
+                                    )}
+                                  </div>
                                   {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
                                 </div>
-                                <div className="relative">
+                                <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (incl. GST)</label>
                                   <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className={inputCls} placeholder="0.00" />
                                 </div>
-                                <div className="relative">
+                                <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
-                                  <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly={variant.priceLockSide === 'excl'} onChange={(e) => {
-                                    const v = e.target.value
-                                    const n = parseFloat(v)
-                                    const updated = [...variants]
-                                    updated[index] = { ...updated[index], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
-                                    if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
-                                    else if (v === '') updated[index].price = ''
-                                    setVariants(updated)
-                                  }} className={lockedInputCls(inputCls, variant.priceLockSide === 'excl')} placeholder="0.00" />
-                                  {variant.priceLockSide === 'excl' && (
-                                    <UnlockBtn onClick={() => {
+                                  <div className="relative">
+                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly={variant.priceLockSide === 'excl'} onChange={(e) => {
+                                      const v = e.target.value
+                                      const n = parseFloat(v)
                                       const updated = [...variants]
-                                      updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                      updated[index] = { ...updated[index], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
+                                      if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                                      else if (v === '') updated[index].price = ''
                                       setVariants(updated)
-                                    }} />
-                                  )}
+                                    }} className={`${lockedInputCls(inputCls, variant.priceLockSide === 'excl')} ${variant.priceLockSide === 'excl' ? 'pr-7' : ''}`} placeholder="0.00" />
+                                    {variant.priceLockSide === 'excl' && (
+                                      <UnlockBtn onClick={() => {
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                        setVariants(updated)
+                                      }} />
+                                    )}
+                                  </div>
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (incl. GST)</label>
@@ -1787,43 +1791,47 @@ export default function ProductForm({ categories, brands, action, product, produ
                     </div>
                   ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <div className="relative">
+                    <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Price (incl. GST)</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.price} readOnly={popupVariant.priceLockSide === 'incl'} onChange={(e) => {
-                        const v = e.target.value
-                        const n = parseFloat(v)
-                        const updated = [...variants]
-                        updated[popupIndex] = { ...updated[popupIndex], price: v, priceLockSide: v === '' ? null : 'excl' }
-                        if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
-                        else if (v === '') updated[popupIndex].price_ex_gst = ''
-                        setVariants(updated)
-                      }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.priceLockSide === 'incl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
-                      {popupVariant.priceLockSide === 'incl' && (
-                        <UnlockBtn onClick={() => {
+                      <div className="relative">
+                        <input type="number" step="0.01" min="0" value={popupVariant.price} readOnly={popupVariant.priceLockSide === 'incl'} onChange={(e) => {
+                          const v = e.target.value
+                          const n = parseFloat(v)
                           const updated = [...variants]
-                          updated[popupIndex] = { ...updated[popupIndex], price: '', price_ex_gst: '', priceLockSide: null }
+                          updated[popupIndex] = { ...updated[popupIndex], price: v, priceLockSide: v === '' ? null : 'excl' }
+                          if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
+                          else if (v === '') updated[popupIndex].price_ex_gst = ''
                           setVariants(updated)
-                        }} />
-                      )}
+                        }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.priceLockSide === 'incl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                        {popupVariant.priceLockSide === 'incl' && (
+                          <UnlockBtn onClick={() => {
+                            const updated = [...variants]
+                            updated[popupIndex] = { ...updated[popupIndex], price: '', price_ex_gst: '', priceLockSide: null }
+                            setVariants(updated)
+                          }} />
+                        )}
+                      </div>
                     </div>
-                    <div className="relative">
+                    <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} readOnly={popupVariant.priceLockSide === 'excl'} onChange={(e) => {
-                        const v = e.target.value
-                        const n = parseFloat(v)
-                        const updated = [...variants]
-                        updated[popupIndex] = { ...updated[popupIndex], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
-                        if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
-                        else if (v === '') updated[popupIndex].price = ''
-                        setVariants(updated)
-                      }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.priceLockSide === 'excl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
-                      {popupVariant.priceLockSide === 'excl' && (
-                        <UnlockBtn onClick={() => {
+                      <div className="relative">
+                        <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} readOnly={popupVariant.priceLockSide === 'excl'} onChange={(e) => {
+                          const v = e.target.value
+                          const n = parseFloat(v)
                           const updated = [...variants]
-                          updated[popupIndex] = { ...updated[popupIndex], price: '', price_ex_gst: '', priceLockSide: null }
+                          updated[popupIndex] = { ...updated[popupIndex], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
+                          if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                          else if (v === '') updated[popupIndex].price = ''
                           setVariants(updated)
-                        }} />
-                      )}
+                        }} className={`w-full px-2 py-1.5 pr-7 ${popupVariant.priceLockSide === 'excl' ? 'bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                        {popupVariant.priceLockSide === 'excl' && (
+                          <UnlockBtn onClick={() => {
+                            const updated = [...variants]
+                            updated[popupIndex] = { ...updated[popupIndex], price: '', price_ex_gst: '', priceLockSide: null }
+                            setVariants(updated)
+                          }} />
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (incl. GST)</label>
