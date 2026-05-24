@@ -2285,13 +2285,15 @@ export default function ProductForm({ categories, brands, action, product, produ
                   {popupVariant.use_own_images ? (
                     <>
                       {(variantImagesMap[variantPopupId] || []).length > 1 && (
-                        <p className="text-xs text-foreground-muted mb-2">Drag to reorder · First image is shown first on the product page</p>
+                        <p className="text-xs text-foreground-muted mb-2">
+                          <span className="hidden sm:inline">Drag</span><span className="sm:hidden">Use ◀ ▶</span> to reorder · First image is shown first on the product page
+                        </p>
                       )}
                       <div className="flex flex-wrap gap-2">
-                        {(variantImagesMap[variantPopupId] || []).map((img: any, imgIdx: number) => (
+                        {(variantImagesMap[variantPopupId] || []).map((img: any, imgIdx: number, arr: any[]) => (
                           <div
                             key={img.id}
-                            className="relative group w-16 h-16 rounded border border-border-default overflow-hidden bg-surface cursor-grab active:cursor-grabbing"
+                            className="relative group w-20 h-20 sm:w-16 sm:h-16 rounded border border-border-default overflow-hidden bg-surface cursor-grab active:cursor-grabbing select-none"
                             draggable
                             onDragStart={() => { variantImageDragIndex.current = imgIdx }}
                             onDragEnter={() => { variantImageDragOverIndex.current = imgIdx }}
@@ -2306,16 +2308,40 @@ export default function ProductForm({ categories, brands, action, product, produ
                             }}
                           >
                             <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
-                            <span className="absolute top-0 right-0 text-[9px] bg-black/60 text-white px-1 leading-4 font-bold">{imgIdx + 1}</span>
-                            {img.is_primary && <span className="absolute top-0 left-0 text-[9px] bg-accent-500 text-white px-1 leading-4">★</span>}
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                              {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 text-xs leading-none" title="Set primary">★</button>}
-                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 text-xs leading-none" title="Delete">✕</button>
+                            <span className="absolute top-0 right-0 text-[10px] sm:text-[9px] bg-black/60 text-white px-1 leading-4 font-bold">{imgIdx + 1}</span>
+                            {img.is_primary && <span className="absolute top-0 left-0 text-[10px] sm:text-[9px] bg-accent-500 text-white px-1 leading-4">★</span>}
+                            {arr.length > 1 && (
+                              <div className="absolute inset-x-0 bottom-0 flex justify-between px-0.5 pb-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => imgIdx > 0 && reorderVariantImages(variantPopupId, imgIdx, imgIdx - 1)}
+                                  disabled={imgIdx === 0}
+                                  className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30"
+                                  title="Move left"
+                                  aria-label="Move image left"
+                                >
+                                  ◀
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => imgIdx < arr.length - 1 && reorderVariantImages(variantPopupId, imgIdx, imgIdx + 1)}
+                                  disabled={imgIdx === arr.length - 1}
+                                  className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30"
+                                  title="Move right"
+                                  aria-label="Move image right"
+                                >
+                                  ▶
+                                </button>
+                              </div>
+                            )}
+                            <div className="absolute inset-x-0 top-4 bottom-6 sm:inset-0 sm:top-0 sm:bottom-0 bg-black/50 sm:bg-black/0 sm:group-hover:bg-black/50 transition-opacity flex items-center justify-center gap-1">
+                              {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 text-base sm:text-xs leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Set primary">★</button>}
+                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 text-base sm:text-xs leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Delete">✕</button>
                             </div>
                           </div>
                         ))}
                         {(variantImagesMap[variantPopupId] || []).length < 5 && (
-                          <label className={`w-16 h-16 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${variantImageUploading[variantPopupId] ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <label className={`w-20 h-20 sm:w-16 sm:h-16 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${variantImageUploading[variantPopupId] ? 'opacity-50 pointer-events-none' : ''}`}>
                             <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVariantImageFile(variantPopupId, f); e.target.value = '' }} />
                             {variantImageUploading[variantPopupId] ? <svg className="w-4 h-4 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
                           </label>
