@@ -25,6 +25,9 @@ interface VariantRow {
   mrp: string
   price_ex_gst: string
   wholeprice_ex_gst: string
+  priceLockSide?: 'incl' | 'excl' | null
+  mrpLockSide?: 'incl' | 'excl' | null
+  wholesaleLockSide?: 'incl' | 'excl' | null
   stock_quantity: string
   mpn: string
   gtin: string
@@ -142,23 +145,18 @@ function toExGst(val: string, rate: number, mode: 'inclusive' | 'exclusive'): st
   return String(Math.round(incl / (1 + rate / 100) * 100) / 100)
 }
 
-function inclusivePreview(val: string, rate: number, mode: 'inclusive' | 'exclusive'): string | null {
-  if (mode !== 'exclusive') return null
-  const n = parseFloat(val)
-  if (!val || isNaN(n) || n <= 0) return null
-  return `= ₹${(Math.round(n * (1 + rate / 100) * 100) / 100).toFixed(2)} incl. GST`
+function lockedInputCls(baseCls: string, isLocked: boolean): string {
+  return isLocked ? `${baseCls} bg-surface-secondary text-foreground-muted cursor-not-allowed` : baseCls
 }
 
-function previewIncl(val: string, rate: number): string | null {
-  const n = parseFloat(val)
-  if (!val || isNaN(n) || n <= 0 || rate <= 0) return null
-  return `= ₹${(Math.round(n * (1 + rate / 100) * 100) / 100).toFixed(2)} incl.`
-}
-
-function previewExcl(val: string, rate: number): string | null {
-  const n = parseFloat(val)
-  if (!val || isNaN(n) || n <= 0 || rate <= 0) return null
-  return `= ₹${(Math.round(n / (1 + rate / 100) * 100) / 100).toFixed(2)} ex. GST`
+function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: () => void; title?: string }) {
+  return (
+    <button type="button" onClick={onClick} title={title} className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-foreground-muted hover:text-accent-600 transition-colors" tabIndex={-1}>
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    </button>
+  )
 }
 
 export default function ProductForm({ categories, brands, action, product, productId }: ProductFormProps) {
@@ -214,11 +212,28 @@ export default function ProductForm({ categories, brands, action, product, produ
   }
   const [gstRate, setGstRate] = useState<number>(product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18)
 
-  const [basePrice, setBasePrice] = useState(product?.base_price != null ? String(product.base_price) : '')
+  const [basePrice, setBasePrice] = useState(() => {
+    if (product?.base_price != null) return String(product.base_price)
+    if (product?.price_ex_gst != null) {
+      const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
+      return String(Math.round(Number(product.price_ex_gst) * (1 + r / 100) * 100) / 100)
+    }
+    return ''
+  })
   const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '')
   const [mrp, setMrp] = useState(product?.mrp != null ? String(product.mrp) : '')
-  const [salePrice, setSalePrice] = useState(product?.price_ex_gst != null ? String(product.price_ex_gst) : '')
+  const [salePrice, setSalePrice] = useState(() => {
+    if (product?.price_ex_gst != null) return String(product.price_ex_gst)
+    if (product?.base_price != null) {
+      const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
+      return String(Math.round(Number(product.base_price) / (1 + r / 100) * 100) / 100)
+    }
+    return ''
+  })
   const [wholesalePrice, setWholesalePrice] = useState(product?.wholeprice_ex_gst != null ? String(product.wholeprice_ex_gst) : '')
+  const [topPriceLockSide, setTopPriceLockSide] = useState<'incl' | 'excl' | null>(
+    product?.base_price != null ? 'excl' : (product?.price_ex_gst != null ? 'incl' : null)
+  )
 
   const draftKey = productId ? `draft_product_${productId}` : 'draft_product_new'
   const [isActive, setIsActive] = useState<boolean>(product?.is_active ?? true)
@@ -237,6 +252,9 @@ export default function ProductForm({ categories, brands, action, product, produ
         const hasPriceEx = v.price_ex_gst != null
         const price = hasPrice ? String(v.price) : (hasPriceEx ? deriveIncl(v.price_ex_gst) : '')
         const priceEx = hasPriceEx ? String(v.price_ex_gst) : (hasPrice ? deriveExGst(v.price) : '')
+        const priceLockSide: 'incl' | 'excl' | null = hasPrice ? 'excl' : (hasPriceEx ? 'incl' : null)
+        const mrpLockSide: 'incl' | 'excl' | null = v.mrp != null ? 'excl' : null
+        const wholesaleLockSide: 'incl' | 'excl' | null = v.wholeprice_ex_gst != null ? 'incl' : null
         return ({
         id: v.id,
         variant_name: v.variant_name,
@@ -244,6 +262,9 @@ export default function ProductForm({ categories, brands, action, product, produ
         mrp: v.mrp != null ? String(v.mrp) : '',
         price_ex_gst: priceEx,
         wholeprice_ex_gst: v.wholeprice_ex_gst != null ? String(v.wholeprice_ex_gst) : '',
+        priceLockSide,
+        mrpLockSide,
+        wholesaleLockSide,
         stock_quantity: String(v.stock_quantity || 0),
         mpn: v.mpn || '',
         gtin: v.gtin || '',
@@ -808,9 +829,6 @@ export default function ProductForm({ categories, brands, action, product, produ
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Maximum Retail Price"
             />
-            {previewExcl(mrp, gstRate) && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{previewExcl(mrp, gstRate)}</p>
-            )}
           </div>
           )}
 
@@ -818,24 +836,34 @@ export default function ProductForm({ categories, brands, action, product, produ
           {!hasVariants && (
             <div>
               <label htmlFor="base_price" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Selling Price (Rs.) * {gstMode === 'exclusive' ? '(excl. GST)' : '(incl. GST)'}
+                Selling Price (Rs.) * (incl. GST)
               </label>
-              <input
-                type="number"
-                id="base_price"
-                name="base_price"
-                required={!hasVariants}
-                step="0.01"
-                min="0"
-                value={basePrice}
-                onChange={e => setBasePrice(e.target.value)}
-                className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                placeholder={gstMode === 'exclusive' ? 'Price excl. GST' : 'Price incl. GST'}
-              />
-              {previewExcl(basePrice, gstRate)
-                ? <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{previewExcl(basePrice, gstRate)}</p>
-                : <p className="text-xs text-foreground-muted mt-1">GST-inclusive price the customer pays</p>
-              }
+              <div className="relative">
+                <input
+                  type="number"
+                  id="base_price"
+                  name="base_price"
+                  required={!hasVariants}
+                  step="0.01"
+                  min="0"
+                  value={basePrice}
+                  readOnly={topPriceLockSide === 'incl'}
+                  onChange={e => {
+                    const v = e.target.value
+                    const n = parseFloat(v)
+                    setBasePrice(v)
+                    setTopPriceLockSide(v === '' ? null : 'excl')
+                    if (!isNaN(n) && n > 0 && gstRate > 0) setSalePrice(String(Math.round(n / (1 + gstRate / 100) * 100) / 100))
+                    else if (v === '') setSalePrice('')
+                  }}
+                  className={`w-full px-4 py-2 ${topPriceLockSide === 'incl' ? 'pr-9 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent`}
+                  placeholder="Price incl. GST"
+                />
+                {topPriceLockSide === 'incl' && (
+                  <UnlockBtn onClick={() => { setBasePrice(''); setSalePrice(''); setTopPriceLockSide(null) }} />
+                )}
+              </div>
+              <p className="text-xs text-foreground-muted mt-1">GST-inclusive price the customer pays</p>
             </div>
           )}
 
@@ -907,22 +935,32 @@ export default function ProductForm({ categories, brands, action, product, produ
           {!hasVariants && (
           <div>
             <label htmlFor="price_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Ex-GST Price (Rs.) {gstMode === 'exclusive' ? '(excl. GST)' : ''}
+              Ex-GST Price (Rs.)
             </label>
-            <input
-              type="number"
-              id="price_ex_gst"
-              name="price_ex_gst"
-              step="0.01"
-              min="0"
-              value={salePrice}
-              onChange={e => setSalePrice(e.target.value)}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="Price excluding GST (optional)"
-            />
-            {previewIncl(salePrice, gstRate) && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{previewIncl(salePrice, gstRate)}</p>
-            )}
+            <div className="relative">
+              <input
+                type="number"
+                id="price_ex_gst"
+                name="price_ex_gst"
+                step="0.01"
+                min="0"
+                value={salePrice}
+                readOnly={topPriceLockSide === 'excl'}
+                onChange={e => {
+                  const v = e.target.value
+                  const n = parseFloat(v)
+                  setSalePrice(v)
+                  setTopPriceLockSide(v === '' ? null : 'incl')
+                  if (!isNaN(n) && n > 0 && gstRate > 0) setBasePrice(String(Math.round(n * (1 + gstRate / 100) * 100) / 100))
+                  else if (v === '') setBasePrice('')
+                }}
+                className={`w-full px-4 py-2 ${topPriceLockSide === 'excl' ? 'pr-9 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent`}
+                placeholder="Price excluding GST (optional)"
+              />
+              {topPriceLockSide === 'excl' && (
+                <UnlockBtn onClick={() => { setBasePrice(''); setSalePrice(''); setTopPriceLockSide(null) }} />
+              )}
+            </div>
           </div>
           )}
 
@@ -943,9 +981,6 @@ export default function ProductForm({ categories, brands, action, product, produ
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Bulk price (optional)"
             />
-            {previewIncl(wholesalePrice, gstRate) && (
-              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{previewIncl(wholesalePrice, gstRate)}</p>
-            )}
           </div>
           )}
 
@@ -1320,42 +1355,52 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   </>
                                 ) : (
                                   <>
-                                <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price {gstMode === 'exclusive' ? '(excl. GST) *' : '*'}</label>
-                                  <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => {
+                                <div className="relative">
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price (incl. GST) *</label>
+                                  <input type="number" step="0.01" min="0" value={variant.price} readOnly={variant.priceLockSide === 'incl'} onChange={(e) => {
                                     const v = e.target.value
                                     const n = parseFloat(v)
                                     const updated = [...variants]
-                                    updated[index] = { ...updated[index], price: v }
+                                    updated[index] = { ...updated[index], price: v, priceLockSide: v === '' ? null : 'excl' }
                                     if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
                                     else if (v === '') updated[index].price_ex_gst = ''
                                     setVariants(updated)
-                                  }} className={inputCls} placeholder="0.00" required />
+                                  }} className={lockedInputCls(inputCls, variant.priceLockSide === 'incl')} placeholder="0.00" required />
+                                  {variant.priceLockSide === 'incl' && (
+                                    <UnlockBtn onClick={() => {
+                                      const updated = [...variants]
+                                      updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                      setVariants(updated)
+                                    }} />
+                                  )}
                                   {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
-                                  {previewExcl(variant.price, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(variant.price, gstRate)}</p>}
                                 </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP {gstMode === 'exclusive' ? '(excl.)' : ''}</label>
+                                <div className="relative">
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (incl. GST)</label>
                                   <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className={inputCls} placeholder="0.00" />
-                                  {previewExcl(variant.mrp, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(variant.mrp, gstRate)}</p>}
                                 </div>
-                                <div>
+                                <div className="relative">
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
-                                  <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => {
+                                  <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly={variant.priceLockSide === 'excl'} onChange={(e) => {
                                     const v = e.target.value
                                     const n = parseFloat(v)
                                     const updated = [...variants]
-                                    updated[index] = { ...updated[index], price_ex_gst: v }
+                                    updated[index] = { ...updated[index], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
                                     if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
                                     else if (v === '') updated[index].price = ''
                                     setVariants(updated)
-                                  }} className={inputCls} placeholder="0.00" />
-                                  {previewIncl(variant.price_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(variant.price_ex_gst, gstRate)}</p>}
+                                  }} className={lockedInputCls(inputCls, variant.priceLockSide === 'excl')} placeholder="0.00" />
+                                  {variant.priceLockSide === 'excl' && (
+                                    <UnlockBtn onClick={() => {
+                                      const updated = [...variants]
+                                      updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                      setVariants(updated)
+                                    }} />
+                                  )}
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale</label>
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (ex. GST)</label>
                                   <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className={inputCls} placeholder="0.00" />
-                                  {previewIncl(variant.wholeprice_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(variant.wholeprice_ex_gst, gstRate)}</p>}
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock *</label>
@@ -1551,39 +1596,51 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   ) : (
                                     <>
                                   <td className="py-2 px-3">
-                                    <div>
-                                      <input type="number" step="0.01" min="0" value={variant.price} onChange={(e) => {
+                                    <div className="relative w-28">
+                                      <input type="number" step="0.01" min="0" value={variant.price} readOnly={variant.priceLockSide === 'incl'} onChange={(e) => {
                                         const v = e.target.value
                                         const n = parseFloat(v)
                                         const updated = [...variants]
-                                        updated[index] = { ...updated[index], price: v }
+                                        updated[index] = { ...updated[index], price: v, priceLockSide: v === '' ? null : 'excl' }
                                         if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
                                         else if (v === '') updated[index].price_ex_gst = ''
                                         setVariants(updated)
-                                      }} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" required />
+                                      }} className={`w-28 px-2 py-1.5 ${variant.priceLockSide === 'incl' ? 'pr-6 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm`} placeholder="0.00" required />
+                                      {variant.priceLockSide === 'incl' && (
+                                        <UnlockBtn onClick={() => {
+                                          const updated = [...variants]
+                                          updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                          setVariants(updated)
+                                        }} />
+                                      )}
                                       {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
-                                      {previewExcl(variant.price, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(variant.price, gstRate)}</p>}
                                     </div>
                                   </td>
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} onChange={(e) => {
-                                      const v = e.target.value
-                                      const n = parseFloat(v)
-                                      const updated = [...variants]
-                                      updated[index] = { ...updated[index], price_ex_gst: v }
-                                      if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
-                                      else if (v === '') updated[index].price = ''
-                                      setVariants(updated)
-                                    }} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
-                                    {previewIncl(variant.price_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(variant.price_ex_gst, gstRate)}</p>}
+                                    <div className="relative w-28">
+                                      <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly={variant.priceLockSide === 'excl'} onChange={(e) => {
+                                        const v = e.target.value
+                                        const n = parseFloat(v)
+                                        const updated = [...variants]
+                                        updated[index] = { ...updated[index], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
+                                        if (!isNaN(n) && n > 0 && gstRate > 0) updated[index].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
+                                        else if (v === '') updated[index].price = ''
+                                        setVariants(updated)
+                                      }} className={`w-28 px-2 py-1.5 ${variant.priceLockSide === 'excl' ? 'pr-6 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm`} placeholder="0.00" />
+                                      {variant.priceLockSide === 'excl' && (
+                                        <UnlockBtn onClick={() => {
+                                          const updated = [...variants]
+                                          updated[index] = { ...updated[index], price: '', price_ex_gst: '', priceLockSide: null }
+                                          setVariants(updated)
+                                        }} />
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="py-2 px-3">
                                     <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => updateVariant(index, 'wholeprice_ex_gst', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
-                                    {previewIncl(variant.wholeprice_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(variant.wholeprice_ex_gst, gstRate)}</p>}
                                   </td>
                                   <td className="py-2 px-3">
                                     <input type="number" step="0.01" min="0" value={variant.mrp} onChange={(e) => updateVariant(index, 'mrp', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0.00" />
-                                    {previewExcl(variant.mrp, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(variant.mrp, gstRate)}</p>}
                                   </td>
                                     </>
                                   )}
@@ -1714,41 +1771,51 @@ export default function ProductForm({ categories, brands, action, product, produ
                     </div>
                   ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <div>
+                    <div className="relative">
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Price (incl. GST)</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.price} onChange={(e) => {
+                      <input type="number" step="0.01" min="0" value={popupVariant.price} readOnly={popupVariant.priceLockSide === 'incl'} onChange={(e) => {
                         const v = e.target.value
                         const n = parseFloat(v)
                         const updated = [...variants]
-                        updated[popupIndex] = { ...updated[popupIndex], price: v }
+                        updated[popupIndex] = { ...updated[popupIndex], price: v, priceLockSide: v === '' ? null : 'excl' }
                         if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price_ex_gst = String(Math.round(n / (1 + gstRate / 100) * 100) / 100)
                         else if (v === '') updated[popupIndex].price_ex_gst = ''
                         setVariants(updated)
-                      }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
-                      {previewExcl(popupVariant.price, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(popupVariant.price, gstRate)}</p>}
+                      }} className={`w-full px-2 py-1.5 ${popupVariant.priceLockSide === 'incl' ? 'pr-7 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                      {popupVariant.priceLockSide === 'incl' && (
+                        <UnlockBtn onClick={() => {
+                          const updated = [...variants]
+                          updated[popupIndex] = { ...updated[popupIndex], price: '', price_ex_gst: '', priceLockSide: null }
+                          setVariants(updated)
+                        }} />
+                      )}
                     </div>
-                    <div>
+                    <div className="relative">
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Ex-GST Price</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} onChange={(e) => {
+                      <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} readOnly={popupVariant.priceLockSide === 'excl'} onChange={(e) => {
                         const v = e.target.value
                         const n = parseFloat(v)
                         const updated = [...variants]
-                        updated[popupIndex] = { ...updated[popupIndex], price_ex_gst: v }
+                        updated[popupIndex] = { ...updated[popupIndex], price_ex_gst: v, priceLockSide: v === '' ? null : 'incl' }
                         if (!isNaN(n) && n > 0 && gstRate > 0) updated[popupIndex].price = String(Math.round(n * (1 + gstRate / 100) * 100) / 100)
                         else if (v === '') updated[popupIndex].price = ''
                         setVariants(updated)
-                      }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
-                      {previewIncl(popupVariant.price_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(popupVariant.price_ex_gst, gstRate)}</p>}
+                      }} className={`w-full px-2 py-1.5 ${popupVariant.priceLockSide === 'excl' ? 'pr-7 bg-surface-secondary text-foreground-muted cursor-not-allowed' : 'bg-surface text-foreground'} border border-border-secondary rounded-lg text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent`} placeholder="0.00" />
+                      {popupVariant.priceLockSide === 'excl' && (
+                        <UnlockBtn onClick={() => {
+                          const updated = [...variants]
+                          updated[popupIndex] = { ...updated[popupIndex], price: '', price_ex_gst: '', priceLockSide: null }
+                          setVariants(updated)
+                        }} />
+                      )}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MRP (incl. GST)</label>
                       <input type="number" step="0.01" min="0" value={popupVariant.mrp} onChange={(e) => updateVariant(popupIndex, 'mrp', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
-                      {previewExcl(popupVariant.mrp, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewExcl(popupVariant.mrp, gstRate)}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (ex. GST)</label>
                       <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_ex_gst} onChange={(e) => updateVariant(popupIndex, 'wholeprice_ex_gst', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="0.00" />
-                      {previewIncl(popupVariant.wholeprice_ex_gst, gstRate) && <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{previewIncl(popupVariant.wholeprice_ex_gst, gstRate)}</p>}
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
