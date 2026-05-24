@@ -28,6 +28,11 @@ export const STORED_DIMS_REQUIRED: PackageType[] = [
   'long_tube',
 ]
 
+export const VOLUMETRIC_DIVISOR_CM3_PER_GRAM = 5
+export const CARTON_MAX_WEIGHT_GRAMS = 30000
+
+const LONG_ITEM_THRESHOLD_MM = 120
+
 export interface StoredDims {
   length_cm: number | null
   breadth_cm: number | null
@@ -49,6 +54,15 @@ export interface ShipmentItem {
 }
 
 export interface ShipmentResult {
+  length_cm: number
+  breadth_cm: number
+  height_cm: number
+  actualWeightGrams: number
+  volumetricWeightGrams: number
+  chargedWeightGrams: number
+}
+
+export interface Carton {
   length_cm: number
   breadth_cm: number
   height_cm: number
@@ -86,8 +100,17 @@ export function parseBoltLengthMm(variantName: string): number | null {
   return null
 }
 
+function inferEffectivePackageType(item: ShipmentItem): PackageType {
+  const declared = item.packageType ?? 'flat_poly_auto'
+  if (declared === 'flat_poly_auto' && item.variantName) {
+    const lengthMm = parseBoltLengthMm(item.variantName)
+    if (lengthMm && lengthMm >= LONG_ITEM_THRESHOLD_MM) return 'long_tube'
+  }
+  return declared
+}
+
 export function resolvePackedDims(item: ShipmentItem): PackedDims {
-  const pt = item.packageType ?? 'flat_poly_auto'
+  const pt = inferEffectivePackageType(item)
   const w = item.weightGrams
   const s = item.storedDims
 
@@ -123,29 +146,108 @@ export function resolvePackedDims(item: ShipmentItem): PackedDims {
   }
 }
 
-export function computeShipmentDims(items: ShipmentItem[]): ShipmentResult {
-  let maxL = 0
-  let maxB = 0
-  let totalH = 0
-  let totalWeight = 0
+interface CartonAccumulator {
+  maxL: number
+  maxB: number
+  totalH: number
+  weightGrams: number
+}
+
+function finalizeCarton(c: CartonAccumulator): Carton {
+  const volumetricGrams = (c.maxL * c.maxB * c.totalH) / VOLUMETRIC_DIVISOR_CM3_PER_GRAM
+  const charged = Math.max(c.weightGrams, volumetricGrams)
+  return {
+    length_cm:             Math.ceil(c.maxL),
+    breadth_cm:            Math.ceil(c.maxB),
+    height_cm:             Math.ceil(c.totalH),
+    actualWeightGrams:     Math.round(c.weightGrams),
+    volumetricWeightGrams: Math.round(volumetricGrams),
+    chargedWeightGrams:    Math.round(charged),
+  }
+}
+
+export function packIntoCartons(
+  items: ShipmentItem[],
+  maxCartonWeightGrams = CARTON_MAX_WEIGHT_GRAMS,
+): Carton[] {
+  const cartons: Carton[] = []
 
   for (const item of items) {
-    const d = resolvePackedDims(item)
-    if (d.length_cm > maxL) maxL = d.length_cm
-    if (d.breadth_cm > maxB) maxB = d.breadth_cm
-    totalH += d.height_cm * item.quantity
-    totalWeight += item.weightGrams * item.quantity
+    const dims = resolvePackedDims(item)
+    const perUnitWeight = item.weightGrams
+    let remaining = item.quantity
+
+    while (remaining > 0) {
+      const unitsThatFit = Math.max(1, Math.floor(maxCartonWeightGrams / Math.max(1, perUnitWeight)))
+      const take = Math.min(remaining, unitsThatFit)
+      const acc: CartonAccumulator = {
+        maxL: dims.length_cm,
+        maxB: dims.breadth_cm,
+        totalH: dims.height_cm * take,
+        weightGrams: perUnitWeight * take,
+      }
+      cartons.push(finalizeCarton(acc))
+      remaining -= take
+    }
   }
 
-  const volumetricGrams = (maxL * maxB * totalH) / 5
-  const chargedWeightGrams = Math.max(totalWeight, volumetricGrams)
+  return cartons
+}
 
+export function computeShipmentDims(items: ShipmentItem[]): ShipmentResult {
+  const cartons = packIntoCartons(items)
+  if (cartons.length === 0) {
+    return { length_cm: 0, breadth_cm: 0, height_cm: 0, actualWeightGrams: 0, volumetricWeightGrams: 0, chargedWeightGrams: 0 }
+  }
+  let maxL = 0, maxB = 0, totalH = 0, actual = 0, vol = 0, charged = 0
+  for (const c of cartons) {
+    if (c.length_cm > maxL) maxL = c.length_cm
+    if (c.breadth_cm > maxB) maxB = c.breadth_cm
+    totalH += c.height_cm
+    actual += c.actualWeightGrams
+    vol += c.volumetricWeightGrams
+    charged += c.chargedWeightGrams
+  }
   return {
-    length_cm:             Math.ceil(maxL),
-    breadth_cm:            Math.ceil(maxB),
-    height_cm:             Math.ceil(totalH),
-    actualWeightGrams:     totalWeight,
-    volumetricWeightGrams: Math.round(volumetricGrams),
-    chargedWeightGrams:    Math.round(chargedWeightGrams),
+    length_cm: maxL,
+    breadth_cm: maxB,
+    height_cm: totalH,
+    actualWeightGrams: actual,
+    volumetricWeightGrams: vol,
+    chargedWeightGrams: charged,
   }
+}
+
+export interface FallbackRateInput {
+  chargedWeightGrams: number
+  destinationPin: string
+  originPin: string
+  cartonCount: number
+}
+
+export interface FallbackRateResult {
+  charge: number
+  zone: string
+  source: 'fallback'
+}
+
+function inferZone(originPin: string, destPin: string): { zone: string; ratePerKg: number; baseRate: number } {
+  const o2 = originPin.slice(0, 2)
+  const d2 = destPin.slice(0, 2)
+  if (o2 === d2) return { zone: 'Local', ratePerKg: 30, baseRate: 49 }
+  const o1 = originPin[0]
+  const d1 = destPin[0]
+  if (o1 === d1) return { zone: 'Regional', ratePerKg: 45, baseRate: 69 }
+  const metroPrefixes = new Set(['11', '40', '56', '60', '70'])
+  if (metroPrefixes.has(o2) && metroPrefixes.has(d2)) return { zone: 'Metro', ratePerKg: 55, baseRate: 79 }
+  if (d1 === '7' || d1 === '8') return { zone: 'Special', ratePerKg: 95, baseRate: 119 }
+  return { zone: 'Rest of India', ratePerKg: 70, baseRate: 99 }
+}
+
+export function fallbackShippingRate(input: FallbackRateInput): FallbackRateResult {
+  const { ratePerKg, baseRate, zone } = inferZone(input.originPin, input.destinationPin)
+  const kg = Math.max(0.5, input.chargedWeightGrams / 1000)
+  const cartonSurcharge = Math.max(0, input.cartonCount - 1) * 25
+  const charge = Math.round(baseRate + ratePerKg * kg + cartonSurcharge)
+  return { charge, zone, source: 'fallback' }
 }

@@ -1,25 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
-import { computeShipmentDims, ShipmentItem, PackageType } from '@/lib/shipping'
+import {
+  packIntoCartons,
+  fallbackShippingRate,
+  ShipmentItem,
+  PackageType,
+  CARTON_MAX_WEIGHT_GRAMS,
+} from '@/lib/shipping'
 
 const DELHIVERY_API = 'https://track.delhivery.com/api/kinko/v1/invoice/charges/.json'
 const ORIGIN_PIN = process.env.DELHIVERY_ORIGIN_PINCODE || '492001'
 const TOKEN = process.env.DELHIVERY_API_KEY
+const FREE_SHIPPING_ABOVE = parseFloat(process.env.FREE_SHIPPING_ABOVE || '0') || 0
+const SHIPPING_MIN_CHARGE = parseFloat(process.env.SHIPPING_MIN_CHARGE || '0') || 0
+const COD_SURCHARGE_FLAT = parseFloat(process.env.COD_SURCHARGE_FLAT || '40') || 40
+const COD_SURCHARGE_PCT = parseFloat(process.env.COD_SURCHARGE_PCT || '2') || 2
+
+interface RateBreakdown {
+  charge: number
+  zone: string
+  source: 'delhivery' | 'fallback' | 'free'
+  chargedWeightGrams: number
+  cartonCount: number
+  cartons?: { weightGrams: number; charge: number; zone: string }[]
+  freeShippingThreshold?: number
+}
+
+async function callDelhiveryForCarton(weightGrams: number, destinationPin: string, isCod: boolean) {
+  const params = new URLSearchParams({
+    md: 'S',
+    ss: 'Delivered',
+    d_pin: destinationPin,
+    o_pin: ORIGIN_PIN,
+    cgm: String(weightGrams),
+    pt: isCod ? 'COD' : 'Pre-paid',
+    cod: isCod ? '0' : '0',
+  })
+  const res = await fetch(`${DELHIVERY_API}?${params}`, {
+    headers: {
+      Authorization: `Token ${TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    next: { revalidate: 0 },
+  })
+  if (!res.ok) throw new Error(`Delhivery ${res.status}`)
+  const data = await res.json()
+  const rate = Array.isArray(data) ? data[0] : data
+  if (!rate || rate.error || rate.total_amount == null) throw new Error(rate?.error || 'no rate')
+  return {
+    charge: Number(rate.total_amount),
+    zone: String(rate.zone || ''),
+    chargedWeight: Number(rate.charged_weight) || weightGrams,
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { destinationPin, cartItems } = await request.json()
+    const { destinationPin, cartItems, subtotal, isCod } = await request.json()
 
     if (!destinationPin || !/^\d{6}$/.test(destinationPin)) {
       return NextResponse.json({ error: 'Invalid destination pincode' }, { status: 400 })
     }
 
-    if (!TOKEN) {
-      return NextResponse.json({ error: 'Shipping service not configured' }, { status: 503 })
-    }
-
-    const variantIds: string[] = cartItems.filter((i: any) => i.variantId).map((i: any) => i.variantId)
-    const productIds: string[] = cartItems.filter((i: any) => !i.variantId).map((i: any) => i.productId)
+    const variantIds: string[] = (cartItems || []).filter((i: any) => i.variantId).map((i: any) => i.variantId)
+    const productIds: string[] = (cartItems || []).filter((i: any) => !i.variantId).map((i: any) => i.productId)
 
     const shipmentItems: ShipmentItem[] = []
 
@@ -56,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     if (productIds.length > 0) {
       const products = await queryMany(
-        `SELECT id, weight_grams, package_type, length_cm, breadth_cm, height_cm
+        `SELECT id, name, weight_grams, package_type, length_cm, breadth_cm, height_cm
          FROM products WHERE id = ANY($1::uuid[])`,
         [productIds]
       )
@@ -72,6 +116,7 @@ export async function POST(request: NextRequest) {
               breadth_cm: p.breadth_cm ? parseFloat(p.breadth_cm) : null,
               height_cm:  p.height_cm  ? parseFloat(p.height_cm)  : null,
             },
+            variantName: p.name,
           })
         }
       }
@@ -81,42 +126,82 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid cart items' }, { status: 400 })
     }
 
-    const dims = computeShipmentDims(shipmentItems)
-
-    const params = new URLSearchParams({
-      md: 'S',
-      ss: 'Delivered',
-      d_pin: destinationPin,
-      o_pin: ORIGIN_PIN,
-      cgm: String(dims.chargedWeightGrams),
-      pt: 'Pre-paid',
-      cod: '0',
-    })
-
-    const res = await fetch(`${DELHIVERY_API}?${params}`, {
-      headers: {
-        Authorization: `Token ${TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      next: { revalidate: 0 },
-    })
-
-    if (!res.ok) {
-      return NextResponse.json({ error: 'Shipping rate unavailable' }, { status: 502 })
+    if (FREE_SHIPPING_ABOVE > 0 && typeof subtotal === 'number' && subtotal >= FREE_SHIPPING_ABOVE) {
+      const result: RateBreakdown = {
+        charge: 0,
+        zone: 'Free',
+        source: 'free',
+        chargedWeightGrams: shipmentItems.reduce((s, i) => s + i.weightGrams * i.quantity, 0),
+        cartonCount: 0,
+        freeShippingThreshold: FREE_SHIPPING_ABOVE,
+      }
+      return NextResponse.json(result)
     }
 
-    const data = await res.json()
-    const rate = Array.isArray(data) ? data[0] : data
+    const cartons = packIntoCartons(shipmentItems, CARTON_MAX_WEIGHT_GRAMS)
 
-    if (!rate || rate.error) {
-      return NextResponse.json({ error: 'Could not calculate shipping for this pincode' }, { status: 422 })
+    let totalCharge = 0
+    let totalChargedWeight = 0
+    let zone = ''
+    let source: 'delhivery' | 'fallback' = 'delhivery'
+    const cartonBreakdown: RateBreakdown['cartons'] = []
+
+    if (TOKEN) {
+      try {
+        for (const c of cartons) {
+          const r = await callDelhiveryForCarton(c.chargedWeightGrams, destinationPin, !!isCod)
+          totalCharge += r.charge
+          totalChargedWeight += r.chargedWeight
+          zone = r.zone || zone
+          cartonBreakdown.push({ weightGrams: c.chargedWeightGrams, charge: r.charge, zone: r.zone })
+        }
+      } catch {
+        source = 'fallback'
+        totalCharge = 0
+        totalChargedWeight = 0
+        cartonBreakdown.length = 0
+      }
+    } else {
+      source = 'fallback'
     }
 
-    return NextResponse.json({
-      charge: Math.round(rate.total_amount * 100) / 100,
-      zone: rate.zone,
-      chargedWeightGrams: rate.charged_weight,
-    })
+    if (source === 'fallback') {
+      for (const c of cartons) {
+        const r = fallbackShippingRate({
+          chargedWeightGrams: c.chargedWeightGrams,
+          destinationPin,
+          originPin: ORIGIN_PIN,
+          cartonCount: cartons.length,
+        })
+        totalCharge += r.charge
+        totalChargedWeight += c.chargedWeightGrams
+        zone = r.zone
+        cartonBreakdown.push({ weightGrams: c.chargedWeightGrams, charge: r.charge, zone: r.zone })
+      }
+    }
+
+    if (SHIPPING_MIN_CHARGE > 0 && totalCharge > 0 && totalCharge < SHIPPING_MIN_CHARGE) {
+      totalCharge = SHIPPING_MIN_CHARGE
+    }
+
+    if (isCod) {
+      const codFee = typeof subtotal === 'number'
+        ? Math.max(COD_SURCHARGE_FLAT, (COD_SURCHARGE_PCT / 100) * subtotal)
+        : COD_SURCHARGE_FLAT
+      totalCharge += codFee
+    }
+
+    const result: RateBreakdown = {
+      charge: Math.round(totalCharge * 100) / 100,
+      zone,
+      source,
+      chargedWeightGrams: totalChargedWeight,
+      cartonCount: cartons.length,
+      cartons: cartonBreakdown,
+    }
+    if (FREE_SHIPPING_ABOVE > 0) result.freeShippingThreshold = FREE_SHIPPING_ABOVE
+
+    return NextResponse.json(result)
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

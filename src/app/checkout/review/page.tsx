@@ -160,7 +160,7 @@ function CheckoutReviewPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ destinationPin: pin, cartItems: items }),
+      body: JSON.stringify({ destinationPin: pin, cartItems: items, subtotal: cartSubtotal }),
     })
       .then(r => r.json())
       .then(data => {
