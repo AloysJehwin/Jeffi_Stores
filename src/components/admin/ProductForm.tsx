@@ -120,6 +120,7 @@ function defaultUnit(pricing_type: string): string {
 
 function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string): VariantRow {
   return {
+    id: `temp-${Math.random().toString(36).slice(2, 11)}`,
     variant_name: '', price: '', mrp: '', price_ex_gst: '', wholeprice_ex_gst: '', wholeprice_incl: '',
     stock_quantity: '0', mpn: '', gtin: '',
     pricing_type, unit, numeric_value: '',
@@ -475,7 +476,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   async function openVariantPopup(variantId: string) {
     setVariantPopupId(variantId)
     setVariantImageError(null)
-    if (productId) {
+    const isTemp = variantId.startsWith('temp-')
+    if (productId && !isTemp) {
       if (!variantImagesMap[variantId]) {
         const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`)
         if (res.ok) {
@@ -504,6 +506,10 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function uploadVariantImageFile(variantId: string, file: File) {
     if (!productId) return
+    if (variantId.startsWith('temp-')) {
+      setVariantImageError('Save the product first to upload variant images.')
+      return
+    }
     setVariantImageError(null)
     setVariantImageUploading(m => ({ ...m, [variantId]: true }))
     try {
@@ -599,6 +605,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function addSubVariant(variantId: string) {
     if (!productId) return
+    if (variantId.startsWith('temp-')) return
     const draft = subVariantDrafts[variantId]
     if (!draft?.name) return
     const wholeEx = draft.wholeprice_incl ? inclToEx(draft.wholeprice_incl, gstRate) : ''
