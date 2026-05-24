@@ -209,24 +209,43 @@ export default function ProductReviews({ productId, productName }: ProductReview
           <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-0.5">What buyers say</p>
           <h2 className="text-xl sm:text-2xl font-extrabold text-foreground">Customer Reviews</h2>
         </div>
-        {!showForm && (
-          <button
-            onClick={() => {
-              if (!user) {
-                showToast('Please login to write a review', 'warning')
-                router.push(`/login?redirect=/products/${productName.toLowerCase().replace(/\s+/g, '-')}`)
-                return
-              }
-              setShowForm(true)
-            }}
-            className="self-start sm:self-auto inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Write a Review
-          </button>
-        )}
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          {reviews.length > 0 && (
+            <label className="hidden sm:flex items-center gap-2 text-sm">
+              <span className="text-foreground-muted">Sort by</span>
+              <div className="w-40">
+                <AdminSelect
+                  value={sortBy}
+                  onChange={(val) => { setSortBy(val as any); setVisibleCount(5) }}
+                  options={[
+                    { value: 'recent', label: 'Most recent' },
+                    { value: 'highest', label: 'Highest rated' },
+                    { value: 'lowest', label: 'Lowest rated' },
+                  ]}
+                  sm
+                />
+              </div>
+            </label>
+          )}
+          {!showForm && (
+            <button
+              onClick={() => {
+                if (!user) {
+                  showToast('Please login to write a review', 'warning')
+                  router.push(`/login?redirect=/products/${productName.toLowerCase().replace(/\s+/g, '-')}`)
+                  return
+                }
+                setShowForm(true)
+              }}
+              className="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Write a Review
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Two-column layout: left = rating summary, right = review list */}
@@ -306,28 +325,33 @@ export default function ProductReviews({ productId, productName }: ProductReview
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <p className="text-sm text-foreground-muted">
-                  {filterStar
-                    ? `Showing ${sortedReviews.length} ${sortedReviews.length === 1 ? 'review' : 'reviews'} with ${filterStar} star${filterStar > 1 ? 's' : ''}`
-                    : `${reviews.length} ${reviews.length === 1 ? 'review' : 'reviews'}`}
-                </p>
-                <label className="flex items-center gap-2 text-sm">
-                  <span className="text-foreground-muted">Sort by</span>
-                  <div className="w-40">
-                    <AdminSelect
-                      value={sortBy}
-                      onChange={(val) => { setSortBy(val as any); setVisibleCount(5) }}
-                      options={[
-                        { value: 'recent', label: 'Most recent' },
-                        { value: 'highest', label: 'Highest rated' },
-                        { value: 'lowest', label: 'Lowest rated' },
-                      ]}
-                      sm
-                    />
-                  </div>
-                </label>
-              </div>
+              {filterStar && (
+                <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-foreground-muted bg-accent-50 dark:bg-accent-900/20 px-3 py-2 rounded-lg">
+                  <span>Showing {sortedReviews.length} {sortedReviews.length === 1 ? 'review' : 'reviews'} with {filterStar} star{filterStar > 1 ? 's' : ''}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setFilterStar(null); setVisibleCount(5) }}
+                    className="text-accent-600 dark:text-accent-400 hover:underline font-medium"
+                  >
+                    Clear filter
+                  </button>
+                </div>
+              )}
+              <label className="sm:hidden flex items-center gap-2 text-sm">
+                <span className="text-foreground-muted">Sort by</span>
+                <div className="flex-1">
+                  <AdminSelect
+                    value={sortBy}
+                    onChange={(val) => { setSortBy(val as any); setVisibleCount(5) }}
+                    options={[
+                      { value: 'recent', label: 'Most recent' },
+                      { value: 'highest', label: 'Highest rated' },
+                      { value: 'lowest', label: 'Lowest rated' },
+                    ]}
+                    sm
+                  />
+                </div>
+              </label>
               {visibleReviews.map((review) => {
                 const initials = `${review.users.first_name?.[0] || ''}${review.users.last_name?.[0] || ''}`.toUpperCase() || '?'
                 return (
