@@ -23,8 +23,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const variant = await queryOne(
-    `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`,
+  const variant = await queryOne<{ id: string; sku: string }>(
+    `SELECT id, sku FROM product_variants WHERE id = $1 AND product_id = $2`,
     [params.variantId, params.id]
   )
   if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
@@ -34,7 +34,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!sub_variant_name) return NextResponse.json({ error: 'sub_variant_name required' }, { status: 400 })
 
   const productRow = await queryOne<{ sku: string }>(`SELECT sku FROM products WHERE id = $1`, [params.id])
-  const sku = body.sku || generateVariantSku(productRow?.sku || 'PRD', sub_variant_name)
+  const parentSku = variant.sku || productRow?.sku || 'PRD'
+  const sku = body.sku || generateVariantSku(parentSku, sub_variant_name)
 
   const row = await queryOne(
     `INSERT INTO product_sub_variants
@@ -57,17 +58,29 @@ export async function PUT(request: NextRequest, { params }: Params) {
   const { id, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, wholeprice_ex_gst, stock_quantity, attributes, is_active } = body
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
+  let newSku: string | null = null
+  if (sub_variant_name) {
+    const variant = await queryOne<{ sku: string }>(
+      `SELECT sku FROM product_variants WHERE id = $1`,
+      [params.variantId]
+    )
+    if (variant?.sku) {
+      newSku = generateVariantSku(variant.sku, sub_variant_name)
+    }
+  }
+
   const row = await queryOne(
     `UPDATE product_sub_variants SET
        sub_variant_name = COALESCE($1, sub_variant_name),
-       price = $2, mrp = $3, price_ex_gst = $4, mrp_ex_gst = $5, wholeprice_ex_gst = $6,
-       stock_quantity = COALESCE($7, stock_quantity),
-       attributes = COALESCE($8, attributes),
-       is_active = COALESCE($9, is_active),
+       sku = COALESCE($2, sku),
+       price = $3, mrp = $4, price_ex_gst = $5, mrp_ex_gst = $6, wholeprice_ex_gst = $7,
+       stock_quantity = COALESCE($8, stock_quantity),
+       attributes = COALESCE($9, attributes),
+       is_active = COALESCE($10, is_active),
        updated_at = NOW()
-     WHERE id = $10 AND variant_id = $11
+     WHERE id = $11 AND variant_id = $12
      RETURNING *`,
-    [sub_variant_name, price ?? null, mrp ?? null, price_ex_gst ?? null,
+    [sub_variant_name, newSku, price ?? null, mrp ?? null, price_ex_gst ?? null,
      mrp_ex_gst ?? null, wholeprice_ex_gst ?? null, stock_quantity ?? null,
      attributes ? JSON.stringify(attributes) : null, is_active ?? null,
      id, params.variantId]

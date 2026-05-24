@@ -294,6 +294,18 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.id, productId,
               ]
             )
+            const subVariants = await queryMany<{ id: string; sub_variant_name: string }>(
+              'SELECT id, sub_variant_name FROM product_sub_variants WHERE variant_id = $1',
+              [variant.id]
+            )
+            for (const sv of (subVariants || [])) {
+              if (!sv.sub_variant_name) continue
+              const newSubSku = generateVariantSku(variantSku, sv.sub_variant_name)
+              await query(
+                'UPDATE product_sub_variants SET sku = $1 WHERE id = $2',
+                [newSubSku, sv.id]
+              )
+            }
           } else if (!isPersisted && !variant._isDeleted) {
             if (isWeightOrLength && !variant.numeric_value) continue
             if (!isWeightOrLength && !variant.variant_name) continue
