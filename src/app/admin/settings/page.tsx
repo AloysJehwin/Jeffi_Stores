@@ -1,5 +1,6 @@
 import { queryOne, queryMany } from '@/lib/db'
 import ChangePasswordForm from '@/components/admin/ChangePasswordForm'
+import TwoFactorCard from '@/components/admin/TwoFactorCard'
 import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
 import StoreRulesForm from '@/components/admin/StoreRulesForm'
 import { headers } from 'next/headers'
@@ -103,6 +104,15 @@ export default async function SettingsPage() {
           </div>
           <div className="p-5">
             <ChangePasswordForm adminId={adminInfo?.id} />
+          </div>
+        </div>
+
+        <div className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
+          <div className="px-5 py-4 border-b border-border-default">
+            <h2 className="text-sm font-semibold text-foreground">Two-Factor Authentication</h2>
+          </div>
+          <div className="p-5">
+            <TwoFactorCard />
           </div>
         </div>
       </section>
