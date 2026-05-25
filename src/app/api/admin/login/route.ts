@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { verifyAdminCredentials } from '@/lib/auth'
-import { generateToken } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
+import { issueMfaTicket } from '@/lib/mfa'
 
 function serialToHex(serial: string): string {
   if (!serial) return ''
@@ -42,6 +42,15 @@ export async function POST(request: Request) {
     const certCN = request.headers.get('x-client-cert-cn') || ''
     const certSerial = request.headers.get('x-client-cert-serial') || ''
 
+    const isProduction = process.env.NODE_ENV === 'production'
+    const certPresent = !!certSerial || (!!certCN && certCN !== 'Admin User')
+    if (isProduction && !certPresent) {
+      return NextResponse.json(
+        { error: 'A client certificate is required to sign in. Please install your admin certificate and try again.' },
+        { status: 403 }
+      )
+    }
+
     if (certSerial) {
       const serialHex = serialToHex(certSerial)
 
@@ -52,7 +61,14 @@ export async function POST(request: Request) {
         [serialHex]
       )
 
-      if (cert) {
+      if (!cert) {
+        if (isProduction) {
+          return NextResponse.json(
+            { error: 'Certificate not recognized or expired. Please contact your administrator.' },
+            { status: 403 }
+          )
+        }
+      } else {
         const certOwner = await queryOne<{ role: string }>(
           `SELECT role FROM admins WHERE id = $1`,
           [cert.admin_id]
@@ -79,6 +95,12 @@ export async function POST(request: Request) {
         `SELECT id, role FROM admins WHERE username = $1`,
         [certCN]
       )
+      if (!certOwnerAccount && isProduction) {
+        return NextResponse.json(
+          { error: 'Certificate not recognized. Please contact your administrator.' },
+          { status: 403 }
+        )
+      }
       const certBelongsToThisAccount = certOwnerAccount?.id === result.admin.id
       const certOwnerIsSuperAdmin = certOwnerAccount?.role === 'super_admin'
       const loggingIntoSuperAdmin = result.admin.role === 'super_admin'
@@ -97,33 +119,28 @@ export async function POST(request: Request) {
       }
     }
 
-    const token = await generateToken({
+    const mfaRow = await queryOne<{ mfa_enabled: boolean }>(
+      `SELECT mfa_enabled FROM admins WHERE id = $1`,
+      [result.admin.id]
+    )
+
+    if (mfaRow?.mfa_enabled) {
+      const ticket = await issueMfaTicket({
+        adminId: result.admin.id,
+        username: result.admin.username,
+        purpose: 'verify',
+        certCN: certCN || undefined,
+      })
+      return NextResponse.json({ mfa_required: true, ticket })
+    }
+
+    const ticket = await issueMfaTicket({
       adminId: result.admin.id,
       username: result.admin.username,
-      first_name: result.admin.first_name || undefined,
-      last_name: result.admin.last_name || undefined,
-      role: result.admin.role,
-      scopes: result.admin.scopes || [],
-      authCertCN: certCN || undefined,
+      purpose: 'enroll',
+      certCN: certCN || undefined,
     })
-
-    const response = NextResponse.json({
-      success: true,
-      admin: {
-        username: result.admin.username,
-        role: result.admin.role,
-      },
-    })
-
-    response.cookies.set('admin_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 8 * 60 * 60,
-      path: '/',
-    })
-
-    return response
+    return NextResponse.json({ enroll_required: true, ticket })
   } catch {
     return NextResponse.json(
       { error: 'Internal server error' },

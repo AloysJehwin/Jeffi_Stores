@@ -3,12 +3,19 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
+type Step = 'password' | 'verify' | 'enroll'
+
 export default function AdminLogin() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   })
+  const [step, setStep] = useState<Step>('password')
+  const [ticket, setTicket] = useState('')
+  const [code, setCode] = useState('')
+  const [enrollData, setEnrollData] = useState<{ secret: string; qr_data_url: string; otpauth_url: string } | null>(null)
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
   const [error, setError] = useState('')
   const [isCertError, setIsCertError] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -49,9 +56,7 @@ export default function AdminLogin() {
     try {
       const response = await fetch('/api/admin/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(formData),
       })
@@ -59,15 +64,81 @@ export default function AdminLogin() {
       const data = await response.json()
 
       if (!response.ok) {
-        if (response.status === 403) {
-          setIsCertError(true)
-        }
+        if (response.status === 403) setIsCertError(true)
         throw new Error(data.error || 'Login failed')
+      }
+
+      if (data.mfa_required && data.ticket) {
+        setTicket(data.ticket)
+        setStep('verify')
+        setLoading(false)
+        return
+      }
+
+      if (data.enroll_required && data.ticket) {
+        setTicket(data.ticket)
+        const startRes = await fetch('/api/admin/mfa/enroll-start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticket: data.ticket }),
+        })
+        const startData = await startRes.json()
+        if (!startRes.ok) throw new Error(startData.error || 'Could not start enrollment')
+        setEnrollData({
+          secret: startData.secret,
+          qr_data_url: startData.qr_data_url,
+          otpauth_url: startData.otpauth_url,
+        })
+        setStep('enroll')
+        setLoading(false)
+        return
       }
 
       window.location.href = '/admin/dashboard'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
+      setLoading(false)
+    }
+  }
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/mfa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ticket, code }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Verification failed')
+      window.location.href = '/admin/dashboard'
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed')
+      setLoading(false)
+    }
+  }
+
+  const handleEnrollConfirm = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!enrollData) return
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch('/api/admin/mfa/enroll-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ticket, secret: enrollData.secret, code }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Verification failed')
+      setRecoveryCodes(data.recovery_codes || [])
+      setLoading(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed')
       setLoading(false)
     }
   }
@@ -88,12 +159,17 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
             <h1 className="text-5xl font-bold text-white mb-3">Jeffi Stores</h1>
             <h2 className="text-2xl font-semibold text-white mb-2">Admin Panel</h2>
-            <p className="text-gray-300">Sign in to access the dashboard</p>
+            <p className="text-gray-300">
+              {step === 'password' && 'Sign in to access the dashboard'}
+              {step === 'verify' && 'Enter the 6-digit code from your authenticator app'}
+              {step === 'enroll' && !recoveryCodes && 'Set up two-factor authentication'}
+              {step === 'enroll' && recoveryCodes && 'Save these recovery codes — shown only once'}
+            </p>
           </div>
 
           <div className="mb-6">
@@ -144,74 +220,130 @@ export default function AdminLogin() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className={`backdrop-blur-sm border rounded-lg p-4 flex items-start gap-3 ${
-                isCertError
-                  ? 'bg-orange-500/20 border-orange-400/50 text-orange-100'
-                  : 'bg-red-500/20 border-red-400/50 text-red-100'
-              }`}>
-                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                  {isCertError ? (
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/>
-                  ) : (
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
-                  )}
-                </svg>
-                <div>
-                  <span className="text-sm font-medium block">{error}</span>
-                  {isCertError && (
-                    <span className="text-xs mt-1 block opacity-80">
-                      Your device certificate does not match this account. Use the certificate issued for your admin account.
-                    </span>
-                  )}
-                </div>
+          {error && (
+            <div className={`mb-4 backdrop-blur-sm border rounded-lg p-4 flex items-start gap-3 ${
+              isCertError
+                ? 'bg-orange-500/20 border-orange-400/50 text-orange-100'
+                : 'bg-red-500/20 border-red-400/50 text-red-100'
+            }`}>
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+              </svg>
+              <span className="text-sm font-medium">{error}</span>
+            </div>
+          )}
+
+          {step === 'password' && (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-white mb-2">Username</label>
+                <input
+                  type="text" id="username" name="username"
+                  value={formData.username} onChange={handleChange}
+                  required autoFocus autoComplete="username"
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
+                  placeholder="Enter your username"
+                />
               </div>
-            )}
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-white mb-2">Password</label>
+                <input
+                  type="password" id="password" name="password"
+                  value={formData.password} onChange={handleChange}
+                  required autoComplete="current-password"
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
+                  placeholder="Enter your password"
+                />
+              </div>
+              <button type="submit" disabled={loading}
+                className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg">
+                {loading ? 'Logging in...' : 'Continue'}
+              </button>
+            </form>
+          )}
 
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-white mb-2">
-                Username
-              </label>
-              <input
-                type="text"
-                id="username"
-                name="username"
-                value={formData.username}
-                onChange={handleChange}
-                required
-                autoFocus
-                autoComplete="username"
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
-                placeholder="Enter your username"
-              />
+          {step === 'verify' && (
+            <form onSubmit={handleVerify} className="space-y-6">
+              <div>
+                <label htmlFor="code" className="block text-sm font-medium text-white mb-2">
+                  6-digit code <span className="text-gray-300">or recovery code</span>
+                </label>
+                <input
+                  type="text" id="code" name="code"
+                  value={code} onChange={(e) => setCode(e.target.value)}
+                  required autoFocus autoComplete="one-time-code" inputMode="text"
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all tracking-widest text-center text-xl"
+                  placeholder="000000"
+                />
+              </div>
+              <button type="submit" disabled={loading}
+                className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg">
+                {loading ? 'Verifying...' : 'Verify and Continue'}
+              </button>
+              <button type="button" onClick={() => { setStep('password'); setCode(''); setError('') }}
+                className="w-full text-sm text-gray-300 hover:text-white">
+                ← Use a different account
+              </button>
+            </form>
+          )}
+
+          {step === 'enroll' && enrollData && !recoveryCodes && (
+            <div className="space-y-5">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4 text-sm text-gray-100 space-y-3">
+                <p>
+                  Two-factor authentication is required for all admins. Open your authenticator app
+                  (Google Authenticator, 1Password, Authy, etc.) and scan this QR code:
+                </p>
+                <div className="bg-white p-3 rounded-lg w-fit mx-auto">
+                  <img src={enrollData.qr_data_url} alt="Scan to add to your authenticator" className="w-48 h-48" />
+                </div>
+                <p className="text-xs text-gray-300">
+                  Can&apos;t scan? Enter this secret manually: <span className="font-mono text-white break-all">{enrollData.secret}</span>
+                </p>
+              </div>
+              <form onSubmit={handleEnrollConfirm} className="space-y-4">
+                <div>
+                  <label htmlFor="enroll_code" className="block text-sm font-medium text-white mb-2">Enter the 6-digit code shown by your app</label>
+                  <input
+                    type="text" id="enroll_code" name="enroll_code"
+                    value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    required autoFocus inputMode="numeric" autoComplete="one-time-code"
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all tracking-widest text-center text-xl"
+                    placeholder="000000"
+                  />
+                </div>
+                <button type="submit" disabled={loading || code.length !== 6}
+                  className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg">
+                  {loading ? 'Confirming...' : 'Confirm and Finish Setup'}
+                </button>
+              </form>
             </div>
+          )}
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-white mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                autoComplete="current-password"
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
-                placeholder="Enter your password"
-              />
+          {step === 'enroll' && recoveryCodes && (
+            <div className="space-y-5">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4 text-sm text-gray-100 space-y-3">
+                <p className="font-semibold text-white">Save these recovery codes now — they will not be shown again.</p>
+                <p>
+                  Use any one of these codes if you lose access to your authenticator. Each code works only once.
+                  Store them in a password manager or print them.
+                </p>
+                <div className="grid grid-cols-2 gap-2 font-mono text-white text-sm bg-black/40 p-3 rounded">
+                  {recoveryCodes.map(c => <div key={c}>{c}</div>)}
+                </div>
+                <button type="button"
+                  onClick={() => navigator.clipboard.writeText(recoveryCodes.join('\n'))}
+                  className="text-xs text-accent-300 hover:text-accent-200 underline">
+                  Copy all codes
+                </button>
+              </div>
+              <button type="button"
+                onClick={() => { window.location.href = '/admin/dashboard' }}
+                className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 text-white font-semibold py-4 px-6 rounded-lg transition-all shadow-lg text-lg">
+                I&apos;ve saved them — continue to dashboard
+              </button>
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg"
-            >
-              {loading ? 'Logging in...' : 'Login to Admin Panel'}
-            </button>
-          </form>
+          )}
 
           <div className="mt-8 space-y-3">
             <div className="flex items-center gap-2 text-sm text-gray-300 justify-center">
