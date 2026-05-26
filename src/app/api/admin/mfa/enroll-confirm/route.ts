@@ -31,8 +31,9 @@ export async function POST(request: Request) {
       scopes: string[] | null
       mfa_enabled: boolean
     }>(
-      `SELECT id, username, first_name, last_name, role, scopes, mfa_enabled
-         FROM admins WHERE id = $1 AND is_active = true`,
+      `SELECT a.id, a.username, u.first_name, u.last_name, a.role, a.scopes, a.mfa_enabled
+         FROM admins a LEFT JOIN users u ON u.id = a.user_id
+         WHERE a.id = $1 AND a.is_active = true`,
       [t.adminId]
     )
     if (!admin) return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
