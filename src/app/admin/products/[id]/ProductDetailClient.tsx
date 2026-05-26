@@ -23,16 +23,41 @@ function Field({ label, value, mono }: { label: string; value?: any; mono?: bool
   )
 }
 
+type ShelfRow = { location_display_code: string; quantity: number; variant_id: string | null; sub_variant_id: string | null }
+
+function ShelfBadges({ rows }: { rows: ShelfRow[] }) {
+  if (rows.length === 0) return <span className="text-xs text-foreground-muted italic">—</span>
+  return (
+    <div className="flex flex-wrap gap-1">
+      {rows.map(l => (
+        <span key={l.location_display_code} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-border-default bg-surface-secondary text-xs">
+          <span className="font-mono font-medium text-foreground">{l.location_display_code}</span>
+          <span className="text-foreground-muted">·</span>
+          <span className="font-semibold text-foreground">{l.quantity}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function ProductDetailClient({ id }: { id: string }) {
   const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState(0)
+  const [shelfStock, setShelfStock] = useState<ShelfRow[]>([])
 
   useEffect(() => {
     fetch(`/api/admin/products/${id}`)
       .then(r => r.json())
       .then(p => { setProduct(p); setLoading(false) })
       .catch(() => setLoading(false))
+  }, [id])
+
+  useEffect(() => {
+    fetch(`/api/admin/shelving/stock?product_id=${id}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setShelfStock(d?.locations ?? []))
+      .catch(() => {})
   }, [id])
 
   if (loading) {
@@ -58,15 +83,27 @@ export default function ProductDetailClient({ id }: { id: string }) {
   const primaryImg = images.find((i: any) => i.is_primary) || images[0]
   const displayImg = images[selectedImage] || primaryImg
 
-  const stockQty = p.has_variants
+  const inventoryQty = p.has_variants
+    ? Number(p.variant_stock_total || 0)
+    : Number(p.inventory_quantity || 0)
+  const listedQty = p.has_variants
     ? Number(p.variant_stock_total || 0)
     : Number(p.stock_quantity || 0)
 
-  const stockColor = stockQty === 0
+  const stockColor = inventoryQty === 0
     ? 'text-red-600 dark:text-red-400'
-    : stockQty <= (p.low_stock_threshold || 5)
+    : inventoryQty <= (p.low_stock_threshold || 5)
     ? 'text-orange-600 dark:text-orange-400'
     : 'text-green-600 dark:text-green-400'
+
+  function shelfFor(variantId: string | null, subVariantId: string | null) {
+    return shelfStock.filter(r =>
+      (variantId ? r.variant_id === variantId : r.variant_id === null) &&
+      (subVariantId ? r.sub_variant_id === subVariantId : r.sub_variant_id === null)
+    )
+  }
+
+  const hasVariantShelf = shelfStock.some(r => r.variant_id !== null)
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -122,6 +159,13 @@ export default function ProductDetailClient({ id }: { id: string }) {
               ))}
             </div>
           )}
+
+          {!p.has_variants && shelfStock.length > 0 && (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Shelf Locations</p>
+              <ShelfBadges rows={shelfStock} />
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-2 space-y-4">
@@ -157,11 +201,17 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Stock & Shipping</p>
               <div className="flex justify-between text-sm">
-                <span className="text-foreground-secondary">Stock</span>
+                <span className="text-foreground-secondary">Inventory Stock</span>
                 <span className={`font-semibold ${stockColor}`}>
-                  {stockQty}{p.has_variants ? ' (variants)' : ''}
+                  {inventoryQty}{p.has_variants ? ' (variants)' : ''}
                 </span>
               </div>
+              {!p.has_variants && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-foreground-secondary">Listed (Online)</span>
+                  <span className="font-semibold text-foreground">{listedQty}</span>
+                </div>
+              )}
               {!p.has_variants && p.low_stock_threshold != null && (
                 <Field label="Low Stock At" value={p.low_stock_threshold} />
               )}
@@ -206,7 +256,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Price (incl. GST)</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">Ex-GST</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">MRP</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Stock</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Inventory</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">Listed</th>
+                  {hasVariantShelf && (
+                    <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden xl:table-cell">Shelf</th>
+                  )}
                   <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Status</th>
                 </tr>
               </thead>
@@ -214,9 +268,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 {variants.map((v: any) => {
                   const subVariants: any[] = v.sub_variants || []
                   const hasSubs = subVariants.length > 0
-                  const vStock = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
-                  const vStockColor = vStock === 0 ? 'text-red-600 dark:text-red-400' : vStock <= (v.low_stock_threshold || 3) ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
+                  const vInventory = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.inventory_quantity || 0)
+                  const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
+                  const vStockColor = vInventory === 0 ? 'text-red-600 dark:text-red-400' : vInventory <= (v.low_stock_threshold || 3) ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
                   const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
+                  const vShelf = hasSubs ? [] : shelfFor(v.id, null)
                   return (
                     <React.Fragment key={v.id}>
                     <tr className="hover:bg-surface-secondary/50 transition-colors">
@@ -231,25 +287,44 @@ export default function ProductDetailClient({ id }: { id: string }) {
                             }
                             align="left"
                             side="bottom"
-                            width="320px"
+                            width="360px"
                           >
                             <div className="p-3 space-y-2">
                               <p className="text-sm font-semibold text-foreground">{v.variant_name}</p>
-                              <div className="border-t border-border-default pt-2 space-y-1.5">
-                                {subVariants.map((sv: any) => (
-                                  <div key={sv.id} className="flex items-center justify-between gap-3 text-xs">
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="font-medium text-foreground truncate">{sv.sub_variant_name}</span>
-                                      {sv.sku && <span className="font-mono text-foreground-muted text-[10px]">{sv.sku}</span>}
+                              <div className="border-t border-border-default pt-2 space-y-2">
+                                {subVariants.map((sv: any) => {
+                                  const svShelf = shelfFor(v.id, sv.id)
+                                  return (
+                                    <div key={sv.id} className="space-y-1">
+                                      <div className="flex items-center justify-between gap-3 text-xs">
+                                        <div className="flex flex-col min-w-0">
+                                          <span className="font-medium text-foreground truncate">{sv.sub_variant_name}</span>
+                                          {sv.sku && <span className="font-mono text-foreground-muted text-[10px]">{sv.sku}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-3 text-right shrink-0">
+                                          <span className="text-foreground-secondary">{sv.price ? formatINR(Number(sv.price)) : '—'}</span>
+                                          <span className={`font-medium ${Number(sv.inventory_quantity || 0) === 0 ? 'text-red-600' : Number(sv.inventory_quantity || 0) <= 3 ? 'text-orange-600' : 'text-foreground'}`}>
+                                            Inv: {Number(sv.inventory_quantity || 0)}
+                                          </span>
+                                          <span className="text-foreground-muted">
+                                            Listed: {Number(sv.stock_quantity || 0)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      {svShelf.length > 0 && (
+                                        <div className="flex flex-wrap gap-1 pl-1">
+                                          {svShelf.map(l => (
+                                            <span key={l.location_display_code} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-border-default bg-surface-secondary text-[10px]">
+                                              <span className="font-mono font-medium text-foreground">{l.location_display_code}</span>
+                                              <span className="text-foreground-muted">·</span>
+                                              <span className="font-semibold text-foreground">{l.quantity}</span>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                    <div className="flex items-center gap-3 text-right shrink-0">
-                                      <span className="text-foreground-secondary">{sv.price ? formatINR(Number(sv.price)) : '—'}</span>
-                                      <span className={`font-medium ${Number(sv.stock_quantity || 0) === 0 ? 'text-red-600' : Number(sv.stock_quantity || 0) <= 3 ? 'text-orange-600' : 'text-foreground'}`}>
-                                        Stock: {Number(sv.stock_quantity || 0)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
+                                  )
+                                })}
                               </div>
                             </div>
                           </HoverCard>
@@ -261,7 +336,16 @@ export default function ProductDetailClient({ id }: { id: string }) {
                       <td className="px-4 py-3 text-right text-foreground">{vMinPrice > 0 ? (hasSubs ? `From ${formatINR(vMinPrice)}` : formatINR(vMinPrice)) : '—'}</td>
                       <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : '—'}</td>
                       <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.mrp ? formatINR(Number(v.mrp)) : '—'}</td>
-                      <td className={`px-4 py-3 text-right font-semibold ${vStockColor}`}>{vStock}</td>
+                      <td className={`px-4 py-3 text-right font-semibold ${vStockColor}`}>{vInventory}</td>
+                      <td className="px-4 py-3 text-right text-foreground-muted hidden lg:table-cell">{vListed}</td>
+                      {hasVariantShelf && (
+                        <td className="px-4 py-3 hidden xl:table-cell">
+                          {hasSubs
+                            ? <span className="text-xs text-foreground-muted italic">see sub-variants</span>
+                            : <ShelfBadges rows={vShelf} />
+                          }
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${v.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-secondary'}`}>
                           {v.is_active ? 'Active' : 'Inactive'}
@@ -269,8 +353,10 @@ export default function ProductDetailClient({ id }: { id: string }) {
                       </td>
                     </tr>
                     {hasSubs && subVariants.map((sv: any) => {
-                      const svStock = Number(sv.stock_quantity || 0)
-                      const svStockColor = svStock === 0 ? 'text-red-600 dark:text-red-400' : svStock <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
+                      const svInventory = Number(sv.inventory_quantity || 0)
+                      const svListed = Number(sv.stock_quantity || 0)
+                      const svStockColor = svInventory === 0 ? 'text-red-600 dark:text-red-400' : svInventory <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
+                      const svShelf = shelfFor(v.id, sv.id)
                       return (
                         <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 transition-colors">
                           <td className="px-4 py-2 pl-10 text-sm text-foreground-secondary">↳ {sv.sub_variant_name}</td>
@@ -278,7 +364,13 @@ export default function ProductDetailClient({ id }: { id: string }) {
                           <td className="px-4 py-2 text-right text-sm text-foreground">{sv.price ? formatINR(Number(sv.price)) : '—'}</td>
                           <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.price_ex_gst ? formatINR(Number(sv.price_ex_gst)) : '—'}</td>
                           <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.mrp ? formatINR(Number(sv.mrp)) : '—'}</td>
-                          <td className={`px-4 py-2 text-right text-sm font-medium ${svStockColor}`}>{svStock}</td>
+                          <td className={`px-4 py-2 text-right text-sm font-medium ${svStockColor}`}>{svInventory}</td>
+                          <td className="px-4 py-2 text-right text-sm text-foreground-muted hidden lg:table-cell">{svListed}</td>
+                          {hasVariantShelf && (
+                            <td className="px-4 py-2 hidden xl:table-cell">
+                              <ShelfBadges rows={svShelf} />
+                            </td>
+                          )}
                           <td className="px-4 py-2 text-center">
                             <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${sv.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-secondary'}`}>
                               {sv.is_active ? 'Active' : 'Inactive'}

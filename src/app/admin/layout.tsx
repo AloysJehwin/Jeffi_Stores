@@ -65,6 +65,7 @@ export default async function AdminLayout({
     { href: '/admin/scan', label: 'QuickScan', scope: 'quick_scan', group: 'Fulfilment', mobileOnly: true },
     { href: '/admin/financial', label: 'Financial', scope: 'financial', group: 'Finance' },
     { href: '/admin/inventory', label: 'Inventory', scope: 'inventory', group: 'Finance' },
+    { href: '/admin/shelving', label: 'Shelving', scope: 'inventory', group: 'Finance' },
     { href: '/admin/gst', label: 'GST Compliance', scope: 'gst', group: 'Finance' },
     { href: '/admin/traffic', label: 'Traffic', scope: 'dashboard', group: 'Marketing' },
     { href: '/admin/coupons', label: 'Coupons', scope: 'coupons', group: 'Marketing' },

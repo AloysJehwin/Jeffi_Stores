@@ -117,7 +117,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
       <div className="md:hidden space-y-3">
         {products && products.length > 0 ? (
           products.map((product: any) => {
-            const stock = product.has_variants ? Number(product.variant_stock_total) : product.stock_quantity
+            const stock = product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)
+            const listedStock = product.has_variants ? Number(product.variant_stock_total) : Number(product.stock_quantity ?? 0)
             const isLow = stock > 0 && stock <= product.low_stock_threshold
             return (
               <div
@@ -147,13 +148,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                   <span className="text-sm font-semibold text-primary-500">
                     {product.has_variants
                       ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN')}`
-                      : `Rs. ${Number(product.base_price).toLocaleString('en-IN')}`
+                      : `Rs. ${Number(product.base_price || 0).toLocaleString('en-IN')}`
                     }
                   </span>
                   <span className="text-sm text-foreground">
-                    Stock: {stock}
+                    Inv: {stock}
                     {isLow && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Low</span>}
                     {stock === 0 && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Out</span>}
+                    {listedStock !== stock && <span className="ml-1 text-xs text-foreground-muted">/ {listedStock}</span>}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-foreground-muted">

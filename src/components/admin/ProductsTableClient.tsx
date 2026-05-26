@@ -90,18 +90,47 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                               }
                             </p>
                           </div>
-                          <div>
-                            <p className="text-foreground-muted">Stock</p>
-                            <p className={`font-medium ${
-                              (product.has_variants ? Number(product.variant_stock_total) : product.stock_quantity) === 0
-                                ? 'text-red-600 dark:text-red-400'
-                                : (product.has_variants ? Number(product.variant_stock_total) : product.stock_quantity) <= product.low_stock_threshold
-                                ? 'text-orange-600 dark:text-orange-400'
-                                : 'text-foreground'
-                            }`}>
-                              {product.has_variants ? Number(product.variant_stock_total) : product.stock_quantity}
-                              {product.has_variants && <span className="ml-0.5 text-foreground-muted font-normal">(v)</span>}
-                            </p>
+                          <div className={product.has_variants && Array.isArray(product.product_variants) && product.product_variants.length > 0 ? 'col-span-2' : ''}>
+                            <p className="text-foreground-muted mb-0.5">Stock</p>
+                            {product.has_variants && Array.isArray(product.product_variants) && product.product_variants.length > 0 ? (
+                              <div className="space-y-0.5">
+                                {product.product_variants.map((v: any) => {
+                                  const hasSubs = Array.isArray(v.sub_variants) && v.sub_variants.length > 0
+                                  const vInv = hasSubs ? Number(v.sub_variant_inventory_total || 0) : Number(v.inventory_quantity || 0)
+                                  const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
+                                  return (
+                                    <div key={v.id} className="flex items-center justify-between gap-2">
+                                      <span className="text-foreground-secondary truncate">{v.variant_name}</span>
+                                      <div className="flex gap-1.5 shrink-0">
+                                        <span className={`font-semibold ${vInv === 0 ? 'text-red-600 dark:text-red-400' : vInv <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>{vInv}</span>
+                                        {vListed !== vInv && <span className="text-foreground-muted text-[11px]">/ {vListed}</span>}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            ) : (
+                              <div className="space-y-0.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-foreground-muted">Inventory</span>
+                                  <span className={`font-semibold shrink-0 ${
+                                    (product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)) === 0
+                                      ? 'text-red-600 dark:text-red-400'
+                                      : (product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)) <= product.low_stock_threshold
+                                      ? 'text-orange-600 dark:text-orange-400'
+                                      : 'text-foreground'
+                                  }`}>
+                                    {product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-foreground-muted">Listed</span>
+                                  <span className="font-semibold shrink-0 text-foreground-secondary">
+                                    {product.has_variants ? Number(product.variant_stock_total) : Number(product.stock_quantity ?? 0)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                         {product.description && (
@@ -131,20 +160,22 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                 <div className="text-sm font-semibold text-primary-500 truncate">
                     {product.has_variants
                       ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                      : `Rs. ${Number(product.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                      : `Rs. ${Number(product.base_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
                     }
                 </div>
               </td>
               <td className="px-4 py-3">
                 {(() => {
-                  const stock = product.has_variants ? Number(product.variant_stock_total) : product.stock_quantity
-                  const isLow = stock > 0 && stock <= product.low_stock_threshold
+                  const invStock = product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)
+                  const listedStock = product.has_variants ? Number(product.variant_stock_total) : Number(product.stock_quantity ?? 0)
+                  const isLow = invStock > 0 && invStock <= product.low_stock_threshold
                   return (
                     <div className="text-sm text-foreground flex items-center gap-0.5">
                       <span>
-                        {stock}
+                        {invStock}
                         {isLow && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Low</span>}
-                        {stock === 0 && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Out</span>}
+                        {invStock === 0 && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Out</span>}
+                        {listedStock !== invStock && <span className="ml-1 text-xs text-foreground-muted">/ {listedStock}</span>}
                       </span>
                       {product.has_variants && (
                         <HoverCard
@@ -153,21 +184,37 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                           }
                           align="left"
                           side="bottom"
-                          width="220px"
+                          width="240px"
                         >
                           <div className="p-3 space-y-2">
-                            <p className="text-xs font-semibold text-foreground">Variant Stock</p>
-                            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                              <div>
-                                <p className="text-foreground-muted">Total Stock</p>
-                                <p className={`font-semibold ${stock === 0 ? 'text-red-600 dark:text-red-400' : stock <= product.low_stock_threshold ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>{stock} units</p>
-                              </div>
-                              <div>
-                                <p className="text-foreground-muted">From Price</p>
-                                <p className="font-semibold text-primary-500">Rs. {Number(product.variant_min_price || 0).toLocaleString('en-IN')}</p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold text-foreground">Variant Stock</p>
+                              <div className="flex gap-2 text-xs">
+                                <span className={`font-semibold ${invStock === 0 ? 'text-red-600 dark:text-red-400' : invStock <= product.low_stock_threshold ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>Inv: {invStock}</span>
+                                <span className="text-foreground-muted">Listed: {listedStock}</span>
                               </div>
                             </div>
-                            <p className="text-xs text-foreground-muted border-t border-border-default pt-2">Click row to see individual variants →</p>
+                            {Array.isArray(product.product_variants) && product.product_variants.length > 0 ? (
+                              <div className="border-t border-border-default pt-2 space-y-1.5">
+                                {product.product_variants.map((v: any) => {
+                                  const hasSubs = Array.isArray(v.sub_variants) && v.sub_variants.length > 0
+                                  const vInv = hasSubs ? Number(v.sub_variant_inventory_total || 0) : Number(v.inventory_quantity || 0)
+                                  const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
+                                  const vColor = vInv === 0 ? 'text-red-600 dark:text-red-400' : vInv <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
+                                  return (
+                                    <div key={v.id} className="flex items-center justify-between gap-2 text-xs">
+                                      <span className="text-foreground-secondary truncate">{v.variant_name}</span>
+                                      <div className="flex gap-2 shrink-0">
+                                        <span className={`font-semibold ${vColor}`}>{vInv}</span>
+                                        {vListed !== vInv && <span className="text-foreground-muted">/ {vListed}</span>}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-foreground-muted border-t border-border-default pt-2">Click row to see individual variants →</p>
+                            )}
                           </div>
                         </HoverCard>
                       )}
