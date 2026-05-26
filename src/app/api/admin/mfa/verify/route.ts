@@ -63,7 +63,10 @@ export async function POST(request: Request) {
     if (!ok) return NextResponse.json({ error: 'Invalid code' }, { status: 401 })
 
     return await issueAdminSession(admin, t.certCN as string | undefined)
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'Internal server error', detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    )
   }
 }
