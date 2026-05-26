@@ -88,16 +88,8 @@ COPY --from=deps /app/node_modules/bwip-js ./node_modules/bwip-js
 # Copy database migration files
 COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 
-# Copy rds-signer + all transitive AWS SDK deps (serverExternalPackages — not bundled by Next.js standalone)
-COPY --from=deps /app/node_modules/@aws-sdk/rds-signer ./node_modules/@aws-sdk/rds-signer
-COPY --from=deps /app/node_modules/@aws-sdk/credential-providers ./node_modules/@aws-sdk/credential-providers
-COPY --from=deps /app/node_modules/@aws-sdk/client-sts ./node_modules/@aws-sdk/client-sts
-COPY --from=deps /app/node_modules/@aws-sdk/client-cognito-identity ./node_modules/@aws-sdk/client-cognito-identity
-COPY --from=deps /app/node_modules/@aws-sdk/credential-provider-cognito-identity ./node_modules/@aws-sdk/credential-provider-cognito-identity
-COPY --from=deps /app/node_modules/@aws-sdk/types ./node_modules/@aws-sdk/types
-COPY --from=deps /app/node_modules/@aws-sdk/util-locate-window ./node_modules/@aws-sdk/util-locate-window
-COPY --from=deps /app/node_modules/@aws-sdk/util-user-agent-browser ./node_modules/@aws-sdk/util-user-agent-browser
-COPY --from=deps /app/node_modules/@aws-sdk/client-apigatewaymanagementapi ./node_modules/@aws-sdk/client-apigatewaymanagementapi
+# Copy entire @aws-sdk tree (rds-signer + s3 + all transitive deps — not bundled by Next.js standalone)
+COPY --from=deps /app/node_modules/@aws-sdk ./node_modules/@aws-sdk
 
 # Copy pg module for migration runner
 COPY --from=deps /app/node_modules/pg ./node_modules/pg
