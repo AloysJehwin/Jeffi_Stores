@@ -56,20 +56,15 @@ export async function POST(request: Request) {
       )
     }
 
-    const session = await issueAdminSession(admin, t.certCN as string | undefined)
-    const body = await session.json()
-    const response = NextResponse.json({ ...body, recovery_codes: codes.map(c => c.plain) })
-    session.cookies.getAll().forEach(c =>
-      response.cookies.set(c.name, c.value, {
-        httpOnly: c.httpOnly,
-        secure: c.secure,
-        sameSite: c.sameSite as any,
-        maxAge: c.maxAge,
-        path: c.path,
-      })
+    return await issueAdminSession(
+      admin,
+      t.certCN as string | undefined,
+      { recovery_codes: codes.map(c => c.plain) },
     )
-    return response
-  } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'Internal server error', detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    )
   }
 }

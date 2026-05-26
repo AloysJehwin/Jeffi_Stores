@@ -10,7 +10,11 @@ export interface AdminSessionAdmin {
   scopes?: string[] | null
 }
 
-export async function issueAdminSession(admin: AdminSessionAdmin, certCN?: string) {
+export async function issueAdminSession(
+  admin: AdminSessionAdmin,
+  certCN?: string,
+  extraBody?: Record<string, unknown>,
+) {
   const token = await generateToken({
     adminId: admin.id,
     username: admin.username,
@@ -23,6 +27,7 @@ export async function issueAdminSession(admin: AdminSessionAdmin, certCN?: strin
   const response = NextResponse.json({
     success: true,
     admin: { username: admin.username, role: admin.role },
+    ...(extraBody || {}),
   })
   response.cookies.set('admin_token', token, {
     httpOnly: true,
