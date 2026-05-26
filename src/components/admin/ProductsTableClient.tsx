@@ -29,18 +29,18 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
               className={`hover:bg-surface-secondary cursor-pointer ${product.is_featured ? 'bg-yellow-50/40 dark:bg-yellow-900/5' : ''}`}
               onClick={() => setSelected(product)}
             >
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-2 min-w-0">
+              <td className="px-4 py-3 overflow-hidden">
+                <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                   <div className="flex-shrink-0 h-10 w-10">
                     <ProductImage
                       thumbnailUrl={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
                       altText={product.name}
                     />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 overflow-hidden">
                     <HoverCard
                       trigger={
-                        <span className="text-sm font-medium text-foreground underline decoration-dotted underline-offset-2 cursor-default hover:text-accent-500 transition-colors truncate block max-w-[180px]">
+                        <span className="text-sm font-medium text-foreground underline decoration-dotted underline-offset-2 cursor-default hover:text-accent-500 transition-colors truncate block w-full">
                           {product.name}
                         </span>
                       }
@@ -118,13 +118,13 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                   </div>
                 </div>
               </td>
-              <td className="px-4 py-3 text-sm text-foreground truncate">
+              <td className="px-4 py-3 text-sm text-foreground truncate overflow-hidden max-w-0">
                 {product.sku}
               </td>
-              <td className="px-4 py-3 text-sm text-foreground truncate">
+              <td className="px-4 py-3 text-sm text-foreground truncate overflow-hidden max-w-0">
                 {product.categories?.name || 'N/A'}
               </td>
-              <td className="px-4 py-3 text-sm text-foreground truncate">
+              <td className="px-4 py-3 text-sm text-foreground truncate overflow-hidden max-w-0">
                 {product.brands?.name || 'N/A'}
               </td>
               <td className="px-4 py-3">
