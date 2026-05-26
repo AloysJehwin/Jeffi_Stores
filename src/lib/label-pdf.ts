@@ -18,7 +18,7 @@ export interface LabelProduct {
   gtin?: string | null
 }
 
-export type LabelSize = '30x20' | '30x50' | '40x60' | '50x50' | '80x20'
+export type LabelSize = '30x20' | '30x50' | '40x60' | '50x50' | '80x20' | 'shelf-card'
 
 export interface LabelSpec {
   size: LabelSize
@@ -37,6 +37,7 @@ export const LABEL_SIZES: LabelSpec[] = [
   { size: '40x60', widthMm: 60, heightMm: 40, widthPt: 60 * MM, heightPt: 40 * MM, label: '40×60 mm' },
   { size: '50x50', widthMm: 50, heightMm: 50, widthPt: 50 * MM, heightPt: 50 * MM, label: '50×50 mm' },
   { size: '80x20', widthMm: 80, heightMm: 20, widthPt: 80 * MM, heightPt: 20 * MM, label: '80×20 mm (Cable)' },
+  { size: 'shelf-card', widthMm: 100, heightMm: 70, widthPt: 100 * MM, heightPt: 70 * MM, label: '100×70 mm (Shelf Card)' },
 ]
 
 async function makeQRBuffer(text: string, size: number): Promise<Buffer> {
@@ -79,22 +80,30 @@ function drawPrice(
   mainSize: number,
   subSize: number
 ): number {
-  const incGst = Number((p.price_ex_gst ?? p.base_price).toFixed(2))
-  if (!incGst || incGst === 0) return py
+  const gstRate = Number(p.gst_percentage) || 0
+  const rawEx = Number(p.price_ex_gst ?? p.base_price)
+  if (!rawEx || rawEx === 0) return py
 
-  const gstRate = p.gst_percentage || 0
-  const exGst = gstRate > 0 ? Number((incGst / (1 + gstRate / 100)).toFixed(2)) : incGst
+  const exGst = Math.round(rawEx * 100) / 100
+  const incGst = gstRate > 0
+    ? Math.round(exGst * (1 + gstRate / 100) * 100) / 100
+    : exGst
   const showExGst = gstRate > 0
 
-  if (p.mrp && p.mrp > 0) {
-    const mrpInc = Number(p.mrp.toFixed(2))
-    if (mrpInc !== incGst) {
-      doc.font('Helvetica').fontSize(subSize).fillColor('#888888')
-      const mrpText = `Rs. ${mrpInc.toFixed(2)}`
-      const mrpW = doc.widthOfString(mrpText)
-      doc.text(mrpText, px, py, { lineBreak: false })
-      doc.moveTo(px, py + subSize * 0.38).lineTo(px + mrpW, py + subSize * 0.38).lineWidth(0.5).stroke('#888888')
-      py += subSize + 1.5
+  if (p.mrp) {
+    const mrpRaw = Number(p.mrp)
+    if (mrpRaw > 0) {
+      const mrpInc = gstRate > 0
+        ? Math.round(mrpRaw * (1 + gstRate / 100) * 100) / 100
+        : mrpRaw
+      if (mrpInc !== incGst) {
+        doc.font('Helvetica').fontSize(subSize).fillColor('#888888')
+        const mrpText = `Rs. ${mrpInc.toFixed(2)}`
+        const mrpW = doc.widthOfString(mrpText)
+        doc.text(mrpText, px, py, { lineBreak: false })
+        doc.moveTo(px, py + subSize * 0.38).lineTo(px + mrpW, py + subSize * 0.38).lineWidth(0.5).stroke('#888888')
+        py += subSize + 1.5
+      }
     }
   }
 
@@ -304,6 +313,7 @@ function getRenderFn(size: LabelSize): RenderFn {
     case '40x60': return render40x60
     case '50x50': return render50x50
     case '80x20': return render80x20
+    case 'shelf-card': return render30x20
   }
 }
 
@@ -379,6 +389,80 @@ export async function generateLabelSheetPDF(
             await renderFn(doc, allLabels[idx], x, y, spec.widthPt, spec.heightPt)
             idx++
           }
+        }
+      }
+      doc.end()
+    }
+    renderAll().catch(reject)
+  })
+}
+
+export interface ShelfLabelItem {
+  displayCode: string
+  warehouseName: string
+  productName?: string
+  sku?: string
+}
+
+async function renderShelfCard(doc: any, item: ShelfLabelItem, x: number, y: number, w: number, h: number) {
+  const pad = 5
+  const barH = 12 * MM
+  const qrSize = 22 * MM
+  const textX = x + pad
+  const textW = w - pad * 3 - qrSize
+
+  const locationBarcode = item.displayCode.replace(/[^\x20-\x7E]/g, '').slice(0, 48) || 'SHELF'
+  const barBuf = await makeBarcodeBuffer(locationBarcode, 4)
+  if (barBuf) {
+    doc.image(barBuf, textX, y + h - pad - barH, { width: w - pad * 2, height: barH })
+  }
+  doc.font('Helvetica').fontSize(6).fillColor('#555555')
+  doc.text(item.displayCode, x + pad, y + h - pad - barH - 7, { width: w - pad * 2, align: 'center', lineBreak: false })
+
+  const qrBuf = await makeQRBuffer(item.displayCode, Math.round(qrSize * 3))
+  if (qrBuf) {
+    doc.image(qrBuf, x + w - pad - qrSize, y + pad, { width: qrSize, height: qrSize })
+  }
+
+  doc.font('Helvetica-Bold').fontSize(16).fillColor('#1a1a1a')
+  doc.text(item.displayCode, textX, y + pad, { width: textW, lineBreak: false })
+
+  doc.font('Helvetica').fontSize(8).fillColor('#777777')
+  doc.text(item.warehouseName, textX, y + pad + 20, { width: textW, lineBreak: false })
+
+  if (item.productName) {
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#222222')
+    const productY = y + pad + 34
+    const maxProductH = h - pad * 2 - barH - 10 - 34
+    doc.text(item.productName, textX, productY, { width: textW, lineBreak: true, height: maxProductH })
+    if (item.sku) {
+      doc.font('Helvetica').fontSize(7).fillColor('#555555')
+      doc.text(`SKU: ${item.sku}`, textX, productY + 14, { width: textW, lineBreak: false })
+    }
+  }
+
+  doc.fillColor('#000000')
+}
+
+export async function generateShelfLabelPDF(
+  items: ShelfLabelItem[],
+  copies: number
+): Promise<Buffer> {
+  const w = 100 * MM
+  const h = 70 * MM
+
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: [w, h], margin: 0, autoFirstPage: false })
+    const chunks: Buffer[] = []
+    doc.on('data', (c: Buffer) => chunks.push(c))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+
+    async function renderAll() {
+      for (const item of items) {
+        for (let i = 0; i < copies; i++) {
+          doc.addPage()
+          await renderShelfCard(doc, item, 0, 0, w, h)
         }
       }
       doc.end()
