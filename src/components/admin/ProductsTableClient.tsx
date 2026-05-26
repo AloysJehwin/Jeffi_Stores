@@ -176,8 +176,8 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                 })()}
               </td>
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full shrink-0 ${
                     product.is_active
                       ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                       : 'bg-surface-secondary text-foreground'
@@ -188,7 +188,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                 </div>
               </td>
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-end gap-1">
+                <div className="flex items-center justify-end gap-1 flex-nowrap whitespace-nowrap">
                   <Link
                     href={`/admin/products/${product.id}`}
                     title="View Details"
