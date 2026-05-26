@@ -88,6 +88,10 @@ COPY --from=deps /app/node_modules/bwip-js ./node_modules/bwip-js
 # Copy database migration files
 COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 
+# Copy entire @aws-sdk + @smithy trees (rds-signer + s3 + all transitive deps — not bundled by Next.js standalone)
+COPY --from=deps /app/node_modules/@aws-sdk ./node_modules/@aws-sdk
+COPY --from=deps /app/node_modules/@smithy ./node_modules/@smithy
+
 # Copy pg module for migration runner
 COPY --from=deps /app/node_modules/pg ./node_modules/pg
 COPY --from=deps /app/node_modules/pg-pool ./node_modules/pg-pool
