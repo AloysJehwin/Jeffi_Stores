@@ -111,6 +111,7 @@ async function createProduct(formData: FormData) {
         )
         for (const gimg of (galleryImages || [])) {
           const copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, data.id)
+          if (!copied) continue
           const inserted = await queryOne<{ id: string }>(
             `INSERT INTO product_images (
               product_id, image_url, thumbnail_url, s3_bucket, s3_key,

@@ -154,23 +154,30 @@ export async function copyGalleryImageToProduct(
   galleryS3Key: string,
   galleryS3ThumbnailKey: string,
   productId: string,
-): Promise<{ s3Key: string; s3ThumbnailKey: string; url: string; thumbnailUrl: string }> {
+): Promise<{ s3Key: string; s3ThumbnailKey: string; url: string; thumbnailUrl: string } | null> {
   const fileName = galleryS3Key.replace(/^gallery\//, '')
   const thumbFileName = galleryS3ThumbnailKey.replace(/^gallery\/thumbnails\//, '')
 
   const s3Key = `products/${productId}/${fileName}`
   const s3ThumbnailKey = `products/${productId}/thumbnails/${thumbFileName}`
 
-  await s3Client.send(new CopyObjectCommand({
-    Bucket: BUCKET_NAME,
-    CopySource: `${BUCKET_NAME}/${KEY_PREFIX}${galleryS3Key}`,
-    Key: `${KEY_PREFIX}${s3Key}`,
-  }))
-  await s3Client.send(new CopyObjectCommand({
-    Bucket: BUCKET_NAME,
-    CopySource: `${BUCKET_NAME}/${KEY_PREFIX}${galleryS3ThumbnailKey}`,
-    Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
-  }))
+  const copy = async (sourceKey: string, destKey: string) => {
+    try {
+      await s3Client.send(new CopyObjectCommand({
+        Bucket: BUCKET_NAME,
+        CopySource: `${BUCKET_NAME}/${KEY_PREFIX}${sourceKey}`,
+        Key: `${KEY_PREFIX}${destKey}`,
+      }))
+    } catch (err: any) {
+      if (err?.Code === 'NoSuchKey' || err?.name === 'NoSuchKey') return false
+      throw err
+    }
+    return true
+  }
+
+  const ok = await copy(galleryS3Key, s3Key)
+  if (!ok) return null
+  await copy(galleryS3ThumbnailKey, s3ThumbnailKey)
 
   return { s3Key, s3ThumbnailKey, url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3ThumbnailKey) }
 }
