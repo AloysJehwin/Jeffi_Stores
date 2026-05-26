@@ -64,7 +64,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(`https://forms.jeffistores.in/${slug}`, request.url), 301)
   }
 
-  const publicApiPaths = ['/api/admin/login', '/api/admin/check-session', '/api/admin/delhivery/sync-statuses']
+  const publicApiPaths = [
+    '/api/admin/login',
+    '/api/admin/check-session',
+    '/api/admin/delhivery/sync-statuses',
+    '/api/admin/mfa/enroll-start',
+    '/api/admin/mfa/enroll-confirm',
+    '/api/admin/mfa/verify',
+  ]
   if (isAdminApiPath && publicApiPaths.some(path => pathname.startsWith(path))) {
     return addSecurityHeaders(NextResponse.next())
   }
