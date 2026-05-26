@@ -16,7 +16,21 @@ export async function PATCH(
 
     const { id } = params
     const body = await request.json()
-    const { scopes, role, is_active } = body
+    const { scopes, role, is_active, reset_mfa } = body
+
+    if (reset_mfa === true) {
+      if (id === admin.adminId) {
+        return NextResponse.json({ error: 'Cannot reset your own MFA' }, { status: 400 })
+      }
+      const target = await queryOne('SELECT id FROM admins WHERE id = $1 AND is_active = true', [id])
+      if (!target) return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
+      await query(
+        `UPDATE admins SET mfa_secret_enc = NULL, mfa_enabled = false, mfa_enrolled_at = NULL WHERE id = $1`,
+        [id]
+      )
+      await query(`DELETE FROM admin_mfa_recovery_codes WHERE admin_id = $1`, [id])
+      return NextResponse.json({ success: true })
+    }
 
     const updates: string[] = []
     const values: any[] = []

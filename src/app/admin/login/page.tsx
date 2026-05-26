@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 type Step = 'password' | 'verify' | 'enroll'
 
 export default function AdminLogin() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get('callbackUrl') || '/admin/dashboard'
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -28,7 +30,7 @@ export default function AdminLogin() {
         const response = await fetch('/api/admin/check-session')
         const data = await response.json()
         if (data.authenticated) {
-          router.push('/admin/dashboard')
+          router.push(callbackUrl)
           return
         }
       } catch {
@@ -114,7 +116,7 @@ export default function AdminLogin() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Verification failed')
-      window.location.href = '/admin/dashboard'
+      window.location.href = callbackUrl
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed')
       setLoading(false)
@@ -338,7 +340,7 @@ export default function AdminLogin() {
                 </button>
               </div>
               <button type="button"
-                onClick={() => { window.location.href = '/admin/dashboard' }}
+                onClick={() => { window.location.href = callbackUrl }}
                 className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 text-white font-semibold py-4 px-6 rounded-lg transition-all shadow-lg text-lg">
                 I&apos;ve saved them — continue to dashboard
               </button>

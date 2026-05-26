@@ -177,7 +177,7 @@ async function updateProduct(productId: string, formData: FormData) {
           [galleryImageRefs.map(r => r.id)]
         )
         for (const gimg of (galleryImages || [])) {
-          const copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, productId)
+          const copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, productId, gimg.image_url, gimg.thumbnail_url)
           const inserted = await queryOne<{ id: string }>(
             `INSERT INTO product_images (
               product_id, image_url, thumbnail_url, s3_bucket, s3_key,

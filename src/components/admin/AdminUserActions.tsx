@@ -13,6 +13,7 @@ interface AdminUser {
   role: string
   scopes: string[]
   is_active: boolean
+  mfa_enabled: boolean
   last_login: string | null
   created_at: string
   certificate_status?: string
@@ -35,7 +36,7 @@ export default function AdminUserActions({
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const [confirmAction, setConfirmAction] = useState<'toggle' | 'delete' | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'toggle' | 'delete' | 'reset_mfa' | null>(null)
 
   const [resending, setResending] = useState(false)
   const [resendMsg, setResendMsg] = useState<string | null>(null)
@@ -50,6 +51,22 @@ export default function AdminUserActions({
     } finally {
       setResending(false)
       setTimeout(() => setResendMsg(null), 4000)
+    }
+  }
+
+  async function handleResetMfa() {
+    if (confirmAction !== 'reset_mfa') { setConfirmAction('reset_mfa'); return }
+    setConfirmAction(null)
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/users/${admin.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reset_mfa: true }),
+      })
+      if (res.ok) onUpdate ? onUpdate() : router.refresh()
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -141,6 +158,14 @@ export default function AdminUserActions({
                 </button>
                 <button type="button" onClick={() => setConfirmAction(null)} className="text-xs text-foreground-muted hover:text-foreground">No</button>
               </div>
+            ) : confirmAction === 'reset_mfa' ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-foreground-secondary">Reset 2FA?</span>
+                <button type="button" onClick={handleResetMfa} disabled={loading} className="text-xs font-medium text-amber-600 hover:text-amber-700">
+                  {loading ? '…' : 'Yes'}
+                </button>
+                <button type="button" onClick={() => setConfirmAction(null)} className="text-xs text-foreground-muted hover:text-foreground">No</button>
+              </div>
             ) : (
               <>
                 {/* Edit */}
@@ -173,6 +198,20 @@ export default function AdminUserActions({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
                 </button>
+
+                {admin.mfa_enabled && (
+                  <button
+                    type="button"
+                    onClick={handleResetMfa}
+                    disabled={loading}
+                    title="Reset 2FA — forces re-enroll on next login"
+                    className="p-1.5 rounded-lg text-foreground-secondary hover:text-amber-500 hover:bg-surface-secondary transition-colors disabled:opacity-50"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </button>
+                )}
 
                 {/* Deactivate / Activate */}
                 <button

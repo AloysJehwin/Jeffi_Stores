@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { verifyAdminCredentials } from '@/lib/auth'
 import { queryOne } from '@/lib/db'
 import { issueMfaTicket } from '@/lib/mfa'
+import { issueAdminSession } from '@/lib/admin-session'
 
 function serialToHex(serial: string): string {
   if (!serial) return ''
@@ -49,6 +50,19 @@ export async function POST(request: Request) {
         { error: 'A client certificate is required to sign in. Please install your admin certificate and try again.' },
         { status: 403 }
       )
+    }
+
+    if (!isProduction) {
+      const adminRow = await queryOne<{
+        id: string; username: string; first_name: string | null; last_name: string | null; role: string; scopes: string[] | null
+      }>(
+        `SELECT a.id, a.username, u.first_name, u.last_name, a.role, a.scopes
+           FROM admins a LEFT JOIN users u ON u.id = a.user_id
+           WHERE a.id = $1 AND a.is_active = true`,
+        [result.admin.id]
+      )
+      if (!adminRow) return NextResponse.json({ error: 'Admin not found' }, { status: 401 })
+      return await issueAdminSession(adminRow, undefined)
     }
 
     if (certSerial) {

@@ -134,13 +134,17 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get('admin_token')?.value
 
     if (!token) {
-      return NextResponse.redirect(new URL('/admin/login', request.url))
+      const loginUrl = new URL('/admin/login', request.url)
+      loginUrl.searchParams.set('callbackUrl', pathname)
+      return NextResponse.redirect(loginUrl)
     }
 
     const payload = await verifyToken(token)
 
     if (!payload) {
-      const response = NextResponse.redirect(new URL('/admin/login', request.url))
+      const loginUrl = new URL('/admin/login', request.url)
+      loginUrl.searchParams.set('callbackUrl', pathname)
+      const response = NextResponse.redirect(loginUrl)
       response.cookies.delete('admin_token')
       return response
     }
@@ -148,7 +152,9 @@ export async function middleware(request: NextRequest) {
     const certCN = request.headers.get('x-client-cert-cn') || ''
     const tokenCertCN = payload.authCertCN || payload.username
     if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
-      const response = NextResponse.redirect(new URL('/admin/login', request.url))
+      const loginUrl = new URL('/admin/login', request.url)
+      loginUrl.searchParams.set('callbackUrl', pathname)
+      const response = NextResponse.redirect(loginUrl)
       response.cookies.delete('admin_token')
       return response
     }

@@ -18,6 +18,8 @@ async function getAdminInfo(adminId: string) {
 async function getAllAdmins() {
   return queryMany(`
     SELECT a.id, a.username, a.role, a.scopes, a.is_active, a.created_at, a.last_login,
+      a.mfa_enabled,
+      (SELECT COUNT(*) FROM admin_mfa_recovery_codes WHERE admin_id = a.id AND used_at IS NULL) AS mfa_recovery_codes_remaining,
       u.first_name, u.last_name,
       (SELECT json_agg(json_build_object(
         'serial_number', ac.serial_number,
@@ -169,6 +171,7 @@ export default async function TeamPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">Role</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">Scopes</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-16">2FA</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-40">Certificate</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">Last Login</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
@@ -224,6 +227,15 @@ export default async function TeamPage() {
                           : 'bg-surface-secondary text-foreground-muted'
                       }`}>
                         {admin.is_active !== false ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 w-16">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        admin.mfa_enabled
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                      }`}>
+                        {admin.mfa_enabled ? 'On' : 'Off'}
                       </span>
                     </td>
                     <td className="px-4 py-3 w-40">

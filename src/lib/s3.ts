@@ -146,6 +146,8 @@ export async function copyGalleryImageToProduct(
   galleryS3Key: string,
   galleryS3ThumbnailKey: string,
   productId: string,
+  fallbackUrl?: string,
+  fallbackThumbnailUrl?: string,
 ): Promise<{ s3Key: string; s3ThumbnailKey: string; url: string; thumbnailUrl: string }> {
   const fileName = galleryS3Key.replace(/^gallery\//, '')
   const thumbFileName = galleryS3ThumbnailKey.replace(/^gallery\/thumbnails\//, '')
@@ -153,18 +155,24 @@ export async function copyGalleryImageToProduct(
   const s3Key = `products/${productId}/${fileName}`
   const s3ThumbnailKey = `products/${productId}/thumbnails/${thumbFileName}`
 
-  await s3Client.send(new CopyObjectCommand({
-    Bucket: BUCKET_NAME,
-    CopySource: `${BUCKET_NAME}/${KEY_PREFIX}${galleryS3Key}`,
-    Key: `${KEY_PREFIX}${s3Key}`,
-  }))
-  await s3Client.send(new CopyObjectCommand({
-    Bucket: BUCKET_NAME,
-    CopySource: `${BUCKET_NAME}/${KEY_PREFIX}${galleryS3ThumbnailKey}`,
-    Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
-  }))
-
-  return { s3Key, s3ThumbnailKey, url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3ThumbnailKey) }
+  try {
+    await s3Client.send(new CopyObjectCommand({
+      Bucket: BUCKET_NAME,
+      CopySource: `${BUCKET_NAME}/${KEY_PREFIX}${galleryS3Key}`,
+      Key: `${KEY_PREFIX}${s3Key}`,
+    }))
+    await s3Client.send(new CopyObjectCommand({
+      Bucket: BUCKET_NAME,
+      CopySource: `${BUCKET_NAME}/${KEY_PREFIX}${galleryS3ThumbnailKey}`,
+      Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
+    }))
+    return { s3Key, s3ThumbnailKey, url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3ThumbnailKey) }
+  } catch (err: any) {
+    if (err?.name === 'NoSuchKey' || err?.Code === 'NoSuchKey') {
+      return { s3Key: galleryS3Key, s3ThumbnailKey: galleryS3ThumbnailKey, url: fallbackUrl || getS3Url(galleryS3Key), thumbnailUrl: fallbackThumbnailUrl || getS3Url(galleryS3ThumbnailKey) }
+    }
+    throw err
+  }
 }
 
 export async function uploadVariantImage(file: File, variantId: string): Promise<UploadResult> {
