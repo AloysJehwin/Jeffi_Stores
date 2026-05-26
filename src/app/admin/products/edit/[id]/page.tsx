@@ -128,9 +128,17 @@ async function updateProduct(productId: string, formData: FormData) {
       const imagesToDelete = (allExistingImages || []).filter(img => !existingIdsToKeep.has(img.id))
 
       if (imagesToDelete.length > 0) {
-        const { deleteProductImage } = await import('@/lib/s3')
+        const { DeleteObjectCommand, S3Client } = await import('@aws-sdk/client-s3')
+        const s3Client = new S3Client({
+          region: process.env.AWS_REGION || 'us-east-1',
+          credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          },
+        })
         for (const img of imagesToDelete) {
-          if (img.s3_key) await deleteProductImage(img.s3_key, img.s3_thumbnail_key || '')
+          if (img.s3_key) await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket', Key: img.s3_key }))
+          if (img.s3_thumbnail_key) await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket', Key: img.s3_thumbnail_key }))
           await query('DELETE FROM product_images WHERE id = $1', [img.id])
         }
       }

@@ -87,16 +87,8 @@ export async function uploadInvoicePDF(pdfBuffer: Buffer, invoiceNumber: string,
 }
 
 export async function deleteProductImage(s3Key: string, s3ThumbnailKey: string) {
-  const del = async (key: string) => {
-    if (!key) return
-    try {
-      await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${key}` }))
-    } catch (err: any) {
-      if (err?.Code !== 'NoSuchKey' && err?.name !== 'NoSuchKey') throw err
-    }
-  }
-  await del(s3Key)
-  await del(s3ThumbnailKey)
+  await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}` }))
+  await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}` }))
 }
 
 export async function saveProductImages(
