@@ -1,36 +1,51 @@
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
 import path from 'path'
 import fs from 'fs'
+import { Signer } from '@aws-sdk/rds-signer'
 
 let pool: Pool | null = null
 
+function makeRdsSigner(host: string, port: number, user: string, region: string): () => Promise<string> {
+  const signer = new Signer({ hostname: host, port, region, username: user })
+  return () => signer.getAuthToken()
+}
+
 function getPool(): Pool {
   if (!pool) {
+    const dbUrl = process.env.DATABASE_URL || ''
+    const useIamAuth = process.env.RDS_IAM_AUTH === 'true'
+
     const config: any = {
-      connectionString: process.env.DATABASE_URL,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
     }
 
-    // Enable SSL for RDS connections
-    if (process.env.DATABASE_URL?.includes('rds.amazonaws.com')) {
-      const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-      if (fs.existsSync(certPath)) {
-        config.ssl = {
-          rejectUnauthorized: true,
-          ca: fs.readFileSync(certPath).toString(),
-        }
-      } else {
-        config.ssl = { rejectUnauthorized: false }
+    if (useIamAuth) {
+      const host = process.env.RDS_HOST!
+      const port = parseInt(process.env.RDS_PORT || '5432', 10)
+      const user = process.env.RDS_USER!
+      const dbName = process.env.RDS_DB!
+      const region = process.env.AWS_REGION || 'us-east-1'
+
+      config.host = host
+      config.port = port
+      config.user = user
+      config.database = dbName
+      config.ssl = { rejectUnauthorized: false }
+      config.password = makeRdsSigner(host, port, user, region)
+    } else {
+      config.connectionString = dbUrl
+      if (dbUrl.includes('rds.amazonaws.com')) {
+        const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
+        config.ssl = fs.existsSync(certPath)
+          ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
+          : { rejectUnauthorized: false }
       }
     }
 
     pool = new Pool(config)
-
-    pool.on('error', (err) => {
-      console.error('Unexpected database pool error:', err)
-    })
+    pool.on('error', () => {})
   }
   return pool
 }
