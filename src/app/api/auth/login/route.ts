@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         phone: user.phone,
       },
     })
-  } catch {
-    return NextResponse.json({ error: 'Login failed' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: 'Login failed', detail: err?.message }, { status: 500 })
   }
 }
