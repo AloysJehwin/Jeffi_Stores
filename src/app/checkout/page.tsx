@@ -316,11 +316,11 @@ function CheckoutPage() {
       }
 
       if (paymentMethod === 'razorpay' && data.requiresPayment) {
-        await initiateRazorpayPayment(data.order.id, parseFloat(data.order.total))
-      } else {
-        if (!isBuyNow) clearCart()
-        router.push(`/account/orders/${data.order.id}`)
+        initiateRazorpayPayment(data.order.id, parseFloat(data.order.total))
+        return
       }
+      if (!isBuyNow) clearCart()
+      router.push(`/account/orders/${data.order.id}`)
     } catch (err: any) {
       setError(err.message)
       setIsSubmitting(false)
