@@ -92,6 +92,17 @@ COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 COPY --from=deps /app/node_modules/@aws-sdk ./node_modules/@aws-sdk
 COPY --from=deps /app/node_modules/@smithy ./node_modules/@smithy
 
+# Copy ioredis + deps (not bundled by Next.js standalone — required for Redis OTP storage)
+COPY --from=deps /app/node_modules/ioredis ./node_modules/ioredis
+COPY --from=deps /app/node_modules/@ioredis ./node_modules/@ioredis
+COPY --from=deps /app/node_modules/cluster-key-slot ./node_modules/cluster-key-slot
+COPY --from=deps /app/node_modules/denque ./node_modules/denque
+COPY --from=deps /app/node_modules/lodash.defaults ./node_modules/lodash.defaults
+COPY --from=deps /app/node_modules/lodash.isarguments ./node_modules/lodash.isarguments
+COPY --from=deps /app/node_modules/redis-errors ./node_modules/redis-errors
+COPY --from=deps /app/node_modules/redis-parser ./node_modules/redis-parser
+COPY --from=deps /app/node_modules/standard-as-callback ./node_modules/standard-as-callback
+
 # Copy pg module for migration runner
 COPY --from=deps /app/node_modules/pg ./node_modules/pg
 COPY --from=deps /app/node_modules/pg-pool ./node_modules/pg-pool
