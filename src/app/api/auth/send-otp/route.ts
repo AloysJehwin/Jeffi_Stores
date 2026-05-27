@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const otp = generateOTP()
-    storeOTP(email, otp)
+    await storeOTP(email, otp)
 
     const emailResult = await sendOTPEmail(email, otp)
 
