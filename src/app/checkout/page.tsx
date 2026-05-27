@@ -132,6 +132,10 @@ function CheckoutPage() {
   const fetchAddress = async (addressId: string) => {
     try {
       const response = await fetch('/api/user/addresses')
+      if (response.status === 401) {
+        router.push('/login?redirect=/checkout')
+        return
+      }
       if (response.ok) {
         const data = await response.json()
         const selectedAddr = data.addresses.find((a: any) => a.id === addressId)
@@ -140,6 +144,8 @@ function CheckoutPage() {
         } else {
           router.push('/checkout/review')
         }
+      } else {
+        router.push('/checkout/review')
       }
     } catch {
       router.push('/checkout/review')
@@ -330,7 +336,11 @@ function CheckoutPage() {
   }
 
   if (!user || (!isBuyNow && cartCount === 0) || !address) {
-    return null
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full"></div>
+      </div>
+    )
   }
 
   const subtotal = isBuyNow
