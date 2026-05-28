@@ -23,6 +23,10 @@ interface Category {
   id: string
   name: string
   parent_category_id: string | null
+  return_allowed?: boolean | null
+  return_window_days?: number | null
+  replacement_allowed?: boolean | null
+  replacement_window_days?: number | null
 }
 
 interface CategoryFormProps {
@@ -38,6 +42,13 @@ function IconPreview({ name, className }: { name: string; className?: string }) 
 }
 
 export default function CategoryForm({ categories, action, category }: CategoryFormProps) {
+  const isSubcat = !!category?.parent_category_id
+  const isCurrentlyInherited = isSubcat && category?.return_allowed == null
+
+  const parentCat = isSubcat
+    ? categories.find(c => c.id === category.parent_category_id) ?? null
+    : null
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedIcon, setSelectedIcon] = useState<string>(category?.icon_name || 'Package')
@@ -45,10 +56,19 @@ export default function CategoryForm({ categories, action, category }: CategoryF
   const [showPicker, setShowPicker] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [isActive, setIsActive] = useState<boolean>(category?.is_active ?? true)
-  const [returnAllowed, setReturnAllowed] = useState<boolean>(category?.return_allowed ?? true)
-  const [returnDays, setReturnDays] = useState<number>(category?.return_window_days ?? 7)
-  const [replacementAllowed, setReplacementAllowed] = useState<boolean>(category?.replacement_allowed ?? true)
-  const [replacementDays, setReplacementDays] = useState<number>(category?.replacement_window_days ?? 7)
+  const [overriding, setOverriding] = useState(!isCurrentlyInherited)
+  const [returnAllowed, setReturnAllowed] = useState<boolean>(
+    category?.return_allowed ?? parentCat?.return_allowed ?? true
+  )
+  const [returnDays, setReturnDays] = useState<number>(
+    category?.return_window_days ?? parentCat?.return_window_days ?? 7
+  )
+  const [replacementAllowed, setReplacementAllowed] = useState<boolean>(
+    category?.replacement_allowed ?? parentCat?.replacement_allowed ?? true
+  )
+  const [replacementDays, setReplacementDays] = useState<number>(
+    category?.replacement_window_days ?? parentCat?.replacement_window_days ?? 7
+  )
   const nameRef = useRef<HTMLInputElement>(null)
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
@@ -287,56 +307,92 @@ export default function CategoryForm({ categories, action, category }: CategoryF
       </div>
 
       <div className="px-4 sm:px-6 py-5 border-t border-border-default">
-        <h2 className="text-base font-semibold text-foreground mb-4">Return &amp; Replacement Policy</h2>
+        <h2 className="text-base font-semibold text-foreground mb-1">Return &amp; Replacement Policy</h2>
         <p className="text-xs text-foreground-muted mb-4">Category policy is the default. Brand policy can override per product.</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
-              <Toggle id="return_allowed" checked={returnAllowed} onChange={setReturnAllowed} label="Returns Allowed" />
-            </div>
-            {returnAllowed && (
-              <div>
-                <label htmlFor="return_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
-                  Return window (days)
-                </label>
-                <input
-                  type="number"
-                  id="return_window_days"
-                  name="return_window_days"
-                  min={1}
-                  max={90}
-                  value={returnDays}
-                  onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                />
-              </div>
-            )}
+
+        <input type="hidden" name="policy_override" value={overriding ? 'true' : 'false'} />
+
+        {isSubcat && !overriding ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 text-sm bg-surface-secondary border border-border-secondary text-foreground-secondary px-3 py-1.5 rounded-full">
+              <svg className="w-3.5 h-3.5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Inherited from {parentCat?.name ?? 'parent category'}
+              {' — '}
+              {(parentCat?.return_allowed ?? true) ? `Returns ${parentCat?.return_window_days ?? 7}d` : 'No returns'}
+              {' · '}
+              {(parentCat?.replacement_allowed ?? true) ? `Replacement ${parentCat?.replacement_window_days ?? 7}d` : 'No replacement'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setOverriding(true)}
+              className="text-sm text-accent-500 hover:text-accent-600 font-medium underline underline-offset-2"
+            >
+              Override for this subcategory
+            </button>
           </div>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
-              <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
-            </div>
-            {replacementAllowed && (
-              <div>
-                <label htmlFor="replacement_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
-                  Replacement window (days)
-                </label>
-                <input
-                  type="number"
-                  id="replacement_window_days"
-                  name="replacement_window_days"
-                  min={1}
-                  max={90}
-                  value={replacementDays}
-                  onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                />
-              </div>
+        ) : (
+          <>
+            {isSubcat && (
+              <button
+                type="button"
+                onClick={() => setOverriding(false)}
+                className="text-xs text-foreground-muted hover:text-foreground underline underline-offset-2 mb-4 block"
+              >
+                Reset to inherited (use parent policy)
+              </button>
             )}
-          </div>
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
+                  <Toggle id="return_allowed" checked={returnAllowed} onChange={setReturnAllowed} label="Returns Allowed" />
+                </div>
+                {returnAllowed && (
+                  <div>
+                    <label htmlFor="return_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
+                      Return window (days)
+                    </label>
+                    <input
+                      type="number"
+                      id="return_window_days"
+                      name="return_window_days"
+                      min={1}
+                      max={90}
+                      value={returnDays}
+                      onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
+                  <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
+                </div>
+                {replacementAllowed && (
+                  <div>
+                    <label htmlFor="replacement_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
+                      Replacement window (days)
+                    </label>
+                    <input
+                      type="number"
+                      id="replacement_window_days"
+                      name="replacement_window_days"
+                      min={1}
+                      max={90}
+                      value={replacementDays}
+                      onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex justify-end gap-4">
