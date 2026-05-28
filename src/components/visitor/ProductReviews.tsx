@@ -14,6 +14,7 @@ interface Review {
   title: string | null
   comment: string
   is_verified_purchase: boolean
+  is_approved: boolean
   image_urls: string[]
   image_thumbnail_urls: string[]
   created_at: string
@@ -332,25 +333,42 @@ export default function ProductReviews({ productId, productName }: ProductReview
               </div>
             </label>
           )}
-          {!showForm && !(user && reviews.some(r => r.user_id === user.id)) && (
-            <button
-              onClick={() => {
-                if (!user) {
-                  showToast('Please login to write a review', 'warning')
-                  router.push(`/login?redirect=/products/${productName.toLowerCase().replace(/\s+/g, '-')}`)
-                  return
-                }
-                setShowForm(true)
-              }}
-              className="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              <span className="hidden sm:inline">Write a Review</span>
-              <span className="sm:hidden">Review</span>
-            </button>
-          )}
+          {!showForm && (() => {
+            const ownReview = user ? reviews.find(r => r.user_id === user.id) : null
+            if (ownReview) {
+              return (
+                <button
+                  onClick={() => openEdit(ownReview)}
+                  className="inline-flex items-center gap-2 bg-surface-elevated hover:bg-surface-secondary border border-border-secondary text-foreground px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span className="hidden sm:inline">Edit your review</span>
+                  <span className="sm:hidden">Edit</span>
+                </button>
+              )
+            }
+            return (
+              <button
+                onClick={() => {
+                  if (!user) {
+                    showToast('Please login to write a review', 'warning')
+                    router.push(`/login?redirect=/products/${productName.toLowerCase().replace(/\s+/g, '-')}`)
+                    return
+                  }
+                  setShowForm(true)
+                }}
+                className="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span className="hidden sm:inline">Write a Review</span>
+                <span className="sm:hidden">Review</span>
+              </button>
+            )
+          })()}
         </div>
       </div>
 
@@ -494,6 +512,14 @@ export default function ProductReviews({ productId, productName }: ProductReview
                             <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-2 py-0.5 rounded-full font-medium">
                               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                              Verified Purchase
+                            </span>
+                          )}
+                          {review.is_approved && (
+                            <span className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs px-2 py-0.5 rounded-full font-medium">
+                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                               Verified
                             </span>

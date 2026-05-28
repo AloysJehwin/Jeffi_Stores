@@ -79,7 +79,7 @@ export async function PATCH(request: NextRequest) {
       [rating, title?.trim() || null, comment.trim(), imageUrls, imageThumbnailUrls, reviewId, user.userId]
     )
 
-    return NextResponse.json({ message: 'Review updated. It will be visible after re-approval.', review: updated })
+    return NextResponse.json({ message: 'Review updated. Changes will be visible after re-approval.', review: updated })
   } catch {
     return NextResponse.json({ error: 'Failed to update review' }, { status: 500 })
   }
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       `INSERT INTO product_reviews (product_id, user_id, rating, title, comment, is_verified_purchase, is_approved)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [productId, user.userId, rating, title?.trim() || null, comment.trim(), !!hasPurchased, false]
+      [productId, user.userId, rating, title?.trim() || null, comment.trim(), !!hasPurchased, true]
     )
 
     const imageFiles = formData.getAll('images') as File[]
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      message: 'Review submitted successfully! It will be visible after admin approval.',
+      message: 'Review submitted successfully!',
       review
     })
   } catch {
