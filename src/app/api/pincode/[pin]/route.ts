@@ -1,4 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import https from 'https'
+
+function httpsGet(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    https.get(url, { rejectUnauthorized: false }, (res) => {
+      let data = ''
+      res.on('data', (chunk) => { data += chunk })
+      res.on('end', () => resolve(data))
+    }).on('error', reject)
+  })
+}
 
 export async function GET(
   _request: NextRequest,
@@ -11,15 +22,8 @@ export async function GET(
   }
 
   try {
-    const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`, {
-      next: { revalidate: 86400 },
-    })
-
-    if (!res.ok) {
-      return NextResponse.json({ error: 'Lookup failed' }, { status: 502 })
-    }
-
-    const data = await res.json()
+    const raw = await httpsGet(`https://api.postalpincode.in/pincode/${pin}`)
+    const data = JSON.parse(raw)
     const entry = data?.[0]
 
     if (!entry || entry.Status !== 'Success' || !entry.PostOffice?.length) {
