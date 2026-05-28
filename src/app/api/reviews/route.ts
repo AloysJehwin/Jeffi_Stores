@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
         json_build_object('first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM product_reviews pr
       LEFT JOIN users u ON pr.user_id = u.id
-      WHERE pr.product_id = $1 AND pr.is_approved = true
+      WHERE pr.product_id = $1
       ORDER BY pr.created_at DESC
     `, [productId])
 
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       `INSERT INTO product_reviews (product_id, user_id, rating, title, comment, is_verified_purchase, is_approved)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [productId, user.userId, rating, title?.trim() || null, comment.trim(), !!hasPurchased, true]
+      [productId, user.userId, rating, title?.trim() || null, comment.trim(), !!hasPurchased, false]
     )
 
     const imageFiles = formData.getAll('images') as File[]
