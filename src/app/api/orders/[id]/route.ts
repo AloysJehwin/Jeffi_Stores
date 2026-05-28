@@ -42,9 +42,16 @@ export async function GET(
              FROM product_images pi WHERE pi.product_id = p.id),
             '[]'::json
           )
-        ) AS products
+        ) AS products,
+        COALESCE(b.return_allowed, COALESCE(c.return_allowed, pc.return_allowed, true)) AS return_allowed,
+        COALESCE(b.return_window_days, COALESCE(c.return_window_days, pc.return_window_days, 7)) AS return_window_days,
+        COALESCE(b.replacement_allowed, COALESCE(c.replacement_allowed, pc.replacement_allowed, true)) AS replacement_allowed,
+        COALESCE(b.replacement_window_days, COALESCE(c.replacement_window_days, pc.replacement_window_days, 7)) AS replacement_window_days
       FROM order_items oi
       LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN brands b ON p.brand_id = b.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_category_id = pc.id
       WHERE oi.order_id = $1
     `, [orderId])
 
@@ -80,6 +87,10 @@ export async function GET(
         buyMode: item.buy_mode || 'unit',
         buyUnit: item.buy_unit || null,
         products: item.products,
+        returnAllowed: item.return_allowed === false ? false : !!item.return_allowed,
+        returnWindowDays: parseInt(item.return_window_days) || 7,
+        replacementAllowed: item.replacement_allowed === false ? false : !!item.replacement_allowed,
+        replacementWindowDays: parseInt(item.replacement_window_days) || 7,
       })),
     }
 
