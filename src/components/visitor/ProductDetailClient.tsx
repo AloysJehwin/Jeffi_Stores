@@ -65,7 +65,15 @@ interface ProductDetailClientProps {
     length_unit?: string | null
     weight?: number | null
     dimensions?: string | null
-    brands?: { id: string; name: string; slug: string } | null
+    brands?: {
+      id: string
+      name: string
+      slug: string
+      return_allowed?: boolean
+      return_window_days?: number
+      replacement_allowed?: boolean
+      replacement_window_days?: number
+    } | null
     categories?: {
       id: string
       name: string
@@ -106,22 +114,29 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           <div>
-            <p className="text-sm font-semibold text-foreground">{returnAllowed ? 'Easy Returns' : 'No Returns'}</p>
-            <p className="text-xs text-foreground-secondary">
-              {returnAllowed ? `${returnDays}-day hassle-free return policy` : 'This item is not eligible for returns'}
-            </p>
+            {returnAllowed ? (
+              <>
+                <p className="text-sm font-semibold text-foreground">Easy Returns</p>
+                <p className="text-xs text-foreground-secondary">{returnDays}-day hassle-free return policy</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-foreground-secondary">No Returns</p>
+                <p className="text-xs text-foreground-muted">This product is non-returnable</p>
+              </>
+            )}
           </div>
         </div>
         {replacementAllowed && (
-        <div className="flex items-start gap-3">
-          <svg className="w-5 h-5 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-          </svg>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Replacement Available</p>
-            <p className="text-xs text-foreground-secondary">{replacementDays}-day replacement window</p>
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Replacement Available</p>
+              <p className="text-xs text-foreground-secondary">{replacementDays}-day replacement guarantee</p>
+            </div>
           </div>
-        </div>
         )}
         <div className="flex items-start gap-3">
           <svg className="w-5 h-5 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -157,19 +172,20 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
     ? Math.round(((mrp - displayPrice) / mrp) * 100)
     : 0
 
+  const brand = product.brands
+  const cat = product.categories
+  const returnAllowed = brand?.return_allowed ?? cat?.return_allowed ?? true
+  const returnDays = returnAllowed ? (brand?.return_allowed != null ? (brand.return_window_days ?? 7) : (cat?.return_window_days ?? 7)) : 0
+  const replacementAllowed = brand?.replacement_allowed ?? cat?.replacement_allowed ?? true
+  const replacementDays = replacementAllowed ? (brand?.replacement_allowed != null ? (brand.replacement_window_days ?? 7) : (cat?.replacement_window_days ?? 7)) : 0
+  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays }
+
   const handleVariantChange = (variant: Variant | null) => {
     if (variant?.variant_images && variant.variant_images.length > 0) {
       setVariantImages(variant.variant_images)
     } else {
       setVariantImages(undefined)
     }
-  }
-
-  const policyProps: PolicyProps = {
-    returnAllowed: product.categories?.return_allowed ?? true,
-    returnDays: product.categories?.return_window_days ?? 7,
-    replacementAllowed: product.categories?.replacement_allowed ?? true,
-    replacementDays: product.categories?.replacement_window_days ?? 7,
   }
 
   return (
@@ -182,9 +198,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           variantImages={variantImages}
         />
 
-        {/* Delivery & Returns — desktop only (mobile version below as order-3) */}
         <div className="hidden lg:block mt-4">
-          <DeliveryInfo {...policyProps} />
+          <DeliveryInfo {...policy} />
         </div>
       </div>
 
@@ -313,9 +328,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
         </div>
       </div>
 
-      {/* Delivery & Returns — mobile only (desktop version is inside image column above) */}
       <div className="order-3 lg:hidden">
-        <DeliveryInfo {...policyProps} />
+        <DeliveryInfo {...policy} />
       </div>
     </>
   )
