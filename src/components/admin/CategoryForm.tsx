@@ -286,9 +286,9 @@ export default function CategoryForm({ categories, action, category }: CategoryF
         </div>
       </div>
 
-      {/* Return & Replacement Policy */}
       <div className="px-4 sm:px-6 py-5 border-t border-border-default">
         <h2 className="text-base font-semibold text-foreground mb-4">Return &amp; Replacement Policy</h2>
+        <p className="text-xs text-foreground-muted mb-4">Category policy is the default. Brand policy can override per product.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
@@ -308,7 +308,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
                   max={90}
                   value={returnDays}
                   onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-28 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 />
               </div>
             )}
@@ -316,7 +316,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
-              <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacements Allowed" />
+              <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
             </div>
             {replacementAllowed && (
               <div>
@@ -331,7 +331,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
                   max={90}
                   value={replacementDays}
                   onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-28 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 />
               </div>
             )}

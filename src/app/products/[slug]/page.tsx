@@ -17,7 +17,10 @@ const getProductBySlug = cache(async (slug: string) => {
         'return_allowed', c.return_allowed, 'return_window_days', c.return_window_days,
         'replacement_allowed', c.replacement_allowed, 'replacement_window_days', c.replacement_window_days
       ) AS categories,
-      json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
+      json_build_object('id', b.id, 'name', b.name, 'slug', b.slug,
+        'return_allowed', b.return_allowed, 'return_window_days', b.return_window_days,
+        'replacement_allowed', b.replacement_allowed, 'replacement_window_days', b.replacement_window_days
+      ) AS brands,
       COALESCE(
         (SELECT json_agg(pi ORDER BY pi.display_order)
          FROM product_images pi WHERE pi.product_id = p.id),
