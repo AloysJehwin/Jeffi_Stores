@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   DndContext,
@@ -473,22 +473,68 @@ function SortableRow({
   )
 }
 
-export default function CategoriesClient({ initialCategories, productCounts = {} }: { initialCategories: Category[], productCounts?: Record<string, number> }) {
+export default function CategoriesClient({
+  initialCategories,
+  productCounts = {},
+  initialSearch = '',
+  initialType = '',
+}: {
+  initialCategories: Category[]
+  productCounts?: Record<string, number>
+  initialSearch?: string
+  initialType?: string
+}) {
   const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [activeId, setActiveId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [viewCategory, setViewCategory] = useState<Category | null>(null)
   const [policyOpenId, setPolicyOpenId] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const search = searchParams.get('search') || ''
+  const typeFilter = searchParams.get('type') || ''
+  const PAGE_SIZE = 10
+
+  useEffect(() => { setPage(1) }, [search, typeFilter])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
-  const mainCategories = categories.filter(c => !c.parent_category_id).sort((a, b) => a.display_order - b.display_order)
   const getSubcats = useCallback(
     (parentId: string) => categories.filter(c => c.parent_category_id === parentId).sort((a, b) => a.display_order - b.display_order),
     [categories]
   )
+
+  const q = search.toLowerCase()
+  const allMainCategories = categories
+    .filter(c => !c.parent_category_id)
+    .sort((a, b) => a.display_order - b.display_order)
+
+  const filteredMain = allMainCategories.filter(cat => {
+    if (typeFilter === 'sub') return false
+    const subcats = getSubcats(cat.id)
+    const matchesSelf = !q || cat.name.toLowerCase().includes(q) || cat.slug.toLowerCase().includes(q)
+    const matchesChild = q ? subcats.some(s => s.name.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q)) : false
+    return matchesSelf || matchesChild
+  })
+
+  const filteredSubOnly = typeFilter === 'sub'
+    ? categories
+        .filter(c => !!c.parent_category_id)
+        .filter(c => !q || c.name.toLowerCase().includes(q) || c.slug.toLowerCase().includes(q))
+        .sort((a, b) => a.display_order - b.display_order)
+    : []
+
+  const totalPages = typeFilter === 'sub'
+    ? Math.max(1, Math.ceil(filteredSubOnly.length / PAGE_SIZE))
+    : Math.max(1, Math.ceil(filteredMain.length / PAGE_SIZE))
+
+  const pagedMain = typeFilter === 'sub' ? [] : filteredMain.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const pagedSubOnly = typeFilter === 'sub' ? filteredSubOnly.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : []
+
+  const mainCategories = pagedMain
 
   const toggleCollapse = (id: string) => {
     setCollapsed(prev => {
@@ -498,7 +544,9 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
     })
   }
 
-  const flatOrder = mainCategories.flatMap(m => [m, ...(collapsed.has(m.id) ? [] : getSubcats(m.id))])
+  const flatOrder = typeFilter === 'sub'
+    ? pagedSubOnly
+    : mainCategories.flatMap(m => [m, ...(collapsed.has(m.id) ? [] : getSubcats(m.id))])
 
   const saveReorder = async (updated: Category[]) => {
     setSaving(true)
@@ -612,9 +660,43 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
-                {mainCategories.length > 0 ? mainCategories.map(cat => {
+                {typeFilter === 'sub' ? (
+                  pagedSubOnly.length > 0 ? pagedSubOnly.map(sub => {
+                    const parentCat = categories.find(c => c.id === sub.parent_category_id)
+                    return (
+                      <>
+                        <SortableRow
+                          key={sub.id}
+                          category={sub}
+                          isSubcat={true}
+                          productCount={productCounts[sub.id] || 0}
+                          onDeleted={() => handleCategoryDeleted(sub.id)}
+                          onView={() => setViewCategory(sub)}
+                          policyOpen={policyOpenId === sub.id}
+                          onTogglePolicy={() => setPolicyOpenId(policyOpenId === sub.id ? null : sub.id)}
+                        />
+                        {policyOpenId === sub.id && (
+                          <PolicyExpandRow
+                            category={categories.find(c => c.id === sub.id) ?? sub}
+                            parentCategory={parentCat}
+                            colSpan={5}
+                            onSaved={handleSaved}
+                            onClose={() => setPolicyOpenId(null)}
+                          />
+                        )}
+                      </>
+                    )
+                  }) : (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-foreground-muted">No subcategories found.</td>
+                    </tr>
+                  )
+                ) : mainCategories.length > 0 ? mainCategories.map(cat => {
                   const subcats = getSubcats(cat.id)
                   const isCollapsed = collapsed.has(cat.id)
+                  const visibleSubcats = q
+                    ? subcats.filter(s => s.name.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q))
+                    : subcats
                   return (
                     <>
                       <SortableRow
@@ -638,7 +720,7 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
                           onClose={() => setPolicyOpenId(null)}
                         />
                       )}
-                      {!isCollapsed && subcats.map(sub => (
+                      {!isCollapsed && visibleSubcats.map(sub => (
                         <>
                           <SortableRow
                             key={sub.id}
@@ -686,77 +768,139 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
       </DndContext>
 
       <div className="md:hidden space-y-3">
-        {mainCategories.map(cat => {
-          const subcats = getSubcats(cat.id)
-          const isCollapsed = collapsed.has(cat.id)
-          return (
-            <div key={cat.id}>
+        {typeFilter === 'sub' ? (
+          pagedSubOnly.map(sub => {
+            const parent = categories.find(c => c.id === sub.parent_category_id)
+            return (
               <div
+                key={sub.id}
                 className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 cursor-pointer"
-                onClick={() => setViewCategory(cat)}
+                onClick={() => setViewCategory(sub)}
               >
                 <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    {subcats.length > 0 && (
-                      <button onClick={e => { e.stopPropagation(); toggleCollapse(cat.id) }} className="text-foreground-muted">
-                        <svg className={`w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    )}
-                    <div className="w-7 h-7 rounded-md bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
-                      <CategoryIcon iconName={cat.icon_name} categoryName={cat.name} className="w-4 h-4 text-accent-600 dark:text-accent-400" />
+                  <div className="text-sm text-foreground flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md bg-surface-secondary flex items-center justify-center shrink-0">
+                      <CategoryIcon iconName={sub.icon_name} categoryName={sub.name} className="w-3.5 h-3.5 text-foreground-muted" />
                     </div>
-                    <div className="text-sm font-semibold text-foreground">{cat.name}</div>
-                    {subcats.length > 0 && (
-                      <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">{subcats.length}</span>
-                    )}
+                    {sub.name}
                   </div>
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
-                    {cat.is_active ? 'Active' : 'Inactive'}
+                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+                    {sub.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
+                {parent && <p className="text-xs text-foreground-muted mb-1">Under: {parent.name}</p>}
                 <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
-                  <span>{cat.slug}</span>
-                  <span>Order: {cat.display_order}</span>
+                  <span>{sub.slug}</span>
+                  <span>Order: {sub.display_order}</span>
                 </div>
                 <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                  <Link href={`/admin/categories/edit/${cat.id}`} className="text-accent-500 font-medium">Edit</Link>
-                  <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} onDeleted={() => handleCategoryDeleted(cat.id)} />
+                  <Link href={`/admin/categories/edit/${sub.id}`} className="text-accent-500 font-medium">Edit</Link>
+                  <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                 </div>
               </div>
-
-              {!isCollapsed && subcats.map(sub => (
+            )
+          })
+        ) : (
+          mainCategories.map(cat => {
+            const subcats = getSubcats(cat.id)
+            const visibleSubcats = q
+              ? subcats.filter(s => s.name.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q))
+              : subcats
+            const isCollapsed = collapsed.has(cat.id)
+            return (
+              <div key={cat.id}>
                 <div
-                  key={sub.id}
-                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 ml-6 mt-2 cursor-pointer"
-                  onClick={() => setViewCategory(sub)}
+                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 cursor-pointer"
+                  onClick={() => setViewCategory(cat)}
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <div className="text-sm text-foreground flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-md bg-surface-secondary flex items-center justify-center shrink-0">
-                        <CategoryIcon iconName={sub.icon_name} categoryName={sub.name} className="w-3.5 h-3.5 text-foreground-muted" />
+                    <div className="flex items-center gap-2">
+                      {subcats.length > 0 && (
+                        <button onClick={e => { e.stopPropagation(); toggleCollapse(cat.id) }} className="text-foreground-muted">
+                          <svg className={`w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      )}
+                      <div className="w-7 h-7 rounded-md bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
+                        <CategoryIcon iconName={cat.icon_name} categoryName={cat.name} className="w-4 h-4 text-accent-600 dark:text-accent-400" />
                       </div>
-                      <span className="text-foreground-muted mr-1">└</span>{sub.name}
+                      <div className="text-sm font-semibold text-foreground">{cat.name}</div>
+                      {subcats.length > 0 && (
+                        <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">{subcats.length}</span>
+                      )}
                     </div>
-                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
-                      {sub.is_active ? 'Active' : 'Inactive'}
+                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+                      {cat.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
-                    <span>{sub.slug}</span>
-                    <span>Order: {sub.display_order}</span>
+                    <span>{cat.slug}</span>
+                    <span>Order: {cat.display_order}</span>
                   </div>
                   <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                    <Link href={`/admin/categories/edit/${sub.id}`} className="text-accent-500 font-medium">Edit</Link>
-                    <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
+                    <Link href={`/admin/categories/edit/${cat.id}`} className="text-accent-500 font-medium">Edit</Link>
+                    <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} onDeleted={() => handleCategoryDeleted(cat.id)} />
                   </div>
                 </div>
-              ))}
-            </div>
-          )
-        })}
+
+                {!isCollapsed && visibleSubcats.map(sub => (
+                  <div
+                    key={sub.id}
+                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 ml-6 mt-2 cursor-pointer"
+                    onClick={() => setViewCategory(sub)}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="text-sm text-foreground flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-md bg-surface-secondary flex items-center justify-center shrink-0">
+                          <CategoryIcon iconName={sub.icon_name} categoryName={sub.name} className="w-3.5 h-3.5 text-foreground-muted" />
+                        </div>
+                        <span className="text-foreground-muted mr-1">└</span>{sub.name}
+                      </div>
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+                        {sub.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
+                      <span>{sub.slug}</span>
+                      <span>Order: {sub.display_order}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
+                      <Link href={`/admin/categories/edit/${sub.id}`} className="text-accent-500 font-medium">Edit</Link>
+                      <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })
+        )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 px-1">
+          <p className="text-xs text-foreground-muted">Page {page} of {totalPages}</p>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1.5 text-sm border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >Prev</button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+              <button
+                key={n}
+                onClick={() => setPage(n)}
+                className={`w-8 h-8 text-sm rounded-lg font-medium transition-colors ${n === page ? 'bg-accent-500 text-white' : 'border border-border-secondary text-foreground-secondary hover:bg-surface-secondary'}`}
+              >{n}</button>
+            ))}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1.5 text-sm border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >Next</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
