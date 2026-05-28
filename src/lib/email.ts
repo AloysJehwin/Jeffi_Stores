@@ -67,7 +67,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
               padding: 20px;
               border-radius: 8px;
               letter-spacing: 8px;
-              margin: 30px 0;
+              margin: 24px 0;
             }
             .info {
               background-color: #fff3cd;
@@ -90,7 +90,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Your Jeffi Stores OTP is ${otp} — valid for 10 minutes. Do not share.</span>
           <div class="container">
             <div class="header">
-              <img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" />
+              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -99,14 +99,6 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
             <p>Thank you for registering with Jeffi Stores. Please use the following One-Time Password (OTP) to verify your email address:</p>
 
             <div class="otp-box">${otp}</div>
-
-            <p style="text-align: center; margin: -10px 0 24px;">
-              <a href="#"
-                 onclick="var t=this;navigator.clipboard.writeText('${otp}').then(function(){t.innerHTML='&#10003; Copied!';t.style.backgroundColor='#22c55e';t.style.borderColor='#16a34a';t.style.color='white';setTimeout(function(){t.innerHTML='&#128203; Copy OTP';t.style.backgroundColor='#f1f5f9';t.style.borderColor='#cbd5e1';t.style.color='#334155';},2000)}).catch(function(){});return false;"
-                 style="display:inline-block;background-color:#f1f5f9;color:#334155;border:1px solid #cbd5e1;padding:9px 24px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;font-family:Arial,sans-serif;cursor:pointer;">
-                &#128203; Copy OTP
-              </a>
-            </p>
 
             <div class="info">
               <strong>This OTP will expire in 10 minutes.</strong>
@@ -171,7 +163,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
             .button {
               display: inline-block;
               background-color: #f97316;
-              color: white;
+              color: #ffffff !important;
               padding: 12px 30px;
               text-decoration: none;
               border-radius: 5px;
@@ -192,7 +184,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Welcome to Jeffi Stores! Your account is ready — shop industrial tools, hardware and more.</span>
           <div class="container">
             <div class="header">
-              <img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" />
+              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -209,7 +201,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
             </ul>
 
             <div style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/products" class="button">
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/products" class="button" style="color:#ffffff;">
                 Start Shopping
               </a>
             </div>
@@ -310,7 +302,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Order confirmed! We've received your order and will keep you updated on dispatch.</span>
           <div class="container">
             <div class="header">
-              <img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" />
+              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -663,7 +655,7 @@ export async function sendOrderStatusUpdate(
             .button {
               display: inline-block;
               background-color: #2563eb;
-              color: white;
+              color: #ffffff !important;
               padding: 12px 30px;
               text-decoration: none;
               border-radius: 5px;
@@ -676,7 +668,7 @@ export async function sendOrderStatusUpdate(
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${statusInfo.title} — Order #${orderNumber}. ${statusInfo.message}</span>
           <div class="container">
             <div class="header">
-              <img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" />
+              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -726,7 +718,7 @@ export async function sendOrderStatusUpdate(
 
             <p style="text-align: center;">
               <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
-                 class="button">
+                 class="button" style="color:#ffffff;">
                 View Order Details
               </a>
             </p>
@@ -873,7 +865,7 @@ export async function sendPaymentStatusUpdate(
             .button {
               display: inline-block;
               background-color: #2563eb;
-              color: white;
+              color: #ffffff !important;
               padding: 12px 30px;
               text-decoration: none;
               border-radius: 5px;
@@ -886,7 +878,7 @@ export async function sendPaymentStatusUpdate(
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${paymentInfo.title} — Order #${orderNumber}. ${paymentInfo.message}</span>
           <div class="container">
             <div class="header">
-              <img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" />
+              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -943,7 +935,7 @@ export async function sendPaymentStatusUpdate(
 
             <p style="text-align: center;">
               <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
-                 class="button">
+                 class="button" style="color:#ffffff;">
                 View Order Details
               </a>
             </p>
@@ -1062,7 +1054,7 @@ export async function sendAdminCertificateEmail(
         <body>
           <div class="container">
             <div class="header">
-              <img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" />
+              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
               <p style="color: #666;">Admin Panel Access</p>
             </div>
 
@@ -1196,7 +1188,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
               display: inline-block;
               padding: 12px 30px;
               background-color: #28a745;
-              color: white;
+              color: #ffffff !important;
               text-decoration: none;
               border-radius: 5px;
               margin: 10px 5px;
@@ -1275,7 +1267,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
             </div>
 
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/reviews" class="button">
+              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/reviews" class="button" style="color:#ffffff;">
                 Approve / Reject Review
               </a>
             </div>
@@ -1305,6 +1297,9 @@ export async function sendPaymentFailedAdminNotification(
   const adminEmail = await getAdminNotificationEmails()
 
   const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+    to: adminEmail,
+    subject: `[Payment Failed] Order ${order.order_number}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -1375,7 +1370,7 @@ export async function sendPaymentFailedAdminNotification(
 
             <p style="text-align: center; margin-top: 30px;">
               <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/orders/${order.id}"
-                 style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                 style="display: inline-block; background-color: #2563eb; color: #ffffff !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                 View Order in Admin Panel
               </a>
             </p>
@@ -1419,7 +1414,7 @@ export async function sendAdminContactEmail(
         <body>
           <div class="container">
             <div class="header">
-              <img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" />
+              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
               <p style="color: #666; margin: 4px 0 0;">Hardware &amp; Tools</p>
             </div>
             <p>Hello ${name || 'Valued Customer'},</p>
@@ -1471,7 +1466,7 @@ export async function sendSupportEscalationEmail(
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
       <body><div class="container">
-        <div class="header"><img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" /></div>
+        <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
         <div class="body">
           <p style="font-size:16px;font-weight:bold;color:#1f2937;">New Support Chat Request</p>
           <p>A customer has requested to connect with a support agent.</p>
@@ -1520,7 +1515,7 @@ export async function sendAgentConnectedEmail(
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
       <body><div class="container">
-        <div class="header"><img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" /></div>
+        <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
         <div class="body">
           <p style="font-size:16px;font-weight:bold;color:#1f2937;">Hi ${customerName}, your support agent is here!</p>
           <p>A support agent has joined your chat and is ready to help you.</p>
@@ -1616,7 +1611,7 @@ export async function sendReturnStatusEmail(
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
       <body><div class="container">
-        <div class="header"><img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" /></div>
+        <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
         <div class="body">
           ${event !== 'requested_admin' ? `<p>Hi ${recipientName},</p>` : ''}
           ${bodies[event]}
@@ -1663,7 +1658,7 @@ export async function sendPaymentRetryEmail(
 </style></head>
 <body>
 <div class="wrap">
-  <div class="hdr"><img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" /></div>
+  <div class="hdr"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
   <div class="body">
     <p style="color:#333;font-size:16px;margin:0 0 8px">Hi ${customerName},</p>
     <p style="color:#555;line-height:1.6;margin:0 0 16px">We're sorry your purchase didn't go through. It looks like the payment for order <strong>#${orderNumber}</strong> (${formatted}) could not be processed.</p>
@@ -1712,13 +1707,13 @@ export async function sendInvoiceFinalizedEmail(
             .logo{font-size:22px;font-weight:bold;color:#fff}
             .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
             .box{background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;border-radius:4px;margin:20px 0}
-            .btn{display:inline-block;background:#1a3a4a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
+            .btn{display:inline-block;background:#1a3a4a;color:#ffffff !important;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
             .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
           </style>
         </head>
         <body>
           <div class="container">
-            <div class="header"><img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" /></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
             <div class="body">
               <p>Dear ${customerName},</p>
               <p>Thank you for your purchase! Your invoice has been generated.</p>
@@ -1727,7 +1722,7 @@ export async function sendInvoiceFinalizedEmail(
                 ${orderNumber ? `<p style="margin:0 0 6px"><strong>Order No.:</strong> ${orderNumber}</p>` : ''}
                 <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
               </div>
-              ${viewUrl ? `<p style="text-align:center"><a href="${viewUrl}" class="btn">View Invoice</a></p>` : ''}
+              ${viewUrl ? `<p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>` : ''}
               <p>For any queries, please contact us.</p>
               <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
@@ -1779,7 +1774,7 @@ export async function sendPurchaseOrderEmail(
             .logo{font-size:22px;font-weight:bold;color:#fff}
             .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
             .box{background:#eff6ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
-            .btn{display:inline-block;background:#1a3a4a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
+            .btn{display:inline-block;background:#1a3a4a;color:#ffffff !important;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
             table{width:100%;border-collapse:collapse;margin-top:16px}
             thead{background:#f3f4f6}
             th{padding:8px 12px;text-align:left;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
@@ -1788,7 +1783,7 @@ export async function sendPurchaseOrderEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" /></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
             <div class="body">
               <p>Dear ${contactName || supplierName},</p>
               <p>Please find below our purchase order. Kindly confirm receipt and expected delivery.</p>
@@ -1796,7 +1791,7 @@ export async function sendPurchaseOrderEmail(
                 <p style="margin:0 0 6px"><strong>PO Number:</strong> ${poNumber}</p>
                 <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
               </div>
-              ${viewUrl ? `<p style="text-align:center"><a href="${viewUrl}" class="btn">View Purchase Order</a></p>` : ''}
+              ${viewUrl ? `<p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Purchase Order</a></p>` : ''}
               <table>
                 <thead><tr>
                   <th>Product</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Cost</th>
@@ -1862,7 +1857,7 @@ export async function sendPOReceiveNotificationEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" /></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
             <div class="body">
               <p>Dear ${contactName || supplierName},</p>
               <p>We have recorded receipt of goods against your purchase order.</p>
@@ -1919,13 +1914,13 @@ export async function sendQuotationFinalizedEmail(
             .logo{font-size:22px;font-weight:bold;color:#fff}
             .body{padding:28px;color:#374151;font-size:14px;line-height:1.6}
             .box{background:#f0f9ff;border-left:4px solid #2563eb;padding:16px;border-radius:4px;margin:20px 0}
-            .btn{display:inline-block;background:#1a3a4a;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
+            .btn{display:inline-block;background:#1a3a4a;color:#ffffff !important;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:16px 0}
             .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
           </style>
         </head>
         <body>
           <div class="container">
-            <div class="header"><img src="https://dm9rri2wgl1e.cloudfront.net/images/store-logo.png" alt="Jeffi Stores" style="height:56px;max-width:200px;object-fit:contain;" /></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
             <div class="body">
               <p>Dear ${consigneeName},</p>
               <p>Please find your quotation from Jeffi Stores.</p>
@@ -1933,7 +1928,7 @@ export async function sendQuotationFinalizedEmail(
                 <p style="margin:0 0 6px"><strong>Quotation No.:</strong> ${quoteNumber}</p>
                 <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
               </div>
-              <p style="text-align:center"><a href="${viewUrl}" class="btn">View Quotation</a></p>
+              <p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Quotation</a></p>
               <p>If you have any questions regarding this quotation, please feel free to contact us.</p>
               <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
@@ -1945,6 +1940,136 @@ export async function sendQuotationFinalizedEmail(
       </html>
     `,
   }
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+export async function sendOrderAutoCancelledEmail(
+  customerEmail: string,
+  customerName: string,
+  orderNumber: string,
+  orderId: string,
+  orderType: string,
+  orderTotal: number,
+  redirectPath: string
+) {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
+  const isDirect = orderType === 'direct'
+  const ctaLabel = isDirect ? 'Place Order Again' : 'Return to Cart'
+  const bodyMessage = isDirect
+    ? 'Your order was automatically cancelled because payment was not completed within the 10-minute window. You can place the order again from the product page below.'
+    : 'Your order was automatically cancelled because payment was not completed within the 10-minute window. The items have been returned to your cart so you can try again.'
+
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    to: customerEmail,
+    subject: `Order Cancelled - ${orderNumber}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .logo { font-size: 28px; font-weight: bold; color: #2563eb; }
+            .badge { background-color: #ef4444; color: white; font-size: 18px; font-weight: bold; text-align: center; padding: 15px 20px; border-radius: 8px; margin: 20px 0; text-transform: uppercase; }
+            .amount-box { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; }
+            .amount { font-size: 28px; font-weight: bold; color: #2563eb; }
+            .info-box { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            .button { display: inline-block; background-color: #2563eb; color: white !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 15px; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">Jeffi Stores</div>
+            </div>
+            <p>Dear ${customerName},</p>
+            <div class="badge">Order Auto-Cancelled</div>
+            <p>${bodyMessage}</p>
+            <div class="amount-box">
+              <p style="margin:0;color:#666;">Order Number</p>
+              <div style="font-size:18px;font-weight:bold;">${orderNumber}</div>
+              <p style="margin:10px 0 0;color:#666;">Amount</p>
+              <div class="amount">₹${orderTotal.toFixed(2)}</div>
+            </div>
+            <div class="info-box">
+              <strong>What happened?</strong><br>
+              Payment for this order was not received within 10 minutes of placing it, so the order was automatically cancelled and stock was released.
+            </div>
+            <div style="text-align:center;">
+              <a href="${baseUrl}${redirectPath}" class="button" style="color:#ffffff;">${ctaLabel}</a>
+            </div>
+            <p style="margin-top:25px;">If you completed the payment but still received this email, please contact us so we can reconcile your transaction.</p>
+            <div class="footer">
+              <p>Need help? Reply to this email or contact <a href="mailto:${process.env.SUPPORT_EMAIL || 'jeffistoress@gmail.com'}">${process.env.SUPPORT_EMAIL || 'jeffistoress@gmail.com'}</a></p>
+              <p>&copy; ${new Date().getFullYear()} Jeffi Stores</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+export async function sendOrderAutoCancelledAdminNotification(order: any, redirectPath: string) {
+  const adminEmail = await getAdminNotificationEmails()
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
+  const total = parseFloat(order.total_amount || 0)
+
+  const mailOptions = {
+    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+    to: adminEmail,
+    subject: `[Auto-Cancelled] Order ${order.order_number}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
+            .badge { background-color: #ef4444; color: white; font-size: 16px; font-weight: bold; text-align: center; padding: 12px; border-radius: 8px; margin: 15px 0; }
+            table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+            td { padding: 8px; border-bottom: 1px solid #e0e0e0; }
+            td.label { color: #666; width: 40%; }
+            .button { display: inline-block; background-color: #2563eb; color: white !important; padding: 10px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h2 style="margin-top:0;">Order Auto-Cancelled (Payment Timeout)</h2>
+            <div class="badge">10-MINUTE PAYMENT WINDOW EXPIRED</div>
+            <p>An order was automatically cancelled because the customer did not complete payment within 10 minutes.</p>
+            <table>
+              <tr><td class="label">Order Number</td><td><strong>${order.order_number}</strong></td></tr>
+              <tr><td class="label">Customer</td><td>${order.customer_name || ''} &lt;${order.customer_email || ''}&gt;</td></tr>
+              <tr><td class="label">Order Type</td><td>${order.order_type || 'cart'}</td></tr>
+              <tr><td class="label">Amount</td><td>₹${total.toFixed(2)}</td></tr>
+              <tr><td class="label">Customer Redirected To</td><td>${redirectPath}</td></tr>
+            </table>
+            <p>Stock has been released. ${order.order_type === 'direct' ? 'Items were not restored to a cart (direct order).' : 'Items were restored to the customer cart.'}</p>
+            <div style="text-align:center;margin-top:20px;">
+              <a href="${baseUrl}/admin/orders/${order.id}" class="button" style="color:#ffffff;">View Order in Admin</a>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  }
+
   try {
     const info = await transporter.sendMail(mailOptions)
     return { success: true, messageId: info.messageId }

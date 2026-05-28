@@ -6,12 +6,13 @@ const ALLOWED_ORIGINS = [
 
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.razorpay.com https://*.google.com https://*.googleapis.com https://www.googletagmanager.com",
-  "style-src 'self' 'unsafe-inline' https://*.googleapis.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://cdn.razorpay.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://maps.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' https://*.razorpay.com https://*.google.com https://*.googleapis.com https://dm9rri2wgl1e.cloudfront.net https://*.google-analytics.com https://www.googletagmanager.com",
-  "img-src 'self' data: blob: https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com https://*.googleusercontent.com https://*.gstatic.com https://*.googleapis.com https://*.google-analytics.com https://www.googletagmanager.com",
-  "frame-src https://*.razorpay.com https://*.google.com",
+  "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://cdn.razorpay.com https://ifsc.razorpay.com https://accounts.google.com https://oauth2.googleapis.com https://maps.googleapis.com https://dm9rri2wgl1e.cloudfront.net https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com",
+  "img-src 'self' data: blob: https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com https://lh3.googleusercontent.com https://maps.gstatic.com https://maps.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com",
+  "frame-src https://*.razorpay.com https://accounts.google.com",
+  "child-src https://*.razorpay.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

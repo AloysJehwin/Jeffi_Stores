@@ -11,7 +11,6 @@ import DelhiveryTracking from '@/components/DelhiveryTracking'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
-const RETURN_WINDOW_DAYS = 7
 const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 
 interface OrderItem {
@@ -24,6 +23,10 @@ interface OrderItem {
   totalPrice: number
   buyMode?: string
   buyUnit?: string | null
+  returnAllowed: boolean
+  returnWindowDays: number
+  replacementAllowed: boolean
+  replacementWindowDays: number
   products: {
     slug: string
     product_images: Array<{
@@ -185,7 +188,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const response = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restoreToCart: order?.orderType !== 'direct' }),
+        body: JSON.stringify({
+          restoreToCart: order?.orderType !== 'direct',
+          autoCancelUnpaid: true,
+        }),
       })
       if (response.ok) {
         await fetchOrder()
@@ -372,15 +378,23 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const canReturn = order?.status === 'delivered' && !returnRequest && (() => {
     const deliveryDate = order.deliveredAt || order.updatedAt
     if (!deliveryDate) return false
-    const expiry = new Date(deliveryDate).getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000
-    return Date.now() <= expiry
+    const ts = new Date(deliveryDate).getTime()
+    return order.items.some((item: OrderItem) => {
+      if (!item.returnAllowed && !item.replacementAllowed) return false
+      const days = Math.max(item.returnWindowDays, item.replacementWindowDays)
+      return Date.now() <= ts + days * 24 * 60 * 60 * 1000
+    })
   })()
 
-  const returnWindowExpired = order?.status === 'delivered' && !returnRequest && (() => {
+  const returnWindowExpired = order?.status === 'delivered' && !returnRequest && !canReturn && (() => {
     const deliveryDate = order.deliveredAt || order.updatedAt
     if (!deliveryDate) return false
-    const expiry = new Date(deliveryDate).getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000
-    return Date.now() > expiry
+    const ts = new Date(deliveryDate).getTime()
+    return order.items.some((item: OrderItem) => item.returnAllowed || item.replacementAllowed) &&
+      order.items.every((item: OrderItem) => {
+        const days = Math.max(item.returnWindowDays, item.replacementWindowDays)
+        return Date.now() > ts + days * 24 * 60 * 60 * 1000
+      })
   })()
 
   const MobileAccountHeader = () => (
@@ -540,7 +554,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   )}
                   {returnWindowExpired && (
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 cursor-not-allowed">
-                      Return window closed ({RETURN_WINDOW_DAYS} days from delivery)
+                      Return window closed
                     </span>
                   )}
                   {order.invoiceNumber && !order.originalOrderId && (

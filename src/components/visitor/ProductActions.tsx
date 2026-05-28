@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
-import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 
 interface VariantImage {
@@ -90,13 +89,10 @@ export default function ProductActions({
   onVariantChange,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
-  const { showToast, showConfirm } = useToast()
-  const { user } = useAuth()
+  const { showToast } = useToast()
   const router = useRouter()
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [isBuyingNow, setIsBuyingNow] = useState(false)
-  const [isAddingToWishlist, setIsAddingToWishlist] = useState(false)
-  const [isInWishlist, setIsInWishlist] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [customQty, setCustomQty] = useState('1')
 
@@ -269,19 +265,6 @@ export default function ProductActions({
     setQuantity(1)
   }, [selectedVariantId])
 
-  useEffect(() => {
-    const checkWishlistStatus = async () => {
-      try {
-        const response = await fetch('/api/wishlist', { credentials: 'include' })
-        if (response.ok) {
-          const data = await response.json()
-          setIsInWishlist(data.items?.some((item: any) => item.product_id === productId))
-        }
-      } catch {}
-    }
-    checkWishlistStatus()
-  }, [productId, user])
-
   const handleAddToCart = async () => {
     setIsAddingToCart(true)
     try {
@@ -336,54 +319,6 @@ export default function ProductActions({
     if (selectedSubVariant) params.set('subVariantName', selectedSubVariant.sub_variant_name)
     if (currentUnit) params.set('buyUnit', currentUnit)
     router.push(`/checkout/review?${params.toString()}`)
-  }
-
-  const handleToggleWishlist = async () => {
-    if (!user) {
-      showConfirm({
-        title: 'Sign In Required',
-        message: 'Please sign in to save items to your wishlist and access them anytime.',
-        confirmText: 'Sign In',
-        cancelText: 'Maybe Later',
-        type: 'info',
-        onConfirm: () => {
-          router.push(`/login?redirect=/products/${productName.toLowerCase().replace(/\s+/g, '-')}`)
-        },
-      })
-      return
-    }
-
-    setIsAddingToWishlist(true)
-    try {
-      if (isInWishlist) {
-        const response = await fetch(`/api/wishlist?productId=${productId}`, { method: 'DELETE', credentials: 'include' })
-        if (response.ok) {
-          setIsInWishlist(false)
-          showToast('Removed from wishlist', 'success')
-        } else {
-          const data = await response.json()
-          showToast(data.message || 'Failed to remove from wishlist', 'error')
-        }
-      } else {
-        const response = await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId }),
-          credentials: 'include',
-        })
-        if (response.ok) {
-          setIsInWishlist(true)
-          showToast('Added to wishlist!', 'success')
-        } else {
-          const data = await response.json()
-          showToast(data.message || 'Failed to add to wishlist', 'error')
-        }
-      }
-    } catch {
-      showToast('Failed to update wishlist', 'error')
-    } finally {
-      setIsAddingToWishlist(false)
-    }
   }
 
   return (
@@ -600,7 +535,21 @@ export default function ProductActions({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
               </svg>
             </button>
-            <span className="px-6 py-2 border-x border-border-secondary min-w-[80px] text-center font-semibold">{quantity}</span>
+            <input
+              type="number"
+              min={1}
+              max={effectiveStock}
+              value={quantity}
+              onChange={e => {
+                const v = parseInt(e.target.value, 10)
+                if (!isNaN(v)) setQuantity(Math.min(effectiveStock, Math.max(1, v)))
+              }}
+              onBlur={e => {
+                const v = parseInt(e.target.value, 10)
+                setQuantity(isNaN(v) || v < 1 ? 1 : Math.min(effectiveStock, v))
+              }}
+              className="w-16 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
             <button
               onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
               disabled={quantity >= effectiveStock}
@@ -638,7 +587,6 @@ export default function ProductActions({
             <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>Add to Cart</>
           )}
         </button>
-
       </div>
 
     </div>

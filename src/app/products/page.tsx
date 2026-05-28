@@ -4,8 +4,8 @@ import SortDropdown from '@/components/visitor/SortDropdown'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
-import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import Pagination from '@/components/ui/Pagination'
+import ProductCard from '@/components/visitor/ProductCard'
 
 const PAGE_SIZE = 21
 
@@ -181,13 +181,10 @@ export default async function ProductsPage({
     <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
       <div className="container mx-auto px-4 h-full">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 lg:h-full">
-          {/* Sidebar Filters */}
-          <aside className="lg:col-span-1 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
-            {/* Mobile bottom-sheet filter */}
-            <MobileFilterSheet categories={allCats} brands={brands as any[]} />
-
+          {/* Sidebar Filters — desktop only */}
+          <aside className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
             {/* Desktop sidebar filter */}
-            <div className="hidden lg:block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
                 <h2 className="font-bold text-lg text-foreground mb-4">Filters</h2>
 
                 {/* Search */}
@@ -375,9 +372,14 @@ export default async function ProductsPage({
           {/* Products Grid */}
           <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
             {/* Page heading */}
-            <div className="mb-4">
-              <h1 className="text-2xl md:text-3xl font-bold text-secondary-500 dark:text-foreground">All Products</h1>
-              <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of hardware and industrial tools</p>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-secondary-500 dark:text-foreground">All Products</h1>
+                <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of hardware and industrial tools</p>
+              </div>
+              <div className="lg:hidden shrink-0">
+                <MobileFilterSheet categories={allCats} brands={brands as any[]} />
+              </div>
             </div>
             {/* Sort Bar */}
             <div className="flex items-center justify-between mb-6">
@@ -407,81 +409,20 @@ export default async function ProductsPage({
                       : 0
 
                     return (
-                      <Link
+                      <ProductCard
                         key={product.id}
-                        href={`/products/${product.slug}`}
-                        className="group"
-                      >
-                        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
-                          {/* Product Image */}
-                          <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
-                            {primaryImage ? (
-                              <>
-                                <img
-                                  src={primaryImage.image_url}
-                                  alt=""
-                                  aria-hidden="true"
-                                  className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
-                                />
-                                <div className="relative w-full h-full">
-                                  <ImgWithSkeleton
-                                    src={primaryImage.image_url}
-                                    alt={product.name}
-                                    className="w-full h-full object-contain"
-                                  />
-                                </div>
-                              </>
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <svg className="w-20 h-20 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                            )}
-                            {mrpDiscount > 0 && (
-                              <div className="absolute top-3 right-3 bg-accent-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                                {mrpDiscount}% off
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Product Info */}
-                          <div className="p-5 flex flex-col flex-grow">
-                            <h3 className="font-semibold text-base text-foreground mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[3rem]">
-                              {product.name}
-                            </h3>
-                            <div className="text-xs text-foreground-muted mb-3 space-y-1">
-                              {product.brands && (
-                                <div>Brand: {product.brands.name}</div>
-                              )}
-                              {product.categories && (
-                                <div>Category: {product.categories.name}</div>
-                              )}
-                            </div>
-                            <div className="mt-auto">
-                              <div className="flex items-baseline gap-2 mb-1">
-                                <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
-                                  {hasVariants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                                </span>
-                                {mrp && mrp > Number(displayPrice) && (
-                                  <span className="text-sm text-foreground-muted line-through">
-                                    ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[10px] text-foreground-muted mb-3">Inclusive of all taxes</p>
-                              <div className="flex items-center justify-between">
-                                <span className={`text-xs font-medium ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
-                                </span>
-                                <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-sm">
-                                  View Details →
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
+                        id={product.id}
+                        name={product.name}
+                        slug={product.slug}
+                        hasVariants={hasVariants}
+                        displayPrice={Number(displayPrice)}
+                        mrp={mrp}
+                        mrpDiscount={mrpDiscount}
+                        effectiveStock={effectiveStock}
+                        primaryImage={primaryImage}
+                        brandName={product.brands?.name ?? null}
+                        categoryName={product.categories?.name ?? null}
+                      />
                     )
                   })}
                 </div>

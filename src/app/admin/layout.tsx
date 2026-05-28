@@ -73,11 +73,14 @@ export default async function AdminLayout({
     { href: '/admin/mailer', label: 'Mailer', scope: 'mailer', group: 'Marketing' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews', group: 'Marketing' },
     { href: '/admin/inflation', label: 'Inflation', scope: 'inflation', group: 'Settings' },
-    { href: '/admin/team', label: 'Team Members', scope: 'settings', group: 'Settings' },
+    { href: '/admin/team', label: 'Team Members', scope: 'settings', group: 'Settings', superAdminOnly: true },
     { href: '/admin/settings', label: 'Settings', scope: 'settings', group: 'Settings' },
   ]
 
-  const filteredNavLinks = navLinks.filter(link => hasScope(role, scopes, link.scope))
+  const filteredNavLinks = navLinks.filter(link => {
+    if ('superAdminOnly' in link && link.superAdminOnly && role !== 'super_admin') return false
+    return hasScope(role, scopes, link.scope)
+  })
   const desktopNavLinks = filteredNavLinks.filter(link => !('mobileOnly' in link && link.mobileOnly))
 
   const displayName = session?.first_name && session?.last_name

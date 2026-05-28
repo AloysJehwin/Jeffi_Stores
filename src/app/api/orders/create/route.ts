@@ -141,13 +141,14 @@ export async function POST(request: NextRequest) {
     const order = await withTransaction(async (client) => {
       let shippingAddressId = null
       let billingAddressId = null
+      let shippingAddressSnapshot = null
 
       if (shippingAddress) {
         const fullName = shippingAddress.fullName || `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
         const phone = shippingAddress.phone || user.phone || '0000000000'
 
         const existingAddress = await client.query(
-          `SELECT id FROM addresses
+          `SELECT * FROM addresses
            WHERE user_id = $1 AND address_line1 = $2 AND city = $3 AND postal_code = $4
            LIMIT 1`,
           [userId, shippingAddress.addressLine1, shippingAddress.city, shippingAddress.postalCode]
@@ -156,11 +157,12 @@ export async function POST(request: NextRequest) {
         if (existingAddress.rows[0]) {
           shippingAddressId = existingAddress.rows[0].id
           billingAddressId = existingAddress.rows[0].id
+          shippingAddressSnapshot = existingAddress.rows[0]
         } else {
           const addressResult = await client.query(
             `INSERT INTO addresses (user_id, address_type, full_name, phone, address_line1, address_line2, landmark, city, state, postal_code, country, is_default)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-             RETURNING id`,
+             RETURNING *`,
             [userId, 'both', fullName, phone, shippingAddress.addressLine1,
              shippingAddress.addressLine2 || null, shippingAddress.landmark || null,
              shippingAddress.city, shippingAddress.state, shippingAddress.postalCode,
@@ -170,6 +172,7 @@ export async function POST(request: NextRequest) {
           if (addressResult.rows[0]) {
             shippingAddressId = addressResult.rows[0].id
             billingAddressId = addressResult.rows[0].id
+            shippingAddressSnapshot = addressResult.rows[0]
           }
         }
       }
@@ -223,16 +226,17 @@ export async function POST(request: NextRequest) {
       }
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, shipping_address_snapshot, billing_address_snapshot, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $17, $18, $19, $20, $21)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
          'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, Math.max(0, total), shippingAddressId, billingAddressId,
-         addrSnapshot ? JSON.stringify(addrSnapshot) : null,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
-         isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST]
+         isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
+         shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null),
+         shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null)]
       )
 
       const createdOrder = orderResult.rows[0]

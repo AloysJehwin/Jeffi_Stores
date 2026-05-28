@@ -45,9 +45,16 @@ export async function GET(
              FROM product_images pi WHERE pi.product_id = p.id),
             '[]'::json
           )
-        ) AS products
+        ) AS products,
+        COALESCE(b.return_allowed, COALESCE(c.return_allowed, pc.return_allowed, true)) AS return_allowed,
+        COALESCE(b.return_window_days, COALESCE(c.return_window_days, pc.return_window_days, 7)) AS return_window_days,
+        COALESCE(b.replacement_allowed, COALESCE(c.replacement_allowed, pc.replacement_allowed, true)) AS replacement_allowed,
+        COALESCE(b.replacement_window_days, COALESCE(c.replacement_window_days, pc.replacement_window_days, 7)) AS replacement_window_days
       FROM order_items oi
       LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN brands b ON p.brand_id = b.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN categories pc ON c.parent_category_id = pc.id
       WHERE oi.order_id = $1
     `, [orderId])
 
@@ -83,6 +90,10 @@ export async function GET(
         buyMode: item.buy_mode || 'unit',
         buyUnit: item.buy_unit || null,
         products: item.products,
+        returnAllowed: item.return_allowed === false ? false : !!item.return_allowed,
+        returnWindowDays: parseInt(item.return_window_days) || 7,
+        replacementAllowed: item.replacement_allowed === false ? false : !!item.replacement_allowed,
+        replacementWindowDays: parseInt(item.replacement_window_days) || 7,
       })),
     }
 
@@ -301,6 +312,48 @@ export async function PATCH(
   }
 }
 
-export async function DELETE() {
-  return NextResponse.json({ error: 'Orders cannot be deleted.' }, { status: 405 })
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const authUser = await authenticateUser(request)
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const order = await queryOne<{
+      id: string
+      status: string
+      payment_status: string
+      committed_payment_count: number
+    }>(
+      `SELECT o.id, o.status, o.payment_status,
+        (SELECT COUNT(*) FROM payments p WHERE p.order_id = o.id AND p.status NOT IN ('pending', 'failed'))::int AS committed_payment_count
+       FROM orders o
+       WHERE o.id = $1 AND o.user_id = $2`,
+      [params.id, authUser.userId]
+    )
+
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    if (
+      order.status !== 'pending' ||
+      order.payment_status !== 'unpaid' ||
+      order.committed_payment_count > 0
+    ) {
+      return NextResponse.json(
+        { error: 'Order cannot be deleted in its current state' },
+        { status: 400 }
+      )
+    }
+
+    await query('DELETE FROM orders WHERE id = $1 AND user_id = $2', [params.id, authUser.userId])
+
+    return NextResponse.json({ success: true, deleted: true })
+  } catch {
+    return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
+  }
 }

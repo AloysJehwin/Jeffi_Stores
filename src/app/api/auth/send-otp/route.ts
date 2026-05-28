@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateOTP, storeOTP } from '@/lib/otp'
+import { generateOTP, storeOTP, checkSendOtpRateLimit, recordSendOtp } from '@/lib/otp'
 import { sendOTPEmail } from '@/lib/email'
 import { queryOne } from '@/lib/db'
 
@@ -15,6 +15,17 @@ export async function POST(request: NextRequest) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+    }
+
+    const rateLimit = await checkSendOtpRateLimit(email)
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: `Please wait ${rateLimit.retryAfter}s before requesting another OTP.`,
+          retryAfter: rateLimit.retryAfter,
+        },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfter) } }
+      )
     }
 
     if (isSignup) {
@@ -49,12 +60,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    await recordSendOtp(email)
+
     return NextResponse.json({
       message: 'OTP sent successfully to your email',
       email: email.toLowerCase(),
+      nextCooldown: rateLimit.nextCooldown,
     })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to send OTP' }, { status: 500 })
   }
 }
-

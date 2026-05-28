@@ -213,7 +213,12 @@ function CheckoutPage() {
         theme: { color: '#f97316' },
         modal: {
           ondismiss: function () {
-            window.location.href = `/account/orders/${orderId}`
+            fetch(`/api/orders/${orderId}`, {
+              method: 'DELETE',
+              credentials: 'include',
+              keepalive: true,
+            }).catch(() => {})
+            setIsSubmitting(false)
           },
         },
       }
@@ -225,6 +230,7 @@ function CheckoutPage() {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ errorDescription: response.error.description }),
+          keepalive: true,
         }).catch(() => {})
         window.location.href = `/account/orders/${orderId}`
       })

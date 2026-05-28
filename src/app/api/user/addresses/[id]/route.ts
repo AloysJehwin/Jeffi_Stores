@@ -63,7 +63,7 @@ export async function PATCH(
     }
 
     return NextResponse.json({ address })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -103,7 +103,7 @@ export async function DELETE(
     )
 
     return NextResponse.json({ message: 'Address deleted successfully' })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
