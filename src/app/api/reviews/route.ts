@@ -19,13 +19,69 @@ export async function GET(request: NextRequest) {
         json_build_object('first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM product_reviews pr
       LEFT JOIN users u ON pr.user_id = u.id
-      WHERE pr.product_id = $1 AND pr.is_approved = true
+      WHERE pr.product_id = $1
       ORDER BY pr.created_at DESC
     `, [productId])
 
     return NextResponse.json({ reviews: reviews || [] })
   } catch {
     return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const user = await authenticateUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const formData = await request.formData()
+    const reviewId = formData.get('reviewId') as string
+    const ratingRaw = formData.get('rating') as string
+    const title = formData.get('title') as string | null
+    const comment = formData.get('comment') as string
+    const rating = parseInt(ratingRaw, 10)
+    const existingImageUrlsRaw = formData.get('existingImageUrls') as string | null
+    const existingImageThumbUrlsRaw = formData.get('existingImageThumbUrls') as string | null
+
+    if (!reviewId || !rating || !comment) {
+      return NextResponse.json({ error: 'Review ID, rating, and comment are required' }, { status: 400 })
+    }
+    if (rating < 1 || rating > 5) {
+      return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 })
+    }
+
+    const existing = await queryOne(
+      'SELECT id FROM product_reviews WHERE id = $1 AND user_id = $2',
+      [reviewId, user.userId]
+    )
+    if (!existing) {
+      return NextResponse.json({ error: 'Review not found' }, { status: 404 })
+    }
+
+    let imageUrls: string[] = existingImageUrlsRaw ? JSON.parse(existingImageUrlsRaw) : []
+    let imageThumbnailUrls: string[] = existingImageThumbUrlsRaw ? JSON.parse(existingImageThumbUrlsRaw) : []
+
+    const newImageFiles = formData.getAll('images') as File[]
+    const validNewImages = newImageFiles.filter(f => f && f.size > 0).slice(0, Math.max(0, 3 - imageUrls.length))
+    if (validNewImages.length > 0) {
+      for (const file of validNewImages) {
+        const { url, thumbnailUrl } = await uploadReviewImage(file, reviewId)
+        imageUrls.push(url)
+        imageThumbnailUrls.push(thumbnailUrl)
+      }
+    }
+
+    const updated = await queryOne(
+      `UPDATE product_reviews SET rating = $1, title = $2, comment = $3, image_urls = $4, image_thumbnail_urls = $5, is_approved = false, updated_at = now()
+       WHERE id = $6 AND user_id = $7 RETURNING *`,
+      [rating, title?.trim() || null, comment.trim(), imageUrls, imageThumbnailUrls, reviewId, user.userId]
+    )
+
+    return NextResponse.json({ message: 'Review updated. Changes will be visible after re-approval.', review: updated })
+  } catch {
+    return NextResponse.json({ error: 'Failed to update review' }, { status: 500 })
   }
 }
 
@@ -110,7 +166,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      message: 'Review submitted successfully! It will be visible after admin approval.',
+      message: 'Review submitted successfully!',
       review
     })
   } catch {
