@@ -516,14 +516,6 @@ export default function ProductReviews({ productId, productName }: ProductReview
                               Verified Purchase
                             </span>
                           )}
-                          {review.is_approved && (
-                            <span className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs px-2 py-0.5 rounded-full font-medium">
-                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              Verified
-                            </span>
-                          )}
                           <span className="text-xs text-foreground-muted ml-auto shrink-0">
                             {new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
