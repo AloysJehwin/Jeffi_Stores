@@ -9,8 +9,6 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
   const [categories, productCountRows, misassignedRows] = await Promise.all([
     getFilteredCategories({
       is_active: searchParams.is_active,
-      type: searchParams.type,
-      search: searchParams.search,
     }),
     queryMany<{ category_id: string; count: string }>(
       'SELECT category_id, COUNT(*) as count FROM products WHERE is_active = true GROUP BY category_id'
@@ -94,7 +92,12 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
         searchParam="search"
       />
 
-      <CategoriesClient initialCategories={allCategories} productCounts={productCounts} />
+      <CategoriesClient
+        initialCategories={allCategories}
+        productCounts={productCounts}
+        initialSearch={searchParams.search || ''}
+        initialType={searchParams.type || ''}
+      />
     </div>
   )
 }
