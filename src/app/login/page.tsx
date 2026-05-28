@@ -28,7 +28,14 @@ function LoginPage() {
   const [otp, setOtp] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendCooldown])
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
@@ -111,6 +118,7 @@ function LoginPage() {
 
   const handleResendOTP = async () => {
     setError('')
+    setOtp('')
     setIsLoading(true)
     try {
       const response = await fetch('/api/auth/send-otp', {
@@ -120,7 +128,8 @@ function LoginPage() {
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to resend OTP')
-      showToast('OTP sent successfully!', 'success')
+      setResendCooldown(60)
+      showToast('New OTP sent! Check your email for the latest code.', 'success')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -217,9 +226,9 @@ function LoginPage() {
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <button type="button" onClick={handleResendOTP} disabled={isLoading}
-                  className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
-                  Resend Code
+                <button type="button" onClick={handleResendOTP} disabled={isLoading || resendCooldown > 0}
+                  className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
                 </button>
                 <button type="button" onClick={() => setStep('email')}
                   className="text-foreground-secondary hover:text-foreground">
