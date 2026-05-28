@@ -155,10 +155,10 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 items-stretch">
         {items.map((item, i) => (
           <Link key={i} href={item.href} target="_blank" rel="noopener noreferrer"
-            className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group">
+            className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${item.color}`}>
               {item.icon}
             </div>
