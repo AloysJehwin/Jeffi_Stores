@@ -166,7 +166,7 @@ export default function AddressesPage() {
       type: 'danger',
       onConfirm: async () => {
         try {
-          const response = await fetch(`/api/user/addresses/${addressId}`, { method: 'DELETE' })
+          const response = await fetch(`/api/user/addresses/${addressId}`, { method: 'DELETE', credentials: 'include' })
           if (response.ok) {
             await fetchAddresses()
             showToast('Address deleted successfully', 'success')

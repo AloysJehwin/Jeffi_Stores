@@ -11,14 +11,15 @@ import { useCart } from '@/contexts/CartContext'
 export default function Header() {
   const { cartCount } = useCart()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   return (
     <>
       <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default fixed top-0 left-0 right-0 z-40 w-full">
-        <div className="container mx-auto px-3 sm:px-4">
-          <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20">
+        <div className="container mx-auto px-3 sm:px-4 relative">
+          <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20 gap-3">
             {/* Logo */}
-            <Link href="/" className="flex items-center">
+            <Link href="/" className="flex items-center shrink-0">
               <div className="flex items-center gap-2 sm:gap-3">
                 <img
                   src="/images/logo.png"
@@ -33,7 +34,14 @@ export default function Header() {
             </Link>
 
             {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center gap-8">
+            <nav
+              className={`hidden lg:flex items-center gap-8 transition-all duration-300 ${
+                searchOpen
+                  ? 'opacity-0 pointer-events-none -translate-y-1 invisible'
+                  : 'opacity-100 translate-y-0 visible'
+              }`}
+              aria-hidden={searchOpen}
+            >
               <Link href="/" className="text-foreground-secondary hover:text-accent-500 font-medium transition-colors">
                 Home
               </Link>
@@ -52,9 +60,9 @@ export default function Header() {
             </nav>
 
             {/* Right Actions */}
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               {/* Search Bar */}
-              <SearchBar />
+              <SearchBar isOpen={searchOpen} onOpen={() => setSearchOpen(true)} onClose={() => setSearchOpen(false)} />
 
               {/* Tools/Spanner Icon (mobile) */}
               <Link href="/support" className="sm:hidden p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors">

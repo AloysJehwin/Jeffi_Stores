@@ -33,10 +33,13 @@ export async function GET(request: NextRequest) {
         SELECT
           o.id, o.order_number, o.created_at, o.status, o.payment_status,
           o.total_amount, o.subtotal, o.shipping_address_id,
-          (SELECT row_to_json(a) FROM (
-            SELECT address_line1, address_line2, city, state, postal_code
-            FROM addresses WHERE id = o.shipping_address_id
-          ) a) AS addresses,
+          COALESCE(
+            o.shipping_address_snapshot,
+            (SELECT to_jsonb(a) FROM (
+              SELECT address_line1, address_line2, city, state, postal_code
+              FROM addresses WHERE id = o.shipping_address_id
+            ) a)
+          ) AS addresses,
           COALESCE(
             (SELECT json_agg(
               json_build_object(

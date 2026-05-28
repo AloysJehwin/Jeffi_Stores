@@ -38,8 +38,7 @@ export async function POST(request: NextRequest) {
     const razorpayOrder = await razorpay.orders.create({
       amount: amountInPaise,
       currency: 'INR',
-      receipt: order.order_number,
-      payment_capture: true,
+      receipt: order.order_number.slice(0, 40),
       notes: {
         order_id: order.id,
         order_number: order.order_number,
@@ -65,7 +64,8 @@ export async function POST(request: NextRequest) {
       currency: 'INR',
       orderId: order.id,
     })
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to create payment order' }, { status: 500 })
+  } catch (error: any) {
+    const msg = error?.error?.description || error?.message || 'Failed to create payment order'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

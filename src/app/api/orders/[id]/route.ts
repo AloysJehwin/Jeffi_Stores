@@ -20,10 +20,13 @@ export async function GET(
 
     const order = await queryOne(`
       SELECT o.*,
-        (SELECT row_to_json(a) FROM (
-          SELECT full_name, address_line1, address_line2, landmark, city, state, postal_code, phone
-          FROM addresses WHERE id = o.shipping_address_id
-        ) a) AS shipping_address,
+        COALESCE(
+          o.shipping_address_snapshot,
+          (SELECT to_jsonb(a) FROM (
+            SELECT full_name, address_line1, address_line2, landmark, city, state, postal_code, phone
+            FROM addresses WHERE id = o.shipping_address_id
+          ) a)
+        ) AS shipping_address,
         orig.order_number AS original_order_number
       FROM orders o
       LEFT JOIN orders orig ON orig.id = o.original_order_id
@@ -309,6 +312,48 @@ export async function PATCH(
   }
 }
 
-export async function DELETE() {
-  return NextResponse.json({ error: 'Orders cannot be deleted.' }, { status: 405 })
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const authUser = await authenticateUser(request)
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const order = await queryOne<{
+      id: string
+      status: string
+      payment_status: string
+      committed_payment_count: number
+    }>(
+      `SELECT o.id, o.status, o.payment_status,
+        (SELECT COUNT(*) FROM payments p WHERE p.order_id = o.id AND p.status NOT IN ('pending', 'failed'))::int AS committed_payment_count
+       FROM orders o
+       WHERE o.id = $1 AND o.user_id = $2`,
+      [params.id, authUser.userId]
+    )
+
+    if (!order) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    if (
+      order.status !== 'pending' ||
+      order.payment_status !== 'unpaid' ||
+      order.committed_payment_count > 0
+    ) {
+      return NextResponse.json(
+        { error: 'Order cannot be deleted in its current state' },
+        { status: 400 }
+      )
+    }
+
+    await query('DELETE FROM orders WHERE id = $1 AND user_id = $2', [params.id, authUser.userId])
+
+    return NextResponse.json({ success: true, deleted: true })
+  } catch {
+    return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
+  }
 }

@@ -181,13 +181,10 @@ export default async function ProductsPage({
     <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
       <div className="container mx-auto px-4 h-full">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 lg:h-full">
-          {/* Sidebar Filters */}
-          <aside className="lg:col-span-1 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
-            {/* Mobile bottom-sheet filter */}
-            <MobileFilterSheet categories={allCats} brands={brands as any[]} />
-
+          {/* Sidebar Filters — desktop only */}
+          <aside className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
             {/* Desktop sidebar filter */}
-            <div className="hidden lg:block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
                 <h2 className="font-bold text-lg text-foreground mb-4">Filters</h2>
 
                 {/* Search */}
@@ -375,9 +372,14 @@ export default async function ProductsPage({
           {/* Products Grid */}
           <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
             {/* Page heading */}
-            <div className="mb-4">
-              <h1 className="text-2xl md:text-3xl font-bold text-secondary-500 dark:text-foreground">All Products</h1>
-              <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of hardware and industrial tools</p>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-secondary-500 dark:text-foreground">All Products</h1>
+                <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of hardware and industrial tools</p>
+              </div>
+              <div className="lg:hidden shrink-0">
+                <MobileFilterSheet categories={allCats} brands={brands as any[]} />
+              </div>
             </div>
             {/* Sort Bar */}
             <div className="flex items-center justify-between mb-6">
