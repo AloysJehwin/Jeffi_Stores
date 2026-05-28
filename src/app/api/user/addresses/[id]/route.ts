@@ -97,18 +97,6 @@ export async function DELETE(
       )
     }
 
-    const orderLink = await queryOne(
-      'SELECT id FROM orders WHERE shipping_address_id = $1 OR billing_address_id = $1 LIMIT 1',
-      [addressId]
-    )
-
-    if (orderLink) {
-      return NextResponse.json(
-        { error: 'This address cannot be deleted because it is linked to existing orders. You can edit it instead.', code: 'ADDRESS_IN_USE' },
-        { status: 400 }
-      )
-    }
-
     await query(
       'DELETE FROM addresses WHERE id = $1 AND user_id = $2',
       [addressId, userId]

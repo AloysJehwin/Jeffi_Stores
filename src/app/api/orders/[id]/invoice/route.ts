@@ -22,7 +22,14 @@ export async function GET(
     const orderId = params.id
 
     const order = await queryOne(
-      `SELECT o.*, a.full_name, a.address_line1, a.address_line2, a.city, a.state, a.postal_code, a.phone AS address_phone
+      `SELECT o.*,
+        COALESCE((o.shipping_address_snapshot->>'full_name'), a.full_name) AS full_name,
+        COALESCE((o.shipping_address_snapshot->>'address_line1'), a.address_line1) AS address_line1,
+        COALESCE((o.shipping_address_snapshot->>'address_line2'), a.address_line2) AS address_line2,
+        COALESCE((o.shipping_address_snapshot->>'city'), a.city) AS city,
+        COALESCE((o.shipping_address_snapshot->>'state'), a.state) AS state,
+        COALESCE((o.shipping_address_snapshot->>'postal_code'), a.postal_code) AS postal_code,
+        COALESCE((o.shipping_address_snapshot->>'phone'), a.phone) AS address_phone
        FROM orders o
        LEFT JOIN addresses a ON o.shipping_address_id = a.id
        WHERE o.id = $1`,
@@ -130,8 +137,18 @@ export async function GET(
     let billingAddress: InvoiceBuyerAddress | undefined
     if (order.billing_address_id && order.billing_address_id !== order.shipping_address_id) {
       const billAddr = await queryOne(
-        'SELECT full_name, address_line1, address_line2, city, state, postal_code, phone FROM addresses WHERE id = $1',
-        [order.billing_address_id]
+        `SELECT
+          COALESCE((o.billing_address_snapshot->>'full_name'), a.full_name) AS full_name,
+          COALESCE((o.billing_address_snapshot->>'address_line1'), a.address_line1) AS address_line1,
+          COALESCE((o.billing_address_snapshot->>'address_line2'), a.address_line2) AS address_line2,
+          COALESCE((o.billing_address_snapshot->>'city'), a.city) AS city,
+          COALESCE((o.billing_address_snapshot->>'state'), a.state) AS state,
+          COALESCE((o.billing_address_snapshot->>'postal_code'), a.postal_code) AS postal_code,
+          COALESCE((o.billing_address_snapshot->>'phone'), a.phone) AS phone
+         FROM orders o
+         LEFT JOIN addresses a ON a.id = $1
+         WHERE o.id = $2`,
+        [order.billing_address_id, orderId]
       )
       if (billAddr) {
         billingAddress = {

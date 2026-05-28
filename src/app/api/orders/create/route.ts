@@ -213,13 +213,24 @@ export async function POST(request: NextRequest) {
       orderSgst = Math.round(orderSgst * 100) / 100
       orderIgst = Math.round(orderIgst * 100) / 100
 
+      let addrSnapshot: object | null = null
+      if (shippingAddressId) {
+        const addrRow = await client.query(
+          'SELECT full_name, phone, address_line1, address_line2, landmark, city, state, postal_code, country FROM addresses WHERE id = $1',
+          [shippingAddressId]
+        )
+        addrSnapshot = addrRow.rows[0] || null
+      }
+
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, shipping_address_snapshot, billing_address_snapshot, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $15, $16, $17, $18, $19, $20, $21)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, Math.max(0, total), shippingAddressId, billingAddressId, notes || null,
+         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, Math.max(0, total), shippingAddressId, billingAddressId,
+         addrSnapshot ? JSON.stringify(addrSnapshot) : null,
+         notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST]
       )

@@ -261,7 +261,16 @@ export async function POST(
 
       if (returnRequest.type === 'replacement') {
         const originalOrder = await queryOne(
-          `SELECT o.*, a.full_name, a.address_line1, a.address_line2, a.landmark, a.city, a.state, a.postal_code, a.phone, a.country
+          `SELECT o.*,
+            COALESCE((o.shipping_address_snapshot->>'full_name'), a.full_name) AS full_name,
+            COALESCE((o.shipping_address_snapshot->>'address_line1'), a.address_line1) AS address_line1,
+            COALESCE((o.shipping_address_snapshot->>'address_line2'), a.address_line2) AS address_line2,
+            COALESCE((o.shipping_address_snapshot->>'landmark'), a.landmark) AS landmark,
+            COALESCE((o.shipping_address_snapshot->>'city'), a.city) AS city,
+            COALESCE((o.shipping_address_snapshot->>'state'), a.state) AS state,
+            COALESCE((o.shipping_address_snapshot->>'postal_code'), a.postal_code) AS postal_code,
+            COALESCE((o.shipping_address_snapshot->>'phone'), a.phone) AS phone,
+            COALESCE((o.shipping_address_snapshot->>'country'), a.country) AS country
            FROM orders o
            LEFT JOIN addresses a ON a.id = o.shipping_address_id
            WHERE o.id = $1`,
