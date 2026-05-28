@@ -340,17 +340,32 @@ jobs:
               }
               const pool = new Pool(config);
               (async () => {
+                await pool.query(\`
+                  CREATE TABLE IF NOT EXISTS schema_migrations (
+                    filename TEXT PRIMARY KEY,
+                    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                  )
+                \`);
                 const dir = '/app/database/migrations';
                 const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
+                const { rows: applied } = await pool.query('SELECT filename FROM schema_migrations');
+                const appliedSet = new Set(applied.map(r => r.filename));
+                let ran = 0;
                 for (const file of files) {
+                  if (appliedSet.has(file)) {
+                    process.stdout.write('Skipping ' + file + ' (already applied)\n');
+                    continue;
+                  }
                   const sql = fs.readFileSync(path.join(dir, file), 'utf8').trim();
                   if (sql) {
                     process.stdout.write('Running ' + file + '...');
                     await pool.query(sql);
+                    await pool.query('INSERT INTO schema_migrations (filename) VALUES (\$1)', [file]);
                     process.stdout.write(' done\n');
+                    ran++;
                   }
                 }
-                if (files.length === 0) process.stdout.write('No migration files found.\n');
+                if (ran === 0) process.stdout.write('No new migration files to apply.\n');
                 await pool.end();
               })().catch(e => { process.stderr.write(e.message + '\n'); process.exit(1); });
             "
