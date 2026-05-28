@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import AdminSelect from './AdminSelect'
 
 interface Product {
   id: string
@@ -91,16 +92,16 @@ export default function MisassignedProductsBanner({
               <span className="font-medium text-foreground flex-1 min-w-0 truncate">{product.name}</span>
               <span className="text-xs text-amber-700 dark:text-amber-400 whitespace-nowrap">{product.category_name}</span>
               <span className="text-foreground-muted">→</span>
-              <select
+              <AdminSelect
+                sm
                 value={selections[product.id] || ''}
-                onChange={e => setSelections(s => ({ ...s, [product.id]: e.target.value }))}
-                className="text-xs border border-border-secondary rounded px-2 py-1 bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              >
-                <option value="">Select subcategory…</option>
-                {subs.map(sub => (
-                  <option key={sub.id} value={sub.id}>{sub.name}</option>
-                ))}
-              </select>
+                onChange={v => setSelections(s => ({ ...s, [product.id]: v }))}
+                placeholder="Select subcategory…"
+                options={[
+                  { value: '', label: 'Select subcategory…' },
+                  ...subs.map(sub => ({ value: sub.id, label: sub.name })),
+                ]}
+              />
               <button
                 onClick={() => reassign(product)}
                 disabled={!selections[product.id] || saving[product.id]}
