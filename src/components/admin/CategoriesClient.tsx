@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   DndContext,
   DragOverlay,
@@ -42,12 +43,11 @@ interface Category {
   subCount?: number
 }
 
-function ViewModal({ category, subCount, productCount, onClose, onEdit }: {
+function ViewModal({ category, subCount, productCount, onClose }: {
   category: Category
   subCount?: number
   productCount?: number
   onClose: () => void
-  onEdit: () => void
 }) {
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -121,12 +121,13 @@ function ViewModal({ category, subCount, productCount, onClose, onEdit }: {
             </div>
           </div>
           <div className="flex gap-3 pt-1 border-t border-border-default">
-            <button
-              onClick={() => { onClose(); onEdit() }}
+            <Link
+              href={`/admin/categories/edit/${category.id}`}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
+              onClick={onClose}
             >
               Edit Category
-            </button>
+            </Link>
             <a
               href={`/categories/${category.slug}`}
               target="_blank"
@@ -143,16 +144,12 @@ function ViewModal({ category, subCount, productCount, onClose, onEdit }: {
   )
 }
 
-function EditDrawer({ category, allCategories, onClose, onSaved }: {
+function PolicyExpandRow({ category, colSpan, onSaved, onClose }: {
   category: Category
-  allCategories: Category[]
-  onClose: () => void
+  colSpan: number
   onSaved: (updated: Category) => void
+  onClose: () => void
 }) {
-  const [name, setName] = useState(category.name)
-  const [description, setDescription] = useState(category.description ?? '')
-  const [displayOrder, setDisplayOrder] = useState(String(category.display_order))
-  const [isActive, setIsActive] = useState(category.is_active)
   const [returnAllowed, setReturnAllowed] = useState(category.return_allowed !== false)
   const [returnDays, setReturnDays] = useState(category.return_window_days ?? 7)
   const [replacementAllowed, setReplacementAllowed] = useState(category.replacement_allowed !== false)
@@ -161,7 +158,6 @@ function EditDrawer({ category, allCategories, onClose, onSaved }: {
   const [error, setError] = useState<string | null>(null)
 
   async function handleSave() {
-    if (!name.trim()) { setError('Name is required'); return }
     setSaving(true)
     setError(null)
     try {
@@ -169,12 +165,12 @@ function EditDrawer({ category, allCategories, onClose, onSaved }: {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name.trim(),
-          description: description || null,
+          name: category.name,
+          description: category.description || null,
           parent_id: category.parent_category_id || null,
-          display_order: parseInt(displayOrder) || 0,
+          display_order: category.display_order,
           sku_prefix: category.sku_prefix || null,
-          is_active: isActive,
+          is_active: category.is_active,
           google_product_category: null,
           icon_name: category.icon_name || null,
           return_allowed: returnAllowed,
@@ -192,111 +188,58 @@ function EditDrawer({ category, allCategories, onClose, onSaved }: {
     }
   }
 
-  const mainCategories = allCategories.filter(c => !c.parent_category_id && c.id !== category.id)
+  return (
+    <tr className="bg-surface-secondary border-b border-border-default">
+      <td colSpan={colSpan} className="px-4 py-3">
+        <div className="flex flex-wrap items-end gap-4">
+          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide w-full sm:w-auto self-center">
+            Return &amp; Replacement Policy
+          </p>
 
-  return createPortal(
-    <>
-      <div className="fixed inset-0 z-40 bg-black/40" onClick={onClose} />
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-surface-elevated shadow-2xl border-l border-border-default flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
-          <h2 className="text-base font-bold text-foreground">Edit Category</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-800 dark:text-red-300">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1">Name *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1">Description</label>
-            <textarea
-              rows={3}
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm resize-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1">Display Order</label>
-            <input
-              type="number"
-              min={0}
-              value={displayOrder}
-              onChange={e => setDisplayOrder(e.target.value)}
-              className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-            />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Toggle id="drawer_is_active" checked={isActive} onChange={setIsActive} label="Active" />
-          </div>
-
-          <div className="border-t border-border-default pt-4">
-            <p className="text-sm font-semibold text-foreground mb-3">Return &amp; Replacement Policy</p>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <Toggle id="drawer_return_allowed" checked={returnAllowed} onChange={setReturnAllowed} label="Returns Allowed" />
+          <div className="flex items-center gap-2">
+            <Toggle id={`ret_${category.id}`} checked={returnAllowed} onChange={setReturnAllowed} label="Returns" />
+            {returnAllowed && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number" min={1} max={90} value={returnDays}
+                  onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-16 px-2 py-1 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                />
+                <span className="text-xs text-foreground-muted">days</span>
               </div>
-              {returnAllowed && (
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1">Return window (days)</label>
-                  <input
-                    type="number" min={1} max={90} value={returnDays}
-                    onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                  />
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <Toggle id="drawer_replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Toggle id={`rpl_${category.id}`} checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement" />
+            {replacementAllowed && (
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number" min={1} max={90} value={replacementDays}
+                  onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-16 px-2 py-1 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                />
+                <span className="text-xs text-foreground-muted">days</span>
               </div>
-              {replacementAllowed && (
-                <div>
-                  <label className="block text-sm font-medium text-foreground-secondary mb-1">Replacement window (days)</label>
-                  <input
-                    type="number" min={1} max={90} value={replacementDays}
-                    onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                  />
-                </div>
-              )}
-            </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 ml-auto">
+            {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
+            <button onClick={onClose} className="px-3 py-1.5 text-xs border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-3 py-1.5 text-xs bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save Policy'}
+            </button>
           </div>
         </div>
-
-        <div className="px-5 py-4 border-t border-border-default shrink-0 flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 border border-border-secondary rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Saving…' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
-    </>,
-    document.body
+      </td>
+    </tr>
   )
 }
 
@@ -308,8 +251,9 @@ function SortableRow({
   subCount,
   productCount,
   onDeleted,
-  onEdit,
   onView,
+  policyOpen,
+  onTogglePolicy,
 }: {
   category: Category
   isSubcat: boolean
@@ -318,8 +262,9 @@ function SortableRow({
   subCount?: number
   productCount?: number
   onDeleted?: () => void
-  onEdit?: () => void
   onView?: () => void
+  policyOpen?: boolean
+  onTogglePolicy?: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
@@ -471,9 +416,16 @@ function SortableRow({
         </span>
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
-        <button onClick={onEdit} className="text-accent-500 hover:text-accent-600 mr-4">
-          Edit
+        <button
+          onClick={onTogglePolicy}
+          title="Edit return & replacement policy"
+          className={`mr-3 text-xs px-2 py-1 rounded border transition-colors ${policyOpen ? 'bg-accent-100 dark:bg-accent-900/30 border-accent-400 text-accent-600 dark:text-accent-400' : 'border-border-secondary text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
+        >
+          Policy
         </button>
+        <Link href={`/admin/categories/edit/${category.id}`} className="text-accent-500 hover:text-accent-600 mr-4">
+          Edit
+        </Link>
         <DeleteCategoryButton categoryId={category.id} categoryName={category.name} onDeleted={onDeleted} />
       </td>
     </tr>
@@ -486,7 +438,7 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
   const [activeId, setActiveId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [viewCategory, setViewCategory] = useState<Category | null>(null)
-  const [editCategory, setEditCategory] = useState<Category | null>(null)
+  const [policyOpenId, setPolicyOpenId] = useState<string | null>(null)
   const router = useRouter()
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -572,7 +524,7 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
 
   const handleSaved = (updated: Category) => {
     setCategories(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c))
-    setEditCategory(null)
+    setPolicyOpenId(null)
     router.refresh()
   }
 
@@ -596,16 +548,6 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
           subCount={getSubcats(viewCategory.id).length}
           productCount={productCounts[viewCategory.id]}
           onClose={() => setViewCategory(null)}
-          onEdit={() => setEditCategory(viewCategory)}
-        />
-      )}
-
-      {editCategory && typeof document !== 'undefined' && (
-        <EditDrawer
-          category={editCategory}
-          allCategories={categories}
-          onClose={() => setEditCategory(null)}
-          onSaved={handleSaved}
         />
       )}
 
@@ -643,19 +585,39 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
                         subCount={subcats.length}
                         productCount={subcats.reduce((sum, s) => sum + (productCounts[s.id] || 0), productCounts[cat.id] || 0)}
                         onDeleted={() => handleCategoryDeleted(cat.id)}
-                        onEdit={() => setEditCategory(cat)}
                         onView={() => setViewCategory(cat)}
+                        policyOpen={policyOpenId === cat.id}
+                        onTogglePolicy={() => setPolicyOpenId(policyOpenId === cat.id ? null : cat.id)}
                       />
-                      {!isCollapsed && subcats.map(sub => (
-                        <SortableRow
-                          key={sub.id}
-                          category={sub}
-                          isSubcat={true}
-                          productCount={productCounts[sub.id] || 0}
-                          onDeleted={() => handleCategoryDeleted(sub.id)}
-                          onEdit={() => setEditCategory(sub)}
-                          onView={() => setViewCategory(sub)}
+                      {policyOpenId === cat.id && (
+                        <PolicyExpandRow
+                          category={categories.find(c => c.id === cat.id) ?? cat}
+                          colSpan={5}
+                          onSaved={handleSaved}
+                          onClose={() => setPolicyOpenId(null)}
                         />
+                      )}
+                      {!isCollapsed && subcats.map(sub => (
+                        <>
+                          <SortableRow
+                            key={sub.id}
+                            category={sub}
+                            isSubcat={true}
+                            productCount={productCounts[sub.id] || 0}
+                            onDeleted={() => handleCategoryDeleted(sub.id)}
+                            onView={() => setViewCategory(sub)}
+                            policyOpen={policyOpenId === sub.id}
+                            onTogglePolicy={() => setPolicyOpenId(policyOpenId === sub.id ? null : sub.id)}
+                          />
+                          {policyOpenId === sub.id && (
+                            <PolicyExpandRow
+                              category={categories.find(c => c.id === sub.id) ?? sub}
+                              colSpan={5}
+                              onSaved={handleSaved}
+                              onClose={() => setPolicyOpenId(null)}
+                            />
+                          )}
+                        </>
                       ))}
                     </>
                   )
@@ -717,7 +679,7 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
                   <span>Order: {cat.display_order}</span>
                 </div>
                 <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setEditCategory(cat)} className="text-accent-500 font-medium">Edit</button>
+                  <Link href={`/admin/categories/edit/${cat.id}`} className="text-accent-500 font-medium">Edit</Link>
                   <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} onDeleted={() => handleCategoryDeleted(cat.id)} />
                 </div>
               </div>
@@ -744,7 +706,7 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
                     <span>Order: {sub.display_order}</span>
                   </div>
                   <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => setEditCategory(sub)} className="text-accent-500 font-medium">Edit</button>
+                    <Link href={`/admin/categories/edit/${sub.id}`} className="text-accent-500 font-medium">Edit</Link>
                     <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                   </div>
                 </div>
