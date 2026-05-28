@@ -16,6 +16,7 @@ interface AuthContextType {
   isLoading: boolean
   login: (email: string, otp: string) => Promise<void>
   googleLogin: (idToken: string) => Promise<void>
+  googleLoginWithAccessToken: (accessToken: string) => Promise<void>
   signup: (data: SignupData) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -83,6 +84,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
   }
 
+  const googleLoginWithAccessToken = async (accessToken: string) => {
+    const response = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken }),
+    })
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Google login failed')
+    }
+    const data = await response.json()
+    setUser(data.user)
+  }
+
   const signup = async (signupData: SignupData) => {
     const response = await fetch('/api/auth/signup', {
       method: 'POST',
@@ -112,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, googleLogin, signup, logout, refreshUser }}
+      value={{ user, isLoading, login, googleLogin, googleLoginWithAccessToken, signup, logout, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

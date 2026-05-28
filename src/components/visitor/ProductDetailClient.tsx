@@ -155,40 +155,34 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 items-stretch">
         {items.map((item, i) => (
           <Link key={i} href={item.href} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group">
-            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${item.color}`}>
+            className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${item.color}`}>
               {item.icon}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground leading-tight group-hover:text-accent-600 transition-colors">{item.label}</p>
               <p className="text-[11px] text-foreground-muted leading-snug mt-0.5">{item.sub}</p>
             </div>
-            <svg className="w-3.5 h-3.5 text-foreground-muted shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
           </Link>
         ))}
       </div>
 
       <Link href="/legal/faq" target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group">
+        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group">
         <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
-        <span className="text-[11px] font-medium text-foreground-muted group-hover:text-accent-600 transition-colors">Secure Payment</span>
-        <div className="flex items-center gap-1.5 ml-auto flex-wrap justify-end">
+        <span className="text-[11px] font-medium text-foreground-muted group-hover:text-accent-600 transition-colors whitespace-nowrap">Secure Payment</span>
+        <div className="flex items-center gap-1 ml-auto flex-wrap justify-end">
           {['UPI', 'Cards', 'Net Banking', 'Wallets'].map(m => (
-            <span key={m} className="text-[10px] font-semibold text-foreground-secondary bg-surface-secondary border border-border-default px-1.5 py-0.5 rounded">
+            <span key={m} className="text-[9px] font-semibold text-foreground-secondary bg-surface-secondary border border-border-default px-1 py-0.5 rounded whitespace-nowrap">
               {m}
             </span>
           ))}
         </div>
-        <svg className="w-3.5 h-3.5 text-foreground-muted shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
       </Link>
     </div>
   )

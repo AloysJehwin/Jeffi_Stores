@@ -6,12 +6,13 @@ export async function register() {
 
   if (!CRON_SECRET || !APP_URL) return
 
-  const INTERVAL_MS = 10 * 60 * 1000
+  const TEN_MIN = 10 * 60 * 1000
+  const ONE_MIN = 60 * 1000
 
-  const runSync = async () => {
+  const callCron = async (path: string, method: 'GET' | 'POST') => {
     try {
-      await fetch(`${APP_URL}/api/admin/delhivery/sync-statuses`, {
-        method: 'POST',
+      await fetch(`${APP_URL}${path}`, {
+        method,
         headers: { Authorization: `Bearer ${CRON_SECRET}` },
       })
     } catch {
@@ -19,7 +20,12 @@ export async function register() {
   }
 
   setTimeout(() => {
-    runSync()
-    setInterval(runSync, INTERVAL_MS)
+    callCron('/api/admin/delhivery/sync-statuses', 'POST')
+    setInterval(() => callCron('/api/admin/delhivery/sync-statuses', 'POST'), TEN_MIN)
   }, 30_000)
+
+  setTimeout(() => {
+    callCron('/api/cron/cancel-stale-orders', 'GET')
+    setInterval(() => callCron('/api/cron/cancel-stale-orders', 'GET'), ONE_MIN)
+  }, 45_000)
 }

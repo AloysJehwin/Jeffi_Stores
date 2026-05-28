@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isOTPVerified, deleteOTP } from '@/lib/otp'
+import { isOTPVerified, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { sendWelcomeEmail } from '@/lib/email'
 import { queryOne } from '@/lib/db'
 import { SignJWT } from 'jose'
@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
     })
 
     await deleteOTP(email)
+    await resetSendOtpCounter(email)
 
     return NextResponse.json({
       message: 'Account created successfully',

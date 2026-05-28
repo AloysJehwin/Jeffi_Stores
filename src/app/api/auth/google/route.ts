@@ -36,12 +36,37 @@ async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload | 
   }
 }
 
+async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleTokenPayload | null> {
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    if (!data.sub || !data.email || data.email_verified === false) return null
+    return {
+      sub: data.sub,
+      email: data.email,
+      given_name: data.given_name,
+      family_name: data.family_name,
+      name: data.name,
+      picture: data.picture,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { idToken } = await request.json()
-    if (!idToken) return NextResponse.json({ error: 'idToken required' }, { status: 400 })
+    const { idToken, accessToken } = await request.json()
+    if (!idToken && !accessToken) {
+      return NextResponse.json({ error: 'idToken or accessToken required' }, { status: 400 })
+    }
 
-    const payload = await verifyGoogleToken(idToken)
+    const payload = idToken
+      ? await verifyGoogleToken(idToken)
+      : await verifyGoogleAccessToken(accessToken)
     if (!payload) return NextResponse.json({ error: 'Invalid Google token' }, { status: 401 })
 
     const email = payload.email.toLowerCase()

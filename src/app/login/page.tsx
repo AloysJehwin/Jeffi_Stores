@@ -1,11 +1,12 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
+import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 
 export default function LoginPageWrapper() {
   return (
@@ -19,7 +20,7 @@ function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get('redirect') || '/'
-  const { login, googleLogin } = useAuth()
+  const { login, googleLoginWithAccessToken } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
 
@@ -28,37 +29,35 @@ function LoginPage() {
   const [otp, setOtp] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
   const [error, setError] = useState('')
+  const otpInputRef = useRef<HTMLInputElement>(null)
+  const submittedOtpRef = useRef<string>('')
 
   useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-    if (!clientId) return
+    if (resendCooldown <= 0) return
+    const t = setTimeout(() => setResendCooldown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendCooldown])
 
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.defer = true
-    script.onload = () => {
-      const gsi = (window as any).google as GoogleIdentityServices | undefined
-      gsi?.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleCredential,
-      })
-    }
-    document.body.appendChild(script)
-    return () => { document.body.removeChild(script) }
-  }, [])
-
-  function handleGoogleButtonClick() {
-    const gsi = (window as any).google as GoogleIdentityServices | undefined
-    gsi?.accounts.id.prompt()
-  }
-
-  async function handleGoogleCredential(response: { credential: string }) {
-    setGoogleLoading(true)
+  async function handleGoogleButtonClick() {
     setError('')
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    if (!clientId) {
+      setError('Google sign-in is not configured')
+      return
+    }
+    setGoogleLoading(true)
+    const result = await openGoogleOAuthPopup({ clientId })
+    if (!result.accessToken) {
+      if (result.error && result.error !== 'popup_closed') {
+        setError(result.error)
+      }
+      setGoogleLoading(false)
+      return
+    }
     try {
-      await googleLogin(response.credential)
+      await googleLoginWithAccessToken(result.accessToken)
       await refreshCart()
       router.push(redirect)
     } catch (err: any) {
@@ -80,6 +79,11 @@ function LoginPage() {
       })
       const data = await response.json()
       if (!response.ok) {
+        if (response.status === 429 && typeof data.retryAfter === 'number') {
+          setResendCooldown(data.retryAfter)
+          setStep('otp')
+          throw new Error(data.error || 'Please wait before requesting another OTP')
+        }
         if (data.userNotFound) {
           router.push(`/signup?email=${encodeURIComponent(email)}&from=login`)
           return
@@ -87,8 +91,28 @@ function LoginPage() {
         throw new Error(data.error || 'Failed to send OTP')
       }
       setStep('otp')
+      setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 30)
     } catch (err: any) {
       setError(err.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const submitLogin = async (otpValue: string) => {
+    if (submittedOtpRef.current === otpValue) return
+    submittedOtpRef.current = otpValue
+    setError('')
+    setIsLoading(true)
+    try {
+      await login(email, otpValue)
+      await refreshCart()
+      router.push(redirect)
+    } catch (err: any) {
+      setError(err.message)
+      setOtp('')
+      submittedOtpRef.current = ''
+      setTimeout(() => otpInputRef.current?.focus(), 0)
     } finally {
       setIsLoading(false)
     }
@@ -96,21 +120,20 @@ function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    setIsLoading(true)
-    try {
-      await login(email, otp)
-      await refreshCart()
-      router.push(redirect)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setIsLoading(false)
-    }
+    if (otp.length === 6) await submitLogin(otp)
   }
+
+  useEffect(() => {
+    if (step !== 'otp') return
+    if (otp.length !== 6) return
+    if (isLoading) return
+    submitLogin(otp)
+  }, [otp, step, isLoading])
 
   const handleResendOTP = async () => {
     setError('')
+    setOtp('')
+    submittedOtpRef.current = ''
     setIsLoading(true)
     try {
       const response = await fetch('/api/auth/send-otp', {
@@ -119,8 +142,15 @@ function LoginPage() {
         body: JSON.stringify({ email, isSignup: false }),
       })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Failed to resend OTP')
-      showToast('OTP sent successfully!', 'success')
+      if (!response.ok) {
+        if (response.status === 429 && typeof data.retryAfter === 'number') {
+          setResendCooldown(data.retryAfter)
+        }
+        throw new Error(data.error || 'Failed to resend OTP')
+      }
+      setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 60)
+      showToast('New OTP sent! Check your email for the latest code.', 'success')
+      setTimeout(() => otpInputRef.current?.focus(), 0)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -211,17 +241,21 @@ function LoginPage() {
                 </label>
                 <input
                   id="otp" type="text" required maxLength={6} value={otp}
+                  ref={otpInputRef}
                   onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
                   className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-center text-2xl tracking-widest"
                   placeholder="000000"
+                  autoFocus
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <button type="button" onClick={handleResendOTP} disabled={isLoading}
-                  className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
-                  Resend Code
+                <button type="button" onClick={handleResendOTP} disabled={isLoading || resendCooldown > 0}
+                  className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
                 </button>
-                <button type="button" onClick={() => setStep('email')}
+                <button type="button" onClick={() => { setStep('email'); setOtp(''); submittedOtpRef.current = '' }}
                   className="text-foreground-secondary hover:text-foreground">
                   Change Email
                 </button>

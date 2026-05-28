@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyOTP, deleteOTP } from '@/lib/otp'
+import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { queryOne, query } from '@/lib/db'
 import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
     })
 
     await deleteOTP(email)
+    await resetSendOtpCounter(email)
 
     return NextResponse.json({
       message: 'Login successful',

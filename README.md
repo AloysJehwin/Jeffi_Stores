@@ -130,6 +130,13 @@ The repo is cloned from `git@github.com:AloysJehwin/Jeffi_Stores.git` (configure
 - `0 3 * * *` — `certbot renew --quiet --deploy-hook 'docker restart jeffi-nginx'`
 - `30 2 * * *` — Nightly Google Merchant Center sync via `GET /api/admin/merchant/sync` with `Authorization: Bearer $CRON_SECRET`
 
+### In-app Schedules (run inside the Next.js process via `src/instrumentation.ts`)
+
+- Every 10 min — Delhivery shipment status sync (`POST /api/admin/delhivery/sync-statuses`)
+- Every 1 min — Cancel stale unpaid orders past the 10-minute payment window (`GET /api/cron/cancel-stale-orders`). Sends auto-cancel emails to the customer and to all active admins.
+
+Both are gated by `Authorization: Bearer $CRON_SECRET` and started by the `register()` hook 30–45 s after app boot. With two replicas under Docker Compose, both replicas tick — duplicate work is harmless because each route is idempotent (`UPDATE ... WHERE status='pending'` won't double-cancel).
+
 ### Maintenance Mode
 
 `deploy/maintenance.sh` runs from your **local** machine — it SSHs into EC2 and uses the AWS CLI to flip CloudFront over to the S3 maintenance page while RDS / EC2 are stopped.

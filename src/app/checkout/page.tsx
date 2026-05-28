@@ -131,7 +131,7 @@ function CheckoutPage() {
 
   const fetchAddress = async (addressId: string) => {
     try {
-      const response = await fetch('/api/user/addresses')
+      const response = await fetch('/api/user/addresses', { credentials: 'include' })
       if (response.status === 401) {
         router.push('/login?redirect=/checkout')
         return
@@ -163,6 +163,7 @@ function CheckoutPage() {
     try {
       const response = await fetch('/api/razorpay/verify', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId }),
       })
@@ -172,8 +173,8 @@ function CheckoutPage() {
       clearCart()
       showToast('Payment successful!', 'success')
       window.location.href = `/account/orders/${orderId}`
-    } catch {
-      setError('Payment received but verification failed. Please contact support — your payment is safe.')
+    } catch (err: any) {
+      setError(err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.')
       setIsSubmitting(false)
     }
   }
@@ -182,6 +183,7 @@ function CheckoutPage() {
     try {
       const rzpResponse = await fetch('/api/razorpay/create-order', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId }),
       })
@@ -211,7 +213,12 @@ function CheckoutPage() {
         theme: { color: '#f97316' },
         modal: {
           ondismiss: function () {
-            window.location.href = `/account/orders/${orderId}`
+            fetch(`/api/orders/${orderId}`, {
+              method: 'DELETE',
+              credentials: 'include',
+              keepalive: true,
+            }).catch(() => {})
+            setIsSubmitting(false)
           },
         },
       }
@@ -220,8 +227,10 @@ function CheckoutPage() {
       rzp.on('payment.failed', function (response: any) {
         fetch(`/api/orders/${orderId}/payment-failed`, {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ errorDescription: response.error.description }),
+          keepalive: true,
         }).catch(() => {})
         window.location.href = `/account/orders/${orderId}`
       })
@@ -229,6 +238,7 @@ function CheckoutPage() {
     } catch (err: any) {
       await fetch(`/api/orders/${orderId}/payment-failed`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ errorDescription: err.message }),
       }).catch(() => {})
@@ -240,7 +250,7 @@ function CheckoutPage() {
     if (!existingOrder) return
     setIsCancellingPrevious(true)
     try {
-      const response = await fetch(`/api/orders/${existingOrder.id}/cancel`, { method: 'POST' })
+      const response = await fetch(`/api/orders/${existingOrder.id}/cancel`, { method: 'POST', credentials: 'include' })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to cancel order')
       setExistingOrder(null)
@@ -298,6 +308,7 @@ function CheckoutPage() {
 
       const response = await fetch(endpoint, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })

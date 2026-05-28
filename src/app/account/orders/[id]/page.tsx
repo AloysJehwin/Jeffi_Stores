@@ -188,7 +188,10 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const response = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restoreToCart: order?.orderType !== 'direct' }),
+        body: JSON.stringify({
+          restoreToCart: order?.orderType !== 'direct',
+          autoCancelUnpaid: true,
+        }),
       })
       if (response.ok) {
         await fetchOrder()
@@ -297,6 +300,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
       const rzpResponse = await fetch('/api/razorpay/create-order', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId: order.id }),
       })
@@ -314,6 +318,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
           try {
             const verifyResponse = await fetch('/api/razorpay/verify', {
               method: 'POST',
+              credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
@@ -328,7 +333,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             await fetchOrder()
             setIsPayingNow(false)
           } catch (err: any) {
-            setPaymentError('Payment received but verification failed. Please contact support — your payment is safe.')
+            setPaymentError(err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.')
             setIsPayingNow(false)
           }
         },
