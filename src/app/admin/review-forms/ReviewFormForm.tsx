@@ -222,13 +222,12 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
                     placeholder="Field label"
                     className="px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
                   />
-                  <select
+                  <AdminSelect
+                    sm
                     value={field.type}
-                    onChange={e => updateField(field.id, { type: e.target.value as CustomField['type'] })}
-                    className="px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
-                  >
-                    {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
+                    onChange={v => updateField(field.id, { type: v as CustomField['type'] })}
+                    options={FIELD_TYPES}
+                  />
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 shrink-0">
                   <Toggle checked={field.required} onChange={v => updateField(field.id, { required: v })} label="Req" size="sm" />
