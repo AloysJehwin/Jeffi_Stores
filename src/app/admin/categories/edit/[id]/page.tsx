@@ -20,11 +20,10 @@ async function updateCategory(categoryId: string, formData: FormData) {
   const displayOrder = parseInt(formData.get('display_order') as string)
   const skuPrefix = (formData.get('sku_prefix') as string || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || null
   const isActive = formData.get('is_active') === 'true'
-  const policyOverride = formData.get('policy_override') === 'true'
-  const returnAllowed = policyOverride ? (formData.get('return_allowed') !== 'false') : null
-  const returnWindowDays = policyOverride ? Math.max(1, parseInt(formData.get('return_window_days') as string) || 7) : null
-  const replacementAllowed = policyOverride ? (formData.get('replacement_allowed') !== 'false') : null
-  const replacementWindowDays = policyOverride ? Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7) : null
+  const returnAllowed = formData.get('return_allowed') !== 'false'
+  const returnWindowDays = Math.max(1, parseInt(formData.get('return_window_days') as string) || 7)
+  const replacementAllowed = formData.get('replacement_allowed') !== 'false'
+  const replacementWindowDays = Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
   const googleProductCategory = formData.get('google_product_category') as string || null
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
