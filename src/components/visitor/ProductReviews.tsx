@@ -508,12 +508,17 @@ export default function ProductReviews({ productId, productName }: ProductReview
                             {review.users.first_name} {review.users.last_name}
                           </span>
                           <StarRow rating={review.rating} size="sm" />
-                          {review.is_verified_purchase && (
+                          {review.is_verified_purchase && review.is_approved && (
                             <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-2 py-0.5 rounded-full font-medium">
                               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                               </svg>
                               Verified Purchase
+                            </span>
+                          )}
+                          {user && review.user_id === user.id && !review.is_approved && (
+                            <span className="inline-flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs px-2 py-0.5 rounded-full font-medium">
+                              Pending approval
                             </span>
                           )}
                           <span className="text-xs text-foreground-muted ml-auto shrink-0">
@@ -778,7 +783,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                   <p className="text-sm font-semibold text-foreground truncate">{expandedReview.users.first_name} {expandedReview.users.last_name}</p>
                   <div className="flex items-center gap-2">
                     <StarRow rating={expandedReview.rating} size="sm" />
-                    {expandedReview.is_verified_purchase && (
+                    {expandedReview.is_verified_purchase && expandedReview.is_approved && (
                       <span className="text-xs text-green-600 dark:text-green-400 font-medium">Verified</span>
                     )}
                   </div>
