@@ -3,9 +3,10 @@ import { getFilteredCategories } from '@/lib/queries'
 import { queryMany } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import CategoriesClient from '@/components/admin/CategoriesClient'
+import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
 
 export default async function CategoriesPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
-  const [categories, productCountRows] = await Promise.all([
+  const [categories, productCountRows, misassignedRows] = await Promise.all([
     getFilteredCategories({
       is_active: searchParams.is_active,
       type: searchParams.type,
@@ -14,13 +15,22 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
     queryMany<{ category_id: string; count: string }>(
       'SELECT category_id, COUNT(*) as count FROM products WHERE is_active = true GROUP BY category_id'
     ),
+    queryMany<{ id: string; name: string; category_id: string; category_name: string }>(
+      `SELECT p.id, p.name, p.category_id, c.name AS category_name
+       FROM products p
+       JOIN categories c ON p.category_id = c.id
+       WHERE p.is_active = true
+         AND EXISTS (SELECT 1 FROM categories sub WHERE sub.parent_category_id = p.category_id)
+       ORDER BY c.name, p.name`
+    ),
   ])
 
   const productCounts: Record<string, number> = {}
   productCountRows.forEach(r => { productCounts[r.category_id] = parseInt(r.count, 10) })
 
-  const mainCategoriesCount = categories?.filter(c => !c.parent_category_id).length || 0
-  const totalCategories = categories?.length || 0
+  const allCategories = categories || []
+  const mainCategoriesCount = allCategories.filter(c => !c.parent_category_id).length
+  const totalCategories = allCategories.length
   const subCategoriesCount = totalCategories - mainCategoriesCount
 
   return (
@@ -53,6 +63,13 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
         </div>
       </div>
 
+      {misassignedRows.length > 0 && (
+        <MisassignedProductsBanner
+          products={misassignedRows}
+          categories={allCategories}
+        />
+      )}
+
       <AdminFilters
         filters={[
           {
@@ -77,7 +94,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
         searchParam="search"
       />
 
-      <CategoriesClient initialCategories={categories || []} productCounts={productCounts} />
+      <CategoriesClient initialCategories={allCategories} productCounts={productCounts} />
     </div>
   )
 }
