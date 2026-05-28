@@ -36,15 +36,19 @@ const icons: Record<string, React.ReactNode> = {
 export default function LegalIndexPage() {
   return (
     <div className="bg-surface min-h-screen">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16">
-
-        <div className="mb-8 md:mb-10">
-          <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-1">Legal</p>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-foreground">Policies &amp; Legal</h1>
-          <p className="text-foreground-secondary mt-2">Everything you need to know about how we operate, your rights, and our commitments to you.</p>
+      <div className="bg-surface-elevated border-b border-border-default">
+        <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
+            Policies &amp; Legal
+          </h1>
+          <p className="text-foreground-secondary text-sm">Everything you need to know about how we operate, your rights, and our commitments to you.</p>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="container mx-auto px-4 py-8 md:py-12">
+        <div className="max-w-4xl mx-auto space-y-8">
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {policies.map((policy) => (
             <Link
               key={policy.slug}
@@ -68,18 +72,19 @@ export default function LegalIndexPage() {
           ))}
         </div>
 
-        <div className="mt-10 bg-surface-elevated rounded-xl border border-border-default p-6 text-center">
-          <p className="text-sm text-foreground-secondary mb-3">
-            Can&apos;t find what you&apos;re looking for? Our support team can help.
-          </p>
-          <Link
-            href="/support"
-            className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors"
-          >
-            Contact Support
-          </Link>
-        </div>
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-6 text-center">
+            <p className="text-sm text-foreground-secondary mb-3">
+              Can&apos;t find what you&apos;re looking for? Our support team can help.
+            </p>
+            <Link
+              href="/support"
+              className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors"
+            >
+              Contact Support
+            </Link>
+          </div>
 
+        </div>
       </div>
     </div>
   )
