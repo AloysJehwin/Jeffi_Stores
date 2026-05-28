@@ -343,6 +343,9 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
   const getSubcategories = (parentId: string) => categories.filter(c => c.parent_category_id === parentId)
+  const leafCategories = categories.filter(c =>
+    !categories.some(other => other.parent_category_id === c.id)
+  )
 
   useEffect(() => {
     const saved = localStorage.getItem(draftKey)
@@ -862,15 +865,15 @@ export default function ProductForm({ categories, brands, action, product, produ
             required
             defaultValue={product?.category_id}
             placeholder="Select a category"
-            options={mainCategories.flatMap(cat => [
-              { value: cat.id, label: cat.name, group: cat.name },
-              ...getSubcategories(cat.id).map(sub => ({
-                value: sub.id,
-                label: sub.name,
-                group: cat.name,
-                indent: true,
-              })),
-            ])}
+            options={leafCategories.map(cat => {
+              const parent = cat.parent_category_id ? categories.find(c => c.id === cat.parent_category_id) : null
+              return {
+                value: cat.id,
+                label: cat.name,
+                group: parent ? parent.name : cat.name,
+                indent: !!parent,
+              }
+            })}
           />
 
           {/* Brand */}
