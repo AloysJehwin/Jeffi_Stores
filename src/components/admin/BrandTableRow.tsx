@@ -13,6 +13,10 @@ interface Brand {
   description: string | null
   website: string | null
   is_active: boolean
+  return_allowed: boolean
+  return_window_days: number
+  replacement_allowed: boolean
+  replacement_window_days: number
 }
 
 export default function BrandTableRow({ brand }: { brand: Brand }) {
@@ -64,6 +68,23 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
                   <p className="text-sm text-foreground leading-relaxed">{brand.description}</p>
                 </div>
               )}
+              <div>
+                <p className="text-xs text-foreground-muted uppercase tracking-wide mb-2">Return &amp; Replacement Policy</p>
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-surface-secondary text-sm">
+                  <div>
+                    <p className="text-xs text-foreground-muted">Returns</p>
+                    <p className={`font-semibold mt-0.5 ${brand.return_allowed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {brand.return_allowed ? `${brand.return_window_days} days` : 'Not allowed'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-foreground-muted">Replacement</p>
+                    <p className={`font-semibold mt-0.5 ${brand.replacement_allowed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {brand.replacement_allowed ? `${brand.replacement_window_days} days` : 'Not allowed'}
+                    </p>
+                  </div>
+                </div>
+              </div>
               <div className="flex gap-3 pt-1 border-t border-border-default">
                 <Link
                   href={`/admin/brands/edit/${brand.id}`}

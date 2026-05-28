@@ -12,12 +12,16 @@ async function createBrand(formData: FormData) {
   const website = (formData.get('website') as string) || null
   const logo_url = (formData.get('logo_url') as string) || null
   const is_active = formData.get('is_active') === 'true'
+  const return_allowed = formData.get('return_allowed') !== 'false'
+  const return_window_days = Math.max(1, parseInt(formData.get('return_window_days') as string) || 7)
+  const replacement_allowed = formData.get('replacement_allowed') !== 'false'
+  const replacement_window_days = Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
 
   try {
     await query(
-      `INSERT INTO brands (name, slug, description, website, logo_url, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [name, slug, description, website, logo_url, is_active]
+      `INSERT INTO brands (name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days]
     )
 
     revalidatePath('/admin/brands')

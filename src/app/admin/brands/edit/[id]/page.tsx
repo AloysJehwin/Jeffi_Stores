@@ -18,12 +18,17 @@ async function updateBrand(brandId: string, formData: FormData) {
   const website = (formData.get('website') as string) || null
   const logo_url = (formData.get('logo_url') as string) || null
   const is_active = formData.get('is_active') === 'true'
+  const return_allowed = formData.get('return_allowed') !== 'false'
+  const return_window_days = Math.max(1, parseInt(formData.get('return_window_days') as string) || 7)
+  const replacement_allowed = formData.get('replacement_allowed') !== 'false'
+  const replacement_window_days = Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
 
   try {
     await query(
-      `UPDATE brands SET name = $1, slug = $2, description = $3, website = $4, logo_url = $5, is_active = $6
-       WHERE id = $7`,
-      [name, slug, description, website, logo_url, is_active, brandId]
+      `UPDATE brands SET name = $1, slug = $2, description = $3, website = $4, logo_url = $5, is_active = $6,
+        return_allowed = $7, return_window_days = $8, replacement_allowed = $9, replacement_window_days = $10
+       WHERE id = $11`,
+      [name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days, brandId]
     )
 
     revalidatePath('/admin/brands')
