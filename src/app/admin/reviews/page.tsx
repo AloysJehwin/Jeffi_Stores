@@ -140,7 +140,7 @@ export default function AdminReviewsPage() {
   const pendingCount = reviews.filter(r => !r.is_approved).length
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl">
+    <div className="p-4 sm:p-6">
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
