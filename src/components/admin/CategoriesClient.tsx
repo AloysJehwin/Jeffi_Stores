@@ -36,10 +36,10 @@ interface Category {
   is_active: boolean
   parent_category_id: string | null
   sku_prefix?: string | null
-  return_allowed?: boolean
-  return_window_days?: number
-  replacement_allowed?: boolean
-  replacement_window_days?: number
+  return_allowed?: boolean | null
+  return_window_days?: number | null
+  replacement_allowed?: boolean | null
+  replacement_window_days?: number | null
   subCount?: number
 }
 
@@ -144,16 +144,26 @@ function ViewModal({ category, subCount, productCount, onClose }: {
   )
 }
 
-function PolicyExpandRow({ category, colSpan, onSaved, onClose }: {
+function PolicyExpandRow({ category, parentCategory, colSpan, onSaved, onClose }: {
   category: Category
+  parentCategory?: Category | null
   colSpan: number
   onSaved: (updated: Category) => void
   onClose: () => void
 }) {
-  const [returnAllowed, setReturnAllowed] = useState(category.return_allowed !== false)
-  const [returnDays, setReturnDays] = useState(category.return_window_days ?? 7)
-  const [replacementAllowed, setReplacementAllowed] = useState(category.replacement_allowed !== false)
-  const [replacementDays, setReplacementDays] = useState(category.replacement_window_days ?? 7)
+  const isSubcat = !!category.parent_category_id
+  const isInherited = isSubcat && category.return_allowed == null
+
+  const effectiveReturnAllowed     = category.return_allowed     ?? parentCategory?.return_allowed     ?? true
+  const effectiveReturnDays        = category.return_window_days ?? parentCategory?.return_window_days ?? 7
+  const effectiveReplaceAllowed    = category.replacement_allowed     ?? parentCategory?.replacement_allowed     ?? true
+  const effectiveReplaceDays       = category.replacement_window_days ?? parentCategory?.replacement_window_days ?? 7
+
+  const [overriding, setOverriding] = useState(!isInherited)
+  const [returnAllowed, setReturnAllowed] = useState(!!effectiveReturnAllowed)
+  const [returnDays, setReturnDays] = useState(effectiveReturnDays ?? 7)
+  const [replacementAllowed, setReplacementAllowed] = useState(!!effectiveReplaceAllowed)
+  const [replacementDays, setReplacementDays] = useState(effectiveReplaceDays ?? 7)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -171,12 +181,11 @@ function PolicyExpandRow({ category, colSpan, onSaved, onClose }: {
           display_order: category.display_order,
           sku_prefix: category.sku_prefix || null,
           is_active: category.is_active,
-          google_product_category: null,
           icon_name: category.icon_name || null,
-          return_allowed: returnAllowed,
-          return_window_days: returnDays,
-          replacement_allowed: replacementAllowed,
-          replacement_window_days: replacementDays,
+          return_allowed:          overriding ? returnAllowed      : null,
+          return_window_days:      overriding ? returnDays         : null,
+          replacement_allowed:     overriding ? replacementAllowed : null,
+          replacement_window_days: overriding ? replacementDays    : null,
         }),
       })
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Save failed') }
@@ -191,38 +200,70 @@ function PolicyExpandRow({ category, colSpan, onSaved, onClose }: {
   return (
     <tr className="bg-surface-secondary border-b border-border-default">
       <td colSpan={colSpan} className="px-4 py-3">
-        <div className="flex flex-wrap items-end gap-4">
-          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide w-full sm:w-auto self-center">
+        <div className="flex flex-wrap items-start gap-4">
+          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide self-center">
             Return &amp; Replacement Policy
           </p>
 
-          <div className="flex items-center gap-2">
-            <Toggle id={`ret_${category.id}`} checked={returnAllowed} onChange={setReturnAllowed} label="Returns" />
-            {returnAllowed && (
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number" min={1} max={90} value={returnDays}
-                  onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-16 px-2 py-1 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                />
-                <span className="text-xs text-foreground-muted">days</span>
-              </div>
-            )}
-          </div>
+          {isSubcat && isInherited && !overriding ? (
+            <div className="flex items-center gap-3 flex-1">
+              <span className="inline-flex items-center gap-1.5 text-xs bg-surface-elevated border border-border-secondary text-foreground-secondary px-2.5 py-1 rounded-full">
+                <svg className="w-3 h-3 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Inherited from {parentCategory?.name ?? 'parent'}
+                {' — '}
+                {effectiveReturnAllowed ? `Returns ${effectiveReturnDays}d` : 'No returns'}
+                {' · '}
+                {effectiveReplaceAllowed ? `Replacement ${effectiveReplaceDays}d` : 'No replacement'}
+              </span>
+              <button
+                onClick={() => setOverriding(true)}
+                className="text-xs text-accent-500 hover:text-accent-600 font-medium underline underline-offset-2"
+              >
+                Override
+              </button>
+            </div>
+          ) : (
+            <>
+              {isSubcat && (
+                <button
+                  onClick={() => setOverriding(false)}
+                  className="text-xs text-foreground-muted hover:text-foreground underline underline-offset-2 self-center"
+                >
+                  Reset to inherited
+                </button>
+              )}
 
-          <div className="flex items-center gap-2">
-            <Toggle id={`rpl_${category.id}`} checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement" />
-            {replacementAllowed && (
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number" min={1} max={90} value={replacementDays}
-                  onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-16 px-2 py-1 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                />
-                <span className="text-xs text-foreground-muted">days</span>
+              <div className="flex items-center gap-2">
+                <Toggle id={`ret_${category.id}`} checked={returnAllowed} onChange={setReturnAllowed} label="Returns" />
+                {returnAllowed && (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number" min={1} max={90} value={returnDays}
+                      onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-16 px-2 py-1 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    />
+                    <span className="text-xs text-foreground-muted">days</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+
+              <div className="flex items-center gap-2">
+                <Toggle id={`rpl_${category.id}`} checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement" />
+                {replacementAllowed && (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number" min={1} max={90} value={replacementDays}
+                      onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-16 px-2 py-1 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                    />
+                    <span className="text-xs text-foreground-muted">days</span>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="flex items-center gap-2 ml-auto">
             {error && <span className="text-xs text-red-600 dark:text-red-400">{error}</span>}
@@ -612,6 +653,7 @@ export default function CategoriesClient({ initialCategories, productCounts = {}
                           {policyOpenId === sub.id && (
                             <PolicyExpandRow
                               category={categories.find(c => c.id === sub.id) ?? sub}
+                              parentCategory={cat}
                               colSpan={5}
                               onSaved={handleSaved}
                               onClose={() => setPolicyOpenId(null)}
