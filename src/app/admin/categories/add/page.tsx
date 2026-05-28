@@ -14,11 +14,12 @@ async function createCategory(formData: FormData) {
   const displayOrder = parseInt(formData.get('display_order') as string)
   const skuPrefix = (formData.get('sku_prefix') as string || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || null
   const isActive = formData.get('is_active') === 'true'
+  const policyOverride = formData.get('policy_override') === 'true'
+  const returnAllowed = policyOverride ? (formData.get('return_allowed') !== 'false') : null
+  const returnWindowDays = policyOverride ? Math.max(1, parseInt(formData.get('return_window_days') as string) || 7) : null
+  const replacementAllowed = policyOverride ? (formData.get('replacement_allowed') !== 'false') : null
+  const replacementWindowDays = policyOverride ? Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7) : null
   const googleProductCategory = formData.get('google_product_category') as string || null
-  const returnAllowed = formData.get('return_allowed') === 'true'
-  const returnWindowDays = Math.max(1, parseInt(formData.get('return_window_days') as string) || 7)
-  const replacementAllowed = formData.get('replacement_allowed') === 'true'
-  const replacementWindowDays = Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   const manualIcon = (formData.get('icon_name') as string || '').trim()
@@ -27,8 +28,7 @@ async function createCategory(formData: FormData) {
   await query(
     `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, google_product_category, icon_name, return_allowed, return_window_days, replacement_allowed, replacement_window_days)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-    [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, iconName,
-     returnAllowed, returnWindowDays, replacementAllowed, replacementWindowDays]
+    [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, iconName, returnAllowed, returnWindowDays, replacementAllowed, replacementWindowDays]
   )
 
   revalidatePath('/admin/categories')

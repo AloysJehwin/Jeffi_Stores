@@ -14,10 +14,15 @@ const getProductBySlug = cache(async (slug: string) => {
   return queryOne(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug,
-        'return_allowed', c.return_allowed, 'return_window_days', c.return_window_days,
-        'replacement_allowed', c.replacement_allowed, 'replacement_window_days', c.replacement_window_days
+        'return_allowed',          COALESCE(c.return_allowed,          pc.return_allowed,          true),
+        'return_window_days',      COALESCE(c.return_window_days,      pc.return_window_days,      7),
+        'replacement_allowed',     COALESCE(c.replacement_allowed,     pc.replacement_allowed,     true),
+        'replacement_window_days', COALESCE(c.replacement_window_days, pc.replacement_window_days, 7)
       ) AS categories,
-      json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
+      json_build_object('id', b.id, 'name', b.name, 'slug', b.slug,
+        'return_allowed', b.return_allowed, 'return_window_days', b.return_window_days,
+        'replacement_allowed', b.replacement_allowed, 'replacement_window_days', b.replacement_window_days
+      ) AS brands,
       COALESCE(
         (SELECT json_agg(pi ORDER BY pi.display_order)
          FROM product_images pi WHERE pi.product_id = p.id),
@@ -53,6 +58,7 @@ const getProductBySlug = cache(async (slug: string) => {
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.slug = $1 AND p.is_active = true
   `, [slug])

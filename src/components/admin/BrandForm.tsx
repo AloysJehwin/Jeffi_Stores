@@ -13,6 +13,10 @@ export default function BrandForm({ action, brand }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isActive, setIsActive] = useState<boolean>(brand?.is_active ?? true)
+  const [returnAllowed, setReturnAllowed] = useState<boolean>(brand?.return_allowed ?? true)
+  const [returnDays, setReturnDays] = useState<number>(brand?.return_window_days ?? 7)
+  const [replacementAllowed, setReplacementAllowed] = useState<boolean>(brand?.replacement_allowed ?? true)
+  const [replacementDays, setReplacementDays] = useState<number>(brand?.replacement_window_days ?? 7)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -127,6 +131,59 @@ export default function BrandForm({ action, brand }: BrandFormProps) {
               <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
               <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 sm:px-6 py-5 border-t border-border-default">
+        <h2 className="text-base font-semibold text-foreground mb-4">Return &amp; Replacement Policy</h2>
+        <p className="text-xs text-foreground-muted mb-4">Brand policy takes priority over category policy on the product page.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
+              <Toggle id="return_allowed" checked={returnAllowed} onChange={setReturnAllowed} label="Returns Allowed" />
+            </div>
+            {returnAllowed && (
+              <div>
+                <label htmlFor="return_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
+                  Return window (days)
+                </label>
+                <input
+                  type="number"
+                  id="return_window_days"
+                  name="return_window_days"
+                  min={1}
+                  max={90}
+                  value={returnDays}
+                  onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                />
+              </div>
+            )}
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
+              <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
+            </div>
+            {replacementAllowed && (
+              <div>
+                <label htmlFor="replacement_window_days" className="block text-sm font-medium text-foreground-secondary mb-1">
+                  Replacement window (days)
+                </label>
+                <input
+                  type="number"
+                  id="replacement_window_days"
+                  name="replacement_window_days"
+                  min={1}
+                  max={90}
+                  value={replacementDays}
+                  onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
