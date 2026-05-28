@@ -516,11 +516,6 @@ export default function ProductReviews({ productId, productName }: ProductReview
                               Verified Purchase
                             </span>
                           )}
-                          {user && review.user_id === user.id && !review.is_approved && (
-                            <span className="inline-flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs px-2 py-0.5 rounded-full font-medium">
-                              Pending approval
-                            </span>
-                          )}
                           <span className="text-xs text-foreground-muted ml-auto shrink-0">
                             {new Date(review.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
