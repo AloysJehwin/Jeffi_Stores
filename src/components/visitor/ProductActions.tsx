@@ -639,19 +639,6 @@ export default function ProductActions({
           )}
         </button>
 
-        <button
-          onClick={handleToggleWishlist}
-          disabled={isAddingToWishlist}
-          className={`w-full px-6 py-4 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-            isInWishlist ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary border border-border-secondary'
-          }`}
-        >
-          {isAddingToWishlist ? (
-            <><div className={`animate-spin w-5 h-5 border-2 ${isInWishlist ? 'border-white' : 'border-foreground-secondary'} border-t-transparent rounded-full`} />{isInWishlist ? 'Removing...' : 'Adding...'}</>
-          ) : (
-            <><svg className="w-5 h-5" fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>{isInWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}</>
-          )}
-        </button>
       </div>
 
     </div>
