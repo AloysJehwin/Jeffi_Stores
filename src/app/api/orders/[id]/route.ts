@@ -22,7 +22,7 @@ export async function GET(
       SELECT o.*,
         COALESCE(
           o.shipping_address_snapshot,
-          (SELECT row_to_json(a) FROM (
+          (SELECT to_jsonb(a) FROM (
             SELECT full_name, address_line1, address_line2, landmark, city, state, postal_code, phone
             FROM addresses WHERE id = o.shipping_address_id
           ) a)

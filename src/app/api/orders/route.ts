@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
           o.total_amount, o.subtotal, o.shipping_address_id,
           COALESCE(
             o.shipping_address_snapshot,
-            (SELECT row_to_json(a) FROM (
+            (SELECT to_jsonb(a) FROM (
               SELECT address_line1, address_line2, city, state, postal_code
               FROM addresses WHERE id = o.shipping_address_id
             ) a)
