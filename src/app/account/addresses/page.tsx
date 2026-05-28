@@ -172,11 +172,7 @@ export default function AddressesPage() {
             showToast('Address deleted successfully', 'success')
           } else {
             const data = await response.json()
-            if (data.code === 'ADDRESS_IN_USE') {
-              showToast(data.error, 'warning')
-            } else {
-              showToast('Failed to delete address', 'error')
-            }
+            showToast(data.error || 'Failed to delete address', 'error')
           }
         } catch {
           showToast('Failed to delete address', 'error')
