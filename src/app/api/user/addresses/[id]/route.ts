@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 
-// Update address
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -30,7 +29,6 @@ export async function PATCH(
       is_default,
     } = body
 
-    // Validate and normalize phone
     if (!phone) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
     }
@@ -41,7 +39,6 @@ export async function PATCH(
     }
     const normalizedPhone = `+91${cleanedPhone}`
 
-    // If this is set as default, unset other defaults
     if (is_default) {
       await query(
         'UPDATE addresses SET is_default = false WHERE user_id = $1 AND address_type = $2 AND id != $3',
@@ -67,12 +64,10 @@ export async function PATCH(
 
     return NextResponse.json({ address })
   } catch (error) {
-    console.error('Error in address update API:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// Delete address
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -86,7 +81,6 @@ export async function DELETE(
     const userId = user.userId
     const addressId = params.id
 
-    // Check if address is the default
     const address = await queryOne(
       'SELECT is_default FROM addresses WHERE id = $1 AND user_id = $2',
       [addressId, userId]
@@ -103,7 +97,6 @@ export async function DELETE(
       )
     }
 
-    // Check if address is linked to any orders
     const orderLink = await queryOne(
       'SELECT id FROM orders WHERE shipping_address_id = $1 OR billing_address_id = $1 LIMIT 1',
       [addressId]
@@ -111,7 +104,7 @@ export async function DELETE(
 
     if (orderLink) {
       return NextResponse.json(
-        { error: 'This address cannot be deleted because it is associated with existing orders. You can edit it instead.' },
+        { error: 'This address cannot be deleted because it is linked to existing orders. You can edit it instead.', code: 'ADDRESS_IN_USE' },
         { status: 400 }
       )
     }
@@ -123,7 +116,6 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Address deleted successfully' })
   } catch (error) {
-    console.error('Error in address delete API:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
