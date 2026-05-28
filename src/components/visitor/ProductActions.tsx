@@ -600,7 +600,21 @@ export default function ProductActions({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
               </svg>
             </button>
-            <span className="px-6 py-2 border-x border-border-secondary min-w-[80px] text-center font-semibold">{quantity}</span>
+            <input
+              type="number"
+              min={1}
+              max={effectiveStock}
+              value={quantity}
+              onChange={e => {
+                const v = parseInt(e.target.value, 10)
+                if (!isNaN(v)) setQuantity(Math.min(effectiveStock, Math.max(1, v)))
+              }}
+              onBlur={e => {
+                const v = parseInt(e.target.value, 10)
+                setQuantity(isNaN(v) || v < 1 ? 1 : Math.min(effectiveStock, v))
+              }}
+              className="w-16 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
             <button
               onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
               disabled={quantity >= effectiveStock}

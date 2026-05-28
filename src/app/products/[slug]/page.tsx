@@ -13,7 +13,10 @@ import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 const getProductBySlug = cache(async (slug: string) => {
   return queryOne(`
     SELECT p.*,
-      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug,
+        'return_allowed', c.return_allowed, 'return_window_days', c.return_window_days,
+        'replacement_allowed', c.replacement_allowed, 'replacement_window_days', c.replacement_window_days
+      ) AS categories,
       json_build_object('id', b.id, 'name', b.name, 'slug', b.slug) AS brands,
       COALESCE(
         (SELECT json_agg(pi ORDER BY pi.display_order)
