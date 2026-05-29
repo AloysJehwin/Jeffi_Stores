@@ -701,15 +701,19 @@ export default function CashSaleClient() {
       </div>
 
       {totalPages > 1 && (
-        <div className="px-4 py-3 border border-border-default border-t-0 rounded-b-xl bg-surface-elevated flex items-center justify-between">
-          <p className="text-xs text-foreground-muted">Page {page} of {totalPages} — {total} sales</p>
-          <div className="flex gap-2">
+        <div className="px-4 py-3 border border-border-default border-t-0 rounded-b-xl bg-surface-elevated flex items-center justify-between gap-2">
+          <p className="text-xs text-foreground-muted whitespace-nowrap">
+            <span className="font-medium text-foreground">{(page - 1) * 25 + 1}–{Math.min(page * 25, total)}</span>
+            {' '}of <span className="font-medium text-foreground">{total}</span> sales
+          </p>
+          <div className="flex items-center gap-1.5">
             <button disabled={page <= 1} onClick={() => fetchSales(page - 1)}
-              className="px-3 py-1.5 border border-border-default rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary transition-colors">
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">
               Prev
             </button>
+            <span className="text-xs text-foreground-muted whitespace-nowrap">{page}/{totalPages}</span>
             <button disabled={page >= totalPages} onClick={() => fetchSales(page + 1)}
-              className="px-3 py-1.5 border border-border-default rounded text-xs text-foreground disabled:opacity-40 hover:bg-surface-secondary transition-colors">
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">
               Next
             </button>
           </div>

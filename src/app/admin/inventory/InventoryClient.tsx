@@ -58,39 +58,17 @@ function ClientPagination({ page, total, pageSize, onChange }: { page: number; t
 
   const start = (page - 1) * pageSize + 1
   const end = Math.min(page * pageSize, total)
+  const btnCls = 'px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
 
-  const pages: (number | '…')[] = []
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i)
-  } else {
-    pages.push(1)
-    if (page > 3) pages.push('…')
-    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i)
-    if (page < totalPages - 2) pages.push('…')
-    pages.push(totalPages)
-  }
-
-  const base = 'inline-flex items-center justify-center h-8 min-w-[2rem] px-2 rounded-md text-sm font-medium transition-colors'
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-1 pt-4 border-t border-border-default mt-2">
-      <p className="text-xs text-foreground-muted">
-        Showing <span className="font-medium text-foreground">{start}–{end}</span> of <span className="font-medium text-foreground">{total}</span>
+    <div className="flex items-center justify-between gap-2 px-1 pt-4 border-t border-border-default mt-2">
+      <p className="text-xs text-foreground-muted whitespace-nowrap">
+        <span className="font-medium text-foreground">{start}–{end}</span> of <span className="font-medium text-foreground">{total}</span>
       </p>
-      <div className="flex items-center gap-1">
-        <button onClick={() => onChange(page - 1)} disabled={page <= 1}
-          className={`${base} border border-border-default ${page <= 1 ? 'opacity-40 pointer-events-none text-foreground-muted' : 'text-foreground-secondary hover:bg-surface-secondary'}`}>‹</button>
-        {pages.map((p, i) =>
-          p === '…' ? (
-            <span key={`e-${i}`} className="px-1 text-foreground-muted text-sm">…</span>
-          ) : (
-            <button key={p} onClick={() => onChange(p as number)}
-              className={`${base} ${p === page ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900' : 'border border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
-              {p}
-            </button>
-          )
-        )}
-        <button onClick={() => onChange(page + 1)} disabled={page >= totalPages}
-          className={`${base} border border-border-default ${page >= totalPages ? 'opacity-40 pointer-events-none text-foreground-muted' : 'text-foreground-secondary hover:bg-surface-secondary'}`}>›</button>
+      <div className="flex items-center gap-1.5">
+        <button onClick={() => onChange(page - 1)} disabled={page <= 1} className={btnCls}>Prev</button>
+        <span className="text-xs text-foreground-muted whitespace-nowrap">{page}/{totalPages}</span>
+        <button onClick={() => onChange(page + 1)} disabled={page >= totalPages} className={btnCls}>Next</button>
       </div>
     </div>
   )
