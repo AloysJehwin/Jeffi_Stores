@@ -200,14 +200,23 @@ export async function POST(request: NextRequest) {
         const rr = batch.find(r => r.rvp_awb_number === awb)
         if (!rr) continue
 
-        const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+        const statusLabel: string = (shipment.Status?.Status ?? '').toLowerCase()
         const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
+        const destReceiveDate: string | null = shipment.DestRecieveDate ?? null
+        const returnedDate: string | null = shipment.ReturnedDate ?? null
 
-        if (rawType !== 'DL') continue
+        const isReceivedAtWarehouse =
+          destReceiveDate !== null ||
+          returnedDate !== null ||
+          statusLabel === 'delivered'
+
+        if (!isReceivedAtWarehouse) continue
+
+        const receivedAt = destReceiveDate ?? returnedDate ?? statusDateTime ?? new Date().toISOString()
 
         await query(
           `UPDATE return_requests SET received_at = $2, updated_at = NOW() WHERE id = $1`,
-          [rr.id, statusDateTime ?? new Date().toISOString()]
+          [rr.id, receivedAt]
         ).catch(() => {})
 
         rvpResults.push({ returnRequestId: rr.id, awb, receivedAt: true })
