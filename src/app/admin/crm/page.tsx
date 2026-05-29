@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { getCrmDashboardData } from '@/lib/admin-crm'
+import HealthDistributionCard from './HealthDistributionCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,40 +96,7 @@ export default async function CrmDashboardPage() {
       {/* Health distribution + churn risks + biggest drops */}
       {data.health && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Health Distribution</h2>
-            {(() => {
-              const d = data.health.distribution
-              const max = Math.max(d.b0_20, d.b20_40, d.b40_60, d.b60_80, d.b80_100, 1)
-              const buckets: { label: string; count: number; color: string }[] = [
-                { label: '0-20',   count: d.b0_20,   color: 'bg-red-500' },
-                { label: '20-40',  count: d.b20_40,  color: 'bg-orange-500' },
-                { label: '40-60',  count: d.b40_60,  color: 'bg-yellow-500' },
-                { label: '60-80',  count: d.b60_80,  color: 'bg-lime-500' },
-                { label: '80-100', count: d.b80_100, color: 'bg-green-500' },
-              ]
-              return (
-                <>
-                  <div className="space-y-2">
-                    {buckets.map(b => (
-                      <div key={b.label} className="flex items-center gap-2 text-xs">
-                        <span className="w-12 text-foreground-muted tabular-nums">{b.label}</span>
-                        <div className="flex-1 h-4 bg-surface-secondary rounded overflow-hidden">
-                          <div className={`h-full ${b.color}`} style={{ width: `${(b.count / max) * 100}%` }} />
-                        </div>
-                        <span className="w-10 text-right font-semibold tabular-nums">{b.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {d.unscored > 0 && (
-                    <p className="text-[10px] text-foreground-muted mt-3">
-                      {d.unscored.toLocaleString('en-IN')} customer(s) not yet scored
-                    </p>
-                  )}
-                </>
-              )
-            })()}
-          </div>
+          <HealthDistributionCard distribution={data.health.distribution} />
 
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Top Churn Risks</h2>
