@@ -26,7 +26,6 @@ const SEGMENT_META: Record<string, { label: string; color: string; href: string 
 }
 
 
-
 export default async function CrmDashboardPage() {
   const cookieStore = cookies()
   const token = cookieStore.get('admin_token')?.value
