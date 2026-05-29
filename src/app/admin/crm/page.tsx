@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { cookies } from 'next/headers'
+import { verifyToken } from '@/lib/jwt'
+import { getCrmDashboardData } from '@/lib/admin-crm'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,20 +32,22 @@ function fmtDate(iso: string) {
 
 export default async function CrmDashboardPage() {
   const cookieStore = cookies()
-  const cookie = cookieStore.toString()
+  const token = cookieStore.get('admin_token')?.value
+  let adminId = ''
+  if (token) {
+    try { adminId = (await verifyToken(token))?.adminId || '' } catch {}
+  }
 
-  const res = await fetch(`http://localhost:3000/api/admin/crm/dashboard`, {
-    headers: { cookie },
-    cache: 'no-store',
-  })
-  if (!res.ok) {
+  let data: Awaited<ReturnType<typeof getCrmDashboardData>>
+  try {
+    data = await getCrmDashboardData(adminId)
+  } catch {
     return (
       <div className="p-6">
         <p className="text-foreground-muted">Failed to load CRM dashboard.</p>
       </div>
     )
   }
-  const data = await res.json()
   const s = data.segments
 
   return (

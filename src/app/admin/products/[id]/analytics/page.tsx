@@ -1,20 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { cookies } from 'next/headers'
 import ProductAnalyticsClient from './ProductAnalyticsClient'
+import { getProductAnalyticsData } from '@/lib/admin-product-analytics'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProductAnalyticsPage({ params }: { params: { id: string } }) {
-  const cookieStore = cookies()
-  const cookie = cookieStore.toString()
-
-  const res = await fetch(`http://localhost:3000/api/admin/products/${params.id}/analytics?days=30`, {
-    headers: { cookie },
-    cache: 'no-store',
-  })
-  if (!res.ok) notFound()
-  const data = await res.json()
+  const data = await getProductAnalyticsData(params.id, 30)
+  if (!data) notFound()
 
   return (
     <div className="p-4 sm:p-6 max-w-full space-y-5">
