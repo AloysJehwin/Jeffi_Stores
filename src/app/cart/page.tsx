@@ -183,7 +183,7 @@ export default function CartPage() {
 
                       {/* Product Details */}
                       <div className="flex-1">
-                        <Link href={`/products/${item.products.slug}`} className="text-lg font-semibold text-foreground hover:text-accent-600 transition-colors">
+                        <Link href={`/products/${item.products.slug}`} className="text-base sm:text-lg font-semibold text-foreground hover:text-accent-600 transition-colors">
                           {item.products.name}
                         </Link>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -227,7 +227,7 @@ export default function CartPage() {
                         )}
 
                         {/* Quantity Controls */}
-                        <div className="mt-4 flex items-center gap-4">
+                        <div className="mt-4 flex items-center gap-3 flex-wrap">
                           {isCustomQty ? (
                             <div className="flex items-center gap-2">
                               <input
@@ -475,7 +475,7 @@ export default function CartPage() {
 
               {user ? (
                 <Link
-                  href={`/checkout${appliedCoupon ? `?couponCode=${appliedCoupon.code}` : ''}`}
+                  href={`/checkout/review${appliedCoupon ? `?couponCode=${appliedCoupon.code}` : ''}`}
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                 >
                   Proceed to Checkout

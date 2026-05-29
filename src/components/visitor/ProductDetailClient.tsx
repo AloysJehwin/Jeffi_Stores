@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
 
@@ -196,6 +196,10 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const { showToast, showConfirm } = useToast()
   const router = useRouter()
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [product.slug])
+
   const hasVariants = product.has_variants && product.product_variants?.length > 0
   const displayPrice = Number(product.base_price)
   const mrp = product.mrp ? Number(product.mrp) : null
@@ -286,7 +290,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
       {/* Product info column — order-2 on mobile, natural on desktop */}
       <div className="order-2 lg:order-none">
         <div className="flex items-start justify-between gap-3 mb-4">
-          <h1 className="text-3xl font-bold text-foreground flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1">
             {product.name}
           </h1>
           <div className="flex items-center gap-2 shrink-0 mt-1">

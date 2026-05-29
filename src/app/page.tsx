@@ -134,7 +134,7 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-4 gap-2 sm:gap-3 md:grid-cols-4 lg:grid-cols-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 lg:grid-cols-8">
               {mainCategories.map((category) => (
                 <Link
                   key={category.id}

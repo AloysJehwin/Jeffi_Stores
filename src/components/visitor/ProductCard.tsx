@@ -139,7 +139,7 @@ export default function ProductCard({
         </div>
 
         {/* Info */}
-        <div className="p-5 flex flex-col flex-grow">
+        <div className="p-3 sm:p-5 flex flex-col flex-grow">
           <h3 className="font-semibold text-base text-foreground mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[3rem]">
             {name}
           </h3>
