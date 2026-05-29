@@ -50,11 +50,10 @@ function Highlight({ text, query }: { text: string; query: string }) {
 function getDropdownStyle(el: HTMLElement): React.CSSProperties {
   const rect = el.getBoundingClientRect()
   return {
-    position: 'fixed',
+    position: 'absolute',
     top: rect.bottom + 4,
     left: rect.left,
     width: rect.width,
-    zIndex: 9999,
   }
 }
 
@@ -83,7 +82,7 @@ export default function AdminTypeahead({
 
   useEffect(() => {
     const el = document.createElement('div')
-    el.style.cssText = 'position:fixed;top:0;left:0;z-index:9999;pointer-events:none'
+    el.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:visible;z-index:9999;pointer-events:none'
     document.body.appendChild(el)
     portalRef.current = el
     return () => { document.body.removeChild(el) }
