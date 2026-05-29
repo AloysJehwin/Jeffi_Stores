@@ -139,7 +139,9 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
   const aggregated = aggregate(data.timeSeries, granularity)
   const hasZeros = aggregated.some(r => r.views + r.carts + r.orders === 0)
   const displayed = showZeros ? aggregated : aggregated.filter(r => r.views + r.carts + r.orders > 0)
-  const maxValue = Math.max(...displayed.map(d => Math.max(d.views, d.carts * 5, d.orders * 20)), 1)
+  const maxViews = Math.max(...displayed.map(d => d.views), 1)
+  const maxCarts = Math.max(...displayed.map(d => d.carts), 1)
+  const maxOrders = Math.max(...displayed.map(d => d.orders), 1)
 
   const refPreview = data.referrers.slice(0, PREVIEW)
   const refHasMore = data.referrers.length > PREVIEW
@@ -218,22 +220,38 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
               )}
             </p>
           ) : (
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {displayed.map(d => (
                 <div key={d.date} className="flex items-center gap-3 text-xs">
                   <span className={`shrink-0 text-foreground-muted ${granularity === 'weekly' ? 'w-32' : 'w-20'}`}>
                     {fmtLabel(d.date, granularity)}
                   </span>
-                  <div className="flex-1 flex items-center gap-1 h-5">
-                    <div
-                      className="bg-blue-500 rounded h-full transition-all"
-                      style={{ width: `${(d.views / maxValue) * 100}%`, minWidth: d.views > 0 ? '2px' : '0' }}
-                      title={`${d.views} views`}
-                    />
-                    <span className="text-foreground tabular-nums w-10 text-right">{d.views}</span>
+                  <div className="flex-1 flex flex-col gap-1">
+                    <div className="flex items-center gap-1 h-2.5">
+                      <div
+                        className="bg-blue-500 rounded-sm h-full transition-all"
+                        style={{ width: `${(d.views / maxViews) * 100}%`, minWidth: d.views > 0 ? '2px' : '0' }}
+                        title={`${d.views} views`}
+                      />
+                      <span className="text-foreground tabular-nums text-[10px] w-6 shrink-0">{d.views}</span>
+                    </div>
+                    <div className="flex items-center gap-1 h-2.5">
+                      <div
+                        className="bg-amber-400 rounded-sm h-full transition-all"
+                        style={{ width: `${(d.carts / maxCarts) * 100}%`, minWidth: d.carts > 0 ? '2px' : '0' }}
+                        title={`${d.carts} cart adds`}
+                      />
+                      <span className="text-amber-500 dark:text-amber-400 tabular-nums text-[10px] w-6 shrink-0">{d.carts}</span>
+                    </div>
+                    <div className="flex items-center gap-1 h-2.5">
+                      <div
+                        className="bg-green-500 rounded-sm h-full transition-all"
+                        style={{ width: `${(d.orders / maxOrders) * 100}%`, minWidth: d.orders > 0 ? '2px' : '0' }}
+                        title={`${d.orders} orders`}
+                      />
+                      <span className="text-green-600 dark:text-green-400 tabular-nums text-[10px] font-semibold w-6 shrink-0">{d.orders}</span>
+                    </div>
                   </div>
-                  <span className="text-foreground-secondary tabular-nums w-8 text-right">{d.carts}c</span>
-                  <span className="text-green-600 dark:text-green-400 tabular-nums w-8 text-right font-semibold">{d.orders}o</span>
                 </div>
               ))}
             </div>
@@ -241,9 +259,9 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
 
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-border-default text-xs text-foreground-muted flex-wrap gap-2">
             <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-blue-500 rounded inline-block" /> Views</span>
-              <span><span className="font-semibold text-foreground-secondary">N</span>c Cart adds</span>
-              <span><span className="font-semibold text-green-600 dark:text-green-400">N</span>o Orders</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 bg-blue-500 rounded-sm inline-block" /> Views</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 bg-amber-400 rounded-sm inline-block" /> Cart adds</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 bg-green-500 rounded-sm inline-block" /> Orders</span>
             </div>
             {hasZeros && (
               <button
