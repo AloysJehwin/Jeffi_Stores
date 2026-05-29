@@ -376,12 +376,12 @@ export default function OrdersPage() {
                 ))}
 
                 {total > pageSize && (
-                  <div className="flex items-center justify-between pt-4">
-                    <p className="text-sm text-foreground-muted">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4">
+                    <p className="text-sm text-foreground-muted text-center sm:text-left whitespace-nowrap">
                       Showing <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}</span> of{' '}
                       <span className="font-medium text-foreground">{total}</span> orders
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-center gap-2">
                       <button
                         onClick={() => setPage(p => Math.max(1, p - 1))}
                         disabled={page <= 1}
@@ -389,7 +389,7 @@ export default function OrdersPage() {
                       >
                         Previous
                       </button>
-                      <span className="text-sm text-foreground-muted">Page {page} of {Math.ceil(total / pageSize)}</span>
+                      <span className="text-sm text-foreground-muted whitespace-nowrap">{page} / {Math.ceil(total / pageSize)}</span>
                       <button
                         onClick={() => setPage(p => p + 1)}
                         disabled={page >= Math.ceil(total / pageSize)}
