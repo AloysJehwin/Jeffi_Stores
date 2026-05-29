@@ -7,11 +7,11 @@ import {
   PackageType,
   CARTON_MAX_WEIGHT_GRAMS,
 } from '@/lib/shipping'
+import { getDeliverySettings, applyDeliveryRules } from '@/lib/delivery-settings'
 
 const DELHIVERY_API = 'https://track.delhivery.com/api/kinko/v1/invoice/charges/.json'
 const ORIGIN_PIN = process.env.DELHIVERY_ORIGIN_PINCODE || '492001'
 const TOKEN = process.env.DELHIVERY_API_KEY
-const FREE_SHIPPING_ABOVE = parseFloat(process.env.FREE_SHIPPING_ABOVE || '0') || 0
 const SHIPPING_MIN_CHARGE = parseFloat(process.env.SHIPPING_MIN_CHARGE || '0') || 0
 const COD_SURCHARGE_FLAT = parseFloat(process.env.COD_SURCHARGE_FLAT || '40') || 40
 const COD_SURCHARGE_PCT = parseFloat(process.env.COD_SURCHARGE_PCT || '2') || 2
@@ -19,7 +19,7 @@ const COD_SURCHARGE_PCT = parseFloat(process.env.COD_SURCHARGE_PCT || '2') || 2
 interface RateBreakdown {
   charge: number
   zone: string
-  source: 'delhivery' | 'fallback' | 'free'
+  source: 'delhivery' | 'fallback' | 'free' | 'admin_disabled' | 'free_threshold'
   chargedWeightGrams: number
   cartonCount: number
   cartons?: { weightGrams: number; charge: number; zone: string }[]
@@ -126,16 +126,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid cart items' }, { status: 400 })
     }
 
-    if (FREE_SHIPPING_ABOVE > 0 && typeof subtotal === 'number' && subtotal >= FREE_SHIPPING_ABOVE) {
-      const result: RateBreakdown = {
+    const deliverySettings = await getDeliverySettings()
+    const totalWeightGrams = shipmentItems.reduce((s, i) => s + i.weightGrams * i.quantity, 0)
+
+    if (!deliverySettings.enabled) {
+      return NextResponse.json<RateBreakdown>({
         charge: 0,
         zone: 'Free',
-        source: 'free',
-        chargedWeightGrams: shipmentItems.reduce((s, i) => s + i.weightGrams * i.quantity, 0),
+        source: 'admin_disabled',
+        chargedWeightGrams: totalWeightGrams,
         cartonCount: 0,
-        freeShippingThreshold: FREE_SHIPPING_ABOVE,
-      }
-      return NextResponse.json(result)
+      })
+    }
+
+    if (deliverySettings.freeThreshold > 0 && typeof subtotal === 'number' && subtotal >= deliverySettings.freeThreshold) {
+      return NextResponse.json<RateBreakdown>({
+        charge: 0,
+        zone: 'Free',
+        source: 'free_threshold',
+        chargedWeightGrams: totalWeightGrams,
+        cartonCount: 0,
+        freeShippingThreshold: deliverySettings.freeThreshold,
+      })
     }
 
     const cartons = packIntoCartons(shipmentItems, CARTON_MAX_WEIGHT_GRAMS)
@@ -191,15 +203,22 @@ export async function POST(request: NextRequest) {
       totalCharge += codFee
     }
 
+    const baseCharge = Math.round(totalCharge * 100) / 100
+    const ruleResult = applyDeliveryRules({
+      baseCharge,
+      subtotal: typeof subtotal === 'number' ? subtotal : 0,
+      settings: deliverySettings,
+    })
+
     const result: RateBreakdown = {
-      charge: Math.round(totalCharge * 100) / 100,
+      charge: ruleResult.charge,
       zone,
-      source,
+      source: ruleResult.source === 'as_is' || ruleResult.source === 'discounted' ? source : ruleResult.source,
       chargedWeightGrams: totalChargedWeight,
       cartonCount: cartons.length,
       cartons: cartonBreakdown,
     }
-    if (FREE_SHIPPING_ABOVE > 0) result.freeShippingThreshold = FREE_SHIPPING_ABOVE
+    if (deliverySettings.freeThreshold > 0) result.freeShippingThreshold = deliverySettings.freeThreshold
 
     return NextResponse.json(result)
   } catch {

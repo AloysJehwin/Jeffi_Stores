@@ -1,5 +1,6 @@
 import { queryOne, queryMany, query } from './db'
 import { sendOrderAutoCancelledEmail, sendOrderAutoCancelledAdminNotification, sendOrderStatusUpdate } from './email'
+import { createAutoTask } from './auto-tasks'
 
 export const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 
@@ -111,6 +112,18 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
       }
 
       sendOrderAutoCancelledAdminNotification(order, redirectPath).catch(() => {})
+
+      if (order.user_id) {
+        createAutoTask({
+          userId: order.user_id,
+          sourceKind: 'abandoned_checkout',
+          sourceRefId: orderId,
+          title: `Reach out about abandoned checkout #${order.order_number}`,
+          description: `Order auto-cancelled (10-min payment window). Total ₹${order.total_amount}. Worth a follow-up.`,
+          priority: 'medium',
+          dueInDays: 1,
+        }).catch(() => {})
+      }
     }
 
     return { success: true, directCancel: true, restoredToCart: restoreToCart }

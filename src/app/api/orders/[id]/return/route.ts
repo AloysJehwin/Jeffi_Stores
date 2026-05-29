@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { sendReturnStatusEmail } from '@/lib/email'
+import { logActivity } from '@/lib/activity'
+import { createAutoTask } from '@/lib/auto-tasks'
 
 const RETURN_WINDOW_DAYS = 7
 
@@ -99,6 +101,25 @@ const deliveredAt = new Date(order.delivered_at || order.updated_at)
       `UPDATE orders SET status = 'return_requested', updated_at = NOW() WHERE id = $1`,
       [params.id]
     )
+
+    logActivity({
+      userId: authUser.userId,
+      kind: 'return_requested',
+      referenceId: params.id,
+      referenceType: 'orders',
+      summary: `${type === 'return' ? 'Return' : 'Replacement'} requested for order #${order.order_number}: ${reason}`,
+      metadata: { type, reason, orderNumber: order.order_number },
+    }).catch(() => {})
+
+    createAutoTask({
+      userId: authUser.userId,
+      sourceKind: 'review_return',
+      sourceRefId: params.id,
+      title: `Review ${type} request for #${order.order_number}`,
+      description: `Reason: ${reason}${description ? `\n\n${description}` : ''}`,
+      priority: 'high',
+      dueInDays: 1,
+    }).catch(() => {})
 
     const customerName = `${order.first_name || ''} ${order.last_name || ''}`.trim() || order.customer_name || 'Customer'
     const customerEmail = order.user_email || order.customer_email

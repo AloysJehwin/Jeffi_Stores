@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const FUNNEL_LABELS: Record<string, string> = {
   home: 'Homepage', categories: 'Categories', category: 'Category Page',
@@ -29,6 +30,10 @@ interface DeviceRow { type: string; sessions: number }
 interface BrowserRow { browser: string; sessions: number }
 interface HourRow { hour: number; hits: number }
 interface Totals { sessions: number; pageviews: number; conversions: number; bounceRate: number; avgPages: number }
+interface TopProductRow { productId: string; name: string; slug: string; views: number; uniqueViewers: number; cartAdds: number; orders: number; revenue: number; conversionRate: number }
+interface ConversionLaggardRow { productId: string; name: string; slug: string; views: number; orders: number }
+interface SearchTermRow { query: string; searches: number; clicks: number }
+interface NoResultSearchRow { query: string; searches: number }
 
 interface TrafficData {
   funnel: FunnelStep[]
@@ -38,6 +43,10 @@ interface TrafficData {
   devices: DeviceRow[]
   browsers: BrowserRow[]
   hourly: HourRow[]
+  topProducts: TopProductRow[]
+  conversionLaggards: ConversionLaggardRow[]
+  topSearchTerms: SearchTermRow[]
+  noResultSearches: NoResultSearchRow[]
   totals: Totals
 }
 
@@ -71,11 +80,26 @@ function Empty({ msg = 'No data yet' }: { msg?: string }) {
   return <p className="text-sm text-foreground-muted text-center py-8">{msg}</p>
 }
 
+type TrafficTab = 'overview' | 'funnel' | 'pages' | 'audience' | 'products'
+const TRAFFIC_TABS: TrafficTab[] = ['overview', 'funnel', 'pages', 'audience', 'products']
+
 export default function TrafficClient() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab') as TrafficTab | null
+  const initialTab: TrafficTab = tabParam && TRAFFIC_TABS.includes(tabParam) ? tabParam : 'overview'
+
   const [days, setDays] = useState(7)
   const [data, setData] = useState<TrafficData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'overview' | 'funnel' | 'pages' | 'audience'>('overview')
+  const [tab, setTabState] = useState<TrafficTab>(initialTab)
+
+  function setTab(next: TrafficTab) {
+    setTabState(next)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', next)
+    router.replace(`/admin/traffic?${params.toString()}`, { scroll: false })
+  }
 
   useEffect(() => {
     setLoading(true)
@@ -96,6 +120,7 @@ export default function TrafficClient() {
   const TABS = [
     { id: 'overview' as const, label: 'Overview' },
     { id: 'funnel' as const, label: 'Funnel' },
+    { id: 'products' as const, label: 'Products' },
     { id: 'pages' as const, label: 'Pages & Sources' },
     { id: 'audience' as const, label: 'Audience' },
   ]
@@ -266,6 +291,116 @@ export default function TrafficClient() {
                 </div>
               )}
             </Section>
+          )}
+
+          {tab === 'products' && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <Section title="Top Products by Views">
+                  {data.topProducts.length === 0 ? (
+                    <p className="text-sm text-foreground-muted">No product views in this period.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="text-xs uppercase tracking-wide text-foreground-muted border-b border-border-default">
+                            <th className="text-left py-2 px-2 font-semibold">Product</th>
+                            <th className="text-right py-2 px-2 font-semibold">Views</th>
+                            <th className="text-right py-2 px-2 font-semibold">Carts</th>
+                            <th className="text-right py-2 px-2 font-semibold">Orders</th>
+                            <th className="text-right py-2 px-2 font-semibold">CR%</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border-default">
+                          {data.topProducts.map(p => (
+                            <tr key={p.productId} className="hover:bg-surface-secondary/50">
+                              <td className="py-2 px-2 max-w-xs">
+                                <a href={`/admin/products/${p.productId}/analytics`} className="text-foreground hover:text-accent-600 truncate block">
+                                  {p.name}
+                                </a>
+                              </td>
+                              <td className="py-2 px-2 text-right tabular-nums text-foreground">{p.views.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-foreground-secondary">{p.cartAdds.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-foreground-secondary">{p.orders.toLocaleString()}</td>
+                              <td className={`py-2 px-2 text-right tabular-nums font-semibold ${p.conversionRate >= 5 ? 'text-green-600 dark:text-green-400' : p.conversionRate >= 1 ? 'text-foreground' : 'text-foreground-muted'}`}>
+                                {p.conversionRate}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Section>
+
+                <Section title="Conversion Laggards (high views, no orders)">
+                  {data.conversionLaggards.length === 0 ? (
+                    <p className="text-sm text-foreground-muted">No products with stuck-conversion patterns.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead>
+                          <tr className="text-xs uppercase tracking-wide text-foreground-muted border-b border-border-default">
+                            <th className="text-left py-2 px-2 font-semibold">Product</th>
+                            <th className="text-right py-2 px-2 font-semibold">Views</th>
+                            <th className="text-right py-2 px-2 font-semibold">Orders</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border-default">
+                          {data.conversionLaggards.map(p => (
+                            <tr key={p.productId} className="hover:bg-surface-secondary/50">
+                              <td className="py-2 px-2 max-w-xs">
+                                <a href={`/admin/products/${p.productId}/analytics`} className="text-foreground hover:text-accent-600 truncate block">
+                                  {p.name}
+                                </a>
+                              </td>
+                              <td className="py-2 px-2 text-right tabular-nums text-orange-600 dark:text-orange-400 font-semibold">{p.views.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-foreground-muted">{p.orders}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <p className="text-xs text-foreground-muted mt-3">Items with 20+ views and 0 paid orders. Worth checking pricing, images, or stock.</p>
+                    </div>
+                  )}
+                </Section>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <Section title="Top Search Terms">
+                  {data.topSearchTerms.length === 0 ? (
+                    <p className="text-sm text-foreground-muted">No search activity yet. (Search-term tracking starts logging after this deploy.)</p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {data.topSearchTerms.map(t => (
+                        <div key={t.query} className="flex items-center justify-between text-sm">
+                          <span className="font-medium text-foreground truncate flex-1 mr-3">&quot;{t.query}&quot;</span>
+                          <span className="text-foreground-secondary tabular-nums text-xs whitespace-nowrap">
+                            {t.searches.toLocaleString()} searches · {t.clicks.toLocaleString()} with results
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Section>
+
+                <Section title="No-Results Searches (catalog gaps)">
+                  {data.noResultSearches.length === 0 ? (
+                    <p className="text-sm text-foreground-muted">No &quot;no-results&quot; searches detected — catalog covers what people are looking for.</p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {data.noResultSearches.map(t => (
+                        <div key={t.query} className="flex items-center justify-between text-sm">
+                          <span className="font-medium text-foreground truncate flex-1 mr-3">&quot;{t.query}&quot;</span>
+                          <span className="text-orange-600 dark:text-orange-400 tabular-nums text-xs font-semibold whitespace-nowrap">{t.searches.toLocaleString()}×</span>
+                        </div>
+                      ))}
+                      <p className="text-xs text-foreground-muted pt-2 border-t border-border-default">Customers searched these but found nothing — opportunities to expand catalog.</p>
+                    </div>
+                  )}
+                </Section>
+              </div>
+            </div>
           )}
 
           {tab === 'pages' && (

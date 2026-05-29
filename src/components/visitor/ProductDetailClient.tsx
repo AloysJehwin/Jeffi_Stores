@@ -294,9 +294,9 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
               onClick={handleWishlist}
               disabled={wishlistLoading}
               aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-              className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center transition-colors disabled:opacity-60"
+              className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
             >
-              <svg className="w-5 h-5" fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: isInWishlist ? '#ef4444' : undefined }}>
+              <svg className={`w-5 h-5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`} fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: isInWishlist ? '#ef4444' : undefined }}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
             </button>

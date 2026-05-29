@@ -90,7 +90,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
 
       {confirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/30 animate-fade-in">
           <div className="bg-surface-elevated rounded-lg shadow-xl max-w-md w-full p-6 animate-fade-in">
             <h3 className="text-lg font-bold text-foreground mb-2">{confirmDialog.title}</h3>
             <p className="text-foreground-secondary mb-6">{confirmDialog.message}</p>

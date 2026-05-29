@@ -7,6 +7,7 @@ import { CartProvider } from '@/contexts/CartContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { ConfirmProvider } from '@/contexts/ConfirmContext'
 import PageTracker from './visitor/PageTracker'
 
 function shouldShowFooter(pathname: string | null): boolean {
@@ -23,7 +24,9 @@ export default function ConditionalLayout({ children, isFormsSubdomain, isDocume
     return (
       <ThemeProvider>
         <ToastProvider>
-          {children}
+          <ConfirmProvider>
+            {children}
+          </ConfirmProvider>
         </ToastProvider>
       </ThemeProvider>
     )
@@ -36,14 +39,16 @@ export default function ConditionalLayout({ children, isFormsSubdomain, isDocume
       <AuthProvider>
         <CartProvider>
           <ToastProvider>
-            <div className="flex flex-col min-h-screen bg-surface">
-              <PageTracker />
-              <Header />
-              <main className="flex-1 bg-surface pt-16 lg:pt-20">
-                {children}
-              </main>
-              {showFooter && <Footer />}
-            </div>
+            <ConfirmProvider>
+              <div className="flex flex-col min-h-screen bg-surface">
+                <PageTracker />
+                <Header />
+                <main className="flex-1 bg-surface pt-16 lg:pt-20">
+                  {children}
+                </main>
+                {showFooter && <Footer />}
+              </div>
+            </ConfirmProvider>
           </ToastProvider>
         </CartProvider>
       </AuthProvider>

@@ -3,6 +3,7 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendNewReviewNotification } from '@/lib/email'
 import { uploadReviewImage } from '@/lib/s3'
+import { createAutoTask } from '@/lib/auto-tasks'
 
 export async function GET(request: NextRequest) {
   try {
@@ -163,6 +164,18 @@ export async function POST(request: NextRequest) {
         await sendNewReviewNotification(review, userDetails, product)
       } catch {
       }
+    }
+
+    if (rating <= 2) {
+      createAutoTask({
+        userId: user.userId,
+        sourceKind: 'respond_review',
+        sourceRefId: review.id,
+        title: `Respond to ${rating}★ review on ${product?.name || 'product'}`,
+        description: comment.trim().slice(0, 500),
+        priority: 'high',
+        dueInDays: 1,
+      }).catch(() => {})
     }
 
     return NextResponse.json({

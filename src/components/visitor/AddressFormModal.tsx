@@ -221,7 +221,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
   const pinLookupDone = pinLookupState === 'found'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/30">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/30 animate-fade-in">
       <div className="bg-surface-elevated rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-fade-in">
         <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">

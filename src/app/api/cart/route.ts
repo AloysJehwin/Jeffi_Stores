@@ -28,15 +28,19 @@ export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const { userId } = await resolveUserId(cookieStore)
+    const url = new URL(request.url)
+    const savedOnly = url.searchParams.get('saved') === '1'
+    const savedFilter = savedOnly ? 'TRUE' : 'FALSE'
 
     const cartItems = await queryMany(`
       SELECT
         ci.*,
         json_build_object(
-          'id', p.id, 'name', p.name, 'slug', p.slug,
-          'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
+          'id', p.id, 'name', p.name, 'slug', p.slug, 'sku', p.sku,
+          'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst, 'mrp', p.mrp,
           'gst_percentage', p.gst_percentage,
           'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
+          'brand_name', b.name,
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'image_url', pi.image_url, 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),
@@ -52,11 +56,21 @@ export async function GET(request: NextRequest) {
             'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
             'length_rate', pv.length_rate, 'length_unit', pv.length_unit
           )
-        ELSE NULL END AS variant
+        ELSE NULL END AS variant,
+        CASE WHEN ci.sub_variant_id IS NOT NULL THEN
+          json_build_object(
+            'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
+            'price', psv.price, 'mrp', psv.mrp, 'price_ex_gst', psv.price_ex_gst,
+            'mrp_ex_gst', psv.mrp_ex_gst, 'wholeprice_ex_gst', psv.wholeprice_ex_gst,
+            'stock_quantity', psv.stock_quantity, 'inventory_quantity', psv.inventory_quantity
+          )
+        ELSE NULL END AS sub_variant
       FROM cart_items ci
       LEFT JOIN products p ON ci.product_id = p.id
+      LEFT JOIN brands b ON p.brand_id = b.id
       LEFT JOIN product_variants pv ON ci.variant_id = pv.id
-      WHERE ci.user_id = $1
+      LEFT JOIN product_sub_variants psv ON ci.sub_variant_id = psv.id
+      WHERE ci.user_id = $1 AND COALESCE(ci.saved_for_later, FALSE) = ${savedFilter}
     `, [userId])
 
     return NextResponse.json({ items: cartItems || [] })
@@ -144,7 +158,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { cartItemId, quantity } = body
+    const { cartItemId, quantity, savedForLater } = body
 
     const cookieStore = await cookies()
     const { userId, sessionId, authUserId } = await resolveUserId(cookieStore)
@@ -158,8 +172,20 @@ export async function PATCH(request: NextRequest) {
 
     if (!cartItem) return NextResponse.json({ error: 'Cart item not found' }, { status: 404 })
 
-    await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [quantity, cartItemId])
-    return NextResponse.json({ message: 'Cart updated' })
+    if (typeof savedForLater === 'boolean') {
+      await query(
+        'UPDATE cart_items SET saved_for_later = $1, saved_at = CASE WHEN $1 THEN NOW() ELSE NULL END, updated_at = NOW() WHERE id = $2',
+        [savedForLater, cartItemId]
+      )
+      return NextResponse.json({ message: savedForLater ? 'Saved for later' : 'Moved to cart' })
+    }
+
+    if (typeof quantity === 'number') {
+      await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [quantity, cartItemId])
+      return NextResponse.json({ message: 'Cart updated' })
+    }
+
+    return NextResponse.json({ error: 'No valid update fields provided' }, { status: 400 })
   } catch {
     return NextResponse.json({ error: 'Failed to update cart' }, { status: 500 })
   }
