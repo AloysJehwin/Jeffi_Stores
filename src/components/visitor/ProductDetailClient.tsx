@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
 
@@ -195,6 +195,10 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
   const router = useRouter()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [product.slug])
 
   const hasVariants = product.has_variants && product.product_variants?.length > 0
   const displayPrice = Number(product.base_price)
