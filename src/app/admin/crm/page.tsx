@@ -58,7 +58,7 @@ export default async function CrmDashboardPage() {
 
       {/* Tasks summary */}
       {data.tasks && (data.tasks.open > 0 || data.tasks.mine > 0) && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <Link
             href="/admin/tasks?scope=mine&status=open"
             className="bg-surface-elevated rounded-xl border border-border-default p-4 hover:shadow-md hover:-translate-y-0.5 transition-all"

@@ -878,25 +878,19 @@ export default function CategoriesClient({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-1">
-          <p className="text-xs text-foreground-muted">Page {page} of {totalPages}</p>
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between gap-2 mt-4 px-1">
+          <p className="text-xs text-foreground-muted whitespace-nowrap">Page <span className="font-medium text-foreground">{page}</span> of <span className="font-medium text-foreground">{totalPages}</span></p>
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 text-sm border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >Prev</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-              <button
-                key={n}
-                onClick={() => setPage(n)}
-                className={`w-8 h-8 text-sm rounded-lg font-medium transition-colors ${n === page ? 'bg-accent-500 text-white' : 'border border-border-secondary text-foreground-secondary hover:bg-surface-secondary'}`}
-              >{n}</button>
-            ))}
+            <span className="text-xs text-foreground-muted whitespace-nowrap">{page}/{totalPages}</span>
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3 py-1.5 text-sm border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >Next</button>
           </div>
         </div>

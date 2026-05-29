@@ -236,7 +236,7 @@ export default function OrdersPage() {
                     {/* Order Header */}
                     <div className="bg-surface border-b border-border-default px-4 sm:px-6 py-4">
                       <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-6">
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
                           <div>
                             <p className="text-xs text-foreground-muted mb-1">Order Number</p>
                             <p className="font-mono text-sm font-medium text-foreground">
@@ -376,24 +376,24 @@ export default function OrdersPage() {
                 ))}
 
                 {total > pageSize && (
-                  <div className="flex items-center justify-between pt-4">
-                    <p className="text-sm text-foreground-muted">
-                      Showing <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}</span> of{' '}
-                      <span className="font-medium text-foreground">{total}</span> orders
+                  <div className="flex items-center justify-between gap-2 pt-4">
+                    <p className="text-xs text-foreground-muted whitespace-nowrap">
+                      <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}</span>
+                      {' '}of <span className="font-medium text-foreground">{total}</span> orders
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => setPage(p => Math.max(1, p - 1))}
                         disabled={page <= 1}
-                        className="px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                        className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                       >
-                        Previous
+                        Prev
                       </button>
-                      <span className="text-sm text-foreground-muted">Page {page} of {Math.ceil(total / pageSize)}</span>
+                      <span className="text-xs text-foreground-muted whitespace-nowrap">{page}/{Math.ceil(total / pageSize)}</span>
                       <button
                         onClick={() => setPage(p => p + 1)}
                         disabled={page >= Math.ceil(total / pageSize)}
-                        className="px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                        className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                       >
                         Next
                       </button>

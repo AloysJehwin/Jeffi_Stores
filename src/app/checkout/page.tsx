@@ -4,7 +4,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import Link from 'next/link'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
@@ -40,6 +40,7 @@ function CheckoutPage() {
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
+  const razorpayOpen = useRef(false)
 
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
@@ -59,7 +60,7 @@ function CheckoutPage() {
       return
     }
 
-    if (!isBuyNow && !cartLoading && cartCount === 0) {
+    if (!isBuyNow && !cartLoading && cartCount === 0 && !razorpayOpen.current) {
       router.push('/cart')
       return
     }
@@ -213,18 +214,21 @@ function CheckoutPage() {
         theme: { color: '#f97316' },
         modal: {
           ondismiss: function () {
+            razorpayOpen.current = false
             fetch(`/api/orders/${orderId}`, {
               method: 'DELETE',
               credentials: 'include',
               keepalive: true,
             }).catch(() => {})
             setIsSubmitting(false)
+            showToast('Payment cancelled. Your order has been voided.', 'info')
           },
         },
       }
 
       const rzp = new (window as any).Razorpay(options)
       rzp.on('payment.failed', function (response: any) {
+        razorpayOpen.current = false
         fetch(`/api/orders/${orderId}/payment-failed`, {
           method: 'POST',
           credentials: 'include',
@@ -234,6 +238,7 @@ function CheckoutPage() {
         }).catch(() => {})
         window.location.href = `/account/orders/${orderId}`
       })
+      razorpayOpen.current = true
       rzp.open()
     } catch (err: any) {
       await fetch(`/api/orders/${orderId}/payment-failed`, {

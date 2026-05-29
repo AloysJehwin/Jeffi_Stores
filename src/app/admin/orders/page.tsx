@@ -53,7 +53,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Orders</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
