@@ -25,17 +25,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       ct.id, ct.title, ct.description, ct.due_date, ct.priority, ct.status,
       ct.completed_at, ct.created_at, ct.updated_at,
       ct.auto_created, ct.source_kind, ct.source_ref_id,
-      cu.username AS created_by_username,
+      ca.username AS created_by_username,
       cuser.first_name AS created_by_first_name, cuser.last_name AS created_by_last_name,
-      au.username AS assigned_to_username,
+      aa.username AS assigned_to_username,
       auser.first_name AS assigned_to_first_name, auser.last_name AS assigned_to_last_name,
       ct.assigned_to
     FROM customer_tasks ct
     LEFT JOIN admins ca ON ct.created_by = ca.id
-    LEFT JOIN users cu ON ca.user_id = cu.id
     LEFT JOIN users cuser ON ca.user_id = cuser.id
     LEFT JOIN admins aa ON ct.assigned_to = aa.id
-    LEFT JOIN users au ON aa.user_id = au.id
     LEFT JOIN users auser ON aa.user_id = auser.id
     WHERE ${wheres.join(' AND ')}
     ORDER BY
