@@ -47,16 +47,6 @@ function Highlight({ text, query }: { text: string; query: string }) {
   )
 }
 
-function getDropdownStyle(el: HTMLElement): React.CSSProperties {
-  const rect = el.getBoundingClientRect()
-  return {
-    position: 'absolute',
-    top: rect.bottom + 4,
-    left: rect.left,
-    width: rect.width,
-  }
-}
-
 export default function AdminTypeahead({
   type,
   value,
@@ -73,7 +63,7 @@ export default function AdminTypeahead({
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const [loading, setLoading] = useState(false)
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
+  const [portalReady, setPortalReady] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const portalRef = useRef<HTMLDivElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -82,10 +72,13 @@ export default function AdminTypeahead({
 
   useEffect(() => {
     const el = document.createElement('div')
-    el.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:visible;z-index:2147483647;pointer-events:none;transform:translateZ(0)'
     document.body.appendChild(el)
     portalRef.current = el
-    return () => { document.body.removeChild(el) }
+    setPortalReady(true)
+    return () => {
+      document.body.removeChild(el)
+      portalRef.current = null
+    }
   }, [])
 
   useEffect(() => {
@@ -113,12 +106,7 @@ export default function AdminTypeahead({
           const data = await res.json()
           const newItems = data.items || []
           setItems(newItems)
-          if (newItems.length > 0 && containerRef.current) {
-            setDropdownStyle(getDropdownStyle(containerRef.current))
-            setOpen(true)
-          } else {
-            setOpen(false)
-          }
+          setOpen(newItems.length > 0)
         }
       } catch (err: unknown) {
         if ((err as { name?: string }).name !== 'AbortError') {
@@ -134,7 +122,10 @@ export default function AdminTypeahead({
 
   useEffect(() => {
     function onOutsideClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current && !containerRef.current.contains(e.target as Node) &&
+        portalRef.current && !portalRef.current.contains(e.target as Node)
+      ) {
         setOpen(false)
       }
     }
@@ -193,33 +184,17 @@ export default function AdminTypeahead({
     }
   }
 
-  const defaultInputCls = 'w-full px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted'
+  const rect = containerRef.current?.getBoundingClientRect()
+  const dropdownStyle: React.CSSProperties = rect ? {
+    position: 'fixed',
+    top: rect.bottom + 4,
+    left: rect.left,
+    width: rect.width,
+    pointerEvents: 'auto',
+    zIndex: 2147483647,
+  } : {}
 
-  const dropdown = open && items.length > 0 && typeof document !== 'undefined' ? createPortal(
-    <div style={{ ...dropdownStyle, pointerEvents: 'auto' }} className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto">
-      {items.map((item, idx) => (
-        <button
-          key={item.id}
-          type="button"
-          onMouseDown={e => { e.preventDefault(); selectItem(item) }}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${activeIdx === idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
-        >
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-foreground font-medium truncate">
-              <Highlight text={item.label} query={value} />
-            </p>
-            {item.sublabel && (
-              <p className="text-xs text-foreground-muted truncate mt-0.5">{item.sublabel}</p>
-            )}
-          </div>
-          <svg className="w-3.5 h-3.5 text-foreground-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      ))}
-    </div>,
-    portalRef.current ?? document.body
-  ) : null
+  const defaultInputCls = 'w-full px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted'
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -230,10 +205,7 @@ export default function AdminTypeahead({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (items.length > 0 && containerRef.current) {
-              setDropdownStyle(getDropdownStyle(containerRef.current))
-              setOpen(true)
-            }
+            if (items.length > 0) setOpen(true)
           }}
           placeholder={placeholder}
           disabled={disabled}
@@ -251,7 +223,32 @@ export default function AdminTypeahead({
           )}
         </span>
       </div>
-      {dropdown}
+
+      {portalReady && open && items.length > 0 && portalRef.current && createPortal(
+        <div style={dropdownStyle} className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto">
+          {items.map((item, idx) => (
+            <button
+              key={item.id}
+              type="button"
+              onMouseDown={e => { e.preventDefault(); selectItem(item) }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${activeIdx === idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground font-medium truncate">
+                  <Highlight text={item.label} query={value} />
+                </p>
+                {item.sublabel && (
+                  <p className="text-xs text-foreground-muted truncate mt-0.5">{item.sublabel}</p>
+                )}
+              </div>
+              <svg className="w-3.5 h-3.5 text-foreground-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          ))}
+        </div>,
+        portalRef.current
+      )}
     </div>
   )
 }
