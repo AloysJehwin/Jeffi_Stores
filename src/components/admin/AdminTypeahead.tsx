@@ -77,8 +77,15 @@ export default function AdminTypeahead({
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
   const containerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const typedValueRef = useRef(value)
+  const skipFetchRef = useRef(false)
 
   useEffect(() => {
+    if (skipFetchRef.current) {
+      skipFetchRef.current = false
+      return
+    }
+    typedValueRef.current = value
     setActiveIdx(-1)
     if (value.trim().length < 2) {
       setItems([])
@@ -133,18 +140,40 @@ export default function AdminTypeahead({
     setItems([])
   }, [onSelect])
 
+  function previewItem(idx: number) {
+    skipFetchRef.current = true
+    if (idx < 0) {
+      onChange(typedValueRef.current)
+    } else {
+      onChange(items[idx].label)
+    }
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Escape') { setOpen(false); return }
+    if (e.key === 'Escape') {
+      skipFetchRef.current = true
+      onChange(typedValueRef.current)
+      setOpen(false)
+      return
+    }
     if (!open) {
       if (e.key === 'Enter') { e.preventDefault(); onEnter?.(value); return }
       return
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIdx(i => Math.min(i + 1, items.length - 1))
+      setActiveIdx(i => {
+        const next = Math.min(i + 1, items.length - 1)
+        previewItem(next)
+        return next
+      })
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveIdx(i => Math.max(i - 1, -1))
+      setActiveIdx(i => {
+        const next = Math.max(i - 1, -1)
+        previewItem(next)
+        return next
+      })
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (activeIdx >= 0) {
