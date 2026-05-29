@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Tag {
@@ -9,40 +9,73 @@ interface Tag {
   created_at: string
 }
 
+interface TagDefinition {
+  id: string
+  tag: string
+  color: string
+  sort_order: number
+}
+
 interface CustomerTagsProps {
   customerId: string
   initialTags: Tag[]
 }
 
+const COLOR_CLASSES: Record<string, { badge: string; pill: string }> = {
+  blue:   { badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',     pill: 'bg-blue-500' },
+  purple: { badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300', pill: 'bg-purple-500' },
+  green:  { badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',  pill: 'bg-green-500' },
+  orange: { badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300', pill: 'bg-orange-500' },
+  gold:   { badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300', pill: 'bg-yellow-500' },
+  red:    { badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',          pill: 'bg-red-500' },
+  gray:   { badge: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',         pill: 'bg-zinc-400' },
+  teal:   { badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',      pill: 'bg-teal-500' },
+  accent: { badge: 'bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300', pill: 'bg-accent-500' },
+}
+
+function tagClasses(color: string) {
+  return COLOR_CLASSES[color] ?? COLOR_CLASSES.accent
+}
+
 export default function CustomerTags({ customerId, initialTags }: CustomerTagsProps) {
   const router = useRouter()
   const [tags, setTags] = useState<Tag[]>(initialTags)
-  const [input, setInput] = useState('')
+  const [definitions, setDefinitions] = useState<TagDefinition[]>([])
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const panelRef = useRef<HTMLDivElement>(null)
 
-  async function add() {
-    const trimmed = input.trim()
-    if (!trimmed) return
+  useEffect(() => {
+    fetch('/api/admin/customer-tag-definitions', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => setDefinitions(d.definitions || []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    if (open) document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  async function add(tag: string) {
     setBusy(true)
-    setError('')
     try {
       const res = await fetch(`/api/admin/customers/${customerId}/tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag: trimmed }),
+        body: JSON.stringify({ tag }),
         credentials: 'include',
       })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to add tag')
+      if (res.ok) {
+        const list = await fetch(`/api/admin/customers/${customerId}/tags`, { credentials: 'include' }).then(r => r.json())
+        setTags(list.tags || [])
+        router.refresh()
       }
-      setInput('')
-      router.refresh()
-      const list = await fetch(`/api/admin/customers/${customerId}/tags`, { credentials: 'include' }).then(r => r.json())
-      setTags(list.tags || [])
-    } catch (e: any) {
-      setError(e.message)
     } finally {
       setBusy(false)
     }
@@ -62,51 +95,83 @@ export default function CustomerTags({ customerId, initialTags }: CustomerTagsPr
     }
   }
 
+  const assignedSet = new Set(tags.map(t => t.tag))
+  const available = definitions.filter(d => !assignedSet.has(d.tag))
+
   return (
     <div>
       <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">Tags</h2>
-      <div className="flex flex-wrap gap-2 mb-3">
+
+      {/* Assigned tags */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
         {tags.length === 0 ? (
           <p className="text-xs text-foreground-muted italic">No tags yet</p>
         ) : (
-          tags.map(t => (
-            <span key={t.id} className="inline-flex items-center gap-1 px-2.5 py-1 bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 rounded-full text-xs font-medium">
-              {t.tag}
-              <button
-                type="button"
-                onClick={() => remove(t.tag)}
-                disabled={busy}
-                aria-label={`Remove tag ${t.tag}`}
-                className="ml-0.5 hover:text-accent-900 dark:hover:text-accent-100 disabled:opacity-50"
+          tags.map(t => {
+            const def = definitions.find(d => d.tag === t.tag)
+            const cls = tagClasses(def?.color ?? 'accent')
+            return (
+              <span
+                key={t.id}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${cls.badge}`}
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </span>
-          ))
+                {t.tag}
+                <button
+                  type="button"
+                  onClick={() => remove(t.tag)}
+                  disabled={busy}
+                  aria-label={`Remove tag ${t.tag}`}
+                  className="ml-0.5 opacity-60 hover:opacity-100 disabled:opacity-30 transition-opacity"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            )
+          })
         )}
       </div>
-      <div className="flex gap-2">
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
-          placeholder="Add tag (e.g. wholesale-prospect)"
-          maxLength={60}
-          disabled={busy}
-          className="flex-1 min-w-0 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-        />
-        <button
-          type="button"
-          onClick={add}
-          disabled={busy || !input.trim()}
-          className="px-3 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Add
-        </button>
-      </div>
-      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+
+      {/* Add tag picker */}
+      {available.length > 0 && (
+        <div ref={panelRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            disabled={busy}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-foreground-muted border border-dashed border-border-secondary rounded-lg hover:border-border-default hover:text-foreground transition-colors disabled:opacity-50"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add tag
+          </button>
+
+          {open && (
+            <div className="absolute z-50 top-full mt-1 left-0 bg-surface-elevated border border-border-default rounded-xl shadow-lg p-2 min-w-[180px] max-w-xs">
+              <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider px-2 pb-1.5">Select a tag</p>
+              <div className="flex flex-col gap-0.5">
+                {available.map(def => {
+                  const cls = tagClasses(def.color)
+                  return (
+                    <button
+                      key={def.id}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => { add(def.tag); setOpen(false) }}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm hover:bg-surface-secondary transition-colors disabled:opacity-50 text-left"
+                    >
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${cls.pill}`} />
+                      <span className="text-foreground">{def.tag}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
