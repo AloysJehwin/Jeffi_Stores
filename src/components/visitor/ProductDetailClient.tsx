@@ -286,7 +286,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
       {/* Product info column — order-2 on mobile, natural on desktop */}
       <div className="order-2 lg:order-none">
         <div className="flex items-start justify-between gap-3 mb-4">
-          <h1 className="text-3xl font-bold text-foreground flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1">
             {product.name}
           </h1>
           <div className="flex items-center gap-2 shrink-0 mt-1">
