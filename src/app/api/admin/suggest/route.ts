@@ -150,7 +150,7 @@ async function suggestCustomers(q: string): Promise<SuggestItem[]> {
   const sc = buildSearchClause(q, ['u.first_name', 'u.last_name', 'u.email', 'u.phone'], 1)
   const rows = await queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null }>(
     `SELECT u.id, u.first_name, u.last_name, u.email, u.phone FROM users u
-     JOIN customer_profiles cp ON cp.user_id = u.id
+     LEFT JOIN customer_profiles cp ON cp.user_id = u.id
      WHERE ${sc.clause} ORDER BY u.first_name ASC, u.last_name ASC LIMIT 6`,
     sc.params
   )
