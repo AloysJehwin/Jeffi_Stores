@@ -436,6 +436,34 @@ export async function DELETE(
       )
     }
 
+    const orderItems = await queryMany<{
+      product_id: string
+      variant_id: string | null
+      sub_variant_id: string | null
+      quantity: string
+      unit_price: string
+      buy_mode: string
+      buy_unit: string | null
+    }>(
+      `SELECT product_id, variant_id, sub_variant_id, quantity, unit_price, buy_mode, buy_unit
+       FROM order_items WHERE order_id = $1`,
+      [params.id]
+    )
+    for (const item of orderItems) {
+      const existing = await queryOne<{ id: string }>(
+        `SELECT id FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3 AND sub_variant_id IS NOT DISTINCT FROM $4 AND buy_mode = $5`,
+        [authUser.userId, item.product_id, item.variant_id || null, item.sub_variant_id || null, item.buy_mode || 'unit']
+      )
+      if (existing) {
+        await query(`UPDATE cart_items SET quantity = $1, price_at_addition = $2, updated_at = NOW() WHERE id = $3`, [item.quantity, item.unit_price, existing.id])
+      } else {
+        await query(
+          `INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [authUser.userId, item.product_id, item.variant_id || null, item.sub_variant_id || null, item.quantity, item.unit_price, item.buy_mode || 'unit', item.buy_unit || null]
+        )
+      }
+    }
+
     await query('DELETE FROM orders WHERE id = $1 AND user_id = $2', [params.id, authUser.userId])
 
     return NextResponse.json({ success: true, deleted: true })
