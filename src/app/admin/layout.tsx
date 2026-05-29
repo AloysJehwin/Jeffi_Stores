@@ -150,6 +150,7 @@ export default async function AdminLayout({
         </main>
         <SessionGuard />
       </div>
+      <div id="dropdown-portal" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }} />
     </div>
   )
 }

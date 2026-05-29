@@ -188,7 +188,7 @@ export default function AdminTypeahead({
   const defaultInputCls = 'w-full px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted'
 
   const dropdown = open && items.length > 0 && typeof document !== 'undefined' ? createPortal(
-    <div style={dropdownStyle} className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto">
+    <div style={{ ...dropdownStyle, pointerEvents: 'auto' }} className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto">
       {items.map((item, idx) => (
         <button
           key={item.id}
@@ -210,7 +210,7 @@ export default function AdminTypeahead({
         </button>
       ))}
     </div>,
-    document.body
+    document.getElementById('dropdown-portal') ?? document.body
   ) : null
 
   return (
