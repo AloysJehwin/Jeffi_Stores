@@ -63,11 +63,14 @@ interface CartItem {
 
 interface CartContextType {
   cartItems: CartItem[]
+  savedItems: CartItem[]
   cartCount: number
   isLoading: boolean
   addToCart: (productId: string, quantity?: number, variantId?: string, buyMode?: string, buyUnit?: string, subVariantId?: string) => Promise<void>
   removeFromCart: (cartItemId: string) => Promise<void>
   updateQuantity: (cartItemId: string, quantity: number) => Promise<void>
+  saveForLater: (cartItemId: string) => Promise<void>
+  moveToCart: (cartItemId: string) => Promise<void>
   refreshCart: () => Promise<void>
   getCartTotal: () => number
   getCartTax: () => number
@@ -78,16 +81,24 @@ const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [savedItems, setSavedItems] = useState<CartItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useAuth()
   const prevUserIdRef = useRef<string | null | undefined>(undefined)
 
   const fetchCart = async () => {
     try {
-      const response = await fetch('/api/cart', { credentials: 'include' })
-      if (response.ok) {
-        const data = await response.json()
+      const [activeRes, savedRes] = await Promise.all([
+        fetch('/api/cart', { credentials: 'include' }),
+        fetch('/api/cart?saved=1', { credentials: 'include' }),
+      ])
+      if (activeRes.ok) {
+        const data = await activeRes.json()
         setCartItems(data.items || [])
+      }
+      if (savedRes.ok) {
+        const data = await savedRes.json()
+        setSavedItems(data.items || [])
       }
     } catch {
     } finally {
@@ -168,6 +179,44 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const saveForLater = async (cartItemId: string) => {
+    try {
+      const response = await fetch('/api/cart', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cartItemId, savedForLater: true }),
+        credentials: 'include',
+      })
+      if (response.ok) {
+        await fetchCart()
+      } else {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to save for later')
+      }
+    } catch (error) {
+      throw error
+    }
+  }
+
+  const moveToCart = async (cartItemId: string) => {
+    try {
+      const response = await fetch('/api/cart', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cartItemId, savedForLater: false }),
+        credentials: 'include',
+      })
+      if (response.ok) {
+        await fetchCart()
+      } else {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to move to cart')
+      }
+    } catch (error) {
+      throw error
+    }
+  }
+
   const refreshCart = async () => {
     await fetchCart()
   }
@@ -207,11 +256,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     <CartContext.Provider
       value={{
         cartItems,
+        savedItems,
         cartCount,
         isLoading,
         addToCart,
         removeFromCart,
         updateQuantity,
+        saveForLater,
+        moveToCart,
         refreshCart,
         getCartTotal,
         getCartTax,

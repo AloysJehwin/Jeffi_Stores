@@ -15,7 +15,7 @@ interface AppliedCoupon {
 }
 
 export default function CartPage() {
-  const { cartItems, cartCount, isLoading, removeFromCart, updateQuantity, getCartTotal, getCartTax } = useCart()
+  const { cartItems, savedItems, cartCount, isLoading, removeFromCart, updateQuantity, saveForLater, moveToCart, getCartTotal, getCartTax } = useCart()
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
@@ -70,7 +70,7 @@ export default function CartPage() {
     )
   }
 
-  if (cartCount === 0) {
+  if (cartCount === 0 && savedItems.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-md mx-auto text-center">
@@ -133,6 +133,15 @@ export default function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2">
+            {cartItems.length === 0 ? (
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-8 text-center">
+                <svg className="w-16 h-16 mx-auto text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <p className="text-foreground-secondary mb-4">Your cart is empty.</p>
+                <p className="text-sm text-foreground-muted">Move an item from below or <Link href="/products" className="text-accent-600 hover:text-accent-700 font-medium">browse products</Link>.</p>
+              </div>
+            ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               {cartItems.map((item) => {
                 const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
@@ -270,6 +279,20 @@ export default function CartPage() {
                           )}
 
                           <button
+                            onClick={async () => {
+                              try {
+                                await saveForLater(item.id)
+                                showToast('Saved for later', 'success')
+                              } catch {
+                                showToast('Failed to save', 'error')
+                              }
+                            }}
+                            className="text-foreground-secondary hover:text-accent-600 text-sm font-medium transition-colors"
+                          >
+                            Save for later
+                          </button>
+
+                          <button
                             onClick={() => handleRemove(item.id)}
                             className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
                           >
@@ -290,11 +313,99 @@ export default function CartPage() {
                 )
               })}
             </div>
+            )}
+
+            {savedItems.length > 0 && (
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default mt-6 animate-fade-in-up">
+                <div className="p-4 sm:p-6 border-b border-border-default flex items-center justify-between">
+                  <h2 className="font-semibold text-foreground">
+                    Saved for later <span className="text-foreground-muted font-normal">({savedItems.length})</span>
+                  </h2>
+                </div>
+                <div className="divide-y divide-border-default">
+                  {savedItems.map((item) => {
+                    const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
+                    const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                    const price = isCustomQty
+                      ? item.price_at_addition
+                      : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+                    const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
+                    const isUpdating = updatingItems.has(item.id)
+                    return (
+                      <div key={item.id} className="p-4 sm:p-6 flex gap-4">
+                        <Link href={`/products/${item.products.slug}`} className="shrink-0">
+                          <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
+                            {primaryImage ? (
+                              <img
+                                src={primaryImage.thumbnail_url || primaryImage.image_url}
+                                alt={item.products.name}
+                                className="w-full h-full object-cover rounded-lg"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+                        <div className="flex-1 min-w-0">
+                          <Link href={`/products/${item.products.slug}`} className="text-base font-semibold text-foreground hover:text-accent-600 transition-colors line-clamp-1">
+                            {item.products.name}
+                          </Link>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {item.products.brand_name && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-secondary text-foreground-secondary border border-border-default">
+                                {item.products.brand_name}
+                              </span>
+                            )}
+                            {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
+                          </div>
+                          {item.variant && <p className="text-xs text-foreground-muted mt-0.5">{item.variant.variant_name}</p>}
+                          {item.sub_variant && <p className="text-xs text-foreground-muted">{item.sub_variant.sub_variant_name}</p>}
+                          <p className="text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">
+                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <button
+                              onClick={async () => {
+                                setUpdatingItems(prev => new Set(prev).add(item.id))
+                                try {
+                                  await moveToCart(item.id)
+                                  showToast('Moved to cart', 'success')
+                                } catch {
+                                  showToast('Failed to move', 'error')
+                                } finally {
+                                  setUpdatingItems(prev => { const next = new Set(prev); next.delete(item.id); return next })
+                                }
+                              }}
+                              disabled={isUpdating}
+                              className="text-sm font-medium text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 transition-colors disabled:opacity-50"
+                            >
+                              Move to cart
+                            </button>
+                            <button
+                              onClick={() => handleRemove(item.id)}
+                              disabled={isUpdating}
+                              className="text-sm font-medium text-red-600 hover:text-red-700 transition-colors disabled:opacity-50"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <RecommendedProducts title="You Might Also Like" limit={4} />
           </div>
 
           {/* Order Summary */}
+          {cartItems.length > 0 && (
           <div className="lg:col-span-1 lg:self-start lg:sticky lg:top-20">
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
@@ -397,6 +508,7 @@ export default function CartPage() {
               </Link>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const { userId } = await resolveUserId(cookieStore)
+    const url = new URL(request.url)
+    const savedOnly = url.searchParams.get('saved') === '1'
+    const savedFilter = savedOnly ? 'TRUE' : 'FALSE'
 
     const cartItems = await queryMany(`
       SELECT
@@ -67,7 +70,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN brands b ON p.brand_id = b.id
       LEFT JOIN product_variants pv ON ci.variant_id = pv.id
       LEFT JOIN product_sub_variants psv ON ci.sub_variant_id = psv.id
-      WHERE ci.user_id = $1 AND COALESCE(ci.saved_for_later, FALSE) = FALSE
+      WHERE ci.user_id = $1 AND COALESCE(ci.saved_for_later, FALSE) = ${savedFilter}
     `, [userId])
 
     return NextResponse.json({ items: cartItems || [] })
@@ -155,7 +158,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { cartItemId, quantity } = body
+    const { cartItemId, quantity, savedForLater } = body
 
     const cookieStore = await cookies()
     const { userId, sessionId, authUserId } = await resolveUserId(cookieStore)
@@ -169,8 +172,20 @@ export async function PATCH(request: NextRequest) {
 
     if (!cartItem) return NextResponse.json({ error: 'Cart item not found' }, { status: 404 })
 
-    await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [quantity, cartItemId])
-    return NextResponse.json({ message: 'Cart updated' })
+    if (typeof savedForLater === 'boolean') {
+      await query(
+        'UPDATE cart_items SET saved_for_later = $1, saved_at = CASE WHEN $1 THEN NOW() ELSE NULL END, updated_at = NOW() WHERE id = $2',
+        [savedForLater, cartItemId]
+      )
+      return NextResponse.json({ message: savedForLater ? 'Saved for later' : 'Moved to cart' })
+    }
+
+    if (typeof quantity === 'number') {
+      await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [quantity, cartItemId])
+      return NextResponse.json({ message: 'Cart updated' })
+    }
+
+    return NextResponse.json({ error: 'No valid update fields provided' }, { status: 400 })
   } catch {
     return NextResponse.json({ error: 'Failed to update cart' }, { status: 500 })
   }
