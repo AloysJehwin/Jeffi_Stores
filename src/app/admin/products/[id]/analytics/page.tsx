@@ -1,18 +1,15 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { headers, cookies } from 'next/headers'
+import { cookies } from 'next/headers'
 import ProductAnalyticsClient from './ProductAnalyticsClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function ProductAnalyticsPage({ params }: { params: { id: string } }) {
   const cookieStore = cookies()
-  const h = headers()
-  const host = h.get('host') || 'localhost:3000'
-  const proto = h.get('x-forwarded-proto') || 'http'
   const cookie = cookieStore.toString()
 
-  const res = await fetch(`${proto}://${host}/api/admin/products/${params.id}/analytics?days=30`, {
+  const res = await fetch(`http://localhost:3000/api/admin/products/${params.id}/analytics?days=30`, {
     headers: { cookie },
     cache: 'no-store',
   })

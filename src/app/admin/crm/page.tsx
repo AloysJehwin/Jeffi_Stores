@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { headers, cookies } from 'next/headers'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,13 +29,10 @@ function fmtDate(iso: string) {
 }
 
 export default async function CrmDashboardPage() {
-  const h = headers()
   const cookieStore = cookies()
-  const host = h.get('host') || 'localhost:3000'
-  const proto = h.get('x-forwarded-proto') || 'http'
   const cookie = cookieStore.toString()
 
-  const res = await fetch(`${proto}://${host}/api/admin/crm/dashboard`, {
+  const res = await fetch(`http://localhost:3000/api/admin/crm/dashboard`, {
     headers: { cookie },
     cache: 'no-store',
   })
