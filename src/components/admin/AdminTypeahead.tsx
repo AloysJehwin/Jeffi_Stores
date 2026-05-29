@@ -76,9 +76,18 @@ export default function AdminTypeahead({
   const [loading, setLoading] = useState(false)
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
   const containerRef = useRef<HTMLDivElement>(null)
+  const portalRef = useRef<HTMLDivElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const typedValueRef = useRef(value)
   const skipFetchRef = useRef(false)
+
+  useEffect(() => {
+    const el = document.createElement('div')
+    el.style.cssText = 'position:fixed;top:0;left:0;z-index:9999;pointer-events:none'
+    document.body.appendChild(el)
+    portalRef.current = el
+    return () => { document.body.removeChild(el) }
+  }, [])
 
   useEffect(() => {
     if (skipFetchRef.current) {
@@ -210,7 +219,7 @@ export default function AdminTypeahead({
         </button>
       ))}
     </div>,
-    document.getElementById('dropdown-portal') ?? document.body
+    portalRef.current ?? document.body
   ) : null
 
   return (
