@@ -78,7 +78,11 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
   useEffect(() => {
     if (isOpen) {
       const id = window.setTimeout(() => inputRef.current?.focus(), 280)
-      return () => window.clearTimeout(id)
+      document.body.style.overflow = 'hidden'
+      return () => {
+        window.clearTimeout(id)
+        document.body.style.overflow = ''
+      }
     }
   }, [isOpen])
 
@@ -230,7 +234,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
             role="listbox"
             className="mt-3 w-full bg-surface-elevated rounded-2xl shadow-xl border border-border-default overflow-hidden"
           >
-            <div className="max-h-[60vh] overflow-y-auto">
+            <div className="max-h-[calc(100dvh-8rem)] sm:max-h-[60vh] overflow-y-auto overscroll-contain">
               {isLoading ? (
                 <div className="flex items-center justify-center gap-3 py-8 text-foreground-muted text-sm">
                   <div className="w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
