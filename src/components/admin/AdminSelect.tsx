@@ -175,7 +175,7 @@ export default function AdminSelect({
             ${disabled ? 'opacity-50 cursor-not-allowed bg-surface-secondary' : ''}
           `}
         >
-          <span className={selectedOption ? 'text-foreground' : 'text-foreground-muted'}>
+          <span className={`truncate min-w-0 ${selectedOption ? 'text-foreground' : 'text-foreground-muted'}`}>
             {displayLabel}
           </span>
           <svg

@@ -206,7 +206,7 @@ export default function CustomerTasks({ customerId }: CustomerTasksProps) {
             maxLength={2000}
             className="w-full px-2.5 py-1.5 text-sm border border-border-secondary rounded bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent-500 resize-none"
           />
-          <div className="grid grid-cols-[minmax(0,1.4fr)_1fr_1fr] gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <DatePicker
               value={dueDate}
               onChange={setDueDate}
