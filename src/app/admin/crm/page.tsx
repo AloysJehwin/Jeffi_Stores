@@ -3,6 +3,10 @@ import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { getCrmDashboardData } from '@/lib/admin-crm'
 import HealthDistributionCard from './HealthDistributionCard'
+import ChurnRisksCard from './ChurnRisksCard'
+import BiggestDropsCard from './BiggestDropsCard'
+import AtRiskCard from './AtRiskCard'
+import DormantCard from './DormantCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,9 +31,6 @@ function timeAgo(iso: string) {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-}
 
 export default async function CrmDashboardPage() {
   const cookieStore = cookies()
@@ -98,53 +99,9 @@ export default async function CrmDashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <HealthDistributionCard distribution={data.health.distribution} />
 
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Top Churn Risks</h2>
-            {data.health.topChurnRisks.length === 0 ? (
-              <p className="text-sm text-foreground-muted">No customers below health 40.</p>
-            ) : (
-              <div className="space-y-2">
-                {data.health.topChurnRisks.map((c: any) => (
-                  <Link key={c.id} href={`/admin/customers/${c.id}`} className="flex items-center justify-between text-sm py-1 hover:bg-surface-secondary/50 px-2 -mx-2 rounded transition-colors">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-foreground truncate font-medium">{c.name}</p>
-                      <p className="text-[10px] text-foreground-muted">
-                        ₹{Math.round(c.ltv).toLocaleString('en-IN')} lifetime
-                        {c.daysSinceLastOrder != null && ` · ${c.daysSinceLastOrder}d quiet`}
-                      </p>
-                    </div>
-                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded shrink-0 ml-2 ${
-                      c.score < 20 ? 'bg-red-200 text-red-800 dark:bg-red-900/60 dark:text-red-200' :
-                      'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-                    }`}>
-                      {c.score}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
+          <ChurnRisksCard items={data.health.topChurnRisks} />
 
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Biggest Drops (7d)</h2>
-            {data.health.biggestDrops.length === 0 ? (
-              <p className="text-sm text-foreground-muted">No sharp declines this week.</p>
-            ) : (
-              <div className="space-y-2">
-                {data.health.biggestDrops.map((c: any) => (
-                  <Link key={c.id} href={`/admin/customers/${c.id}`} className="flex items-center justify-between text-sm py-1 hover:bg-surface-secondary/50 px-2 -mx-2 rounded transition-colors">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-foreground truncate font-medium">{c.name}</p>
-                      <p className="text-[10px] text-foreground-muted">Now at {c.score}/100</p>
-                    </div>
-                    <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 shrink-0 ml-2">
-                      ▼ {c.delta}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
+          <BiggestDropsCard items={data.health.biggestDrops} />
         </div>
       )}
 
@@ -172,59 +129,8 @@ export default async function CrmDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Crossing into At Risk */}
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Just Crossed Into At-Risk</h2>
-            <Link href="/admin/customers?segment=at_risk" className="text-xs text-accent-500 hover:text-accent-600 font-medium">View all →</Link>
-          </div>
-          {data.crossingAtRisk.length === 0 ? (
-            <p className="text-sm text-foreground-muted">No customers crossed into at-risk this week.</p>
-          ) : (
-            <div className="divide-y divide-border-default">
-              {data.crossingAtRisk.map((c: any) => (
-                <Link
-                  key={c.id}
-                  href={`/admin/customers/${c.id}`}
-                  className="flex items-center justify-between gap-3 py-2.5 hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
-                    <p className="text-[11px] text-foreground-muted">Last order {fmtDate(c.lastOrderAt)} · LTV ₹{Math.round(c.ltv).toLocaleString('en-IN')}</p>
-                  </div>
-                  <span className="text-xs text-orange-600 dark:text-orange-400 font-semibold whitespace-nowrap">Win back →</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Dormant — top LTV */}
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Dormant — Top by LTV</h2>
-            <Link href="/admin/customers?segment=dormant" className="text-xs text-accent-500 hover:text-accent-600 font-medium">View all →</Link>
-          </div>
-          {data.crossingDormant.length === 0 ? (
-            <p className="text-sm text-foreground-muted">No dormant customers.</p>
-          ) : (
-            <div className="divide-y divide-border-default">
-              {data.crossingDormant.map((c: any) => (
-                <Link
-                  key={c.id}
-                  href={`/admin/customers/${c.id}`}
-                  className="flex items-center justify-between gap-3 py-2.5 hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
-                    <p className="text-[11px] text-foreground-muted">Last order {fmtDate(c.lastOrderAt)} · LTV ₹{Math.round(c.ltv).toLocaleString('en-IN')}</p>
-                  </div>
-                  <span className="text-xs text-red-600 dark:text-red-400 font-semibold whitespace-nowrap">High value</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        <AtRiskCard items={data.crossingAtRisk} />
+        <DormantCard items={data.crossingDormant} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
