@@ -99,7 +99,7 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
   if (!customers.length) {
     return (
       <tr>
-        <td colSpan={7} className="px-6 py-12 text-center text-foreground-muted">No customers found.</td>
+        <td colSpan={8} className="px-6 py-12 text-center text-foreground-muted">No customers found.</td>
       </tr>
     )
   }
@@ -113,12 +113,12 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
           className="hover:bg-surface-secondary cursor-pointer"
           onClick={() => setSelected(customer)}
         >
-          <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+          <td className="px-6 py-4" onClick={e => e.stopPropagation()}>
             <HoverCard
               trigger={
                 <Link
                   href={`/admin/customers/${customer.id}`}
-                  className="text-sm font-medium text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                  className="text-sm font-medium text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2 whitespace-nowrap"
                 >
                   {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || '—'}
                 </Link>
@@ -143,8 +143,37 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
                   <span className="text-foreground-muted">Joined</span>
                   <span className="text-foreground">{new Date(customer.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 </div>
+                {customer.tags && customer.tags.length > 0 && (
+                  <div className="pt-2 border-t border-border-default">
+                    <p className="text-[10px] uppercase tracking-wider text-foreground-muted mb-1">Tags</p>
+                    <div className="flex flex-wrap gap-1">
+                      {customer.tags.map((tag: string) => (
+                        <span key={tag} className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-accent-500/10 text-accent-600 dark:text-accent-400">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </HoverCard>
+            {customer.tags && customer.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1.5 max-w-[220px]">
+                {customer.tags.slice(0, 3).map((tag: string) => (
+                  <span
+                    key={tag}
+                    className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-accent-500/10 text-accent-600 dark:text-accent-400 whitespace-nowrap"
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {customer.tags.length > 3 && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-surface-secondary text-foreground-muted">
+                    +{customer.tags.length - 3}
+                  </span>
+                )}
+              </div>
+            )}
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <div className="text-sm text-foreground">{customer.email}</div>
@@ -163,6 +192,23 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
             <Tooltip content={`${Number(customer.order_count)} total orders placed`}>
               <span className="text-sm text-foreground cursor-default">{Number(customer.order_count)}</span>
             </Tooltip>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            {customer.health_score == null ? (
+              <span className="text-xs text-foreground-muted">—</span>
+            ) : (
+              <Tooltip content={`Churn risk: ${customer.churn_risk || 'unknown'}${customer.trend_delta_30d ? ` · ${customer.trend_delta_30d > 0 ? '+' : ''}${customer.trend_delta_30d} (30d)` : ''}`}>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-bold rounded cursor-default ${
+                  customer.health_score >= 70 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                  customer.health_score >= 40 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' :
+                  'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                }`}>
+                  {customer.health_score}
+                  {customer.trend_delta_30d > 5 && <span className="text-green-600 dark:text-green-400">▲</span>}
+                  {customer.trend_delta_30d < -5 && <span className="text-red-600 dark:text-red-400">▼</span>}
+                </span>
+              </Tooltip>
+            )}
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <Tooltip content={

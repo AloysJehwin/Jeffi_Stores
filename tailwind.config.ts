@@ -59,6 +59,42 @@ const config: Config = {
         bebas: ['"Bebas Neue"', 'cursive'],
         inter: ['"Inter"', 'sans-serif'],
       },
+      keyframes: {
+        'cart-pulse': {
+          '0%':   { transform: 'scale(1)' },
+          '40%':  { transform: 'scale(1.4)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        'heart-pulse': {
+          '0%':   { transform: 'scale(1)' },
+          '50%':  { transform: 'scale(1.3)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        'fade-in-up': {
+          '0%':   { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'fade-in': {
+          '0%':   { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'toast-in': {
+          '0%':   { opacity: '0', transform: 'translateY(16px) scale(0.96)' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+        'toast-out': {
+          '0%':   { opacity: '1', transform: 'translateY(0) scale(1)' },
+          '100%': { opacity: '0', transform: 'translateY(8px) scale(0.96)' },
+        },
+      },
+      animation: {
+        'cart-pulse': 'cart-pulse 500ms ease-out',
+        'heart-pulse': 'heart-pulse 350ms ease-out',
+        'fade-in-up': 'fade-in-up 250ms ease-out',
+        'fade-in': 'fade-in 200ms ease-out',
+        'toast-in': 'toast-in 250ms ease-out',
+        'toast-out': 'toast-out 200ms ease-in forwards',
+      },
     },
   },
   plugins: [],

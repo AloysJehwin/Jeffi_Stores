@@ -17,7 +17,17 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
   const dir = searchParams.dir as 'asc' | 'desc' | undefined
 
   const [{ customers, total }, allStats] = await Promise.all([
-    getCustomers({ search: searchParams.search, status: searchParams.status, page, limit: PAGE_SIZE, sort, dir }),
+    getCustomers({
+      search: searchParams.search,
+      status: searchParams.status,
+      segment: searchParams.segment,
+      tag: searchParams.tag,
+      health: searchParams.health,
+      page,
+      limit: PAGE_SIZE,
+      sort,
+      dir,
+    }),
     getCustomers({}),
   ])
 
@@ -29,6 +39,9 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
     const params = new URLSearchParams()
     if (searchParams.status) params.set('status', searchParams.status)
     if (searchParams.search) params.set('search', searchParams.search)
+    if (searchParams.segment) params.set('segment', searchParams.segment)
+    if (searchParams.tag) params.set('tag', searchParams.tag)
+    if (searchParams.health) params.set('health', searchParams.health)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
@@ -73,6 +86,31 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
               { value: 'flagged', label: 'Flagged' },
             ],
           },
+          {
+            name: 'segment',
+            label: 'Segment',
+            options: [
+              { value: 'vip', label: 'VIP (₹50k+)' },
+              { value: 'loyal', label: 'Loyal' },
+              { value: 'repeat', label: 'Repeat (3+)' },
+              { value: 'one_time', label: 'One-time' },
+              { value: 'new', label: 'New (<30d)' },
+              { value: 'at_risk', label: 'At Risk (90-180d)' },
+              { value: 'dormant', label: 'Dormant (180d+)' },
+              { value: 'b2b', label: 'B2B' },
+              { value: 'lead', label: 'Lead (no orders)' },
+            ],
+          },
+          {
+            name: 'health',
+            label: 'Health',
+            options: [
+              { value: 'healthy', label: 'Healthy (≥70)' },
+              { value: 'at_risk', label: 'At Risk (40-69)' },
+              { value: 'critical', label: 'Critical (<40)' },
+              { value: 'unknown', label: 'Not scored' },
+            ],
+          },
         ]}
         searchPlaceholder="Search by name, email or phone..."
         suggestType="customers"
@@ -81,31 +119,65 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
 
       <div className="md:hidden space-y-3">
         {customers && customers.length > 0 ? (
-          customers.map((customer: any) => (
+          customers.map((customer: any) => {
+            const score = customer.health_score
+            const barColor = score == null
+              ? 'bg-zinc-300 dark:bg-zinc-700'
+              : score >= 70 ? 'bg-green-500'
+              : score >= 40 ? 'bg-yellow-500'
+              : 'bg-red-500'
+            return (
             <Link
               key={customer.id}
               href={`/admin/customers/${customer.id}`}
-              className="block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 active:bg-surface-secondary transition-colors"
+              className="relative block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 pl-5 active:bg-surface-secondary transition-colors overflow-hidden"
             >
+              <div className={`absolute left-0 top-0 bottom-0 w-1 ${barColor}`} aria-hidden />
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-semibold text-foreground">
                   {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown'}
                 </span>
-                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                  customer.is_flagged ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                  : customer.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                  : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-                }`}>
-                  {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {score != null && (
+                    <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                      score >= 70 ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' :
+                      score >= 40 ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' :
+                      'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                    }`}>{score}</span>
+                  )}
+                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                    customer.is_flagged ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                    : customer.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                    : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                  }`}>
+                    {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
               <p className="text-xs text-foreground-muted">{customer.email}</p>
+              {customer.tags && customer.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {customer.tags.slice(0, 4).map((tag: string) => (
+                    <span
+                      key={tag}
+                      className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-accent-500/10 text-accent-600 dark:text-accent-400"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {customer.tags.length > 4 && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-surface-secondary text-foreground-muted">
+                      +{customer.tags.length - 4}
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between mt-2">
                 <span className="text-xs text-foreground-muted">{Number(customer.order_count)} orders</span>
                 <span className="text-xs text-foreground-muted">Joined {new Date(customer.created_at).toLocaleDateString('en-IN')}</span>
               </div>
             </Link>
-          ))
+          )})
         ) : (
           <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
             No customers found.
@@ -124,6 +196,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
                 <SortableHeader label="Phone" column="phone" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
                 <SortableHeader label="Joined" column="joined" options={sortOptions('date')} currentSort={sort} currentDir={dir} />
                 <SortableHeader label="Orders" column="orders" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Health" column="health" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
                 <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
                 <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
               </tr>

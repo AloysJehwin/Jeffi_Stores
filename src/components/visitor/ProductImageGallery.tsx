@@ -80,9 +80,10 @@ export default function ProductImageGallery({ images, productName, variantImages
             <div className={`relative w-full h-full transition-transform duration-300 ${isZoomed ? 'scale-150' : 'scale-100'}`}
               style={isZoomed ? { transformOrigin: `${mousePosition.x}% ${mousePosition.y}%` } : {}}>
               <ImgWithSkeleton
+                key={currentImage.image_url}
                 src={currentImage.image_url}
                 alt={`${productName} - Image ${selectedImageIndex + 1}`}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain animate-fade-in"
               />
             </div>
           </div>
@@ -106,9 +107,9 @@ export default function ProductImageGallery({ images, productName, variantImages
               <div
                 key={image.id}
                 onClick={() => setSelectedImageIndex(index)}
-                className={`relative bg-surface-elevated rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
+                className={`relative bg-surface-elevated rounded-lg overflow-hidden cursor-pointer border-2 transition-all hover:scale-[1.03] active:scale-95 ${
                   index === selectedImageIndex
-                    ? 'border-accent-500 ring-2 ring-accent-200'
+                    ? 'border-accent-500 ring-2 ring-accent-200 scale-[1.02]'
                     : 'border-border-default hover:border-gray-400'
                 }`}
               >

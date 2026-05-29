@@ -48,6 +48,10 @@ export async function GET(
         expectedDelivery: shipment.ExpectedDeliveryDate ?? null,
         origin: shipment.Origin ?? null,
         destination: shipment.Destination ?? null,
+        orderType: shipment.OrderType ?? null,
+        reverseInTransit: shipment.ReverseInTransit ?? false,
+        destReceiveDate: shipment.DestRecieveDate ?? null,
+        returnedDate: shipment.ReturnedDate ?? null,
         scans: (shipment.Scans ?? []).map((s: any) => ({
           date: s.ScanDetail?.ScanDateTime ?? null,
           location: s.ScanDetail?.ScannedLocation ?? null,

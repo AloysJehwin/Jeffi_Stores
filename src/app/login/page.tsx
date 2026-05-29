@@ -243,7 +243,9 @@ function LoginPage() {
                   id="otp" type="text" required maxLength={6} value={otp}
                   ref={otpInputRef}
                   onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                  className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-center text-2xl tracking-widest"
+                  className={`w-full px-4 py-3 border rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-center text-2xl tracking-widest transition-all ${
+                    otp.length === 6 ? 'border-green-500 ring-2 ring-green-200 dark:ring-green-900/40' : 'border-border-secondary'
+                  }`}
                   placeholder="000000"
                   autoFocus
                   inputMode="numeric"

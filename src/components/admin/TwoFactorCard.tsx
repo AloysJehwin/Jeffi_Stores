@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface MfaStatus {
   mfa_enabled: boolean
@@ -9,6 +10,7 @@ interface MfaStatus {
 }
 
 export default function TwoFactorCard() {
+  const confirm = useConfirm()
   const [status, setStatus] = useState<MfaStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [newCodes, setNewCodes] = useState<string[] | null>(null)
@@ -26,7 +28,13 @@ export default function TwoFactorCard() {
   useEffect(() => { load() }, [])
 
   async function regenerate() {
-    if (!confirm('Regenerate recovery codes? Your old codes will stop working.')) return
+    const ok = await confirm({
+      title: 'Regenerate recovery codes?',
+      message: 'Your old recovery codes will stop working immediately.',
+      variant: 'danger',
+      confirmLabel: 'Regenerate',
+    })
+    if (!ok) return
     setLoading(true)
     setError('')
     try {

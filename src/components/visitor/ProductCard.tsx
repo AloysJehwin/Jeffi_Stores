@@ -81,7 +81,7 @@ export default function ProductCard({
 
   return (
     <Link href={`/products/${slug}`} className="group">
-      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow h-full flex flex-col">
+      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1 hover:border-accent-300 dark:hover:border-accent-500 h-full flex flex-col">
         {/* Image */}
         <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
           {primaryImage ? (
@@ -90,13 +90,13 @@ export default function ProductCard({
                 src={primaryImage.image_url}
                 alt=""
                 aria-hidden="true"
-                className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
+                className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60 transition-opacity duration-300 group-hover:opacity-80"
               />
               <div className="relative w-full h-full">
                 <ImgWithSkeleton
                   src={primaryImage.image_url}
                   alt={name}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
                 />
               </div>
             </>
@@ -120,16 +120,16 @@ export default function ProductCard({
               onClick={handleWishlist}
               disabled={wishlistLoading}
               aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-              className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-700/95 backdrop-blur-sm shadow flex items-center justify-center text-gray-600 dark:text-zinc-200 hover:text-red-500 dark:hover:text-red-400 transition-colors disabled:opacity-60"
+              className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-700/95 backdrop-blur-sm shadow flex items-center justify-center text-gray-600 dark:text-zinc-200 hover:text-red-500 dark:hover:text-red-400 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
             >
-              <svg className="w-4 h-4" fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: isInWishlist ? '#ef4444' : undefined }}>
+              <svg className={`w-4 h-4 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`} fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: isInWishlist ? '#ef4444' : undefined }}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
             </button>
             <button
               onClick={handleShare}
               aria-label="Share product"
-              className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-700/95 backdrop-blur-sm shadow flex items-center justify-center text-gray-600 dark:text-zinc-200 hover:text-accent-500 dark:hover:text-accent-400 transition-colors"
+              className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-700/95 backdrop-blur-sm shadow flex items-center justify-center text-gray-600 dark:text-zinc-200 hover:text-accent-500 dark:hover:text-accent-400 transition-all hover:scale-110 active:scale-95"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -163,7 +163,7 @@ export default function ProductCard({
               <span className={`text-xs font-medium ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                 {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
               </span>
-              <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-sm">
+              <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-sm transition-all group-hover:translate-x-1">
                 View Details →
               </span>
             </div>

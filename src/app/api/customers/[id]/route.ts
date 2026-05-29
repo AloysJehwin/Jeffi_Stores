@@ -3,6 +3,8 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { getCustomerById } from '@/lib/queries'
 import { query } from '@/lib/db'
+import { logActivity } from '@/lib/activity'
+import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 
 export async function GET(
   request: NextRequest,
@@ -38,13 +40,42 @@ export async function PATCH(
         'UPDATE users SET is_flagged = true, is_active = false, flag_reason = $1 WHERE id = $2',
         [reason || 'Flagged by admin', params.id]
       )
+      logActivity({
+        userId: params.id,
+        actorId: admin.adminId,
+        kind: 'flagged',
+        summary: `Account flagged${reason ? `: ${reason}` : ''}`,
+        metadata: { reason: reason || null },
+      }).catch(() => {})
+      createAutoTask({
+        userId: params.id,
+        sourceKind: 'review_flagged',
+        sourceRefId: params.id,
+        title: `Review flagged account`,
+        description: reason || 'Account was flagged. Investigate and decide whether to keep flagged or reactivate.',
+        priority: 'urgent',
+        dueInDays: 0,
+      }).catch(() => {})
     } else if (action === 'deactivate') {
       await query('UPDATE users SET is_active = false WHERE id = $1', [params.id])
+      logActivity({
+        userId: params.id,
+        actorId: admin.adminId,
+        kind: 'profile_updated',
+        summary: 'Account deactivated',
+      }).catch(() => {})
     } else if (action === 'activate') {
       await query(
         'UPDATE users SET is_active = true, is_flagged = false, flag_reason = null WHERE id = $1',
         [params.id]
       )
+      logActivity({
+        userId: params.id,
+        actorId: admin.adminId,
+        kind: 'unflagged',
+        summary: 'Account reactivated',
+      }).catch(() => {})
+      completeAutoTask('review_flagged', params.id, { actorAdminId: admin.adminId }).catch(() => {})
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }

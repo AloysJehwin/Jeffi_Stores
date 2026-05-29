@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryMany } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
+import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,8 +39,9 @@ export async function POST(request: NextRequest) {
   const orders = await queryMany<{
     id: string; awb_number: string; status: string
     order_number: string; customer_name: string; customer_email: string
+    user_id: string | null
   }>(
-    `SELECT o.id, o.awb_number, o.status, o.order_number,
+    `SELECT o.id, o.awb_number, o.status, o.order_number, o.user_id,
             COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
             COALESCE(u.email, o.customer_email) AS customer_email
      FROM orders o
@@ -153,6 +155,18 @@ export async function POST(request: NextRequest) {
           ).catch(() => {})
         }
 
+        if (rawType.startsWith('RTO') && order.user_id) {
+          createAutoTask({
+            userId: order.user_id,
+            sourceKind: 'address_rto',
+            sourceRefId: order.id,
+            title: `Address RTO for #${order.order_number}`,
+            description: `Delhivery reported ${rawType}. Decide whether to refund or redispatch and contact the customer.`,
+            priority: 'high',
+            dueInDays: 1,
+          }).catch(() => {})
+        }
+
         results.push({ orderId: order.id, awb, syncedTo: syncRule.orderStatus })
       }
     } catch (err: any) {
@@ -161,15 +175,18 @@ export async function POST(request: NextRequest) {
   }
 
   const rvpRequests = await queryMany<{
-    id: string; rvp_awb_number: string; order_id: string
+    id: string; rvp_awb_number: string; order_id: string;
+    user_id: string | null; order_number: string
   }>(
-    `SELECT id, rvp_awb_number, order_id
-     FROM return_requests
-     WHERE rvp_awb_number IS NOT NULL
-       AND status = 'approved'
-       AND received_at IS NULL`,
+    `SELECT rr.id, rr.rvp_awb_number, rr.order_id,
+            o.user_id, o.order_number
+     FROM return_requests rr
+     LEFT JOIN orders o ON o.id = rr.order_id
+     WHERE rr.rvp_awb_number IS NOT NULL
+       AND rr.status = 'approved'
+       AND rr.received_at IS NULL`,
     []
-  ).catch(() => [] as { id: string; rvp_awb_number: string; order_id: string }[])
+  ).catch(() => [] as { id: string; rvp_awb_number: string; order_id: string; user_id: string | null; order_number: string }[])
 
   const rvpResults: { returnRequestId: string; awb: string; receivedAt: boolean }[] = []
   const rvpErrors: { awb: string; error: string }[] = []
@@ -200,15 +217,37 @@ export async function POST(request: NextRequest) {
         const rr = batch.find(r => r.rvp_awb_number === awb)
         if (!rr) continue
 
-        const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+        const statusLabel: string = (shipment.Status?.Status ?? '').toLowerCase()
         const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
+        const destReceiveDate: string | null = shipment.DestRecieveDate ?? null
+        const returnedDate: string | null = shipment.ReturnedDate ?? null
 
-        if (rawType !== 'DL') continue
+        const isReceivedAtWarehouse =
+          destReceiveDate !== null ||
+          returnedDate !== null ||
+          statusLabel === 'delivered'
+
+        if (!isReceivedAtWarehouse) continue
+
+        const receivedAt = destReceiveDate ?? returnedDate ?? statusDateTime ?? new Date().toISOString()
 
         await query(
           `UPDATE return_requests SET received_at = $2, updated_at = NOW() WHERE id = $1`,
-          [rr.id, statusDateTime ?? new Date().toISOString()]
+          [rr.id, receivedAt]
         ).catch(() => {})
+
+        if (rr.user_id) {
+          completeAutoTask('schedule_pickup', rr.order_id).catch(() => {})
+          createAutoTask({
+            userId: rr.user_id,
+            sourceKind: 'inspect_refund',
+            sourceRefId: rr.order_id,
+            title: `Inspect returned item & process refund for #${rr.order_number}`,
+            description: 'RVP package received at warehouse. Inspect condition and issue refund.',
+            priority: 'high',
+            dueInDays: 2,
+          }).catch(() => {})
+        }
 
         rvpResults.push({ returnRequestId: rr.id, awb, receivedAt: true })
       }

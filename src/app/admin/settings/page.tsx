@@ -3,6 +3,8 @@ import ChangePasswordForm from '@/components/admin/ChangePasswordForm'
 import TwoFactorCard from '@/components/admin/TwoFactorCard'
 import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
 import StoreRulesForm from '@/components/admin/StoreRulesForm'
+import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
+import { getDeliverySettings } from '@/lib/delivery-settings'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES } from '@/lib/scopes'
 
@@ -28,6 +30,7 @@ export default async function SettingsPage() {
   const allAdmins = await getAllAdmins()
   const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
   const minOrderAmount = minOrderSetting ? parseFloat(minOrderSetting.value) || 0 : 0
+  const deliverySettings = await getDeliverySettings()
 
   const scopeLabels: Record<string, string> = {}
   ADMIN_SCOPES.forEach(s => { scopeLabels[s.key] = s.label })
@@ -129,6 +132,17 @@ export default async function SettingsPage() {
         </div>
 
         <ExtensionTokenCard />
+      </section>
+
+      {/* ── Delivery & Shipping ─────────────────────────────────── */}
+      <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
+        <div className="px-5 py-4 border-b border-border-default">
+          <h2 className="text-sm font-semibold text-foreground">Delivery & Shipping</h2>
+          <p className="text-xs text-foreground-muted mt-0.5">Control whether shipping is charged, set free-delivery thresholds, and apply discounts.</p>
+        </div>
+        <div className="p-5">
+          <DeliverySettingsForm initial={deliverySettings} />
+        </div>
       </section>
 
       {/* ── System info ─────────────────────────────────────────── */}

@@ -39,6 +39,8 @@ function ctaButton(text: string, url: string) {
   return `<a href="${url}" style="display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;margin:16px 0;">${text}</a>`
 }
 
+export { baseLayout, ctaButton }
+
 export function renderCampaignEmail(templateKey: string, data: TemplateData, recipientName?: string): { subject: string; html: string } {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
 

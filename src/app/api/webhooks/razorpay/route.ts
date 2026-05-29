@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
+import { createAutoTask } from '@/lib/auto-tasks'
+import { attributeConversion } from '@/lib/marketing'
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,6 +99,7 @@ async function handlePaymentCaptured(payment: any) {
       sendOrderConfirmationEmail(user.email, order, orderItems || []).catch(() => {})
       sendNewOrderNotification(order, orderItems || [], user).catch(() => {})
       sendPaymentStatusUpdate(user.email, userName, order.order_number, orderId, 'paid', parseFloat(order.total_amount)).catch(() => {})
+      attributeConversion(paymentRecord.user_id, orderId).catch(() => {})
     }
   }
 }
@@ -124,6 +127,22 @@ async function handlePaymentFailed(payment: any) {
      WHERE id = $1 AND payment_status = 'unpaid'`,
     [paymentRecord.order_id]
   )
+
+  const orderRow = await queryOne<{ user_id: string | null; order_number: string; total_amount: string }>(
+    `SELECT user_id, order_number, total_amount FROM orders WHERE id = $1`,
+    [paymentRecord.order_id]
+  )
+  if (orderRow?.user_id) {
+    createAutoTask({
+      userId: orderRow.user_id,
+      sourceKind: 'contact_failed_payment',
+      sourceRefId: paymentRecord.order_id,
+      title: `Reach out about failed payment on #${orderRow.order_number}`,
+      description: `Razorpay reported payment.failed for ₹${orderRow.total_amount}.`,
+      priority: 'medium',
+      dueInDays: 1,
+    }).catch(() => {})
+  }
 }
 
 async function handlePaymentLinkPaid(paymentLink: any) {

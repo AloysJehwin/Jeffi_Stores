@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, query } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendPaymentStatusUpdate, sendPaymentFailedAdminNotification } from '@/lib/email'
+import { createAutoTask } from '@/lib/auto-tasks'
 
 export async function POST(
   request: NextRequest,
@@ -68,6 +69,16 @@ export async function POST(
 
     sendPaymentFailedAdminNotification(order, errorDescription)
       .catch(err => console.error('Failed to send admin payment failed notification:', err))
+
+    createAutoTask({
+      userId: authUser.userId,
+      sourceKind: 'contact_failed_payment',
+      sourceRefId: orderId,
+      title: `Reach out about failed payment on #${order.order_number}`,
+      description: `Payment failed for ₹${order.total_amount}.${errorDescription ? ` Reason: ${errorDescription}` : ''}`,
+      priority: 'medium',
+      dueInDays: 1,
+    }).catch(() => {})
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -8,6 +8,7 @@ export async function register() {
 
   const TEN_MIN = 10 * 60 * 1000
   const ONE_MIN = 60 * 1000
+  const THIRTY_MIN = 30 * 60 * 1000
 
   const callCron = async (path: string, method: 'GET' | 'POST') => {
     try {
@@ -28,4 +29,19 @@ export async function register() {
     callCron('/api/cron/cancel-stale-orders', 'GET')
     setInterval(() => callCron('/api/cron/cancel-stale-orders', 'GET'), ONE_MIN)
   }, 45_000)
+
+  setTimeout(() => {
+    callCron('/api/cron/sweep-auto-tasks', 'GET')
+    setInterval(() => callCron('/api/cron/sweep-auto-tasks', 'GET'), THIRTY_MIN)
+  }, 90_000)
+
+  setTimeout(() => {
+    callCron('/api/cron/run-campaigns', 'GET')
+    setInterval(() => callCron('/api/cron/run-campaigns', 'GET'), THIRTY_MIN)
+  }, 120_000)
+
+  setTimeout(() => {
+    callCron('/api/cron/compute-health', 'GET')
+    setInterval(() => callCron('/api/cron/compute-health', 'GET'), THIRTY_MIN)
+  }, 150_000)
 }

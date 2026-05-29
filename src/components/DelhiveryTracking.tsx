@@ -19,6 +19,10 @@ type TrackingData = {
   origin: string | null
   destination: string | null
   scans: Scan[]
+  orderType?: string | null
+  reverseInTransit?: boolean
+  destReceiveDate?: string | null
+  returnedDate?: string | null
 }
 
 const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
@@ -92,6 +96,14 @@ const TIMELINE_STEPS: { key: string; label: string }[] = [
   { key: 'delivered',  label: 'Delivered'   },
 ]
 
+const REVERSE_TIMELINE_STEPS: { key: string; label: string }[] = [
+  { key: 'created',    label: 'Pickup Scheduled' },
+  { key: 'picked_up',  label: 'Picked Up' },
+  { key: 'in_transit', label: 'In Transit' },
+  { key: 'out',        label: 'Out for Return' },
+  { key: 'delivered',  label: 'Received' },
+]
+
 function resolveStep(scans: Scan[], statusType: string | null): number {
   const type = resolveDisplayType(statusType, scans)?.toUpperCase() ?? ''
   if (type === 'DL') return 4
@@ -108,13 +120,45 @@ function resolveStep(scans: Scan[], statusType: string | null): number {
   return 0
 }
 
+function resolveReverseStep(tracking: TrackingData): number {
+  if (tracking.destReceiveDate || tracking.returnedDate) return 4
+  if ((tracking.status ?? '').toLowerCase() === 'delivered') return 4
+
+  const scans = tracking.scans
+  const latestActivity = (scans[scans.length - 1]?.activity ?? '').toLowerCase()
+  const latestInstructions = (scans[scans.length - 1]?.instructions ?? '').toLowerCase()
+
+  if (latestActivity.includes('out for delivery') || latestInstructions.includes('out for delivery')) return 3
+  if (latestActivity === 'in transit' || latestActivity.includes('transit')) return 2
+
+  const everPickedUp = scans.some(s => {
+    const a = (s.activity ?? '').toLowerCase()
+    const ins = (s.instructions ?? '').toLowerCase()
+    return a === 'in transit' || ins.includes('pickup completed') || ins.includes('picked up')
+  })
+  if (everPickedUp) return 2
+
+  const everScheduled = scans.some(s => {
+    const a = (s.activity ?? '').toLowerCase()
+    const ins = (s.instructions ?? '').toLowerCase()
+    return a === 'scheduled' || a === 'dispatched' || ins.includes('out for pickup') || ins.includes('pickup scheduled')
+  })
+  if (everScheduled) return 1
+
+  return 0
+}
+
 function HorizontalTimeline({ tracking }: { tracking: TrackingData }) {
-  const activeStep = resolveStep(tracking.scans, tracking.statusType)
+  const isReverse = tracking.orderType === 'Pickup' || tracking.reverseInTransit === true
+  const activeStep = isReverse
+    ? resolveReverseStep(tracking)
+    : resolveStep(tracking.scans, tracking.statusType)
+  const steps = isReverse ? REVERSE_TIMELINE_STEPS : TIMELINE_STEPS
 
   return (
     <div className="w-full overflow-x-auto pb-1">
       <div className="flex items-start min-w-[480px]">
-        {TIMELINE_STEPS.map((step, i) => {
+        {steps.map((step, i) => {
           const done = i < activeStep
           const current = i === activeStep
           return (
@@ -122,7 +166,7 @@ function HorizontalTimeline({ tracking }: { tracking: TrackingData }) {
               {i > 0 && (
                 <div className={`absolute left-0 top-3.5 h-0.5 w-1/2 ${done || current ? 'bg-accent-500' : 'bg-border-default'}`} />
               )}
-              {i < TIMELINE_STEPS.length - 1 && (
+              {i < steps.length - 1 && (
                 <div className={`absolute right-0 top-3.5 h-0.5 w-1/2 ${done ? 'bg-accent-500' : 'bg-border-default'}`} />
               )}
               <div className={`relative z-10 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${

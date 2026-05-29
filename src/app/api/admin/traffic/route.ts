@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const days = Math.min(Math.max(parseInt(searchParams.get('days') || '7'), 1), 90)
 
-  const [funnel, topPages, topReferrers, dailySessions, devices, browsers, hourly, sessionDepths] = await Promise.all([
+  const [funnel, topPages, topReferrers, dailySessions, devices, browsers, hourly, sessionDepths, topProducts, conversionLaggards, topSearchTerms, noResultSearches] = await Promise.all([
     queryMany<{ page: string; sessions: string; users: string }>(`
       SELECT
         page,
@@ -104,6 +104,91 @@ export async function GET(req: NextRequest) {
       WHERE created_at >= NOW() - INTERVAL '1 day' * $1
       GROUP BY session_id
     `, [days]),
+
+    queryMany<{ product_id: string; name: string; slug: string; views: string; unique_viewers: string; orders: string; revenue: string; cart_adds: string }>(`
+      SELECT
+        pv.product_id,
+        p.name,
+        p.slug,
+        COUNT(*) AS views,
+        COUNT(DISTINCT COALESCE(pv.user_id::text, pv.session_id)) AS unique_viewers,
+        COALESCE(o.orders, 0) AS orders,
+        COALESCE(o.revenue, 0) AS revenue,
+        COALESCE(c.cart_adds, 0) AS cart_adds
+      FROM product_views pv
+      JOIN products p ON p.id = pv.product_id
+      LEFT JOIN (
+        SELECT oi.product_id,
+               COUNT(DISTINCT oi.order_id) AS orders,
+               SUM(oi.total_price) AS revenue
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.created_at >= NOW() - INTERVAL '1 day' * $1
+          AND o.payment_status = 'paid'
+        GROUP BY oi.product_id
+      ) o ON o.product_id = pv.product_id
+      LEFT JOIN (
+        SELECT product_id, COUNT(*) AS cart_adds
+        FROM cart_items
+        WHERE created_at >= NOW() - INTERVAL '1 day' * $1
+        GROUP BY product_id
+      ) c ON c.product_id = pv.product_id
+      WHERE pv.created_at >= NOW() - INTERVAL '1 day' * $1
+      GROUP BY pv.product_id, p.name, p.slug, o.orders, o.revenue, c.cart_adds
+      ORDER BY views DESC
+      LIMIT 15
+    `, [days]),
+
+    queryMany<{ product_id: string; name: string; slug: string; views: string; orders: string }>(`
+      SELECT
+        pv.product_id,
+        p.name,
+        p.slug,
+        COUNT(*) AS views,
+        COALESCE(o.orders, 0) AS orders
+      FROM product_views pv
+      JOIN products p ON p.id = pv.product_id
+      LEFT JOIN (
+        SELECT oi.product_id,
+               COUNT(DISTINCT oi.order_id) AS orders
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.created_at >= NOW() - INTERVAL '1 day' * $1
+          AND o.payment_status = 'paid'
+        GROUP BY oi.product_id
+      ) o ON o.product_id = pv.product_id
+      WHERE pv.created_at >= NOW() - INTERVAL '1 day' * $1
+      GROUP BY pv.product_id, p.name, p.slug, o.orders
+      HAVING COUNT(*) >= 20 AND COALESCE(o.orders, 0) = 0
+      ORDER BY views DESC
+      LIMIT 10
+    `, [days]),
+
+    queryMany<{ query: string; searches: string; clicks: string }>(`
+      SELECT
+        LOWER(TRIM(query)) AS query,
+        COUNT(*) AS searches,
+        COUNT(*) FILTER (WHERE results_count > 0) AS clicks
+      FROM search_logs
+      WHERE created_at >= NOW() - INTERVAL '1 day' * $1
+        AND LENGTH(TRIM(query)) >= 2
+      GROUP BY LOWER(TRIM(query))
+      ORDER BY searches DESC
+      LIMIT 15
+    `, [days]).catch(() => [] as { query: string; searches: string; clicks: string }[]),
+
+    queryMany<{ query: string; searches: string }>(`
+      SELECT
+        LOWER(TRIM(query)) AS query,
+        COUNT(*) AS searches
+      FROM search_logs
+      WHERE created_at >= NOW() - INTERVAL '1 day' * $1
+        AND results_count = 0
+        AND LENGTH(TRIM(query)) >= 2
+      GROUP BY LOWER(TRIM(query))
+      ORDER BY searches DESC
+      LIMIT 10
+    `, [days]).catch(() => [] as { query: string; searches: string }[]),
   ])
 
   const funnelOrder = ['home', 'categories', 'category', 'product', 'cart', 'checkout', 'order_placed']
@@ -143,6 +228,37 @@ export async function GET(req: NextRequest) {
     devices: devices.map(r => ({ type: r.type, sessions: parseInt(r.sessions) })),
     browsers: browsers.map(r => ({ browser: r.browser, sessions: parseInt(r.sessions) })),
     hourly: hourlyData,
+    topProducts: topProducts.map(r => {
+      const views = parseInt(r.views)
+      const orders = parseInt(r.orders)
+      return {
+        productId: r.product_id,
+        name: r.name,
+        slug: r.slug,
+        views,
+        uniqueViewers: parseInt(r.unique_viewers),
+        cartAdds: parseInt(r.cart_adds),
+        orders,
+        revenue: parseFloat(r.revenue),
+        conversionRate: views > 0 ? Math.round((orders / views) * 1000) / 10 : 0,
+      }
+    }),
+    conversionLaggards: conversionLaggards.map(r => ({
+      productId: r.product_id,
+      name: r.name,
+      slug: r.slug,
+      views: parseInt(r.views),
+      orders: parseInt(r.orders),
+    })),
+    topSearchTerms: topSearchTerms.map(r => ({
+      query: r.query,
+      searches: parseInt(r.searches),
+      clicks: parseInt(r.clicks),
+    })),
+    noResultSearches: noResultSearches.map(r => ({
+      query: r.query,
+      searches: parseInt(r.searches),
+    })),
     totals: {
       sessions: totalSessions,
       pageviews: totalPageviews,

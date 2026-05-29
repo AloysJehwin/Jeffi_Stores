@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -23,11 +24,24 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 type Tab = 'pos' | 'expenses'
+const VALID_TABS: Tab[] = ['pos', 'expenses']
 
 export default function SupplierDetailClient({ id }: { id: string }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab') as Tab | null
+  const initialTab: Tab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'pos'
+
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>('pos')
+  const [tab, setTabState] = useState<Tab>(initialTab)
+
+  function setTab(next: Tab) {
+    setTabState(next)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', next)
+    router.replace(`/admin/suppliers/${id}?${params.toString()}`, { scroll: false })
+  }
 
   useEffect(() => {
     fetch(`/api/admin/suppliers/${id}`)

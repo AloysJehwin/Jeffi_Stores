@@ -1,4 +1,3 @@
-\
 /**
  * Upload SS202 product images to S3 and update product_images in RDS.
  * Run locally: node /tmp/upload-ss202-images.mjs
@@ -7,12 +6,23 @@
 import { createRequire } from 'module'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+import dotenv from 'dotenv'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: path.resolve(__dirname, '..', '.env.local') })
+
+const RDS_MASTER_PASSWORD = process.env.RDS_MASTER_PASSWORD
+if (!RDS_MASTER_PASSWORD) {
+  console.error('RDS_MASTER_PASSWORD not set in .env.local')
+  process.exit(1)
+}
 
 const require = createRequire(import.meta.url)
 const { Pool } = require('pg')
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
 
-const DB_URL  = 'postgresql://postgres:JeffiStores2026Rds@jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com:5432/jeffi_stores'
+const DB_URL  = `postgresql://postgres:${encodeURIComponent(RDS_MASTER_PASSWORD)}@jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com:5432/jeffi_stores`
 const BUCKET  = 'jeffi-stores-bucket'
 const REGION  = 'us-east-1'
 const IMG_DIR = '/tmp/product-images'

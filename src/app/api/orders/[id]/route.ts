@@ -5,6 +5,9 @@ import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice } from '@/lib/invoice'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
 import { logStockMovement } from '@/lib/inventory'
+import { logActivity } from '@/lib/activity'
+import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
+import { attributeConversion } from '@/lib/marketing'
 
 export async function GET(
   request: NextRequest,
@@ -226,6 +229,89 @@ export async function PATCH(
       `UPDATE orders SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
       values
     )
+
+    if (currentOrder.user_id) {
+      if (statusChanged) {
+        logActivity({
+          userId: currentOrder.user_id,
+          actorId: admin.adminId,
+          kind: 'order_status',
+          referenceId: orderId,
+          referenceType: 'orders',
+          summary: `Order #${currentOrder.order_number}: ${currentOrder.status} → ${status}`,
+          metadata: { from: currentOrder.status, to: status, orderNumber: currentOrder.order_number },
+        }).catch(() => {})
+
+        if (status === 'cancelled' && currentOrder.payment_status === 'paid' && (payment_status !== 'refunded')) {
+          createAutoTask({
+            userId: currentOrder.user_id,
+            sourceKind: 'process_refund',
+            sourceRefId: orderId,
+            title: `Issue refund for cancelled #${currentOrder.order_number}`,
+            description: `Order was paid (₹${currentOrder.total_amount}) and is now cancelled — refund the customer.`,
+            priority: 'urgent',
+            dueInDays: 0,
+          }).catch(() => {})
+        }
+
+        if (status === 'processing') {
+          completeAutoTask('process_confirmed', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+        }
+        if (status === 'shipped' || status === 'dispatched') {
+          completeAutoTask('stuck_processing', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+        }
+        if (status === 'out_for_delivery' || status === 'delivered') {
+          completeAutoTask('stuck_shipment', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+        }
+        if (status === 'delivered') {
+          completeAutoTask('ndr_check', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+          if (currentOrder.payment_status === 'cod' || payment_status === 'cod') {
+            createAutoTask({
+              userId: currentOrder.user_id,
+              sourceKind: 'confirm_cod_payment',
+              sourceRefId: orderId,
+              title: `Confirm COD payment for #${currentOrder.order_number}`,
+              description: `Order delivered. Confirm cash collected and update payment_status to paid.`,
+              priority: 'medium',
+              dueInDays: 1,
+            }).catch(() => {})
+          }
+        }
+      }
+      if (paymentStatusChanged) {
+        logActivity({
+          userId: currentOrder.user_id,
+          actorId: admin.adminId,
+          kind: 'payment_status',
+          referenceId: orderId,
+          referenceType: 'orders',
+          summary: `Order #${currentOrder.order_number} payment: ${currentOrder.payment_status} → ${payment_status}`,
+          metadata: { from: currentOrder.payment_status, to: payment_status, orderNumber: currentOrder.order_number },
+        }).catch(() => {})
+
+        if (payment_status === 'failed') {
+          createAutoTask({
+            userId: currentOrder.user_id,
+            sourceKind: 'contact_failed_payment',
+            sourceRefId: orderId,
+            title: `Reach out about failed payment on #${currentOrder.order_number}`,
+            description: `Payment failed for ₹${currentOrder.total_amount}. Customer may need help retrying.`,
+            priority: 'medium',
+            dueInDays: 1,
+          }).catch(() => {})
+        }
+        if (payment_status === 'refunded') {
+          completeAutoTask('process_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+          completeAutoTask('chase_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+        }
+        if (payment_status === 'paid' && currentOrder.payment_status === 'cod') {
+          completeAutoTask('confirm_cod_payment', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+        }
+        if (payment_status === 'paid' && currentOrder.user_id) {
+          attributeConversion(currentOrder.user_id, orderId).catch(() => {})
+        }
+      }
+    }
 
     if (statusChanged && status === 'processing') {
       const items = await queryMany<any>(

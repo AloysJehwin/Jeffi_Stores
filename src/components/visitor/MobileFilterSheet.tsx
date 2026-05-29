@@ -109,7 +109,7 @@ export default function MobileFilterSheet({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="lg:hidden flex items-center gap-2 px-4 py-2 bg-surface-elevated border border-border-default rounded-lg text-foreground font-medium shadow-sm hover:bg-surface-secondary transition-colors"
+        className="lg:hidden flex items-center gap-2 px-4 py-2 bg-surface-elevated border border-border-default rounded-lg text-foreground font-medium shadow-sm hover:bg-surface-secondary transition-all active:scale-95"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 010 2H4a1 1 0 01-1-1zm3 6a1 1 0 011-1h10a1 1 0 010 2H7a1 1 0 01-1-1zm4 6a1 1 0 011-1h4a1 1 0 010 2h-4a1 1 0 01-1-1z" />
@@ -126,10 +126,10 @@ export default function MobileFilterSheet({
       {open && (
         <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setOpen(false)} />
 
           {/* Sheet */}
-          <div className="relative bg-surface-elevated rounded-t-2xl shadow-2xl flex flex-col max-h-[85vh]">
+          <div className="relative bg-surface-elevated rounded-t-2xl shadow-2xl flex flex-col max-h-[85vh] animate-slide-up">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
               <h2 className="font-semibold text-foreground text-base">Filters</h2>

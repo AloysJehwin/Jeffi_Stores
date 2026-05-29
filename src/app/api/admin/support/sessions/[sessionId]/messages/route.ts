@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne } from '@/lib/db'
 import { sendAgentConnectedEmail } from '@/lib/email'
+import { logActivity } from '@/lib/activity'
 
 export async function GET(
   request: NextRequest,
@@ -64,6 +65,15 @@ export async function POST(
        RETURNING id, sender, message, created_at`,
       [params.sessionId, message.trim()]
     )
+
+    logActivity({
+      userId: session.user_id,
+      actorId: admin.adminId,
+      kind: 'support_message',
+      referenceId: params.sessionId,
+      referenceType: 'support_sessions',
+      summary: `Admin replied: ${message.trim().length > 100 ? message.trim().slice(0, 100) + '…' : message.trim()}`,
+    }).catch(() => {})
 
     if (isFirstAgentMessage) {
       const customer = await queryOne<{ first_name: string; last_name: string; email: string }>(

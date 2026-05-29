@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/db'
+import { query, queryMany } from '@/lib/db'
+import { cookies } from 'next/headers'
+import { jwtVerify } from 'jose'
 import { buildProductSearchClause, buildProductSearchRank, buildSearchClause } from '@/lib/search'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 
 export const dynamic = 'force-dynamic'
+
+const JWT_SECRET = process.env.JWT_SECRET ? new TextEncoder().encode(process.env.JWT_SECRET) : null
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,7 +46,29 @@ export async function GET(request: NextRequest) {
       `, catSc.params),
     ])
 
-    return NextResponse.json({ products: products || [], categories: categories || [] })
+    const productsArr = products || []
+    const categoriesArr = categories || []
+
+    void (async () => {
+      try {
+        const cookieStore = await cookies()
+        const sessionId = cookieStore.get('session_id')?.value || null
+        let userId: string | null = null
+        const authToken = cookieStore.get('auth_token')?.value
+        if (authToken && JWT_SECRET) {
+          try {
+            const { payload } = await jwtVerify(authToken, JWT_SECRET)
+            userId = (payload.userId as string) || null
+          } catch {}
+        }
+        await query(
+          `INSERT INTO search_logs (query, results_count, user_id, session_id) VALUES ($1, $2, $3, $4)`,
+          [q.slice(0, 200), productsArr.length + categoriesArr.length, userId, sessionId]
+        )
+      } catch {}
+    })()
+
+    return NextResponse.json({ products: productsArr, categories: categoriesArr })
   } catch {
     return NextResponse.json({ products: [], categories: [] }, { status: 500 })
   }

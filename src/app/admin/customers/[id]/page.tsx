@@ -4,6 +4,11 @@ import { getCustomerById } from '@/lib/queries'
 import CustomerContactForm from '@/components/admin/CustomerContactForm'
 import CustomerActionButton from '@/components/admin/CustomerActionButton'
 import AdminSupportChat from '@/components/admin/AdminSupportChat'
+import CustomerTags from '@/components/admin/CustomerTags'
+import CustomerNotes from '@/components/admin/CustomerNotes'
+import CustomerTasks from '@/components/admin/CustomerTasks'
+import CustomerTimeline from '@/components/admin/CustomerTimeline'
+import HealthScoreCard from '@/components/admin/HealthScoreCard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -57,6 +62,18 @@ function paymentStatusBadge(status: string) {
   if (status === 'refunded' || status === 'partial_refund') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
   if (status === 'failed') return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
   return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+}
+
+const SEGMENT_LABELS: Record<string, { label: string; color: string }> = {
+  vip:      { label: 'VIP',           color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
+  loyal:    { label: 'Loyal',         color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' },
+  repeat:   { label: 'Repeat Buyer',  color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
+  one_time: { label: 'One-time',      color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' },
+  new:      { label: 'New',           color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
+  at_risk:  { label: 'At Risk',       color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
+  dormant:  { label: 'Dormant',       color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+  b2b:      { label: 'B2B',           color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' },
+  lead:     { label: 'Lead',          color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' },
 }
 
 export default async function CustomerDetailPage({
@@ -120,6 +137,18 @@ export default async function CustomerDetailPage({
             {customer.phone && (
               <p className="text-zinc-500 text-xs mt-0.5">+91 {customer.phone}</p>
             )}
+            {customer.segments && customer.segments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2.5">
+                {customer.segments.map((seg: string) => {
+                  const meta = SEGMENT_LABELS[seg] ?? { label: seg, color: 'bg-zinc-100 text-zinc-700' }
+                  return (
+                    <span key={seg} className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${meta.color}`}>
+                      {meta.label}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 
@@ -169,6 +198,11 @@ export default async function CustomerDetailPage({
 
         {/* Left column: Actions + Business details + Contact */}
         <div className="space-y-5">
+          {/* Health Score */}
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <HealthScoreCard customerId={customer.id} initial={customer.health || null} />
+          </div>
+
           {/* Account Actions */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Account Actions</h2>
@@ -178,6 +212,21 @@ export default async function CustomerDetailPage({
               isActive={customer.is_active}
               isFlagged={customer.is_flagged}
             />
+          </div>
+
+          {/* Tags */}
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <CustomerTags customerId={customer.id} initialTags={customer.tags || []} />
+          </div>
+
+          {/* Internal Notes */}
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <CustomerNotes customerId={customer.id} initialNotes={customer.notes || []} />
+          </div>
+
+          {/* Tasks */}
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <CustomerTasks customerId={customer.id} />
           </div>
 
           {/* Send message */}
@@ -217,9 +266,12 @@ export default async function CustomerDetailPage({
           <AdminSupportChat customerId={customer.id} autoOpen={searchParams.chat === 'true'} />
         </div>
 
-        {/* Right column: Orders table (spans 2 cols) */}
-        <div className="lg:col-span-2">
-          <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden h-full">
+        {/* Right column: Timeline + Orders table (spans 2 cols) */}
+        <div className="lg:col-span-2 space-y-5">
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <CustomerTimeline customerId={customer.id} />
+          </div>
+          <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
             <div className="px-5 py-4 border-b border-border-default flex items-center justify-between">
               <h2 className="font-semibold text-foreground text-base">Orders</h2>
               {Number(customer.total_orders) > 10 && (
