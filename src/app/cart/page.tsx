@@ -139,12 +139,16 @@ export default function CartPage() {
                 const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
                 const price = isCustomQty
                   ? item.price_at_addition
-                  : (item.variant?.price ?? item.products.base_price)
-                const stockQty = item.variant?.stock_quantity ?? item.products.stock_quantity
+                  : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+                const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
+                const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
                 const itemTotal = isCustomQty
                   ? item.price_at_addition * item.quantity
                   : price * item.quantity
                 const isUpdating = updatingItems.has(item.id)
+                const showMrp = !isCustomQty && mrp !== null && Number(mrp) > Number(price)
+                const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
+                const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
 
                 return (
                   <div key={item.id} className="p-4 sm:p-6 border-b border-border-default last:border-b-0">
@@ -173,18 +177,36 @@ export default function CartPage() {
                         <Link href={`/products/${item.products.slug}`} className="text-lg font-semibold text-foreground hover:text-accent-600 transition-colors">
                           {item.products.name}
                         </Link>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          {item.products.brand_name && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-surface-secondary text-foreground-secondary border border-border-default">
+                              {item.products.brand_name}
+                            </span>
+                          )}
+                          {sku && (
+                            <span className="text-xs text-foreground-muted font-mono">SKU: {sku}</span>
+                          )}
+                        </div>
                         {item.variant && (
                           <p className="text-sm text-foreground-muted mt-0.5">{item.variant.variant_name}</p>
                         )}
+                        {item.sub_variant && (
+                          <p className="text-xs text-foreground-muted mt-0.5">{item.sub_variant.sub_variant_name}</p>
+                        )}
 
-                        <div className="mt-2 flex items-center gap-4">
+                        <div className="mt-2 flex items-center gap-3 flex-wrap">
                           <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
                             ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
                           </span>
-                          {!isCustomQty && item.products.price_ex_gst && (
-                            <span className="text-sm text-foreground-muted line-through">
-                              ₹{item.products.base_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                            </span>
+                          {showMrp && (
+                            <>
+                              <span className="text-sm text-foreground-muted line-through">
+                                ₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">
+                                {discountPct}% off
+                              </span>
+                            </>
                           )}
                         </div>
 

@@ -424,8 +424,13 @@ function CheckoutPage() {
                   ) : (
                     cartItems.map((item) => {
                       const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
-                      const price = item.variant?.price ?? item.products.base_price
+                      const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
                       const itemTotal = price * item.quantity
+                      const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
+                      const showMrp = mrp !== null && Number(mrp) > Number(price)
+                      const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
+                      const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
+                      const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
                       return (
                         <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
                           <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
@@ -441,13 +446,31 @@ function CheckoutPage() {
                           </div>
                           <div className="flex-1">
                             <h3 className="font-semibold text-foreground">{item.products.name}</h3>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {item.products.brand_name && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-secondary text-foreground-secondary border border-border-default">
+                                  {item.products.brand_name}
+                                </span>
+                              )}
+                              {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
+                            </div>
                             {item.variant && <p className="text-sm text-foreground-muted">{item.variant.variant_name}</p>}
+                            {item.sub_variant && <p className="text-xs text-foreground-muted">{item.sub_variant.sub_variant_name}</p>}
                             <p className="text-sm text-foreground-secondary mt-1">
                               ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
+                              {showMrp && (
+                                <>
+                                  {' '}<span className="line-through text-foreground-muted">₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                  {' '}<span className="text-accent-600 dark:text-accent-400 font-semibold">{discountPct}% off</span>
+                                </>
+                              )}
                             </p>
                             <p className="text-sm font-semibold text-foreground mt-1">
                               ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </p>
+                            {stockQty < Number(item.quantity) && (
+                              <p className="text-xs text-red-600 dark:text-red-400 mt-1">Only {stockQty} left in stock</p>
+                            )}
                           </div>
                         </div>
                       )

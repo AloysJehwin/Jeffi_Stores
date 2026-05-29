@@ -59,10 +59,18 @@ export async function POST(request: NextRequest) {
             'price', pv.price, 'price_ex_gst', pv.price_ex_gst,
             'stock_quantity', pv.stock_quantity, 'inventory_quantity', pv.inventory_quantity
           )
-        ELSE NULL END AS variant
+        ELSE NULL END AS variant,
+        CASE WHEN ci.sub_variant_id IS NOT NULL THEN
+          json_build_object(
+            'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
+            'price', psv.price, 'price_ex_gst', psv.price_ex_gst,
+            'stock_quantity', psv.stock_quantity, 'inventory_quantity', psv.inventory_quantity
+          )
+        ELSE NULL END AS sub_variant
       FROM cart_items ci
       LEFT JOIN products p ON ci.product_id = p.id
       LEFT JOIN product_variants pv ON ci.variant_id = pv.id
+      LEFT JOIN product_sub_variants psv ON ci.sub_variant_id = psv.id
       WHERE ci.user_id = $1
     `, [cartUserId])
 
@@ -74,7 +82,7 @@ export async function POST(request: NextRequest) {
       if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
         return sum + (parseFloat(item.price_at_addition) * parseFloat(item.quantity))
       }
-      const price = item.variant?.price ?? item.products.base_price
+      const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
       return sum + (parseFloat(price) * parseFloat(item.quantity))
     }, 0)
 
@@ -87,7 +95,7 @@ export async function POST(request: NextRequest) {
     const taxAmount = cartItems.reduce((sum: number, item: any) => {
       const lineTotal = item.buy_mode === 'weight' || item.buy_mode === 'length'
         ? parseFloat(item.price_at_addition) * parseFloat(item.quantity)
-        : parseFloat(item.variant?.price ?? item.products.base_price) * parseFloat(item.quantity)
+        : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * parseFloat(item.quantity)
       const gstRate = parseFloat(item.products.gst_percentage || '0')
       return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
     }, 0)
@@ -193,7 +201,7 @@ export async function POST(request: NextRequest) {
         const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
         const unitPrice = isCustomQty
           ? parseFloat(item.price_at_addition)
-          : parseFloat(item.variant?.price ?? item.products.base_price)
+          : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
         const qty = parseFloat(item.quantity)
         const gstRate = parseFloat(item.products.gst_percentage || '0')
         const itemTotal = unitPrice * qty
@@ -247,9 +255,13 @@ export async function POST(request: NextRequest) {
           `INSERT INTO order_items (order_id, product_id, variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
           [createdOrder.id, item.product_id, item.variant?.id || null,
-           item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name,
-           item.variant?.sku || item.products.sku,
-           item.variant?.variant_name || null,
+           item.sub_variant
+             ? `${item.products.name}${item.variant ? ' - ' + item.variant.variant_name : ''} - ${item.sub_variant.sub_variant_name}`
+             : (item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name),
+           item.sub_variant?.sku || item.variant?.sku || item.products.sku,
+           item.sub_variant
+             ? `${item.variant?.variant_name ? item.variant.variant_name + ' / ' : ''}${item.sub_variant.sub_variant_name}`
+             : (item.variant?.variant_name || null),
            item.quantity, unitPrice, itemTotal, Math.round(tax * 100) / 100,
            isGSTEnabled ? (item.products.hsn_code || null) : null,
            isGSTEnabled ? gstRate : null,
@@ -282,12 +294,14 @@ export async function POST(request: NextRequest) {
       const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
       const unitPrice = isCustomQty
         ? parseFloat(item.price_at_addition)
-        : parseFloat(item.variant?.price ?? item.products.base_price)
+        : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
       return {
         order_id: order.id,
         product_id: item.product_id,
-        product_name: item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name,
-        product_sku: item.variant?.sku || item.products.sku,
+        product_name: item.sub_variant
+          ? `${item.products.name}${item.variant ? ' - ' + item.variant.variant_name : ''} - ${item.sub_variant.sub_variant_name}`
+          : (item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name),
+        product_sku: item.sub_variant?.sku || item.variant?.sku || item.products.sku,
         quantity: item.quantity,
         unit_price: unitPrice,
         total_price: unitPrice * parseFloat(item.quantity),
