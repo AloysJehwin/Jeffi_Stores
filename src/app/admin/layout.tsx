@@ -145,7 +145,7 @@ export default async function AdminLayout({
           </div>
         </div>
 
-        <main className="flex-1 bg-surface-secondary overflow-y-auto">
+        <main className="flex-1 bg-surface-secondary overflow-y-auto relative z-0">
           {children}
         </main>
         <SessionGuard />
