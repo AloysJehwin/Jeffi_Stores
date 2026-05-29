@@ -141,6 +141,10 @@ export default function ProductActions({
     return null
   })
 
+  const [showAllVariants, setShowAllVariants] = useState(false)
+  const [showAllSubVariants, setShowAllSubVariants] = useState(false)
+  const VARIANT_COLLAPSE_LIMIT = 12
+
   const hasVariants = variants.length > 0
   const selectedVariant = variants.find(v => v.id === selectedVariantId)
   const displaySku = hasVariants && selectedVariant ? selectedVariant.sku : sku
@@ -359,26 +363,49 @@ export default function ProductActions({
                 ? (selectedMode === 'unit' ? `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}` : `Select ${selectedMode === 'weight' ? 'Weight' : 'Length'}`)
                 : `Select ${variants.find(v => v.variant_type)?.variant_type || variantType || 'Variant'}`}
             </label>
-            <div className="flex flex-wrap gap-2">
-              {modeVariants.map((variant) => (
-                <button
-                  key={variant.id}
-                  type="button"
-                  onClick={() => setSelectedVariantId(variant.id)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    selectedVariantId === variant.id
-                      ? 'bg-accent-500 text-white border-accent-500'
-                      : variant.stock_quantity > 0
-                        ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
-                        : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
-                  }`}
-                  disabled={variant.stock_quantity === 0}
-                >
-                  {variant.variant_name}
-                  {variant.stock_quantity === 0 && ' (Out of Stock)'}
-                </button>
-              ))}
-            </div>
+            {(() => {
+              const selectedHiddenIndex = modeVariants.findIndex(v => v.id === selectedVariantId)
+              const mustExpand = !showAllVariants && selectedHiddenIndex >= VARIANT_COLLAPSE_LIMIT
+              const collapsed = !showAllVariants && !mustExpand && modeVariants.length > VARIANT_COLLAPSE_LIMIT
+              const visible = collapsed ? modeVariants.slice(0, VARIANT_COLLAPSE_LIMIT) : modeVariants
+              const hiddenCount = modeVariants.length - visible.length
+              return (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {visible.map((variant) => (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        onClick={() => setSelectedVariantId(variant.id)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                          selectedVariantId === variant.id
+                            ? 'bg-accent-500 text-white border-accent-500'
+                            : variant.stock_quantity > 0
+                              ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
+                              : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
+                        }`}
+                        disabled={variant.stock_quantity === 0}
+                      >
+                        {variant.variant_name}
+                        {variant.stock_quantity === 0 && ' (Out of Stock)'}
+                      </button>
+                    ))}
+                  </div>
+                  {modeVariants.length > VARIANT_COLLAPSE_LIMIT && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllVariants(s => !s)}
+                      className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700 transition-colors"
+                    >
+                      {showAllVariants ? 'Show fewer' : `Show all ${modeVariants.length} options`}
+                      <svg className={`w-4 h-4 transition-transform ${showAllVariants ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  )}
+                </>
+              )
+            })()}
           </div>
 
           {selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && (
@@ -386,26 +413,49 @@ export default function ProductActions({
               <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Select {selectedVariant.sub_variant_type || 'Sub-Variant'}
               </label>
-              <div className="flex flex-wrap gap-2">
-                {selectedVariant.sub_variants.map((sv) => (
-                  <button
-                    key={sv.id}
-                    type="button"
-                    disabled={sv.stock_quantity === 0}
-                    onClick={() => setSelectedSubVariantId(sv.id)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                      selectedSubVariantId === sv.id
-                        ? 'bg-accent-500 text-white border-accent-500'
-                        : sv.stock_quantity > 0
-                          ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
-                          : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
-                    }`}
-                  >
-                    {sv.sub_variant_name}
-                    {sv.stock_quantity === 0 && ' (Out of Stock)'}
-                  </button>
-                ))}
-              </div>
+              {(() => {
+                const subs = selectedVariant.sub_variants!
+                const selectedHiddenIndex = subs.findIndex(s => s.id === selectedSubVariantId)
+                const mustExpand = !showAllSubVariants && selectedHiddenIndex >= VARIANT_COLLAPSE_LIMIT
+                const collapsed = !showAllSubVariants && !mustExpand && subs.length > VARIANT_COLLAPSE_LIMIT
+                const visible = collapsed ? subs.slice(0, VARIANT_COLLAPSE_LIMIT) : subs
+                return (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {visible.map((sv) => (
+                        <button
+                          key={sv.id}
+                          type="button"
+                          disabled={sv.stock_quantity === 0}
+                          onClick={() => setSelectedSubVariantId(sv.id)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                            selectedSubVariantId === sv.id
+                              ? 'bg-accent-500 text-white border-accent-500'
+                              : sv.stock_quantity > 0
+                                ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
+                                : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
+                          }`}
+                        >
+                          {sv.sub_variant_name}
+                          {sv.stock_quantity === 0 && ' (Out of Stock)'}
+                        </button>
+                      ))}
+                    </div>
+                    {subs.length > VARIANT_COLLAPSE_LIMIT && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllSubVariants(s => !s)}
+                        className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700 transition-colors"
+                      >
+                        {showAllSubVariants ? 'Show fewer' : `Show all ${subs.length} options`}
+                        <svg className={`w-4 h-4 transition-transform ${showAllSubVariants ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           )}
         </div>

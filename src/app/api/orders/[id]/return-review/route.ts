@@ -4,6 +4,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { sendReturnStatusEmail, sendPaymentStatusUpdate } from '@/lib/email'
 import { logStockMovement } from '@/lib/inventory'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
+import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 
 export async function POST(
   request: NextRequest,
@@ -76,6 +77,18 @@ export async function POST(
         }).catch(() => {})
       }
 
+      completeAutoTask('review_return', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+      if (order.user_id) {
+        createAutoTask({
+          userId: order.user_id,
+          sourceKind: 'schedule_pickup',
+          sourceRefId: orderId,
+          title: `Schedule return pickup for #${order.order_number}`,
+          priority: 'high',
+          dueInDays: 1,
+        }).catch(() => {})
+      }
+
       return NextResponse.json({ success: true, newStatus: 'return_approved' })
     }
 
@@ -101,6 +114,8 @@ export async function POST(
         }).catch(() => {})
       }
 
+      completeAutoTask('review_return', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+
       return NextResponse.json({ success: true, newStatus: 'return_rejected' })
     }
 
@@ -123,6 +138,18 @@ export async function POST(
       if (userEmail && userName) {
         sendReturnStatusEmail(userEmail, userName, order.order_number, orderId, 'received', {
           returnType: returnRequest.type,
+        }).catch(() => {})
+      }
+
+      completeAutoTask('schedule_pickup', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+      if (order.user_id) {
+        createAutoTask({
+          userId: order.user_id,
+          sourceKind: 'inspect_refund',
+          sourceRefId: orderId,
+          title: `Inspect returned item & process refund for #${order.order_number}`,
+          priority: 'high',
+          dueInDays: 2,
         }).catch(() => {})
       }
 
@@ -212,6 +239,8 @@ export async function POST(
                 ).catch(() => {})
               }
 
+              completeAutoTask('inspect_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+
               return NextResponse.json({ success: true, newStatus: 'returned', refundFailed: false })
             } catch {
               refundFailed = true
@@ -255,6 +284,8 @@ export async function POST(
             })
           }
         })
+
+        completeAutoTask('inspect_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
 
         return NextResponse.json({ success: true, newStatus: 'returned', refundFailed })
       }
@@ -382,6 +413,8 @@ export async function POST(
             replacementOrderNumber: newOrderNumber!,
           }).catch(() => {})
         }
+
+        completeAutoTask('inspect_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
 
         return NextResponse.json({ success: true, newStatus: 'returned', replacementOrderId: newOrderId!, replacementOrderNumber: newOrderNumber! })
       }

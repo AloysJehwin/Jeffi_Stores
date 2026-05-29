@@ -4,6 +4,7 @@ import { sendWelcomeEmail } from '@/lib/email'
 import { queryOne } from '@/lib/db'
 import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
+import { logActivity } from '@/lib/activity'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -62,6 +63,13 @@ export async function POST(request: NextRequest) {
     }
 
     sendWelcomeEmail(email, firstName).catch(() => {})
+
+    logActivity({
+      userId: newUser.id,
+      kind: 'signup',
+      summary: `Account created`,
+      metadata: { email, source: 'email_otp' },
+    }).catch(() => {})
 
     const token = await new SignJWT({
       userId: newUser.id,

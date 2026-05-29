@@ -9,6 +9,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import HoverCard from '@/components/ui/HoverCard'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
 
 type Tab = 'suppliers' | 'po' | 'stock'
@@ -276,6 +277,7 @@ type POItem = {
 
 function POTab({ initialPO }: { initialPO?: string }) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [pos, setPOs] = useState<PO[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -403,7 +405,14 @@ function POTab({ initialPO }: { initialPO?: string }) {
   }
 
   async function cancelPO(id: string) {
-    if (!confirm('Cancel this purchase order?')) return
+    const ok = await confirm({
+      title: 'Cancel purchase order?',
+      message: 'This cannot be undone.',
+      variant: 'danger',
+      confirmLabel: 'Cancel PO',
+      cancelLabel: 'Keep',
+    })
+    if (!ok) return
     await fetch(`/api/admin/inventory/po/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'cancelled' }),

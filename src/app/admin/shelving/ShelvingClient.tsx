@@ -1,11 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Warehouse, ShelfLocation, ShelfStock,
   WarehouseForm, LocationForm, StockRow, AssignStockForm,
 } from '@/components/admin/ShelvingParts'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 type Tab = 'locations' | 'labels'
 type Panel = 'warehouse' | 'location' | 'stock'
@@ -28,7 +31,20 @@ function groupLocations(locs: ShelfLocation[]) {
 }
 
 export default function ShelvingClient() {
-  const [tab, setTab] = useState<Tab>('locations')
+  const { showToast } = useToast()
+  const confirm = useConfirm()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab') as Tab | null
+  const [tab, setTabState] = useState<Tab>(
+    tabParam && (['locations', 'labels'] as Tab[]).includes(tabParam) ? tabParam : 'locations'
+  )
+  function setTab(next: Tab) {
+    setTabState(next)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', next)
+    router.replace(`/admin/shelving?${params.toString()}`, { scroll: false })
+  }
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [locations, setLocations] = useState<ShelfLocation[]>([])
   const [stock, setStock] = useState<ShelfStock[]>([])
@@ -121,9 +137,15 @@ export default function ShelvingClient() {
   }
 
   async function deleteWarehouse(id: string) {
-    if (!confirm('Delete this warehouse? All locations must have no stock.')) return
+    const ok = await confirm({
+      title: 'Delete warehouse?',
+      message: 'All locations must have no stock.',
+      variant: 'danger',
+      confirmLabel: 'Delete',
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/shelving/warehouses/${id}`, { method: 'DELETE' })
-    if (!res.ok) { alert((await res.json()).error); return }
+    if (!res.ok) { showToast((await res.json()).error || 'Failed to delete', 'error'); return }
     if (selectedWarehouse === id) setSelectedWarehouse(null)
     await loadWarehouses()
   }
@@ -147,9 +169,15 @@ export default function ShelvingClient() {
   }
 
   async function deleteLocation(id: string) {
-    if (!confirm('Delete this location? It must have no stock assigned.')) return
+    const ok = await confirm({
+      title: 'Delete location?',
+      message: 'It must have no stock assigned.',
+      variant: 'danger',
+      confirmLabel: 'Delete',
+    })
+    if (!ok) return
     const res = await fetch(`/api/admin/shelving/locations/${id}`, { method: 'DELETE' })
-    if (!res.ok) { alert((await res.json()).error); return }
+    if (!res.ok) { showToast((await res.json()).error || 'Failed to delete', 'error'); return }
     if (selectedLocation === id) setSelectedLocation(null)
     if (selectedWarehouse) await loadLocations(selectedWarehouse)
   }
@@ -166,7 +194,7 @@ export default function ShelvingClient() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url; a.download = filename
       a.click(); URL.revokeObjectURL(url)
-    } catch (e: any) { alert(e.message) } finally { setGeneratingLabels(false) }
+    } catch (e: any) { showToast(e.message || 'Label generation failed', 'error') } finally { setGeneratingLabels(false) }
   }
 
   async function downloadSyntheticLabel(displayCode: string, warehouseName: string, filename: string) {
@@ -181,7 +209,7 @@ export default function ShelvingClient() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url; a.download = filename
       a.click(); URL.revokeObjectURL(url)
-    } catch (e: any) { alert(e.message) } finally { setGeneratingLabels(false) }
+    } catch (e: any) { showToast(e.message || 'Label generation failed', 'error') } finally { setGeneratingLabels(false) }
   }
 
   if (loading) return (

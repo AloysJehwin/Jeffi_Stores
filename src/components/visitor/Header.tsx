@@ -6,6 +6,7 @@ import SearchBar from './SearchBar'
 import UserMenu from './UserMenu'
 import MobileDrawer from './MobileDrawer'
 import ThemeToggle from '@/components/ThemeToggle'
+import AiAssistantButton from './AiAssistantButton'
 import { useCart } from '@/contexts/CartContext'
 
 export default function Header() {
@@ -82,6 +83,9 @@ export default function Header() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
                 </svg>
               </Link>
+
+              {/* AI Assistant (logged-in only) */}
+              <AiAssistantButton />
 
               {/* Wishlist Icon */}
               <Link href="/wishlist" className="hidden sm:flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all hover:scale-110 active:scale-95 relative">

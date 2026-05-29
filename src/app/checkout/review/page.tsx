@@ -47,6 +47,10 @@ function CheckoutReviewPage() {
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
 
   const [shippingCharge, setShippingCharge] = useState<number | null>(null)
+  const [shippingMeta, setShippingMeta] = useState<{
+    source?: string
+    freeShippingThreshold?: number
+  } | null>(null)
   const [isLoadingShipping, setIsLoadingShipping] = useState(false)
   const [shippingError, setShippingError] = useState('')
   const [minOrderAmount, setMinOrderAmount] = useState(0)
@@ -148,6 +152,7 @@ function CheckoutReviewPage() {
     const pin = selectedAddress?.postal_code
     if (!pin || cartSubtotal === 0) {
       setShippingCharge(null)
+      setShippingMeta(null)
       setShippingError('')
       return
     }
@@ -164,7 +169,13 @@ function CheckoutReviewPage() {
     })
       .then(r => r.json())
       .then(data => {
-        if (data.charge != null) setShippingCharge(data.charge)
+        if (data.charge != null) {
+          setShippingCharge(data.charge)
+          setShippingMeta({
+            source: data.source,
+            freeShippingThreshold: data.freeShippingThreshold,
+          })
+        }
         else setShippingError(data.error || 'Unavailable')
       })
       .catch(() => setShippingError('Could not fetch rate'))
@@ -517,11 +528,27 @@ function CheckoutReviewPage() {
                   ) : shippingError ? (
                     <span className="text-yellow-600 dark:text-yellow-400 text-sm">Unavailable</span>
                   ) : shippingCharge != null ? (
-                    <span className="font-medium">₹{shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    shippingCharge === 0 ? (
+                      <span className="font-medium text-green-600 dark:text-green-400">Free</span>
+                    ) : (
+                      <span className="font-medium">₹{shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    )
                   ) : (
                     <span className="text-foreground-muted text-sm">Select address</span>
                   )}
                 </div>
+                {shippingCharge === 0 && shippingMeta && (
+                  <>
+                    {shippingMeta.source === 'free_threshold' && shippingMeta.freeShippingThreshold && (
+                      <div className="text-xs text-green-600 dark:text-green-400 -mt-1">
+                        Free delivery on orders above ₹{shippingMeta.freeShippingThreshold.toLocaleString('en-IN')}
+                      </div>
+                    )}
+                    {shippingMeta.source === 'admin_disabled' && (
+                      <div className="text-xs text-green-600 dark:text-green-400 -mt-1">Free delivery on every order</div>
+                    )}
+                  </>
+                )}
                 <div className="border-t border-border-default pt-3">
                   <div className="flex justify-between text-xl font-bold text-foreground">
                     <span>Total</span>

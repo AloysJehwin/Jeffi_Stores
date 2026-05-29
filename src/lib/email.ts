@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 
-const transporter = nodemailer.createTransport({
+export const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
   port: 465,
   secure: true,

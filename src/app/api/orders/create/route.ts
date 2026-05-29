@@ -3,6 +3,8 @@ import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
 import { isInterState, calculateGST } from '@/lib/gst'
+import { logActivity } from '@/lib/activity'
+import { createAutoTask } from '@/lib/auto-tasks'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
@@ -313,6 +315,27 @@ export async function POST(request: NextRequest) {
     if (!isRazorpayPayment) {
       sendOrderConfirmationEmail(user.email, order, orderItems, null).catch(() => {})
       sendNewOrderNotification(order, orderItems, user).catch(() => {})
+    }
+
+    logActivity({
+      userId,
+      kind: 'order_placed',
+      referenceId: order.id,
+      referenceType: 'orders',
+      summary: `Placed order #${order.order_number} — ₹${Number(order.total_amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
+      metadata: { orderNumber: order.order_number, total: order.total_amount, itemCount: orderItems.length },
+    }).catch(() => {})
+
+    if (Number(order.total_amount) >= 50000) {
+      createAutoTask({
+        userId,
+        sourceKind: 'review_high_value_order',
+        sourceRefId: order.id,
+        title: `Review high-value order #${order.order_number} (₹${Number(order.total_amount).toLocaleString('en-IN')})`,
+        description: 'Large order — verify stock, address, and payment before fulfilling.',
+        priority: 'high',
+        dueInDays: 0,
+      }).catch(() => {})
     }
 
     return NextResponse.json({
