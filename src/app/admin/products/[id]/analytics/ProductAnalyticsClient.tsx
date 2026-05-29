@@ -24,12 +24,62 @@ interface AnalyticsData {
   variantBreakdown: { variantName: string | null; orders: number; quantity: number; revenue: number }[]
 }
 
+type Granularity = 'daily' | 'weekly' | 'monthly'
+type Row = { date: string; views: number; carts: number; orders: number }
+
+function aggregate(series: Row[], mode: Granularity): Row[] {
+  if (mode === 'daily') return series
+
+  const buckets = new Map<string, Row>()
+
+  for (const r of series) {
+    const d = new Date(r.date)
+    let key: string
+
+    if (mode === 'monthly') {
+      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    } else {
+      const day = d.getDay() === 0 ? 6 : d.getDay() - 1
+      const mon = new Date(d)
+      mon.setDate(d.getDate() - day)
+      key = mon.toISOString().slice(0, 10)
+    }
+
+    const existing = buckets.get(key)
+    if (existing) {
+      existing.views += r.views
+      existing.carts += r.carts
+      existing.orders += r.orders
+    } else {
+      buckets.set(key, { date: key, views: r.views, carts: r.carts, orders: r.orders })
+    }
+  }
+
+  return Array.from(buckets.values())
+}
+
+function fmtLabel(date: string, mode: Granularity): string {
+  const d = new Date(date)
+  if (mode === 'monthly') {
+    return d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+  }
+  if (mode === 'weekly') {
+    const sun = new Date(d)
+    sun.setDate(d.getDate() + 6)
+    const fmt = (dt: Date) => dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+    return `${fmt(d)} – ${fmt(sun)}`
+  }
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+}
+
 const RANGES = [7, 14, 30, 60, 90]
 
 export default function ProductAnalyticsClient({ productId, initial }: { productId: string; initial: AnalyticsData }) {
   const [data, setData] = useState<AnalyticsData>(initial)
   const [days, setDays] = useState(initial.days)
   const [loading, setLoading] = useState(false)
+  const [granularity, setGranularity] = useState<Granularity>('daily')
+  const [showZeros, setShowZeros] = useState(false)
 
   async function changeRange(d: number) {
     setLoading(true)
@@ -42,7 +92,10 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
     }
   }
 
-  const maxValue = Math.max(...data.timeSeries.map(d => Math.max(d.views, d.carts * 5, d.orders * 20)), 1)
+  const aggregated = aggregate(data.timeSeries, granularity)
+  const hasZeros = aggregated.some(r => r.views + r.carts + r.orders === 0)
+  const displayed = showZeros ? aggregated : aggregated.filter(r => r.views + r.carts + r.orders > 0)
+  const maxValue = Math.max(...displayed.map(d => Math.max(d.views, d.carts * 5, d.orders * 20)), 1)
 
   return (
     <div className="space-y-5">
@@ -83,18 +136,47 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-surface-elevated rounded-xl border border-border-default p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Daily Traffic</h2>
-          {data.timeSeries.length === 0 ? (
-            <p className="text-sm text-foreground-muted">No data in this range.</p>
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <h2 className="text-sm font-semibold text-foreground">Traffic</h2>
+            <div className="flex items-center gap-1 bg-surface-secondary rounded-lg p-0.5">
+              {(['daily', 'weekly', 'monthly'] as const).map(g => (
+                <button
+                  key={g}
+                  onClick={() => setGranularity(g)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    granularity === g
+                      ? 'bg-surface-elevated shadow text-foreground'
+                      : 'text-foreground-muted hover:text-foreground'
+                  }`}
+                >
+                  {g === 'daily' ? 'Day' : g === 'weekly' ? 'Week' : 'Month'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {displayed.length === 0 ? (
+            <p className="text-sm text-foreground-muted py-2">
+              No activity in this range.{' '}
+              {hasZeros && (
+                <button onClick={() => setShowZeros(true)} className="underline hover:text-foreground transition-colors">
+                  Show all {aggregated.length} {granularity === 'daily' ? 'days' : granularity === 'weekly' ? 'weeks' : 'months'}
+                </button>
+              )}
+            </p>
           ) : (
             <div className="space-y-2.5">
-              {data.timeSeries.slice(-30).map(d => (
+              {displayed.map(d => (
                 <div key={d.date} className="flex items-center gap-3 text-xs">
-                  <span className="w-20 text-foreground-muted shrink-0">
-                    {new Date(d.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                  <span className={`shrink-0 text-foreground-muted ${granularity === 'weekly' ? 'w-32' : 'w-20'}`}>
+                    {fmtLabel(d.date, granularity)}
                   </span>
                   <div className="flex-1 flex items-center gap-1 h-5">
-                    <div className="bg-blue-500 rounded h-full" style={{ width: `${(d.views / maxValue) * 100}%`, minWidth: d.views > 0 ? '2px' : '0' }} title={`${d.views} views`} />
+                    <div
+                      className="bg-blue-500 rounded h-full transition-all"
+                      style={{ width: `${(d.views / maxValue) * 100}%`, minWidth: d.views > 0 ? '2px' : '0' }}
+                      title={`${d.views} views`}
+                    />
                     <span className="text-foreground tabular-nums w-10 text-right">{d.views}</span>
                   </div>
                   <span className="text-foreground-secondary tabular-nums w-8 text-right">{d.carts}c</span>
@@ -103,10 +185,23 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
               ))}
             </div>
           )}
-          <div className="flex items-center gap-4 mt-4 pt-3 border-t border-border-default text-xs text-foreground-muted">
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-blue-500 rounded" /> Views</span>
-            <span><span className="font-semibold text-foreground-secondary">N</span>c = Cart adds</span>
-            <span><span className="font-semibold text-green-600 dark:text-green-400">N</span>o = Orders</span>
+
+          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border-default text-xs text-foreground-muted flex-wrap gap-2">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-blue-500 rounded inline-block" /> Views</span>
+              <span><span className="font-semibold text-foreground-secondary">N</span>c Cart adds</span>
+              <span><span className="font-semibold text-green-600 dark:text-green-400">N</span>o Orders</span>
+            </div>
+            {hasZeros && (
+              <button
+                onClick={() => setShowZeros(v => !v)}
+                className="text-accent-500 hover:text-accent-600 font-medium transition-colors"
+              >
+                {showZeros
+                  ? 'Hide zero days'
+                  : `Show all ${aggregated.length} ${granularity === 'daily' ? 'days' : granularity === 'weekly' ? 'weeks' : 'months'}`}
+              </button>
+            )}
           </div>
         </div>
 
