@@ -72,7 +72,48 @@ function fmtLabel(date: string, mode: Granularity): string {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
 }
 
+function Modal({ title: titleText, subtitle, onClose, children, footer }: {
+  title: string
+  subtitle?: string
+  onClose: () => void
+  children: React.ReactNode
+  footer?: React.ReactNode
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-surface-elevated rounded-2xl border border-border-default p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4 shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">{titleText}</h2>
+            {subtitle && <p className="text-xs text-foreground-muted mt-0.5">{subtitle}</p>}
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
+            aria-label="Close"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1">{children}</div>
+        {footer && (
+          <div className="pt-4 shrink-0 border-t border-border-default mt-2">{footer}</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const RANGES = [7, 14, 30, 60, 90]
+const PREVIEW = 5
 
 export default function ProductAnalyticsClient({ productId, initial }: { productId: string; initial: AnalyticsData }) {
   const [data, setData] = useState<AnalyticsData>(initial)
@@ -80,6 +121,9 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
   const [loading, setLoading] = useState(false)
   const [granularity, setGranularity] = useState<Granularity>('daily')
   const [showZeros, setShowZeros] = useState(false)
+  const [refModal, setRefModal] = useState(false)
+  const [variantModal, setVariantModal] = useState(false)
+  const [buyerModal, setBuyerModal] = useState(false)
 
   async function changeRange(d: number) {
     setLoading(true)
@@ -96,6 +140,15 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
   const hasZeros = aggregated.some(r => r.views + r.carts + r.orders === 0)
   const displayed = showZeros ? aggregated : aggregated.filter(r => r.views + r.carts + r.orders > 0)
   const maxValue = Math.max(...displayed.map(d => Math.max(d.views, d.carts * 5, d.orders * 20)), 1)
+
+  const refPreview = data.referrers.slice(0, PREVIEW)
+  const refHasMore = data.referrers.length > PREVIEW
+
+  const variantPreview = data.variantBreakdown.slice(0, PREVIEW)
+  const variantHasMore = data.variantBreakdown.length > PREVIEW
+
+  const buyerPreview = data.recentBuyers.slice(0, PREVIEW)
+  const buyerHasMore = data.recentBuyers.length > PREVIEW
 
   return (
     <div className="space-y-5">
@@ -205,80 +258,175 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
           </div>
         </div>
 
+        {/* Top Referrers */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Top Referrers</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Top Referrers</h2>
+            {refHasMore && (
+              <button onClick={() => setRefModal(true)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+                View all ({data.referrers.length}) →
+              </button>
+            )}
+          </div>
           {data.referrers.length === 0 ? (
             <p className="text-sm text-foreground-muted">No referrer data yet.</p>
           ) : (
             <div className="space-y-2.5">
-              {data.referrers.map(r => (
-                <div key={r.referrer} className="flex items-center justify-between text-sm">
-                  <span className="text-foreground truncate flex-1 mr-2">{r.referrer}</span>
-                  <span className="text-foreground-secondary tabular-nums text-xs">{r.sessions.toLocaleString()}</span>
-                </div>
-              ))}
+              {refPreview.map(r => <ReferrerRow key={r.referrer} r={r} />)}
+              {refHasMore && (
+                <button
+                  onClick={() => setRefModal(true)}
+                  className="w-full text-center text-xs text-foreground-muted hover:text-foreground pt-1 transition-colors"
+                >
+                  +{data.referrers.length - PREVIEW} more
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Variant Breakdown */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Variant Breakdown</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Variant Breakdown</h2>
+            {variantHasMore && (
+              <button onClick={() => setVariantModal(true)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+                View all ({data.variantBreakdown.length}) →
+              </button>
+            )}
+          </div>
           {data.variantBreakdown.length === 0 ? (
             <p className="text-sm text-foreground-muted">No paid orders in this range.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-xs uppercase tracking-wide text-foreground-muted border-b border-border-default">
-                    <th className="text-left py-2 font-semibold">Variant</th>
-                    <th className="text-right py-2 font-semibold">Orders</th>
-                    <th className="text-right py-2 font-semibold">Qty</th>
-                    <th className="text-right py-2 font-semibold">Revenue</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {data.variantBreakdown.map((v, i) => (
-                    <tr key={i}>
-                      <td className="py-2 text-foreground">{v.variantName || <span className="text-foreground-muted italic">No variant</span>}</td>
-                      <td className="py-2 text-right tabular-nums">{v.orders}</td>
-                      <td className="py-2 text-right tabular-nums">{v.quantity}</td>
-                      <td className="py-2 text-right tabular-nums font-semibold">₹{Math.round(v.revenue).toLocaleString('en-IN')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <VariantTable rows={variantPreview} />
+              {variantHasMore && (
+                <button
+                  onClick={() => setVariantModal(true)}
+                  className="w-full text-center text-xs text-foreground-muted hover:text-foreground pt-2.5 pb-0.5 transition-colors"
+                >
+                  +{data.variantBreakdown.length - PREVIEW} more
+                </button>
+              )}
             </div>
           )}
         </div>
 
+        {/* Recent Buyers */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Recent Buyers</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-foreground">Recent Buyers</h2>
+            {buyerHasMore && (
+              <button onClick={() => setBuyerModal(true)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+                View all ({data.recentBuyers.length}) →
+              </button>
+            )}
+          </div>
           {data.recentBuyers.length === 0 ? (
             <p className="text-sm text-foreground-muted">No buyers yet.</p>
           ) : (
             <div className="space-y-2.5">
-              {data.recentBuyers.map(b => (
-                <Link
-                  key={b.orderNumber}
-                  href={`/admin/orders?search=${b.orderNumber}`}
-                  className="flex items-center justify-between text-sm py-1.5 hover:bg-surface-secondary/50 px-2 -mx-2 rounded transition-colors"
+              {buyerPreview.map(b => <BuyerRow key={`${b.orderNumber}-${b.createdAt}`} b={b} />)}
+              {buyerHasMore && (
+                <button
+                  onClick={() => setBuyerModal(true)}
+                  className="w-full text-center text-xs text-foreground-muted hover:text-foreground pt-1 transition-colors"
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-foreground truncate">{b.customerName}</p>
-                    <p className="text-xs text-foreground-muted">
-                      {new Date(b.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · {b.quantity}× #{b.orderNumber}
-                    </p>
-                  </div>
-                  <span className="font-semibold text-foreground tabular-nums whitespace-nowrap ml-3">₹{Math.round(b.total).toLocaleString('en-IN')}</span>
-                </Link>
-              ))}
+                  +{data.recentBuyers.length - PREVIEW} more
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {refModal && (
+        <Modal
+          title="Top Referrers"
+          subtitle={`${data.referrers.length} sources · last ${days} days`}
+          onClose={() => setRefModal(false)}
+        >
+          <div className="space-y-2.5 py-1">
+            {data.referrers.map(r => <ReferrerRow key={r.referrer} r={r} />)}
+          </div>
+        </Modal>
+      )}
+
+      {variantModal && (
+        <Modal
+          title="Variant Breakdown"
+          subtitle={`${data.variantBreakdown.length} variants · last ${days} days`}
+          onClose={() => setVariantModal(false)}
+        >
+          <VariantTable rows={data.variantBreakdown} />
+        </Modal>
+      )}
+
+      {buyerModal && (
+        <Modal
+          title="Recent Buyers"
+          subtitle={`${data.recentBuyers.length} orders · last ${days} days`}
+          onClose={() => setBuyerModal(false)}
+        >
+          <div className="divide-y divide-border-default">
+            {data.recentBuyers.map(b => <BuyerRow key={`${b.orderNumber}-${b.createdAt}`} b={b} large />)}
+          </div>
+        </Modal>
+      )}
     </div>
+  )
+}
+
+function ReferrerRow({ r }: { r: { referrer: string; sessions: number } }) {
+  return (
+    <div className="flex items-center justify-between text-sm gap-2">
+      <span className="text-foreground truncate flex-1 text-xs font-mono">{r.referrer}</span>
+      <span className="text-foreground-secondary tabular-nums text-xs shrink-0">{r.sessions.toLocaleString()}</span>
+    </div>
+  )
+}
+
+function VariantTable({ rows }: { rows: { variantName: string | null; orders: number; quantity: number; revenue: number }[] }) {
+  return (
+    <table className="min-w-full text-sm">
+      <thead>
+        <tr className="text-xs uppercase tracking-wide text-foreground-muted border-b border-border-default">
+          <th className="text-left py-2 font-semibold">Variant</th>
+          <th className="text-right py-2 font-semibold">Orders</th>
+          <th className="text-right py-2 font-semibold">Qty</th>
+          <th className="text-right py-2 font-semibold">Revenue</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-border-default">
+        {rows.map((v, i) => (
+          <tr key={i}>
+            <td className="py-2 text-foreground">{v.variantName || <span className="text-foreground-muted italic">No variant</span>}</td>
+            <td className="py-2 text-right tabular-nums">{v.orders}</td>
+            <td className="py-2 text-right tabular-nums">{v.quantity}</td>
+            <td className="py-2 text-right tabular-nums font-semibold">₹{Math.round(v.revenue).toLocaleString('en-IN')}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function BuyerRow({ b, large }: { b: { orderNumber: string; createdAt: string; quantity: number; total: number; customerName: string }; large?: boolean }) {
+  return (
+    <Link
+      href={`/admin/orders?search=${b.orderNumber}`}
+      className={`flex items-center justify-between text-sm ${large ? 'py-2.5' : 'py-1.5'} hover:bg-surface-secondary/50 px-2 -mx-2 rounded transition-colors`}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-foreground truncate">{b.customerName}</p>
+        <p className="text-xs text-foreground-muted">
+          {new Date(b.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · {b.quantity}× #{b.orderNumber}
+        </p>
+      </div>
+      <span className="font-semibold text-foreground tabular-nums whitespace-nowrap ml-3">₹{Math.round(b.total).toLocaleString('en-IN')}</span>
+    </Link>
   )
 }
 
