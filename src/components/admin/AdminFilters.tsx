@@ -131,8 +131,12 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                   value={searchValue}
                   onChange={setSearchValue}
                   onSelect={item => {
-                    const qs = createQueryString(searchParam, item.label)
-                    router.push(`${pathname}${qs ? `?${qs}` : ''}`)
+                    if (item.href) {
+                      router.push(item.href)
+                    } else {
+                      const qs = createQueryString(searchParam, searchValue.trim())
+                      router.push(`${pathname}${qs ? `?${qs}` : ''}`)
+                    }
                   }}
                   onEnter={val => {
                     const qs = createQueryString(searchParam, val.trim())

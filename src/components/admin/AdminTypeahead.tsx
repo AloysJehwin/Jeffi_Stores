@@ -128,11 +128,10 @@ export default function AdminTypeahead({
   }, [])
 
   const selectItem = useCallback((item: SuggestItem) => {
-    onChange(item.label)
     onSelect?.(item)
     setOpen(false)
     setItems([])
-  }, [onChange, onSelect])
+  }, [onSelect])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') { setOpen(false); return }
