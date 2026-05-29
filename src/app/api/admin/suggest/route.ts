@@ -147,14 +147,17 @@ async function suggestOrders(q: string): Promise<SuggestItem[]> {
 }
 
 async function suggestCustomers(q: string): Promise<SuggestItem[]> {
-  const sc = buildSearchClause(q, ['name', 'email', 'phone'], 1)
-  const rows = await queryMany<{ id: string; name: string; email: string; phone: string }>(
-    `SELECT u.id, u.name, u.email, u.phone FROM users u
+  const sc = buildSearchClause(q, ['u.first_name', 'u.last_name', 'u.email', 'u.phone'], 1)
+  const rows = await queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null }>(
+    `SELECT u.id, u.first_name, u.last_name, u.email, u.phone FROM users u
      JOIN customer_profiles cp ON cp.user_id = u.id
-     WHERE ${sc.clause} ORDER BY u.name ASC LIMIT 6`,
+     WHERE ${sc.clause} ORDER BY u.first_name ASC, u.last_name ASC LIMIT 6`,
     sc.params
   )
-  return (rows || []).map(r => ({ id: r.id, label: r.name, sublabel: r.phone || r.email, href: `/admin/customers?search=${encodeURIComponent(q)}` }))
+  return (rows || []).map(r => {
+    const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.email
+    return { id: r.id, label: name, sublabel: r.phone || r.email, href: `/admin/customers?search=${encodeURIComponent(q)}` }
+  })
 }
 
 async function suggestInvoices(q: string): Promise<SuggestItem[]> {
