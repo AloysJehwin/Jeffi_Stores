@@ -133,22 +133,22 @@ export default function CustomerTags({ customerId, initialTags }: CustomerTagsPr
         )}
       </div>
 
-      {/* Add tag picker */}
-      {available.length > 0 && (
+      {/* Add tag picker — always visible once definitions loaded, hidden only if all tags assigned */}
+      {definitions.length > 0 && (
         <div ref={panelRef} className="relative">
           <button
             type="button"
             onClick={() => setOpen(o => !o)}
-            disabled={busy}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-foreground-muted border border-dashed border-border-secondary rounded-lg hover:border-border-default hover:text-foreground transition-colors disabled:opacity-50"
+            disabled={busy || available.length === 0}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-foreground-muted border border-dashed border-border-secondary rounded-lg hover:border-border-default hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
-            Add tag
+            {available.length === 0 ? 'All tags assigned' : 'Add tag'}
           </button>
 
-          {open && (
+          {open && available.length > 0 && (
             <div className="absolute z-50 top-full mt-1 left-0 bg-surface-elevated border border-border-default rounded-xl shadow-lg p-2 min-w-[180px] max-w-xs">
               <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider px-2 pb-1.5">Select a tag</p>
               <div className="flex flex-col gap-0.5">
