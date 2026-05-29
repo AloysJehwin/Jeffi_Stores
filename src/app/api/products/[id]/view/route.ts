@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     await query(
       `INSERT INTO product_views (product_id, user_id, session_id, ip_address, user_agent)
        VALUES ($1, $2, $3, $4::inet, $5)`,
-      [productId, userId, sessionHeader, ip, userAgent]
+      [productId, userId, sessionId, ip, userAgent]
     )
   } catch {}
 
