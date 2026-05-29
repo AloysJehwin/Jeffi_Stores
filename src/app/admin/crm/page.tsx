@@ -7,6 +7,9 @@ import ChurnRisksCard from './ChurnRisksCard'
 import BiggestDropsCard from './BiggestDropsCard'
 import AtRiskCard from './AtRiskCard'
 import DormantCard from './DormantCard'
+import RecentNotesCard from './RecentNotesCard'
+import RecentTagsCard from './RecentTagsCard'
+import RecentSignupsCard from './RecentSignupsCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,14 +25,6 @@ const SEGMENT_META: Record<string, { label: string; color: string; href: string 
   lead:     { label: 'Lead',         color: 'bg-pink-100 text-pink-800 border-pink-300 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-700',              href: '/admin/customers?segment=lead' },
 }
 
-function timeAgo(iso: string) {
-  const d = new Date(iso).getTime()
-  const diff = Math.floor((Date.now() - d) / 1000)
-  if (diff < 60) return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
-}
 
 
 export default async function CrmDashboardPage() {
@@ -134,25 +129,7 @@ export default async function CrmDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Recent Notes */}
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5 lg:col-span-2">
-          <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Recent Internal Notes</h2>
-          {data.recentNotes.length === 0 ? (
-            <p className="text-sm text-foreground-muted">No notes yet. Add one from any customer page to track conversations.</p>
-          ) : (
-            <div className="space-y-3">
-              {data.recentNotes.map((n: any, i: number) => (
-                <div key={i} className="border-l-2 border-accent-500 pl-3 py-1">
-                  <p className="text-sm text-foreground whitespace-pre-wrap break-words line-clamp-3">{n.body}</p>
-                  <p className="text-[10px] text-foreground-muted mt-1">
-                    <Link href={`/admin/customers/${n.userId}`} className="text-accent-600 dark:text-accent-400 hover:underline">{n.customerName}</Link>
-                    {' · '}{n.adminName}{' · '}{timeAgo(n.createdAt)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <RecentNotesCard items={data.recentNotes} />
 
         {/* Tag cloud */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
@@ -177,56 +154,8 @@ export default async function CrmDashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Recent Tags applied */}
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-          <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Recently Tagged</h2>
-          {data.recentTags.length === 0 ? (
-            <p className="text-sm text-foreground-muted">No recent tag activity.</p>
-          ) : (
-            <div className="divide-y divide-border-default">
-              {data.recentTags.map((t: any, i: number) => (
-                <Link
-                  key={i}
-                  href={`/admin/customers/${t.userId}`}
-                  className="flex items-center justify-between gap-3 py-2 hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">{t.name}</p>
-                    <span className="inline-block px-2 py-0.5 mt-0.5 bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 rounded-full text-[10px] font-medium">{t.tag}</span>
-                  </div>
-                  <span className="text-[10px] text-foreground-muted whitespace-nowrap">{timeAgo(t.createdAt)}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Recent Signups */}
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Recent Signups</h2>
-            <Link href="/admin/customers?segment=lead" className="text-xs text-accent-500 hover:text-accent-600 font-medium">View leads →</Link>
-          </div>
-          {data.recentSignups.length === 0 ? (
-            <p className="text-sm text-foreground-muted">No new signups yet.</p>
-          ) : (
-            <div className="divide-y divide-border-default">
-              {data.recentSignups.map((s: any) => (
-                <Link
-                  key={s.id}
-                  href={`/admin/customers/${s.id}`}
-                  className="flex items-center justify-between gap-3 py-2 hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">{s.name}</p>
-                    <p className="text-[11px] text-foreground-muted truncate">{s.email}</p>
-                  </div>
-                  <span className="text-[10px] text-foreground-muted whitespace-nowrap">{timeAgo(s.createdAt)}</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        <RecentTagsCard items={data.recentTags} />
+        <RecentSignupsCard items={data.recentSignups} />
       </div>
     </div>
   )
