@@ -200,6 +200,10 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [product.slug])
 
+  useEffect(() => {
+    fetch(`/api/products/${product.id}/view`, { method: 'POST', credentials: 'include' }).catch(() => {})
+  }, [product.id])
+
   const hasVariants = product.has_variants && product.product_variants?.length > 0
   const displayPrice = Number(product.base_price)
   const mrp = product.mrp ? Number(product.mrp) : null
