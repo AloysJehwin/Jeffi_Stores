@@ -245,24 +245,24 @@ export default function TransactionsPage() {
                 ))}
 
                 {total > pageSize && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
-                    <p className="text-sm text-foreground-muted text-center sm:text-left whitespace-nowrap">
-                      Showing <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}</span> of{' '}
-                      <span className="font-medium text-foreground">{total}</span> transactions
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <p className="text-xs text-foreground-muted whitespace-nowrap">
+                      <span className="font-medium text-foreground">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}</span>
+                      {' '}of <span className="font-medium text-foreground">{total}</span> transactions
                     </p>
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => setPage(p => Math.max(1, p - 1))}
                         disabled={page <= 1}
-                        className="px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                        className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                       >
-                        Previous
+                        Prev
                       </button>
-                      <span className="text-sm text-foreground-muted whitespace-nowrap">{page} / {Math.ceil(total / pageSize)}</span>
+                      <span className="text-xs text-foreground-muted whitespace-nowrap">{page}/{Math.ceil(total / pageSize)}</span>
                       <button
                         onClick={() => setPage(p => p + 1)}
                         disabled={page >= Math.ceil(total / pageSize)}
-                        className="px-3 py-1.5 text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                        className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                       >
                         Next
                       </button>
