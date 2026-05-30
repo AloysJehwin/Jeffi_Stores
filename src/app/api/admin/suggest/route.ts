@@ -147,14 +147,17 @@ async function suggestOrders(q: string): Promise<SuggestItem[]> {
 }
 
 async function suggestCustomers(q: string): Promise<SuggestItem[]> {
-  const sc = buildSearchClause(q, ['name', 'email', 'phone'], 1)
-  const rows = await queryMany<{ id: string; name: string; email: string; phone: string }>(
-    `SELECT u.id, u.name, u.email, u.phone FROM users u
-     JOIN customer_profiles cp ON cp.user_id = u.id
-     WHERE ${sc.clause} ORDER BY u.name ASC LIMIT 6`,
+  const sc = buildSearchClause(q, ['u.first_name', 'u.last_name', 'u.email', 'u.phone'], 1)
+  const rows = await queryMany<{ id: string; first_name: string | null; last_name: string | null; email: string; phone: string | null }>(
+    `SELECT u.id, u.first_name, u.last_name, u.email, u.phone FROM users u
+     LEFT JOIN customer_profiles cp ON cp.user_id = u.id
+     WHERE ${sc.clause} ORDER BY u.first_name ASC, u.last_name ASC LIMIT 6`,
     sc.params
   )
-  return (rows || []).map(r => ({ id: r.id, label: r.name, sublabel: r.phone || r.email, href: `/admin/customers?search=${encodeURIComponent(q)}` }))
+  return (rows || []).map(r => {
+    const name = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.email
+    return { id: r.id, label: name, sublabel: r.phone || r.email, href: `/admin/customers?search=${encodeURIComponent(q)}` }
+  })
 }
 
 async function suggestInvoices(q: string): Promise<SuggestItem[]> {
@@ -246,6 +249,79 @@ async function suggestReviewForms(q: string): Promise<SuggestItem[]> {
   return (rows || []).map(r => ({ id: r.id, label: r.title, sublabel: r.slug }))
 }
 
+async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
+  let idx = 1
+  const params: unknown[] = []
+  const sc = buildProductSearchClause(q, 'p.name', 'p.sku', 'p.search_vector', idx)
+  params.push(...sc.params); idx = sc.nextIdx
+  const sc2 = buildProductSearchClause(q, 'p.name', 'pv.sku', 'p.search_vector', idx)
+  params.push(...sc2.params); idx = sc2.nextIdx
+  const sc3 = buildProductSearchClause(q, 'p.name', 'ps.sku', 'p.search_vector', idx)
+  params.push(...sc3.params); idx = sc3.nextIdx
+  const rk = buildProductSearchRank(q, 'name', 'search_vector', idx)
+  params.push(...rk.params); idx = rk.nextIdx
+  params.push(12)
+
+  const rows = await queryMany<{
+    id: string; name: string; variant_name: string | null; sku: string; slug: string
+    mrp: number | null; price_ex_gst: number | null; base_price: number | null
+    gst_percentage: number; brand_name: string | null; gtin: string | null
+    inventory_quantity: number | null
+  }>(
+    `SELECT id, name, variant_name, sku, slug, mrp, price_ex_gst, base_price, gst_percentage, brand_name, gtin, inventory_quantity, search_vector FROM (
+       SELECT 'product:' || p.id AS id, p.name, NULL AS variant_name, p.sku, p.slug,
+              COALESCE(p.mrp,0)::numeric AS mrp, p.price_ex_gst, p.base_price,
+              COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
+              b.name AS brand_name, p.gtin, COALESCE(p.inventory_quantity,0) AS inventory_quantity, p.search_vector
+       FROM products p LEFT JOIN brands b ON b.id = p.brand_id
+       WHERE p.is_active = true AND p.has_variants = false AND ${sc.clause}
+       UNION ALL
+       SELECT 'variant:' || pv.id AS id, p.name, pv.variant_name, pv.sku, p.slug,
+              COALESCE(pv.mrp,0)::numeric AS mrp, pv.price_ex_gst,
+              COALESCE(pv.price, p.base_price) AS base_price,
+              COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
+              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(pv.inventory_quantity,0) AS inventory_quantity, p.search_vector
+       FROM product_variants pv
+       JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id
+       WHERE pv.is_active = true AND p.is_active = true AND ${sc2.clause}
+         AND NOT EXISTS (SELECT 1 FROM product_sub_variants WHERE variant_id = pv.id AND is_active = true)
+       UNION ALL
+       SELECT 'subvariant:' || ps.id AS id, p.name,
+              ps.sub_variant_name || ' (' || pv.variant_name || ')' AS variant_name,
+              ps.sku, p.slug,
+              COALESCE(ps.mrp,0)::numeric AS mrp, ps.price_ex_gst,
+              COALESCE(ps.price,0) AS base_price,
+              COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
+              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(ps.stock_quantity,0) AS inventory_quantity, p.search_vector
+       FROM product_sub_variants ps
+       JOIN product_variants pv ON pv.id = ps.variant_id
+       JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id
+       WHERE ps.is_active = true AND pv.is_active = true AND p.is_active = true AND ${sc3.clause}
+     ) r
+     ORDER BY ${rk.rank}, name ASC, variant_name ASC NULLS FIRST
+     LIMIT $${idx}`,
+    params
+  )
+  return (rows || []).map(r => {
+    const displayName = r.variant_name ? `${r.name} — ${r.variant_name}` : r.name
+    const encoded = [
+      r.id,
+      r.name,
+      r.variant_name ?? '',
+      r.sku,
+      r.slug,
+      r.mrp != null ? String(r.mrp) : '0',
+      r.price_ex_gst != null ? String(r.price_ex_gst) : '',
+      r.base_price != null ? String(r.base_price) : '0',
+      String(r.gst_percentage),
+      r.brand_name ?? '',
+      r.gtin ?? '',
+      r.inventory_quantity != null ? String(r.inventory_quantity) : '0',
+    ].join('\x1f')
+    return { id: encoded, label: displayName, sublabel: r.sku + (r.brand_name ? ` · ${r.brand_name}` : '') }
+  })
+}
+
 async function suggestPayables(q: string): Promise<SuggestItem[]> {
   const sc = buildSearchClause(q, ['e.supplier_name', 'e.expense_number'], 1)
   const rows = await queryMany<{ id: string; supplier_name: string; expense_number: string; total_amount: string }>(
@@ -273,6 +349,7 @@ const handlers: Record<string, (q: string) => Promise<SuggestItem[]>> = {
   receivables: suggestFinancialReceivables,
   payables: suggestPayables,
   review_forms: suggestReviewForms,
+  label_products: suggestLabelProducts,
 }
 
 export async function GET(request: NextRequest) {

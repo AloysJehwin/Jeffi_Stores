@@ -69,10 +69,10 @@ export async function createAutoTask(params: CreateAutoTaskParams): Promise<stri
       `INSERT INTO customer_tasks
          (user_id, created_by, assigned_to, title, description, due_date, priority,
           source_kind, source_ref_id, auto_created)
-       SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, TRUE
+       SELECT $1, $2, $3, $4, $5, $6, $7, $8::text, $9::text, TRUE
        WHERE NOT EXISTS (
          SELECT 1 FROM customer_tasks
-         WHERE source_kind = $8 AND source_ref_id = $9
+         WHERE source_kind = $8::text AND source_ref_id = $9::text
            AND status IN ('pending', 'in_progress')
        )
        RETURNING id`,

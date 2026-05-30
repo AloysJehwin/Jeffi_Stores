@@ -53,6 +53,8 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const typedQueryRef = useRef('')
+  const skipFetchRef = useRef(false)
   const router = useRouter()
 
   const totalItems = categories.length + products.length
@@ -87,6 +89,11 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
   }, [isOpen])
 
   useEffect(() => {
+    if (skipFetchRef.current) {
+      skipFetchRef.current = false
+      return
+    }
+    typedQueryRef.current = query
     setActiveIdx(-1)
     if (query.trim().length < 2) {
       setProducts([])
@@ -120,15 +127,39 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
     return () => clearTimeout(timer)
   }, [query])
 
+  function previewItem(idx: number) {
+    skipFetchRef.current = true
+    if (idx < 0) {
+      setQuery(typedQueryRef.current)
+    } else {
+      const catCount = categories.length
+      const name = idx < catCount ? categories[idx].name : products[idx - catCount].name
+      setQuery(name)
+    }
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (!isOpen) return
-    if (e.key === 'Escape') { close(); return }
+    if (e.key === 'Escape') {
+      skipFetchRef.current = true
+      setQuery(typedQueryRef.current)
+      close()
+      return
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIdx(i => Math.min(i + 1, totalItems - 1))
+      setActiveIdx(i => {
+        const next = Math.min(i + 1, totalItems - 1)
+        previewItem(next)
+        return next
+      })
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveIdx(i => Math.max(i - 1, -1))
+      setActiveIdx(i => {
+        const next = Math.max(i - 1, -1)
+        previewItem(next)
+        return next
+      })
     } else if (e.key === 'Enter' && activeIdx >= 0) {
       e.preventDefault()
       const catCount = categories.length

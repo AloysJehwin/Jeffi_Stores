@@ -159,34 +159,34 @@ function CheckoutPage() {
     razorpay_order_id: string,
     razorpay_payment_id: string,
     razorpay_signature: string,
-    orderId: string,
+    payload: { orderId?: string; draftToken?: string },
   ) => {
     try {
       const response = await fetch('/api/razorpay/verify', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId }),
+        body: JSON.stringify({ razorpay_order_id, razorpay_payment_id, razorpay_signature, ...payload }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Payment verification failed')
 
       clearCart()
       showToast('Payment successful!', 'success')
-      window.location.href = `/account/orders/${orderId}`
+      window.location.href = `/account/orders/${data.order.id}`
     } catch (err: any) {
       setError(err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.')
       setIsSubmitting(false)
     }
   }
 
-  const initiateRazorpayPayment = async (orderId: string, totalAmount: number) => {
+  const initiateRazorpayPayment = async (payload: { orderId?: string; draftToken?: string }) => {
     try {
       const rzpResponse = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId }),
+        body: JSON.stringify(payload),
       })
       const rzpData = await rzpResponse.json()
       if (!rzpResponse.ok) throw new Error(rzpData.error || 'Failed to initiate payment')
@@ -203,7 +203,7 @@ function CheckoutPage() {
             response.razorpay_order_id,
             response.razorpay_payment_id,
             response.razorpay_signature,
-            orderId,
+            payload,
           )
         },
         prefill: {
@@ -215,13 +215,15 @@ function CheckoutPage() {
         modal: {
           ondismiss: function () {
             razorpayOpen.current = false
-            fetch(`/api/orders/${orderId}`, {
-              method: 'DELETE',
-              credentials: 'include',
-              keepalive: true,
-            }).catch(() => {})
+            if (payload.orderId) {
+              fetch(`/api/orders/${payload.orderId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+                keepalive: true,
+              }).catch(() => {})
+            }
             setIsSubmitting(false)
-            showToast('Payment cancelled. Your order has been voided.', 'info')
+            showToast('Payment cancelled — your cart is still here.', 'info')
           },
         },
       }
@@ -229,25 +231,35 @@ function CheckoutPage() {
       const rzp = new (window as any).Razorpay(options)
       rzp.on('payment.failed', function (response: any) {
         razorpayOpen.current = false
-        fetch(`/api/orders/${orderId}/payment-failed`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ errorDescription: response.error.description }),
-          keepalive: true,
-        }).catch(() => {})
-        window.location.href = `/account/orders/${orderId}`
+        if (payload.orderId) {
+          fetch(`/api/orders/${payload.orderId}/payment-failed`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ errorDescription: response.error.description }),
+            keepalive: true,
+          }).catch(() => {})
+          window.location.href = `/account/orders/${payload.orderId}`
+        } else {
+          setError(response.error?.description || 'Payment failed. Please try again.')
+          setIsSubmitting(false)
+        }
       })
       razorpayOpen.current = true
       rzp.open()
     } catch (err: any) {
-      await fetch(`/api/orders/${orderId}/payment-failed`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ errorDescription: err.message }),
-      }).catch(() => {})
-      window.location.href = `/account/orders/${orderId}`
+      if (payload.orderId) {
+        await fetch(`/api/orders/${payload.orderId}/payment-failed`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ errorDescription: err.message }),
+        }).catch(() => {})
+        window.location.href = `/account/orders/${payload.orderId}`
+      } else {
+        setError(err?.message || 'Failed to start payment')
+        setIsSubmitting(false)
+      }
     }
   }
 
@@ -280,6 +292,45 @@ function CheckoutPage() {
     }
 
     try {
+      if (paymentMethod === 'razorpay') {
+        const draftBody: any = {
+          mode: isBuyNow ? 'buyNow' : 'cart',
+          addressId: searchParams.get('addressId'),
+          notes,
+          couponId: couponId || null,
+          shippingAmount: shippingCharge ?? 0,
+        }
+        if (isBuyNow && buyNowItem) {
+          draftBody.item = {
+            productId: buyNowItem.productId,
+            variantId: buyNowItem.variantId,
+            qty: buyNowItem.qty,
+            buyMode: buyNowItem.buyMode,
+            buyUnit: buyNowItem.buyUnit,
+            price: buyNowItem.price,
+          }
+        }
+
+        const draftRes = await fetch('/api/orders/draft', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(draftBody),
+        })
+        const draftData = await draftRes.json()
+
+        if (draftRes.status === 409 && draftData.existingOrderId) {
+          setExistingOrder({ id: draftData.existingOrderId, orderNumber: draftData.existingOrderNumber })
+          setError(draftData.error)
+          setIsSubmitting(false)
+          return
+        }
+        if (!draftRes.ok) throw new Error(draftData.error || 'Failed to start payment')
+
+        await initiateRazorpayPayment({ draftToken: draftData.draftToken })
+        return
+      }
+
       const endpoint = isBuyNow ? '/api/orders/create-direct' : '/api/orders/create'
       const body: any = {
         shippingAddress: {
@@ -331,10 +382,6 @@ function CheckoutPage() {
         throw new Error(data.error || 'Failed to create order')
       }
 
-      if (paymentMethod === 'razorpay' && data.requiresPayment) {
-        initiateRazorpayPayment(data.order.id, parseFloat(data.order.total))
-        return
-      }
       if (!isBuyNow) clearCart()
       router.push(`/account/orders/${data.order.id}`)
     } catch (err: any) {

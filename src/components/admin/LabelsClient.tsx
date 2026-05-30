@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { LabelSpec, LabelSize } from '@/lib/label-pdf'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 
@@ -143,9 +144,10 @@ function LabelPreview({ size, product, scale }: {
   const variantName = product?.variant_name || null
   const sku = product?.sku || 'SKU-001'
   const brand = product?.brand_name || null
-  const exGst = product ? (product.base_price) : null
-  const mrp = product?.mrp ?? null
   const gstPct = product?.gst_percentage ?? 0
+  const gstFactor = 1 + (gstPct || 0) / 100
+  const exGst = product ? (product.price_ex_gst ?? (product.base_price / (gstFactor || 1))) : null
+  const mrp = product?.mrp && product.mrp > 0 ? product.mrp / (gstFactor || 1) : null
   const barcodeText = product?.sku || 'SKU-001'
 
   const barH = Math.round(h * 0.22)
@@ -323,6 +325,14 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
   const [error, setError] = useState('')
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
+  const [taItems, setTaItems] = useState<{ id: string; label: string; sublabel?: string }[]>([])
+  const [taOpen, setTaOpen] = useState(false)
+  const [taIndex, setTaIndex] = useState(-1)
+  const [taRect, setTaRect] = useState<DOMRect | null>(null)
+  const taDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const taAbortRef = useRef<AbortController | null>(null)
+  const taInputRef = useRef<HTMLInputElement | null>(null)
+
   const mainCategories = categories.filter(c => !c.parent_category_id)
   const subCategories = selectedMainCat
     ? categories.filter(c => c.parent_category_id === selectedMainCat)
@@ -376,6 +386,38 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
       if (exists) return prev.filter(sp => sp.id !== p.id)
       return [...prev, { ...p, copies: 1 }]
     })
+  }
+
+  function fetchTypeahead(q: string) {
+    if (taAbortRef.current) taAbortRef.current.abort()
+    if (q.length < 2) { setTaItems([]); setTaOpen(false); return }
+    const ctrl = new AbortController()
+    taAbortRef.current = ctrl
+    fetch(`/api/admin/suggest?type=label_products&q=${encodeURIComponent(q)}`, { signal: ctrl.signal, credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { setTaItems(d.items || []); setTaOpen((d.items || []).length > 0); setTaIndex(-1) })
+      .catch(() => {})
+  }
+
+  function selectTaItem(item: { id: string; label: string; sublabel?: string }) {
+    const parts = item.id.split('\x1f')
+    const p: ProductResult = {
+      id: parts[0] ?? '',
+      name: parts[1] ?? '',
+      variant_name: parts[2] || null,
+      sku: parts[3] ?? '',
+      slug: parts[4] ?? '',
+      mrp: parts[5] ? parseFloat(parts[5]) : null,
+      price_ex_gst: parts[6] ? parseFloat(parts[6]) : null,
+      base_price: parts[7] ? parseFloat(parts[7]) : 0,
+      gst_percentage: parts[8] ? parseFloat(parts[8]) : 0,
+      brand_name: parts[9] || null,
+      gtin: parts[10] || null,
+    }
+    toggleProduct(p)
+    setQuery('')
+    setTaItems([])
+    setTaOpen(false)
   }
 
   function updateProductCopies(id: string, c: number) {
@@ -539,15 +581,64 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           {/* Search box */}
           <div className="relative mb-3">
             <input
+              ref={taInputRef}
               type="text"
               placeholder="Search by name, variant or SKU…"
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => {
+                setQuery(e.target.value)
+                if (taDebounceRef.current) clearTimeout(taDebounceRef.current)
+                taDebounceRef.current = setTimeout(() => {
+                  fetchTypeahead(e.target.value)
+                  setTaRect(taInputRef.current?.getBoundingClientRect() ?? null)
+                }, 180)
+              }}
+              onFocus={() => {
+                setTaRect(taInputRef.current?.getBoundingClientRect() ?? null)
+                if (query.length >= 2 && taItems.length > 0) setTaOpen(true)
+              }}
+              onBlur={() => setTimeout(() => setTaOpen(false), 150)}
+              onKeyDown={e => {
+                if (!taOpen) return
+                if (e.key === 'ArrowDown') { e.preventDefault(); setTaIndex(i => Math.min(i + 1, taItems.length - 1)) }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); setTaIndex(i => Math.max(i - 1, -1)) }
+                else if (e.key === 'Enter' && taIndex >= 0) { e.preventDefault(); selectTaItem(taItems[taIndex]) }
+                else if (e.key === 'Escape') setTaOpen(false)
+              }}
               className="w-full px-3 py-2 pl-9 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm placeholder:text-foreground-muted"
             />
             <svg className="absolute left-3 top-2.5 w-4 h-4 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
+            {taOpen && taRect && taItems.length > 0 && typeof document !== 'undefined' && createPortal(
+              <div
+                style={{
+                  position: 'fixed',
+                  top: taRect.bottom + 4,
+                  left: taRect.left,
+                  width: taRect.width,
+                  zIndex: 9999,
+                }}
+                className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto"
+              >
+                {taItems.map((item, idx) => {
+                  const isSelected = selectedProducts.some(sp => sp.id === item.id.split('\x1f')[0])
+                  return (
+                    <button
+                      key={item.id}
+                      onMouseDown={e => { e.preventDefault(); selectTaItem(item) }}
+                      className={`w-full text-left px-3 py-2 text-sm flex flex-col gap-0.5 transition-colors ${
+                        idx === taIndex ? 'bg-orange-50 dark:bg-orange-900/20' : 'hover:bg-surface-secondary'
+                      } ${isSelected ? 'opacity-60' : ''}`}
+                    >
+                      <span className="font-medium text-foreground truncate">{item.label}</span>
+                      {item.sublabel && <span className="text-xs text-foreground-muted truncate">{item.sublabel}</span>}
+                    </button>
+                  )
+                })}
+              </div>,
+              document.body
+            )}
           </div>
 
           {/* Results list */}

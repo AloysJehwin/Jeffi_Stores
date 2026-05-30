@@ -9,6 +9,7 @@ export type CampaignKind =
   | 'winback_180'
   | 'restock'
   | 'price_drop'
+  | string
 
 export interface Campaign {
   kind: CampaignKind
@@ -17,6 +18,7 @@ export interface Campaign {
   enabled: boolean
   delay_hours: number
   discount_percent: number
+  coupon_id: string | null
   subject_template: string
   body_template: string
   last_run_at: string | null
@@ -154,6 +156,14 @@ export async function generateCouponForUser(params: {
   } catch {
     return null
   }
+}
+
+export async function getAssignedCouponCode(couponId: string): Promise<{ code: string; discountValue: number; discountType: string } | null> {
+  return queryOne<{ code: string; discountValue: number; discountType: string }>(
+    `SELECT code, discount_value::float AS "discountValue", discount_type AS "discountType"
+     FROM coupons WHERE id = $1 AND is_active = TRUE`,
+    [couponId]
+  )
 }
 
 export function buildUnsubscribeUrl(token: string, campaignKind: CampaignKind): string {

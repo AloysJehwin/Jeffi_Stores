@@ -9,6 +9,40 @@ interface Props {
   onClose: () => void
 }
 
+function ShelfLocationsSection({ productId }: { productId: string }) {
+  const [locations, setLocations] = useState<{ location_display_code: string; quantity: number }[] | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/admin/shelving/stock?product_id=${productId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setLocations(d?.locations ?? []))
+      .catch(() => setLocations([]))
+  }, [productId])
+
+  if (locations === null) return null
+  if (locations.length === 0) return (
+    <div className="px-5 pb-4">
+      <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Shelf Locations</p>
+      <p className="text-xs text-foreground-muted italic">No stock assigned to any shelf location</p>
+    </div>
+  )
+
+  return (
+    <div className="px-5 pb-5">
+      <p className="text-xs text-foreground-muted uppercase tracking-wide mb-2">Shelf Locations</p>
+      <div className="flex flex-wrap gap-2">
+        {locations.map(l => (
+          <div key={l.location_display_code} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border-default bg-surface-secondary text-xs">
+            <span className="font-mono font-medium text-foreground">{l.location_display_code}</span>
+            <span className="text-foreground-muted">·</span>
+            <span className="font-semibold text-foreground">{l.quantity}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ProductDetailModal({ product, onClose }: Props) {
   const [detail, setDetail] = useState<any>(null)
   const [imgIdx, setImgIdx] = useState(0)
@@ -43,7 +77,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
   const primaryImg = images.find((i: any) => i.is_primary) || images[0]
   const activeImg = images[imgIdx] || primaryImg
   const variants: any[] = detail?.product_variants || []
-  const stock = p.has_variants ? Number(p.variant_stock_total ?? 0) : Number(p.stock_quantity ?? 0)
+  const stock = p.has_variants ? Number(p.variant_inventory_total ?? 0) : Number(p.inventory_quantity ?? 0)
   const isLow = stock > 0 && stock <= (p.low_stock_threshold ?? 5)
 
   return (
@@ -172,12 +206,18 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                     <p className="text-foreground font-medium">{p.brands?.name || '—'}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-foreground-muted">Stock</p>
+                    <p className="text-xs text-foreground-muted">Inventory Stock</p>
                     <p className="text-foreground font-medium">
                       {stock}
                       {p.has_variants && <span className="ml-1 text-xs text-foreground-muted">(across variants)</span>}
                     </p>
                   </div>
+                  {!p.has_variants && (
+                    <div>
+                      <p className="text-xs text-foreground-muted">Listed (Online)</p>
+                      <p className="text-foreground font-medium">{Number(p.stock_quantity ?? 0)}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-xs text-foreground-muted">HSN Code</p>
                     <p className="text-foreground font-medium">{p.hsn_code || '—'}</p>
@@ -204,6 +244,8 @@ export default function ProductDetailModal({ product, onClose }: Props) {
               </div>
             </div>
 
+            <ShelfLocationsSection productId={p.id} />
+
             {/* Variants table */}
             {variants.length > 0 && (
               <div className="px-5 pb-5">
@@ -212,18 +254,20 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                   <table className="w-full text-sm divide-y divide-border-default table-fixed">
                     <thead className="bg-surface-secondary">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[35%]">Name</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[20%]">SKU</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[20%]">Price</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">Stock</th>
-                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[13%]">Status</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[30%]">Name</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[18%]">SKU</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[18%]">Price</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">Inventory</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[10%]">Listed</th>
+                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-[12%]">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">
                       {variants.map((v: any) => {
                         const subs: any[] = v.sub_variants || []
                         const hasSubs = subs.length > 0
-                        const vStock = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
+                        const vInventory = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.inventory_quantity || 0)
+                        const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
                         const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
                         return (
                           <React.Fragment key={v.id}>
@@ -236,7 +280,8 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                               <td className="px-3 py-2 text-foreground">
                                 {hasSubs ? `From Rs. ${vMinPrice.toLocaleString('en-IN')}` : `Rs. ${Number(v.price || 0).toLocaleString('en-IN')}`}
                               </td>
-                              <td className="px-3 py-2 text-foreground">{vStock}</td>
+                              <td className="px-3 py-2 text-foreground font-medium">{vInventory}</td>
+                              <td className="px-3 py-2 text-foreground-muted">{vListed}</td>
                               <td className="px-3 py-2">
                                 <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${v.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
                                   {v.is_active ? 'Active' : 'Off'}
@@ -248,7 +293,8 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                                 <td className="px-3 py-1.5 pl-6 truncate text-foreground-secondary" title={sv.sub_variant_name}>↳ {sv.sub_variant_name}</td>
                                 <td className="px-3 py-1.5 truncate text-foreground-muted" title={sv.sku}>{sv.sku || '—'}</td>
                                 <td className="px-3 py-1.5 text-foreground">{sv.price ? `Rs. ${Number(sv.price).toLocaleString('en-IN')}` : '—'}</td>
-                                <td className="px-3 py-1.5 text-foreground">{sv.stock_quantity ?? 0}</td>
+                                <td className="px-3 py-1.5 text-foreground font-medium">{sv.inventory_quantity ?? 0}</td>
+                                <td className="px-3 py-1.5 text-foreground-muted">{sv.stock_quantity ?? 0}</td>
                                 <td className="px-3 py-1.5">
                                   <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${sv.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
                                     {sv.is_active ? 'Active' : 'Off'}

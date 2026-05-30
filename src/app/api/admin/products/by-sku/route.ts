@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
          c.name AS category_name,
          p.gtin,
          p.stock_quantity,
+         p.inventory_quantity,
          p.is_active,
          p.has_variants,
          (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.is_primary DESC, pi.display_order ASC LIMIT 1) AS image_url
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest) {
          c.name AS category_name,
          COALESCE(pv.gtin, p.gtin) AS gtin,
          pv.stock_quantity,
+         pv.inventory_quantity,
          pv.is_active,
          false AS has_variants,
          (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.is_primary DESC, pi.display_order ASC LIMIT 1) AS image_url

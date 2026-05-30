@@ -1,0 +1,94 @@
+import { queryMany } from '@/lib/db'
+import {
+  APP_URL,
+  fetchUserContext,
+  resolveCoupon,
+  sendCampaignEmail,
+} from '@/lib/automation-emails'
+import type { ScenarioModule, ParamSchema } from '../types'
+
+export interface WinbackParams extends Record<string, unknown> {
+  minDaysSinceOrder: number
+  maxDaysSinceOrder: number
+  healthScoreMin: number
+  healthScoreMax: number
+  sendCooldownDays: number
+  maxRecipientsPerSweep: number
+}
+
+interface Row {
+  id: string
+}
+
+const winbackSchema: ParamSchema<WinbackParams> = {
+  minDaysSinceOrder:     { type: 'integer', min: 1,   max: 730, label: 'Min days since last order', description: 'Lower bound of the dormant window' },
+  maxDaysSinceOrder:     { type: 'integer', min: 1,   max: 730, label: 'Max days since last order', description: 'Upper bound of the dormant window' },
+  healthScoreMin:        { type: 'integer', min: 0,   max: 100, label: 'Health score min',          description: 'Customer health lower bound (inclusive)' },
+  healthScoreMax:        { type: 'integer', min: 0,   max: 100, label: 'Health score max',          description: 'Customer health upper bound (exclusive)' },
+  sendCooldownDays:      { type: 'integer', min: 1,   max: 365, label: 'Per-user cooldown (days)',  description: 'Skip users sent this campaign within N days' },
+  maxRecipientsPerSweep: { type: 'integer', min: 1,   max: 500, label: 'Max recipients per run',    description: 'Hard limit per sweep' },
+}
+
+export function buildWinbackScenario(opts: { kind: string; name: string; description: string; trigger: string; defaults: WinbackParams }): ScenarioModule<WinbackParams, Row> {
+  return {
+    kind: opts.kind,
+    name: opts.name,
+    description: opts.description,
+    trigger: opts.trigger,
+    defaultParams: opts.defaults,
+    paramSchema: winbackSchema,
+
+    async findEligible({ campaign, params }) {
+      return queryMany<Row>(`
+        SELECT u.id
+        FROM users u
+        LEFT JOIN customer_health ch ON ch.user_id = u.id
+        WHERE u.is_active = TRUE AND u.is_guest = FALSE AND u.marketing_opt_out = FALSE
+          AND EXISTS (
+            SELECT 1 FROM orders o
+            WHERE o.user_id = u.id AND o.payment_status = 'paid'
+            GROUP BY o.user_id
+            HAVING MAX(o.created_at) BETWEEN NOW() - ($3 || ' days')::interval AND NOW() - ($2 || ' days')::interval
+          )
+          AND (ch.score IS NULL OR (ch.score >= $4 AND ch.score < $5))
+          AND NOT EXISTS (
+            SELECT 1 FROM email_campaigns_sent ecs
+            WHERE ecs.campaign_kind = $1
+              AND ecs.user_id = u.id
+              AND ecs.sent_at > NOW() - ($6 || ' days')::interval
+          )
+        LIMIT $7
+      `, [
+        campaign.kind,
+        params.minDaysSinceOrder,
+        params.maxDaysSinceOrder,
+        params.healthScoreMin,
+        params.healthScoreMax,
+        params.sendCooldownDays,
+        params.maxRecipientsPerSweep,
+      ])
+    },
+
+    async send(row, { campaign }) {
+      const user = await fetchUserContext(row.id)
+      if (!user) return { ok: false, reason: 'no_user' }
+
+      const { couponCode, discountPercent } = await resolveCoupon(campaign, row.id)
+      if ((campaign.coupon_id || campaign.discount_percent > 0) && !couponCode) {
+        return { ok: false, reason: 'coupon_failed' }
+      }
+
+      return sendCampaignEmail({
+        campaign,
+        user,
+        referenceId: null,
+        vars: {
+          firstName: user.first_name || 'there',
+          discountPercent,
+          couponCode,
+          ctaUrl: `${APP_URL}/products`,
+        },
+      })
+    },
+  }
+}

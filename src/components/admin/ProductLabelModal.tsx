@@ -84,13 +84,12 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
   const variantName = entry?.variant_name || null
   const sku = entry?.sku || 'SKU-001'
   const brand = entry?.brand_name || null
-  const exGst = entry ? (entry.base_price) : null
-  const mrp = entry?.mrp ?? null
+  const incGst = entry && entry.base_price ? Math.round(Number(entry.base_price) * 100) / 100 : null
+  const mrpInc = entry?.mrp && entry.mrp > 0 ? Math.round(Number(entry.mrp) * 100) / 100 : null
   const gstPct = entry?.gst_percentage ?? 0
-  const gstFactor = 1 + (gstPct || 0) / 100
-  const incGst = exGst ? Number(Number(exGst).toFixed(2)) : null
-  const mrpInc = mrp && mrp > 0 ? Number(Number(mrp).toFixed(2)) : null
-  const exGstDisplay = incGst && gstPct > 0 ? Number((incGst / gstFactor).toFixed(2)) : null
+  const exGstDisplay = incGst && gstPct > 0 && entry?.price_ex_gst
+    ? Math.round(Number(entry.price_ex_gst) * 100) / 100
+    : null
   const showMrp = mrpInc && incGst && mrpInc !== incGst
 
   const nameFs = Math.round(8 * scale)
@@ -498,7 +497,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
 
         <div className="px-5 py-4 border-t border-border-default shrink-0 flex items-center justify-between gap-3">
           <p className="text-xs text-foreground-muted">
-            {selected.size} {product.has_variants ? 'variant' : 'item'}{selected.size !== 1 ? 's' : ''} · {totalLabels} label{totalLabels !== 1 ? 's' : ''}
+            {selected.size} item{selected.size !== 1 ? 's' : ''} · {totalLabels} label{totalLabels !== 1 ? 's' : ''}
           </p>
           <div className="flex gap-2">
             <button

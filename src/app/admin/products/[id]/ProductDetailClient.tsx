@@ -107,6 +107,13 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-foreground-secondary">
+        <Link href="/admin/products" className="text-accent-500 hover:text-accent-600 transition-colors">Products</Link>
+        <span>/</span>
+        <span className="text-foreground truncate">{p.name}</span>
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
           <Link href="/admin/products" className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors">
@@ -127,6 +134,9 @@ export default function ProductDetailClient({ id }: { id: string }) {
           {p.is_featured && (
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">★ Featured</span>
           )}
+          <Link href={`/admin/products/${p.id}/analytics`} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
+            Analytics
+          </Link>
           <Link href={`/admin/products/edit/${p.id}`} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
             Edit
           </Link>

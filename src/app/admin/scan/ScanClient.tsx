@@ -27,6 +27,7 @@ interface ProductInfo {
   category_name: string | null
   gtin: string | null
   stock_quantity: number
+  inventory_quantity: number
   is_active: boolean
   has_variants: boolean
   image_url: string | null
@@ -82,6 +83,7 @@ export default function ScanClient() {
   const [stage, setStage] = useState<Stage>('idle')
   const [order, setOrder] = useState<OrderInfo | null>(null)
   const [product, setProduct] = useState<ProductInfo | null>(null)
+  const [shelfLocations, setShelfLocations] = useState<{ location_display_code: string; quantity: number }[]>([])
   const [selectedStatus, setSelectedStatus] = useState('')
   const [trackingUrl, setTrackingUrl] = useState('')
   const [manualInput, setManualInput] = useState('')
@@ -100,6 +102,16 @@ export default function ScanClient() {
   useEffect(() => {
     return () => stopCamera()
   }, [stopCamera])
+
+  useEffect(() => {
+    if (!product) { setShelfLocations([]); return }
+    const params = new URLSearchParams({ product_id: product.product_id })
+    if (product.variant_id) params.set('variant_id', product.variant_id)
+    fetch(`/api/admin/shelving/stock?${params}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setShelfLocations(d?.locations ?? []))
+      .catch(() => setShelfLocations([]))
+  }, [product])
 
   useEffect(() => {
     if (stage !== 'scanning' || scanningRef.current) return
@@ -455,10 +467,17 @@ export default function ScanClient() {
                   <p className="font-mono text-sm text-white break-all">{product.sku}</p>
                 </div>
                 <div className="bg-gray-700/60 rounded-xl p-3">
-                  <p className="text-xs text-gray-400 mb-0.5">Stock</p>
-                  <p className={`text-sm font-semibold ${product.stock_quantity === 0 ? 'text-red-400' : product.stock_quantity <= 5 ? 'text-yellow-400' : 'text-green-400'}`}>
-                    {product.stock_quantity} units
-                  </p>
+                  <p className="text-xs text-gray-400 mb-1">Stock</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400">Inventory</span>
+                    <span className={`text-sm font-semibold ${product.inventory_quantity === 0 ? 'text-red-400' : product.inventory_quantity <= 5 ? 'text-yellow-400' : 'text-green-400'}`}>
+                      {product.inventory_quantity}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-xs text-gray-400">Listed</span>
+                    <span className="text-sm text-gray-300">{product.stock_quantity}</span>
+                  </div>
                 </div>
               </div>
 
@@ -505,6 +524,23 @@ export default function ScanClient() {
                   <p className="font-mono text-sm text-white">{product.gtin}</p>
                 </div>
               )}
+
+              <div className="bg-gray-700/60 rounded-xl p-3">
+                <p className="text-xs text-gray-400 mb-2">Shelf Locations</p>
+                {shelfLocations.length === 0 ? (
+                  <p className="text-xs text-gray-500 italic">Not assigned to any shelf</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {shelfLocations.map(l => (
+                      <div key={l.location_display_code} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-600/60 text-xs">
+                        <span className="font-mono text-white">{l.location_display_code}</span>
+                        <span className="text-gray-500">·</span>
+                        <span className="font-semibold text-secondary-400">{l.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

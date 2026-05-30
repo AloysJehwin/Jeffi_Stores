@@ -134,7 +134,7 @@ export default function DatePicker({ value, onChange, disabled, min, max, classN
             : 'border-border-default hover:border-border-secondary'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} text-${displayVal ? 'foreground' : 'foreground-muted'}`}
       >
-        <span className={displayVal ? 'text-foreground' : 'text-foreground-muted'}>
+        <span className={`whitespace-nowrap ${displayVal ? 'text-foreground' : 'text-foreground-muted'}`}>
           {displayVal || placeholder}
         </span>
         <svg className="w-4 h-4 text-foreground-muted shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

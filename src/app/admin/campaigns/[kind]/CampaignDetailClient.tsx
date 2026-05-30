@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 
 interface Campaign {
   kind: string
@@ -11,9 +12,17 @@ interface Campaign {
   enabled: boolean
   delay_hours: number
   discount_percent: number
+  coupon_id: string | null
+  scenario_kind: string | null
   subject_template: string
   body_template: string
   last_run_at: string | null
+}
+
+interface ScenarioOption {
+  kind: string
+  name: string
+  description: string
 }
 
 interface RecentSend {
@@ -30,6 +39,14 @@ interface RecentSend {
   user_name: string | null
 }
 
+interface CouponOption {
+  id: string
+  code: string
+  discount_type: string
+  discount_value: number
+  description: string | null
+}
+
 const SAMPLE_VARS: Record<string, string | number> = {
   firstName: 'Sample',
   itemCount: 3,
@@ -39,6 +56,7 @@ const SAMPLE_VARS: Record<string, string | number> = {
   discountPercent: 10,
   couponCode: 'BACK-AB12CD',
   productName: 'Sample Product',
+  productImageUrl: 'https://placehold.co/400x300/f5f5f5/999999?text=Product',
   oldPrice: '999',
   newPrice: '799',
   ctaUrl: '#',
@@ -54,33 +72,63 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [recentSends, setRecentSends] = useState<RecentSend[]>([])
   const [loading, setLoading] = useState(true)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiGenerating, setAiGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testEmail, setTestEmail] = useState('')
   const [testBusy, setTestBusy] = useState(false)
-  const [form, setForm] = useState<{ enabled: boolean; delay_hours: number; discount_percent: number; subject_template: string; body_template: string } | null>(null)
+  const [coupons, setCoupons] = useState<CouponOption[]>([])
+  const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
+  const [sendsOffset, setSendsOffset] = useState(0)
+  const [sendsTotal, setSendsTotal] = useState(0)
+  const SENDS_LIMIT = 20
+  const [form, setForm] = useState<{
+    enabled: boolean
+    delay_hours: number
+    discount_percent: number
+    coupon_id: string | null
+    scenario_kind: string | null
+    subject_template: string
+    body_template: string
+  } | null>(null)
 
-  async function load() {
+  async function load(sOff = sendsOffset) {
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/campaigns/${kind}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
+      const [campaignRes, couponsRes, scenariosRes] = await Promise.all([
+        fetch(`/api/admin/campaigns/${kind}?offset=${sOff}`, { credentials: 'include' }),
+        fetch('/api/admin/campaigns/coupons', { credentials: 'include' }),
+        fetch('/api/admin/campaigns/scenarios', { credentials: 'include' }),
+      ])
+      if (campaignRes.ok) {
+        const data = await campaignRes.json()
         setCampaign(data.campaign)
         setRecentSends(data.recentSends || [])
+        setSendsTotal(data.total || 0)
         setForm({
           enabled: data.campaign.enabled,
           delay_hours: data.campaign.delay_hours,
           discount_percent: data.campaign.discount_percent,
+          coupon_id: data.campaign.coupon_id || null,
+          scenario_kind: data.campaign.scenario_kind || null,
           subject_template: data.campaign.subject_template,
           body_template: data.campaign.body_template,
         })
+      }
+      if (couponsRes.ok) {
+        const cd = await couponsRes.json()
+        setCoupons(cd.coupons || [])
+      }
+      if (scenariosRes.ok) {
+        const sd = await scenariosRes.json()
+        setScenarios(sd.scenarios || [])
       }
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [kind])
+  useEffect(() => { load(0) }, [kind])
 
   async function save() {
     if (!form) return
@@ -93,7 +141,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         body: JSON.stringify(form),
       })
       if (res.ok) {
-        await load()
+        await load(sendsOffset)
         router.refresh()
         showToast('Campaign settings saved', 'success')
       } else {
@@ -124,10 +172,51 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     }
   }
 
+  async function generateWithAI() {
+    if (!aiPrompt.trim() || !form) return
+    setAiGenerating(true)
+    try {
+      const res = await fetch('/api/admin/campaigns/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ prompt: aiPrompt.trim(), campaignName: campaign?.name }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setForm(f => f ? { ...f, subject_template: data.subject_template, body_template: data.body_template } : f)
+        showToast('Template updated', 'success')
+      } else {
+        showToast(data.error || 'Generation failed', 'error')
+      }
+    } finally {
+      setAiGenerating(false)
+    }
+  }
+
   if (loading || !campaign || !form) return <p className="text-sm text-foreground-muted">Loading…</p>
 
-  const previewSubject = renderTemplate(form.subject_template, SAMPLE_VARS)
-  const previewBody = renderTemplate(form.body_template, SAMPLE_VARS)
+  const couponOptions: SelectOption[] = [
+    { value: '', label: 'None — use discount % to auto-generate' },
+    ...coupons.map(c => ({
+      value: c.id,
+      label: `${c.code} — ${c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}${c.description ? ` (${c.description})` : ''}`,
+    })),
+  ]
+
+  const isSeededCampaign = scenarios.some(s => s.kind === campaign.kind)
+  const currentScenario = scenarios.find(s => s.kind === form.scenario_kind)
+  const scenarioOptions: SelectOption[] = [
+    { value: '', label: 'None — manual / no automated trigger' },
+    ...scenarios.map(s => ({ value: s.kind, label: `${s.name} — ${s.description}` })),
+  ]
+
+  const selectedCoupon = coupons.find(c => c.id === form.coupon_id)
+  const previewVars = selectedCoupon
+    ? { ...SAMPLE_VARS, couponCode: selectedCoupon.code, discountPercent: selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value : 0 }
+    : SAMPLE_VARS
+  const previewSubject = renderTemplate(form.subject_template, previewVars)
+  const previewBody = renderTemplate(form.body_template, previewVars)
 
   function status(s: RecentSend): { label: string; color: string } {
     if (s.bounced_at) return { label: 'Bounced', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' }
@@ -140,6 +229,29 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
   return (
     <div className="space-y-5">
+      <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
+        <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Regenerate template with AI</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={aiPrompt}
+            onChange={e => setAiPrompt(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && generateWithAI()}
+            placeholder="Describe changes you want to the email…"
+            className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+          />
+          <button
+            type="button"
+            onClick={generateWithAI}
+            disabled={aiGenerating || !aiPrompt.trim()}
+            className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
+          >
+            {aiGenerating ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
+        <p className="text-[10px] text-foreground-muted">AI will rewrite the subject and body. Your other settings are untouched.</p>
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -156,6 +268,28 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             />
             <span className="text-sm font-medium text-foreground">{form.enabled ? 'Active' : 'Paused'}</span>
           </label>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Scenario (trigger)</label>
+          {isSeededCampaign ? (
+            <div className="px-3 py-2 text-sm bg-surface-secondary rounded-lg border border-border-default text-foreground-secondary">
+              {currentScenario ? `${currentScenario.name} — ${currentScenario.description}` : (form.scenario_kind || 'Built-in')}
+              <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 align-middle">Locked</span>
+            </div>
+          ) : (
+            <AdminSelect
+              value={form.scenario_kind || ''}
+              options={scenarioOptions}
+              onChange={v => setForm({ ...form, scenario_kind: v || null })}
+              sm
+            />
+          )}
+          <p className="text-[10px] text-foreground-muted mt-1">
+            {isSeededCampaign
+              ? "Built-in campaigns keep their original scenario. Create a new campaign to use this scenario with a different template."
+              : 'Picks which behavioral trigger feeds this campaign. Defaults from the scenario apply unless overridden.'}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
@@ -185,8 +319,25 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               onChange={e => setForm({ ...form, discount_percent: parseInt(e.target.value || '0', 10) })}
               className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
-            <p className="text-[10px] text-foreground-muted mt-1">For win-back; auto-generates a unique single-use coupon</p>
+            <p className="text-[10px] text-foreground-muted mt-1">Auto-generates a unique per-user coupon if no coupon is assigned below</p>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+            Assign coupon
+          </label>
+          <AdminSelect
+            value={form.coupon_id || ''}
+            options={couponOptions}
+            onChange={v => setForm({ ...form, coupon_id: v || null })}
+            sm
+          />
+          {selectedCoupon && (
+            <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-1">
+              This coupon will be injected as {'{couponCode}'} in the template for all recipients.
+            </p>
+          )}
         </div>
 
         <div className="mt-4">
@@ -212,7 +363,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             className="w-full px-3 py-2 text-xs font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           />
           <p className="text-[10px] text-foreground-muted mt-1">
-            Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
+            Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
           </p>
         </div>
 
@@ -259,25 +410,48 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
       <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
         <div className="px-5 py-3 border-b border-border-default">
-          <h3 className="text-sm font-semibold text-foreground">Recent sends ({recentSends.length})</h3>
+          <h3 className="text-sm font-semibold text-foreground">Recent sends ({sendsTotal})</h3>
         </div>
         {recentSends.length === 0 ? (
           <p className="p-8 text-sm text-foreground-muted text-center">No sends yet</p>
         ) : (
-          <div className="divide-y divide-border-default">
-            {recentSends.map(s => {
-              const st = status(s)
-              return (
-                <div key={s.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-foreground truncate">{s.user_name || s.user_email}</p>
-                    <p className="text-[10px] text-foreground-muted">{new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+          <>
+            <div className="divide-y divide-border-default">
+              {recentSends.map(s => {
+                const st = status(s)
+                return (
+                  <div key={s.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-foreground truncate">{s.user_name || s.user_email}</p>
+                      <p className="text-[10px] text-foreground-muted">{new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
                   </div>
-                  <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
+                )
+              })}
+            </div>
+            {sendsTotal > SENDS_LIMIT && (
+              <div className="px-5 py-3 border-t border-border-default flex items-center justify-between text-sm text-foreground-muted">
+                <span>Showing {sendsOffset + 1}–{Math.min(sendsOffset + SENDS_LIMIT, sendsTotal)} of {sendsTotal}</span>
+                <div className="flex gap-2">
+                  <button
+                    disabled={sendsOffset === 0}
+                    onClick={() => { const o = sendsOffset - SENDS_LIMIT; setSendsOffset(o); load(o) }}
+                    className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    disabled={sendsOffset + SENDS_LIMIT >= sendsTotal}
+                    onClick={() => { const o = sendsOffset + SENDS_LIMIT; setSendsOffset(o); load(o) }}
+                    className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                  >
+                    Next
+                  </button>
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

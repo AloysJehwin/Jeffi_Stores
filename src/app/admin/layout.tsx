@@ -92,7 +92,7 @@ export default async function AdminLayout({
   const usernameInitial = (session?.first_name || session?.username || 'A')[0].toUpperCase()
 
   return (
-    <div className="h-screen overflow-hidden flex flex-row bg-surface-secondary">
+    <div className="h-screen flex flex-row bg-surface-secondary">
       {/* Left sidebar — desktop only */}
       <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto">
         <div className="flex items-center gap-2 px-4 h-12 border-b border-white/10 shrink-0">
@@ -106,7 +106,7 @@ export default async function AdminLayout({
       </aside>
 
       {/* Right column: top bar + content */}
-      <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 h-full">
 
         {/* Top bar — admin profile & actions */}
         <div className="flex items-center justify-between px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0">
@@ -145,11 +145,12 @@ export default async function AdminLayout({
           </div>
         </div>
 
-        <main className="flex-1 bg-surface-secondary overflow-y-auto">
+        <main className="flex-1 bg-surface-secondary overflow-y-auto relative z-0">
           {children}
         </main>
         <SessionGuard />
       </div>
+      <div id="dropdown-portal" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }} />
     </div>
   )
 }

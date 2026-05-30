@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
 
     let searchWhere = 'TRUE'
     let searchWherePv = 'TRUE'
+    let searchWhereSv = 'TRUE'
     let rank = '(0+0)'
     if (q) {
       const sc = buildProductSearchClause(q, 'p.name', 'p.sku', 'p.search_vector', idx)
@@ -38,6 +39,11 @@ export async function GET(request: NextRequest) {
       searchWherePv = sc2.clause
       params.push(...sc2.params)
       idx = sc2.nextIdx
+
+      const sc3 = buildProductSearchClause(q, 'p.name', 'ps.sku', 'p.search_vector', idx)
+      searchWhereSv = sc3.clause
+      params.push(...sc3.params)
+      idx = sc3.nextIdx
 
       const rk = buildProductSearchRank(q, 'name', 'p.search_vector', idx)
       rank = rk.rank
@@ -92,6 +98,31 @@ export async function GET(request: NextRequest) {
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id
          WHERE pv.is_active = true AND p.is_active = true AND ${catClause} AND ${productClause} AND ${searchWherePv}
+           AND NOT EXISTS (SELECT 1 FROM product_sub_variants WHERE variant_id = pv.id AND is_active = true)
+
+         UNION ALL
+
+         SELECT
+           'subvariant:' || ps.id AS id,
+           p.id AS product_id,
+           pv.id AS variant_id,
+           p.name,
+           ps.sub_variant_name || ' (' || pv.variant_name || ')' AS variant_name,
+           ps.sku,
+           p.slug,
+           COALESCE(ps.mrp, 0)::numeric AS mrp,
+           ps.price_ex_gst,
+           COALESCE(ps.price, 0) AS base_price,
+           COALESCE(p.gst_percentage, 0)::numeric AS gst_percentage,
+           p.hsn_code,
+           b.name AS brand_name,
+           COALESCE(pv.gtin, p.gtin) AS gtin,
+           COALESCE(ps.stock_quantity, 0)::numeric AS inventory_quantity
+         FROM product_sub_variants ps
+         JOIN product_variants pv ON pv.id = ps.variant_id
+         JOIN products p ON p.id = pv.product_id
+         LEFT JOIN brands b ON b.id = p.brand_id
+         WHERE ps.is_active = true AND pv.is_active = true AND p.is_active = true AND ${catClause} AND ${productClause} AND ${searchWhereSv}
        ) results
        ORDER BY ${rank}, name ASC, variant_name ASC NULLS FIRST
        LIMIT $${limitIdx}`,

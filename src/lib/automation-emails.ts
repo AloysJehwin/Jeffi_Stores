@@ -7,6 +7,7 @@ import {
   alreadySentForReference,
   recordSent,
   generateCouponForUser,
+  getAssignedCouponCode,
   buildUnsubscribeUrl,
   renderTemplate,
   wrapWithTracking,
@@ -14,7 +15,7 @@ import {
 import { baseLayout, ctaButton } from './email-campaigns'
 import { queryOne } from './db'
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+export const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
 
 interface UserContext {
   id: string
@@ -24,7 +25,7 @@ interface UserContext {
   unsubscribe_token: string
 }
 
-async function sendCampaignEmail(params: {
+export async function sendCampaignEmail(params: {
   campaign: Campaign
   user: UserContext
   referenceId: string | null
@@ -69,12 +70,40 @@ async function sendCampaignEmail(params: {
   }
 }
 
-async function fetchUserContext(userId: string): Promise<UserContext | null> {
+export async function fetchUserContext(userId: string): Promise<UserContext | null> {
   return queryOne<UserContext>(
     `SELECT id, email, first_name, last_name, unsubscribe_token::text AS unsubscribe_token
      FROM users WHERE id = $1`,
     [userId]
   )
+}
+
+export async function fetchProductImageUrl(productId: string): Promise<string> {
+  const row = await queryOne<{ image_url: string }>(
+    `SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY display_order ASC LIMIT 1`,
+    [productId]
+  )
+  return row?.image_url || ''
+}
+
+export async function resolveCoupon(campaign: Campaign, userId: string): Promise<{ couponCode: string; discountPercent: number }> {
+  if (campaign.coupon_id) {
+    const info = await getAssignedCouponCode(campaign.coupon_id)
+    if (info) {
+      const pct = info.discountType === 'percentage' ? info.discountValue : 0
+      return { couponCode: info.code, discountPercent: pct }
+    }
+  }
+  if (campaign.discount_percent > 0) {
+    const code = await generateCouponForUser({
+      userId,
+      campaignKind: campaign.kind as CampaignKind,
+      discountPercent: campaign.discount_percent,
+      expiresInDays: 14,
+    })
+    if (code) return { couponCode: code, discountPercent: campaign.discount_percent }
+  }
+  return { couponCode: '', discountPercent: campaign.discount_percent }
 }
 
 export async function sendAbandonedCartEmail(userId: string, cartItems: Array<{ name: string; quantity: number; price: number }>) {
@@ -87,6 +116,8 @@ export async function sendAbandonedCartEmail(userId: string, cartItems: Array<{ 
     .map(i => `<li>${i.quantity} × ${i.name} (₹${Math.round(i.price)})</li>`)
     .join('')
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -95,6 +126,8 @@ export async function sendAbandonedCartEmail(userId: string, cartItems: Array<{ 
       firstName: user.first_name || 'there',
       itemCount: cartItems.length,
       cartItems: `<ul>${itemsHtml}</ul>`,
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/cart`,
     },
   })
@@ -105,6 +138,8 @@ export async function sendAbandonedCheckoutEmail(userId: string, order: { id: st
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -113,6 +148,8 @@ export async function sendAbandonedCheckoutEmail(userId: string, order: { id: st
       firstName: user.first_name || 'there',
       orderNumber: order.order_number,
       total: Number(order.total_amount).toFixed(2),
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/cart`,
     },
   })
@@ -123,6 +160,8 @@ export async function sendPostPurchaseEmail(userId: string, order: { id: string;
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -130,6 +169,8 @@ export async function sendPostPurchaseEmail(userId: string, order: { id: string;
     vars: {
       firstName: user.first_name || 'there',
       orderNumber: order.order_number,
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/account/orders/${order.id}`,
     },
   })
@@ -140,6 +181,8 @@ export async function sendReviewReminderEmail(userId: string, order: { id: strin
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -147,6 +190,8 @@ export async function sendReviewReminderEmail(userId: string, order: { id: strin
     vars: {
       firstName: user.first_name || 'there',
       orderNumber: order.order_number,
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/account/orders/${order.id}`,
     },
   })
@@ -157,16 +202,9 @@ export async function sendWinbackEmail(userId: string, kind: 'winback_90' | 'win
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
-  let couponCode = ''
-  if (campaign.discount_percent > 0) {
-    const code = await generateCouponForUser({
-      userId,
-      campaignKind: kind,
-      discountPercent: campaign.discount_percent,
-      expiresInDays: 14,
-    })
-    if (!code) return { ok: false, reason: 'coupon_failed' }
-    couponCode = code
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+  if ((campaign.coupon_id || campaign.discount_percent > 0) && !couponCode) {
+    return { ok: false, reason: 'coupon_failed' }
   }
 
   return sendCampaignEmail({
@@ -175,7 +213,7 @@ export async function sendWinbackEmail(userId: string, kind: 'winback_90' | 'win
     referenceId: null,
     vars: {
       firstName: user.first_name || 'there',
-      discountPercent: campaign.discount_percent,
+      discountPercent,
       couponCode,
       ctaUrl: `${APP_URL}/products`,
     },
@@ -187,6 +225,9 @@ export async function sendRestockEmail(userId: string, product: { id: string; na
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+  const productImageUrl = await fetchProductImageUrl(product.id)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -194,6 +235,9 @@ export async function sendRestockEmail(userId: string, product: { id: string; na
     vars: {
       firstName: user.first_name || 'there',
       productName: product.name,
+      productImageUrl,
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/products/${product.slug}`,
     },
   })
@@ -209,6 +253,9 @@ export async function sendPriceDropEmail(
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+  const productImageUrl = await fetchProductImageUrl(product.id)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -216,8 +263,11 @@ export async function sendPriceDropEmail(
     vars: {
       firstName: user.first_name || 'there',
       productName: product.name,
+      productImageUrl,
       oldPrice: Math.round(oldPrice).toString(),
       newPrice: Math.round(newPrice).toString(),
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/products/${product.slug}`,
     },
   })
@@ -236,6 +286,7 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
     discountPercent: campaign.discount_percent || 10,
     couponCode: 'TEST-CODE',
     productName: 'Sample Product',
+    productImageUrl: '',
     oldPrice: '999',
     newPrice: '799',
     ctaUrl: `${APP_URL}/products`,

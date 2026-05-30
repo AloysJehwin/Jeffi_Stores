@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import Toggle from '@/components/ui/Toggle'
+import DateTimePicker from '@/components/ui/DateTimePicker'
 
 interface CouponFormProps {
   action: (formData: FormData) => Promise<void>
@@ -33,6 +34,8 @@ const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
 export default function CouponForm({ action, submitLabel, defaultValues: d = {} }: CouponFormProps) {
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
+  const [validFrom, setValidFrom] = useState(d.valid_from ?? '')
+  const [validUntil, setValidUntil] = useState(d.valid_until ?? '')
   return (
     <form action={action} className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -113,21 +116,11 @@ export default function CouponForm({ action, submitLabel, defaultValues: d = {} 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
           <label className={labelClass}>Valid From</label>
-          <input
-            name="valid_from"
-            type="datetime-local"
-            defaultValue={d.valid_from}
-            className={inputClass}
-          />
+          <DateTimePicker name="valid_from" value={validFrom} onChange={setValidFrom} className="w-full" />
         </div>
         <div>
           <label className={labelClass}>Valid Until</label>
-          <input
-            name="valid_until"
-            type="datetime-local"
-            defaultValue={d.valid_until}
-            className={inputClass}
-          />
+          <DateTimePicker name="valid_until" value={validUntil} onChange={setValidUntil} className="w-full" />
         </div>
       </div>
 

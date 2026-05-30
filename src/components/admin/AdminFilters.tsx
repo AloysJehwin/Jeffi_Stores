@@ -67,7 +67,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
   }
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 mb-6 sticky top-0 z-10">
+    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 mb-6 sticky top-0 z-[200]">
       {/* Mobile toggle */}
       <button
         type="button"
@@ -131,8 +131,12 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                   value={searchValue}
                   onChange={setSearchValue}
                   onSelect={item => {
-                    const qs = createQueryString(searchParam, item.label)
-                    router.push(`${pathname}${qs ? `?${qs}` : ''}`)
+                    if (item.href) {
+                      router.push(item.href)
+                    } else {
+                      const qs = createQueryString(searchParam, searchValue.trim())
+                      router.push(`${pathname}${qs ? `?${qs}` : ''}`)
+                    }
                   }}
                   onEnter={val => {
                     const qs = createQueryString(searchParam, val.trim())

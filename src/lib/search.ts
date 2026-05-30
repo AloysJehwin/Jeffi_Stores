@@ -118,7 +118,7 @@ export function buildSearchClause(
     return `(${wordClauses.join(' AND ')})`
   })
 
-  const trgmClauses = columns.map(col => `similarity(${col}, $${idx}::text) > 0.12`)
+  const trgmClauses = columns.map(col => `similarity(COALESCE(${col},''), $${idx}::text) > 0.12`)
   params.push(raw.trim())
   idx++
 
