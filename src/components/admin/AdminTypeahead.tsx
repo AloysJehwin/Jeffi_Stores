@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react'
 
 interface SuggestItem {
   id: string
@@ -62,20 +62,26 @@ export default function AdminTypeahead({
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const [loading, setLoading] = useState(false)
+  const [dropPos, setDropPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const typedValueRef = useRef(value)
   const skipFetchRef = useRef(false)
 
-  useEffect(() => {
-    const main = document.querySelector('main')
-    if (!main) return
-    if (open) {
-      main.style.overflowY = 'hidden'
-    } else {
-      main.style.overflowY = ''
+  useLayoutEffect(() => {
+    if (!open || !containerRef.current) return
+    function measure() {
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      setDropPos({ top: rect.bottom + 4, left: rect.left, width: rect.width })
     }
-    return () => { main.style.overflowY = '' }
+    measure()
+    window.addEventListener('scroll', measure, true)
+    window.addEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('scroll', measure, true)
+      window.removeEventListener('resize', measure)
+    }
   }, [open])
 
   useEffect(() => {
@@ -208,8 +214,11 @@ export default function AdminTypeahead({
         </span>
       </div>
 
-      {open && items.length > 0 && (
-        <div className="absolute left-0 top-full mt-1 w-full bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto z-[200]">
+      {open && items.length > 0 && dropPos && (
+        <div
+          style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width, zIndex: 9999 }}
+          className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto"
+        >
           {items.map((item, idx) => (
             <button
               key={item.id}
