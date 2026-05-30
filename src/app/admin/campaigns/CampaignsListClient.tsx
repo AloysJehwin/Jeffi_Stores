@@ -104,7 +104,13 @@ export default function CampaignsListClient() {
       })
       const data = await res.json()
       if (res.ok) {
-        setNewForm(f => ({ ...f, subject_template: data.subject_template, body_template: data.body_template }))
+        setNewForm(f => ({
+          ...f,
+          name: f.name.trim() ? f.name : (data.name || f.name),
+          kind: f.kind.trim() ? f.kind : (data.kind || f.kind),
+          subject_template: data.subject_template,
+          body_template: data.body_template,
+        }))
         showToast('Template generated', 'success')
       } else {
         showToast(data.error || 'Generation failed', 'error')
