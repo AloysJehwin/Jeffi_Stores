@@ -64,6 +64,8 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [recentSends, setRecentSends] = useState<RecentSend[]>([])
   const [loading, setLoading] = useState(true)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiGenerating, setAiGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [testEmail, setTestEmail] = useState('')
   const [testBusy, setTestBusy] = useState(false)
@@ -154,6 +156,28 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     }
   }
 
+  async function generateWithAI() {
+    if (!aiPrompt.trim() || !form) return
+    setAiGenerating(true)
+    try {
+      const res = await fetch('/api/admin/campaigns/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ prompt: aiPrompt.trim(), campaignName: campaign?.name }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setForm(f => f ? { ...f, subject_template: data.subject_template, body_template: data.body_template } : f)
+        showToast('Template updated', 'success')
+      } else {
+        showToast(data.error || 'Generation failed', 'error')
+      }
+    } finally {
+      setAiGenerating(false)
+    }
+  }
+
   if (loading || !campaign || !form) return <p className="text-sm text-foreground-muted">Loading…</p>
 
   const couponOptions: SelectOption[] = [
@@ -182,6 +206,29 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
   return (
     <div className="space-y-5">
+      <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
+        <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Regenerate template with AI</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={aiPrompt}
+            onChange={e => setAiPrompt(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && generateWithAI()}
+            placeholder="Describe changes you want to the email…"
+            className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+          />
+          <button
+            type="button"
+            onClick={generateWithAI}
+            disabled={aiGenerating || !aiPrompt.trim()}
+            className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
+          >
+            {aiGenerating ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
+        <p className="text-[10px] text-foreground-muted">AI will rewrite the subject and body. Your other settings are untouched.</p>
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
