@@ -24,7 +24,8 @@ Generate an email campaign template. Return ONLY valid JSON with exactly four ke
 - "subject_template": a short email subject line (under 80 chars)
 - "body_template": clean HTML email body
 
-Use these template variables where appropriate: {firstName}, {couponCode}, {discountPercent}, {orderNumber}, {productName}, {oldPrice}, {newPrice}, {ctaUrl}, {itemCount}
+Use these template variables where appropriate: {firstName}, {couponCode}, {discountPercent}, {orderNumber}, {productName}, {productImageUrl}, {oldPrice}, {newPrice}, {ctaUrl}, {itemCount}
+For product campaigns, use {productImageUrl} in an <img> tag to display the product image (it may be empty — always wrap it in a conditional like: {productImageUrl} ? show img : nothing, but since this is plain-template substitution with no conditionals, include the img tag and accept it may be blank).
 Keep the HTML clean, mobile-friendly, and brand-appropriate. Use inline styles only. No external CSS or scripts.`
 
   const userPrompt = `Campaign: ${campaignName || 'New Campaign'}

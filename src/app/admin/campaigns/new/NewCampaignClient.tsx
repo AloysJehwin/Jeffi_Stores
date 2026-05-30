@@ -22,6 +22,7 @@ const SAMPLE_VARS: Record<string, string | number> = {
   discountPercent: 10,
   couponCode: 'BACK-AB12CD',
   productName: 'Sample Product',
+  productImageUrl: 'https://placehold.co/400x300/f5f5f5/999999?text=Product',
   oldPrice: '999',
   newPrice: '799',
   ctaUrl: '#',
@@ -253,7 +254,7 @@ export default function NewCampaignClient() {
               className="w-full px-3 py-2 text-xs font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <p className="text-[10px] text-foreground-muted mt-1">
-              Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
+              Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
             </p>
           </div>
 

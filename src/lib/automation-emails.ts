@@ -78,6 +78,14 @@ async function fetchUserContext(userId: string): Promise<UserContext | null> {
   )
 }
 
+async function fetchProductImageUrl(productId: string): Promise<string> {
+  const row = await queryOne<{ image_url: string }>(
+    `SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY display_order ASC LIMIT 1`,
+    [productId]
+  )
+  return row?.image_url || ''
+}
+
 async function resolveCoupon(campaign: Campaign, userId: string): Promise<{ couponCode: string; discountPercent: number }> {
   if (campaign.coupon_id) {
     const info = await getAssignedCouponCode(campaign.coupon_id)
@@ -218,6 +226,7 @@ export async function sendRestockEmail(userId: string, product: { id: string; na
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
   const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+  const productImageUrl = await fetchProductImageUrl(product.id)
 
   return sendCampaignEmail({
     campaign,
@@ -226,6 +235,7 @@ export async function sendRestockEmail(userId: string, product: { id: string; na
     vars: {
       firstName: user.first_name || 'there',
       productName: product.name,
+      productImageUrl,
       couponCode,
       discountPercent,
       ctaUrl: `${APP_URL}/products/${product.slug}`,
@@ -244,6 +254,7 @@ export async function sendPriceDropEmail(
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
   const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+  const productImageUrl = await fetchProductImageUrl(product.id)
 
   return sendCampaignEmail({
     campaign,
@@ -252,6 +263,7 @@ export async function sendPriceDropEmail(
     vars: {
       firstName: user.first_name || 'there',
       productName: product.name,
+      productImageUrl,
       oldPrice: Math.round(oldPrice).toString(),
       newPrice: Math.round(newPrice).toString(),
       couponCode,
@@ -274,6 +286,7 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
     discountPercent: campaign.discount_percent || 10,
     couponCode: 'TEST-CODE',
     productName: 'Sample Product',
+    productImageUrl: '',
     oldPrice: '999',
     newPrice: '799',
     ctaUrl: `${APP_URL}/products`,
