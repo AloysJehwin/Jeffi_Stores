@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
@@ -52,9 +52,11 @@ export default function NewCampaignClient() {
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
 
+  useEffect(() => { loadCoupons() }, [])
+
   async function loadCoupons() {
     if (couponsLoaded) return
-    const res = await fetch('/api/admin/coupons?is_active=true&limit=100', { credentials: 'include' })
+    const res = await fetch('/api/admin/campaigns/coupons', { credentials: 'include' })
     if (res.ok) {
       const data = await res.json()
       setCoupons(data.coupons || [])
@@ -222,7 +224,7 @@ export default function NewCampaignClient() {
             <AdminSelect
               value={form.coupon_id || ''}
               options={couponOptions}
-              onChange={v => { loadCoupons(); setForm(f => ({ ...f, coupon_id: v || null })) }}
+              onChange={v => setForm(f => ({ ...f, coupon_id: v || null }))}
               sm
             />
             {selectedCoupon && (

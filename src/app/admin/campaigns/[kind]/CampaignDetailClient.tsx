@@ -85,7 +85,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     try {
       const [campaignRes, couponsRes] = await Promise.all([
         fetch(`/api/admin/campaigns/${kind}?offset=${sOff}`, { credentials: 'include' }),
-        fetch('/api/admin/coupons?is_active=true&limit=100', { credentials: 'include' }),
+        fetch('/api/admin/campaigns/coupons', { credentials: 'include' }),
       ])
       if (campaignRes.ok) {
         const data = await campaignRes.json()
