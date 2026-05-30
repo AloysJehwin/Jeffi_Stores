@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import CrmCampaignPanel from './CrmCampaignPanel'
 
 interface DropEntry {
   id: string
@@ -34,26 +34,8 @@ function Row({ c, large }: { c: DropEntry; large?: boolean }) {
 
 export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
   const [open, setOpen] = useState(false)
-  const [running, setRunning] = useState(false)
-  const router = useRouter()
   const preview = items.slice(0, 3)
   const hasMore = items.length > 3
-
-  async function runCampaign() {
-    if (!confirm(`Send winback campaign to all ${items.length} customers with sharp health drops?`)) return
-    setRunning(true)
-    try {
-      const res = await fetch('/api/admin/campaigns/winback_90/run', { method: 'POST' })
-      if (res.ok) {
-        alert('Campaign triggered successfully.')
-        router.push('/admin/campaigns/winback_90')
-      } else {
-        alert('Failed to run campaign. Check Campaigns page.')
-      }
-    } finally {
-      setRunning(false)
-    }
-  }
 
   return (
     <>
@@ -113,28 +95,22 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
             <div className="overflow-y-auto divide-y divide-border-default flex-1">
               {items.map(c => <Row key={c.id} c={c} large />)}
             </div>
-            <div className="pt-4 shrink-0 border-t border-border-default mt-2 flex items-center justify-between gap-3">
-              <Link
-                href="/admin/campaigns/winback_90"
-                className="text-xs text-accent-500 hover:text-accent-600 font-medium"
-                onClick={() => setOpen(false)}
-              >
-                View campaign →
-              </Link>
-              <button
-                onClick={runCampaign}
-                disabled={running}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
-              >
-                {running ? (
-                  <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                )}
-                Campaign to all {items.length}
-              </button>
+            <div className="pt-4 shrink-0 border-t border-border-default mt-2">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Campaign</h3>
+                <Link
+                  href="/admin/campaigns/winback_90"
+                  className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+                  onClick={() => setOpen(false)}
+                >
+                  Open campaign page →
+                </Link>
+              </div>
+              <CrmCampaignPanel
+                defaultKind="winback_90"
+                recipientCount={items.length}
+                onClose={() => setOpen(false)}
+              />
             </div>
           </div>
         </div>
