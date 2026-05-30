@@ -4,6 +4,7 @@ import TwoFactorCard from '@/components/admin/TwoFactorCard'
 import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
 import StoreRulesForm from '@/components/admin/StoreRulesForm'
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
+import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
 import { getDeliverySettings } from '@/lib/delivery-settings'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES } from '@/lib/scopes'
@@ -144,6 +145,9 @@ export default async function SettingsPage() {
           <DeliverySettingsForm initial={deliverySettings} />
         </div>
       </section>
+
+      {/* ── Customer Tags ──────────────────────────────────────── */}
+      <CustomerTagDefinitionsCard isSuperAdmin={isSuperAdmin} />
 
       {/* ── System info ─────────────────────────────────────────── */}
       <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">

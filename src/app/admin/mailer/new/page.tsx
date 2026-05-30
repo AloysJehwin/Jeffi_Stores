@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
+import DateTimePicker from '@/components/ui/DateTimePicker'
 
 const TEMPLATES = [
   { value: 'review_form_share', label: 'Review Form Share', description: 'Send customers a link to your review incentive form with a coupon reward' },
@@ -334,7 +335,7 @@ export default function NewCampaignPage() {
 
             <div>
               <label className={labelClass}>Schedule (optional — leave blank to send now or save as draft)</label>
-              <input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} className={inputClass} />
+              <DateTimePicker value={scheduledAt} onChange={setScheduledAt} className="w-full" placeholder="Leave blank to send now" />
             </div>
 
             {error && <p className="text-sm text-red-600">{error}</p>}

@@ -12,23 +12,39 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
+  const { searchParams } = new URL(req.url)
+  const limit = 20
+  const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10))
+
   const campaign = await queryOne(`SELECT * FROM campaigns WHERE kind = $1`, [params.kind])
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
-  const recentSends = await queryMany(`
-    SELECT
-      ecs.id, ecs.user_id, ecs.reference_id, ecs.sent_at, ecs.opened_at, ecs.clicked_at,
-      ecs.converted_at, ecs.unsubscribed_at, ecs.bounced_at,
-      u.email AS user_email,
-      COALESCE(u.first_name || ' ' || u.last_name, u.email) AS user_name
-    FROM email_campaigns_sent ecs
-    LEFT JOIN users u ON u.id = ecs.user_id
-    WHERE ecs.campaign_kind = $1
-    ORDER BY ecs.sent_at DESC
-    LIMIT 50
-  `, [params.kind])
+  const [recentSends, countRow] = await Promise.all([
+    queryMany(`
+      SELECT
+        ecs.id, ecs.user_id, ecs.reference_id, ecs.sent_at, ecs.opened_at, ecs.clicked_at,
+        ecs.converted_at, ecs.unsubscribed_at, ecs.bounced_at,
+        u.email AS user_email,
+        COALESCE(u.first_name || ' ' || u.last_name, u.email) AS user_name
+      FROM email_campaigns_sent ecs
+      LEFT JOIN users u ON u.id = ecs.user_id
+      WHERE ecs.campaign_kind = $1
+      ORDER BY ecs.sent_at DESC
+      LIMIT $2 OFFSET $3
+    `, [params.kind, limit, offset]),
+    queryOne<{ total: string }>(
+      `SELECT COUNT(*) AS total FROM email_campaigns_sent WHERE campaign_kind = $1`,
+      [params.kind]
+    ),
+  ])
 
-  return NextResponse.json({ campaign, recentSends })
+  return NextResponse.json({
+    campaign,
+    recentSends,
+    total: parseInt(countRow?.total || '0', 10),
+    limit,
+    offset,
+  })
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { kind: string } }) {
@@ -61,6 +77,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { kind: stri
       vals.push(n)
     }
   }
+  if ('coupon_id' in body) {
+    updates.push(`coupon_id = $${i++}`)
+    vals.push(body.coupon_id || null)
+  }
   if (typeof body.subject_template === 'string' && body.subject_template.trim()) {
     updates.push(`subject_template = $${i++}`)
     vals.push(body.subject_template.slice(0, 500))
@@ -68,6 +88,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { kind: stri
   if (typeof body.body_template === 'string' && body.body_template.trim()) {
     updates.push(`body_template = $${i++}`)
     vals.push(body.body_template.slice(0, 50000))
+  }
+  if ('scenario_kind' in body) {
+    const seeded = await queryOne<{ kind: string }>(`SELECT kind FROM scenarios WHERE kind = $1`, [params.kind])
+    if (seeded) {
+      return NextResponse.json({ error: 'Cannot change scenario on a seeded campaign' }, { status: 400 })
+    }
+    if (body.scenario_kind) {
+      const exists = await queryOne(`SELECT kind FROM scenarios WHERE kind = $1`, [body.scenario_kind])
+      if (!exists) return NextResponse.json({ error: 'Unknown scenario_kind' }, { status: 400 })
+    }
+    updates.push(`scenario_kind = $${i++}`)
+    vals.push(body.scenario_kind || null)
+  }
+  if ('parameters' in body && body.parameters && typeof body.parameters === 'object') {
+    updates.push(`parameters = $${i++}::jsonb`)
+    vals.push(JSON.stringify(body.parameters))
   }
 
   vals.push(params.kind)

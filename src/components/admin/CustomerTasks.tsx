@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import DatePicker from '@/components/ui/DatePicker'
 
 interface Task {
   id: string
@@ -206,11 +207,11 @@ export default function CustomerTasks({ customerId }: CustomerTasksProps) {
             className="w-full px-2.5 py-1.5 text-sm border border-border-secondary rounded bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent-500 resize-none"
           />
           <div className="grid grid-cols-3 gap-2">
-            <input
-              type="date"
+            <DatePicker
               value={dueDate}
-              onChange={e => setDueDate(e.target.value)}
-              className="px-2 py-1 text-xs border border-border-secondary rounded bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-accent-500"
+              onChange={setDueDate}
+              placeholder="Due date"
+              className="w-full"
             />
             <AdminSelect
               sm
