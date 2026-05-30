@@ -18,7 +18,7 @@ async function createCoupon(formData: FormData) {
   const usage_limit_per_user = formData.get('usage_limit_per_user') ? parseInt(formData.get('usage_limit_per_user') as string, 10) : null
   const valid_from = formData.get('valid_from') || null
   const valid_until = formData.get('valid_until') || null
-  const is_active = formData.get('is_active') === 'on'
+  const is_active = formData.get('is_active') === 'true'
 
   try {
     await query(
@@ -36,7 +36,7 @@ async function createCoupon(formData: FormData) {
 
 export default function AddCouponPage() {
   return (
-    <div className="p-4 sm:p-6 max-w-2xl">
+    <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/admin/coupons" className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
