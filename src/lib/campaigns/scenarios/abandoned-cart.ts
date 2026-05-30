@@ -1,0 +1,97 @@
+import { queryMany } from '@/lib/db'
+import {
+  APP_URL,
+  fetchUserContext,
+  resolveCoupon,
+  sendCampaignEmail,
+} from '@/lib/automation-emails'
+import type { ScenarioModule } from '../types'
+
+interface Params extends Record<string, unknown> {
+  lookbackDays: number
+  sendCooldownDays: number
+  maxRecipientsPerSweep: number
+  maxItemsPerEmail: number
+}
+
+interface Row {
+  user_id: string
+}
+
+export const abandonedCart: ScenarioModule<Params, Row> = {
+  kind: 'abandoned_cart',
+  name: 'Abandoned Cart',
+  description: 'Customer left items in cart without checking out',
+  trigger: 'Fires when a logged-in customer adds items to their cart, then leaves the cart untouched for at least the campaign\'s delay (in hours). Sends at most once per cooldown window per user. Skipped if cart is empty or if user opted out of marketing.',
+  defaultParams: {
+    lookbackDays: 7,
+    sendCooldownDays: 7,
+    maxRecipientsPerSweep: 50,
+    maxItemsPerEmail: 5,
+  },
+  paramSchema: {
+    lookbackDays:          { type: 'integer', min: 1, max: 30,  label: 'Lookback (days)',          description: 'Only consider carts updated in the last N days' },
+    sendCooldownDays:      { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)', description: 'Skip users sent this campaign within N days' },
+    maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',   description: 'Hard limit per sweep' },
+    maxItemsPerEmail:      { type: 'integer', min: 1, max: 10,  label: 'Items shown in email',     description: 'Cap on cart items rendered in the email body' },
+  },
+
+  async findEligible({ campaign, params }) {
+    return queryMany<Row>(`
+      SELECT DISTINCT ci.user_id
+      FROM cart_items ci
+      JOIN users u ON u.id = ci.user_id
+      WHERE ci.saved_for_later = FALSE
+        AND ci.updated_at < NOW() - ($2 || ' hours')::interval
+        AND ci.updated_at > NOW() - ($3 || ' days')::interval
+        AND u.is_active = TRUE
+        AND u.is_guest = FALSE
+        AND u.marketing_opt_out = FALSE
+        AND NOT EXISTS (
+          SELECT 1 FROM email_campaigns_sent ecs
+          WHERE ecs.campaign_kind = $1
+            AND ecs.user_id = ci.user_id
+            AND ecs.sent_at > NOW() - ($4 || ' days')::interval
+        )
+      LIMIT $5
+    `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep])
+  },
+
+  async send(row, { campaign, params }) {
+    const items = await queryMany<{ name: string; quantity: number; price: number }>(`
+      SELECT p.name,
+             ci.quantity::float AS quantity,
+             COALESCE(pv.price, p.base_price)::float AS price
+      FROM cart_items ci
+      JOIN products p ON p.id = ci.product_id
+      LEFT JOIN product_variants pv ON pv.id = ci.variant_id
+      WHERE ci.user_id = $1 AND ci.saved_for_later = FALSE
+      LIMIT $2
+    `, [row.user_id, params.maxItemsPerEmail])
+    if (items.length === 0) return { ok: false, reason: 'no_items' }
+
+    const user = await fetchUserContext(row.user_id)
+    if (!user) return { ok: false, reason: 'no_user' }
+
+    const itemsHtml = items
+      .slice(0, params.maxItemsPerEmail)
+      .map(i => `<li>${i.quantity} × ${i.name} (₹${Math.round(i.price)})</li>`)
+      .join('')
+
+    const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
+
+    return sendCampaignEmail({
+      campaign,
+      user,
+      referenceId: null,
+      vars: {
+        firstName: user.first_name || 'there',
+        itemCount: items.length,
+        cartItems: `<ul>${itemsHtml}</ul>`,
+        couponCode,
+        discountPercent,
+        ctaUrl: `${APP_URL}/cart`,
+      },
+    })
+  },
+}

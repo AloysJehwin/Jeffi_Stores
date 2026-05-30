@@ -13,9 +13,16 @@ interface Campaign {
   delay_hours: number
   discount_percent: number
   coupon_id: string | null
+  scenario_kind: string | null
   subject_template: string
   body_template: string
   last_run_at: string | null
+}
+
+interface ScenarioOption {
+  kind: string
+  name: string
+  description: string
 }
 
 interface RecentSend {
@@ -71,6 +78,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [testEmail, setTestEmail] = useState('')
   const [testBusy, setTestBusy] = useState(false)
   const [coupons, setCoupons] = useState<CouponOption[]>([])
+  const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
   const [sendsOffset, setSendsOffset] = useState(0)
   const [sendsTotal, setSendsTotal] = useState(0)
   const SENDS_LIMIT = 20
@@ -79,6 +87,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     delay_hours: number
     discount_percent: number
     coupon_id: string | null
+    scenario_kind: string | null
     subject_template: string
     body_template: string
   } | null>(null)
@@ -86,9 +95,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   async function load(sOff = sendsOffset) {
     setLoading(true)
     try {
-      const [campaignRes, couponsRes] = await Promise.all([
+      const [campaignRes, couponsRes, scenariosRes] = await Promise.all([
         fetch(`/api/admin/campaigns/${kind}?offset=${sOff}`, { credentials: 'include' }),
         fetch('/api/admin/campaigns/coupons', { credentials: 'include' }),
+        fetch('/api/admin/campaigns/scenarios', { credentials: 'include' }),
       ])
       if (campaignRes.ok) {
         const data = await campaignRes.json()
@@ -100,6 +110,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           delay_hours: data.campaign.delay_hours,
           discount_percent: data.campaign.discount_percent,
           coupon_id: data.campaign.coupon_id || null,
+          scenario_kind: data.campaign.scenario_kind || null,
           subject_template: data.campaign.subject_template,
           body_template: data.campaign.body_template,
         })
@@ -107,6 +118,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       if (couponsRes.ok) {
         const cd = await couponsRes.json()
         setCoupons(cd.coupons || [])
+      }
+      if (scenariosRes.ok) {
+        const sd = await scenariosRes.json()
+        setScenarios(sd.scenarios || [])
       }
     } finally {
       setLoading(false)
@@ -189,6 +204,13 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     })),
   ]
 
+  const isSeededCampaign = scenarios.some(s => s.kind === campaign.kind)
+  const currentScenario = scenarios.find(s => s.kind === form.scenario_kind)
+  const scenarioOptions: SelectOption[] = [
+    { value: '', label: 'None — manual / no automated trigger' },
+    ...scenarios.map(s => ({ value: s.kind, label: `${s.name} — ${s.description}` })),
+  ]
+
   const selectedCoupon = coupons.find(c => c.id === form.coupon_id)
   const previewVars = selectedCoupon
     ? { ...SAMPLE_VARS, couponCode: selectedCoupon.code, discountPercent: selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value : 0 }
@@ -246,6 +268,28 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             />
             <span className="text-sm font-medium text-foreground">{form.enabled ? 'Active' : 'Paused'}</span>
           </label>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Scenario (trigger)</label>
+          {isSeededCampaign ? (
+            <div className="px-3 py-2 text-sm bg-surface-secondary rounded-lg border border-border-default text-foreground-secondary">
+              {currentScenario ? `${currentScenario.name} — ${currentScenario.description}` : (form.scenario_kind || 'Built-in')}
+              <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 align-middle">Locked</span>
+            </div>
+          ) : (
+            <AdminSelect
+              value={form.scenario_kind || ''}
+              options={scenarioOptions}
+              onChange={v => setForm({ ...form, scenario_kind: v || null })}
+              sm
+            />
+          )}
+          <p className="text-[10px] text-foreground-muted mt-1">
+            {isSeededCampaign
+              ? "Built-in campaigns keep their original scenario. Create a new campaign to use this scenario with a different template."
+              : 'Picks which behavioral trigger feeds this campaign. Defaults from the scenario apply unless overridden.'}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">

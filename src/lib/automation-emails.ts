@@ -15,7 +15,7 @@ import {
 import { baseLayout, ctaButton } from './email-campaigns'
 import { queryOne } from './db'
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+export const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
 
 interface UserContext {
   id: string
@@ -25,7 +25,7 @@ interface UserContext {
   unsubscribe_token: string
 }
 
-async function sendCampaignEmail(params: {
+export async function sendCampaignEmail(params: {
   campaign: Campaign
   user: UserContext
   referenceId: string | null
@@ -70,7 +70,7 @@ async function sendCampaignEmail(params: {
   }
 }
 
-async function fetchUserContext(userId: string): Promise<UserContext | null> {
+export async function fetchUserContext(userId: string): Promise<UserContext | null> {
   return queryOne<UserContext>(
     `SELECT id, email, first_name, last_name, unsubscribe_token::text AS unsubscribe_token
      FROM users WHERE id = $1`,
@@ -78,7 +78,7 @@ async function fetchUserContext(userId: string): Promise<UserContext | null> {
   )
 }
 
-async function fetchProductImageUrl(productId: string): Promise<string> {
+export async function fetchProductImageUrl(productId: string): Promise<string> {
   const row = await queryOne<{ image_url: string }>(
     `SELECT image_url FROM product_images WHERE product_id = $1 ORDER BY display_order ASC LIMIT 1`,
     [productId]
@@ -86,7 +86,7 @@ async function fetchProductImageUrl(productId: string): Promise<string> {
   return row?.image_url || ''
 }
 
-async function resolveCoupon(campaign: Campaign, userId: string): Promise<{ couponCode: string; discountPercent: number }> {
+export async function resolveCoupon(campaign: Campaign, userId: string): Promise<{ couponCode: string; discountPercent: number }> {
   if (campaign.coupon_id) {
     const info = await getAssignedCouponCode(campaign.coupon_id)
     if (info) {

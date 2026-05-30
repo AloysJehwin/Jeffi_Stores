@@ -57,11 +57,18 @@ export async function POST(req: NextRequest) {
   const discount_percent = Math.max(0, Math.min(100, parseInt(body.discount_percent ?? '0', 10) || 0))
   const subject_template = typeof body.subject_template === 'string' ? body.subject_template.slice(0, 500) : `${name} — special offer for {firstName}`
   const body_template = typeof body.body_template === 'string' ? body.body_template.slice(0, 50000) : `<p>Hi {firstName},</p><p>${name}</p>`
+  const scenario_kind = typeof body.scenario_kind === 'string' && body.scenario_kind.trim() ? body.scenario_kind.trim() : null
+  const parameters = body.parameters && typeof body.parameters === 'object' ? body.parameters : {}
+
+  if (scenario_kind) {
+    const scenarioExists = await queryOne(`SELECT kind FROM scenarios WHERE kind = $1`, [scenario_kind])
+    if (!scenarioExists) return NextResponse.json({ error: 'Unknown scenario_kind' }, { status: 400 })
+  }
 
   await query(
-    `INSERT INTO campaigns (kind, name, description, enabled, delay_hours, discount_percent, subject_template, body_template)
-     VALUES ($1, $2, $3, FALSE, $4, $5, $6, $7)`,
-    [kind, name, description, delay_hours, discount_percent, subject_template, body_template]
+    `INSERT INTO campaigns (kind, name, description, enabled, delay_hours, discount_percent, subject_template, body_template, scenario_kind, parameters)
+     VALUES ($1, $2, $3, FALSE, $4, $5, $6, $7, $8, $9)`,
+    [kind, name, description, delay_hours, discount_percent, subject_template, body_template, scenario_kind, JSON.stringify(parameters)]
   )
 
   return NextResponse.json({ success: true, kind })

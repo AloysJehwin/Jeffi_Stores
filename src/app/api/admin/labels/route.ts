@@ -25,8 +25,10 @@ export async function POST(request: NextRequest) {
 
     const productIds: string[] = []
     const variantIds: string[] = []
+    const subVariantIds: string[] = []
     for (const id of product_ids as string[]) {
       if (id.startsWith('variant:')) variantIds.push(id.slice(8))
+      else if (id.startsWith('subvariant:')) subVariantIds.push(id.slice(11))
       else if (id.startsWith('product:')) productIds.push(id.slice(8))
       else productIds.push(id)
     }
@@ -67,6 +69,29 @@ export async function POST(request: NextRequest) {
          LEFT JOIN brands b ON b.id = p.brand_id
          WHERE pv.id = ANY($1::uuid[])`,
         [variantIds]
+      )
+      for (const r of (rows || [])) results.push(r)
+    }
+
+    if (subVariantIds.length > 0) {
+      const rows = await queryMany<LabelProduct>(
+        `SELECT 'subvariant:' || ps.id AS id,
+                p.id AS product_id, pv.id AS variant_id,
+                p.name,
+                ps.sub_variant_name || ' (' || pv.variant_name || ')' AS variant_name,
+                ps.sku, p.slug,
+                COALESCE(ps.mrp, 0) AS mrp,
+                ps.price_ex_gst,
+                COALESCE(ps.price, 0) AS base_price,
+                COALESCE(p.gst_percentage, 0) AS gst_percentage,
+                COALESCE(pv.gtin, p.gtin) AS gtin,
+                b.name AS brand_name
+         FROM product_sub_variants ps
+         JOIN product_variants pv ON pv.id = ps.variant_id
+         JOIN products p ON p.id = pv.product_id
+         LEFT JOIN brands b ON b.id = p.brand_id
+         WHERE ps.id = ANY($1::uuid[])`,
+        [subVariantIds]
       )
       for (const r of (rows || [])) results.push(r)
     }

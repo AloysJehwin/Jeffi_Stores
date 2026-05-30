@@ -6,8 +6,8 @@ export async function register() {
 
   if (!CRON_SECRET || !APP_URL) return
 
-  const TEN_MIN = 10 * 60 * 1000
-  const ONE_MIN = 60 * 1000
+  const TEN_MIN    = 10 * 60 * 1000
+  const ONE_MIN    =      60 * 1000
   const THIRTY_MIN = 30 * 60 * 1000
 
   const callCron = async (path: string, method: 'GET' | 'POST') => {

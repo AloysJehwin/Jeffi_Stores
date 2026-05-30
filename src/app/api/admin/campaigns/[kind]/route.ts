@@ -89,6 +89,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { kind: stri
     updates.push(`body_template = $${i++}`)
     vals.push(body.body_template.slice(0, 50000))
   }
+  if ('scenario_kind' in body) {
+    const seeded = await queryOne<{ kind: string }>(`SELECT kind FROM scenarios WHERE kind = $1`, [params.kind])
+    if (seeded) {
+      return NextResponse.json({ error: 'Cannot change scenario on a seeded campaign' }, { status: 400 })
+    }
+    if (body.scenario_kind) {
+      const exists = await queryOne(`SELECT kind FROM scenarios WHERE kind = $1`, [body.scenario_kind])
+      if (!exists) return NextResponse.json({ error: 'Unknown scenario_kind' }, { status: 400 })
+    }
+    updates.push(`scenario_kind = $${i++}`)
+    vals.push(body.scenario_kind || null)
+  }
+  if ('parameters' in body && body.parameters && typeof body.parameters === 'object') {
+    updates.push(`parameters = $${i++}::jsonb`)
+    vals.push(JSON.stringify(body.parameters))
+  }
 
   vals.push(params.kind)
   await query(`UPDATE campaigns SET ${updates.join(', ')} WHERE kind = $${i}`, vals)

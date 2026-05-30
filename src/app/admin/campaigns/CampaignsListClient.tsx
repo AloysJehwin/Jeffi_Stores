@@ -96,10 +96,24 @@ export default function CampaignsListClient() {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2 border-b border-border-default">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/campaigns"
+            className="px-4 py-2 text-sm font-semibold text-accent-600 dark:text-accent-400 border-b-2 border-accent-500"
+          >
+            Campaigns
+          </Link>
+          <Link
+            href="/admin/campaigns/scenarios"
+            className="px-4 py-2 text-sm font-semibold text-foreground-muted hover:text-foreground border-b-2 border-transparent transition-colors"
+          >
+            Scenarios
+          </Link>
+        </div>
         <Link
           href="/admin/campaigns/new"
-          className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
+          className="mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
         >
           + New Campaign
         </Link>

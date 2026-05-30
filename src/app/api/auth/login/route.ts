@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
 
     const otpVerification = await verifyOTP(email, otp)
     if (!otpVerification.valid) {
-      await recordFailedLogin(request, email, 'invalid_otp', null)
+      const existingUser = await queryOne('SELECT id FROM users WHERE email = $1', [email.toLowerCase()])
+      await recordFailedLogin(request, email, 'invalid_otp', existingUser?.id ?? null)
       return NextResponse.json({ error: otpVerification.message }, { status: 400 })
     }
 

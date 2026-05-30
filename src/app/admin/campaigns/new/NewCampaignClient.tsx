@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 
@@ -11,6 +11,13 @@ interface CouponOption {
   discount_type: string
   discount_value: number
   description: string | null
+}
+
+interface ScenarioOption {
+  kind: string
+  name: string
+  description: string
+  default_parameters: Record<string, number | boolean | string>
 }
 
 const SAMPLE_VARS: Record<string, string | number> = {
@@ -39,21 +46,39 @@ const EMPTY = {
   delay_hours: 0,
   discount_percent: 0,
   coupon_id: null as string | null,
+  scenario_kind: '' as string,
   subject_template: '',
   body_template: '',
 }
 
 export default function NewCampaignClient() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { showToast } = useToast()
   const [form, setForm] = useState(EMPTY)
   const [coupons, setCoupons] = useState<CouponOption[]>([])
   const [couponsLoaded, setCouponsLoaded] = useState(false)
+  const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
   const [creating, setCreating] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
 
-  useEffect(() => { loadCoupons() }, [])
+  useEffect(() => { loadCoupons(); loadScenarios() }, [])
+
+  useEffect(() => {
+    const presetScenario = searchParams.get('scenario')
+    if (presetScenario && scenarios.some(s => s.kind === presetScenario)) {
+      setForm(f => f.scenario_kind ? f : { ...f, scenario_kind: presetScenario })
+    }
+  }, [searchParams, scenarios])
+
+  async function loadScenarios() {
+    const res = await fetch('/api/admin/campaigns/scenarios', { credentials: 'include' })
+    if (res.ok) {
+      const data = await res.json()
+      setScenarios(data.scenarios || [])
+    }
+  }
 
   async function loadCoupons() {
     if (couponsLoaded) return
@@ -191,6 +216,20 @@ export default function NewCampaignClient() {
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Scenario (trigger)</label>
+            <AdminSelect
+              value={form.scenario_kind}
+              options={[
+                { value: '', label: 'None — manual / no automated trigger' },
+                ...scenarios.map(s => ({ value: s.kind, label: `${s.name} — ${s.description}` })),
+              ]}
+              onChange={v => setForm(f => ({ ...f, scenario_kind: v }))}
+              sm
+            />
+            <p className="text-[10px] text-foreground-muted mt-1">Picks which behavioral trigger feeds this campaign. Defaults from the scenario apply unless overridden.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
