@@ -102,11 +102,11 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
                 <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
                   <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Campaign</h3>
                   <Link
-                    href="/admin/campaigns/winback_90"
+                    href="/admin/customers?segment=at_risk"
                     className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                     onClick={() => setOpen(false)}
                   >
-                    Open campaign page →
+                    View all in Customers →
                   </Link>
                 </div>
                 <div className="overflow-y-auto flex-1 px-6 pb-6">
