@@ -325,21 +325,49 @@ jobs:
           command_timeout: 10m
           envs: RDS_MASTER_PASSWORD
           script: |
-            set -e
-            # Explicit order required — alphabetical sort breaks dependency between
-            # add_customer_activity_and_tasks (creates customer_tasks) and
-            # add_auto_tasks (alters customer_tasks).
+            set -euo pipefail
+            cd /opt/jeffi-stores
+
+            if [[ -z "${RDS_MASTER_PASSWORD:-}" ]]; then
+              echo "ERROR: RDS_MASTER_PASSWORD is empty — secret not forwarded."
+              exit 1
+            fi
+
+            if ! command -v psql >/dev/null 2>&1; then
+              echo "Installing postgresql client..."
+              sudo dnf install -y postgresql15 || sudo yum install -y postgresql
+            fi
+
+            export PGHOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
+            export PGPORT=5432
+            export PGUSER=postgres
+            export PGDATABASE=jeffi_stores
+            export PGPASSWORD="$RDS_MASTER_PASSWORD"
+            export PGSSLMODE=require
+
+            echo "── Verifying DB connectivity ──"
+            psql -tAc 'SELECT 1' >/dev/null
+
+            echo "── Ensuring schema_migrations table ──"
+            psql -v ON_ERROR_STOP=1 <<'SQL'
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+              filename    TEXT PRIMARY KEY,
+              applied_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+            SQL
+
             MIGRATION_ORDER=(
               add_brand_return_policy.sql
               add_buyer_fields_to_quotations.sql
               add_cart_items_saved_for_later.sql
-              add_category_policy_inheritance.sql
               add_category_return_policy.sql
+              add_category_policy_inheritance.sql
               add_consignee_email_to_quotations.sql
               add_crm_and_search_logs.sql
               add_customer_activity_and_tasks.sql
               add_customer_health.sql
               add_auto_tasks.sql
+              add_customer_tag_definitions.sql
               add_delivery_settings.sql
               add_email_campaigns.sql
               add_image_thumbnail_urls_to_product_reviews.sql
@@ -356,49 +384,39 @@ jobs:
               rename_sale_price_add_ex_gst.sql
               reseed_campaign_templates.sql
               add_ai_assistant_log.sql
+              add_scenarios_to_campaigns.sql
+              add_custom_scenarios.sql
             )
-            ORDER_JSON=$(printf '"%s",' "${MIGRATION_ORDER[@]}" | sed 's/,$//')
 
-            docker exec jeffi-stores-app-1 node -e "
-              const { Pool } = require('pg');
-              const fs = require('fs');
-              const path = require('path');
-              const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem');
-              const config = {
-                host: 'jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com',
-                port: 5432,
-                database: 'jeffi_stores',
-                user: 'postgres',
-                password: process.env.RDS_MASTER_PASSWORD,
-                ssl: fs.existsSync(certPath)
-                  ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-                  : { rejectUnauthorized: false }
-              };
-              const pool = new Pool(config);
-              const ORDER = [$ORDER_JSON];
-              (async () => {
-                await pool.query(\`CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())\`);
-                const dir = '/app/database/migrations';
-                const { rows: applied } = await pool.query('SELECT filename FROM schema_migrations');
-                const appliedSet = new Set(applied.map(r => r.filename));
-                let ran = 0;
-                for (const file of ORDER) {
-                  if (appliedSet.has(file)) { process.stdout.write('Skipping ' + file + '\n'); continue; }
-                  const fp = path.join(dir, file);
-                  if (!fs.existsSync(fp)) { process.stdout.write('Missing ' + file + ' -- skip\n'); continue; }
-                  const sql = fs.readFileSync(fp, 'utf8').trim();
-                  if (sql) {
-                    process.stdout.write('Running ' + file + '...');
-                    await pool.query(sql);
-                    await pool.query('INSERT INTO schema_migrations (filename) VALUES (\\\$1)', [file]);
-                    process.stdout.write(' done\n');
-                    ran++;
-                  }
-                }
-                process.stdout.write(ran === 0 ? 'No new migrations to apply.\n' : ran + ' migration(s) applied.\n');
-                await pool.end();
-              })().catch(e => { process.stderr.write(e.stack + '\n'); process.exit(1); });
-            " RDS_MASTER_PASSWORD="$RDS_MASTER_PASSWORD"
+            APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')
+
+            ran=0
+            skipped=0
+            missing=0
+            for file in "${MIGRATION_ORDER[@]}"; do
+              fp="database/migrations/$file"
+              if ! [[ -f "$fp" ]]; then
+                echo "  ! missing $file (will skip)"
+                missing=$((missing+1))
+                continue
+              fi
+              if echo "$APPLIED" | grep -qx "$file"; then
+                echo "  - skip   $file"
+                skipped=$((skipped+1))
+                continue
+              fi
+              echo "  + apply  $file"
+              psql -v ON_ERROR_STOP=1 -1 -f "$fp"
+              psql -v ON_ERROR_STOP=1 -c \
+                "INSERT INTO schema_migrations (filename) VALUES ('$file') ON CONFLICT DO NOTHING"
+              ran=$((ran+1))
+            done
+
+            echo ""
+            echo "── Migration summary ──"
+            echo "  Applied:  $ran"
+            echo "  Skipped:  $skipped (already applied)"
+            echo "  Missing:  $missing (file not in repo)"
 
   # ────────────────────────────────────────────────────────
   # Stage 6 — Smoke test  (main only, gate: deploy)
