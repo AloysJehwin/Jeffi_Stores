@@ -1,0 +1,18 @@
+import Link from 'next/link'
+import NewCampaignClient from './NewCampaignClient'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export default function NewCampaignPage() {
+  return (
+    <div className="p-4 sm:p-6 space-y-5">
+      <div className="flex items-center gap-2 text-sm text-foreground-secondary">
+        <Link href="/admin/campaigns" className="text-accent-500 hover:text-accent-600 transition-colors">Campaigns</Link>
+        <span>/</span>
+        <span className="text-foreground">New Campaign</span>
+      </div>
+      <NewCampaignClient />
+    </div>
+  )
+}

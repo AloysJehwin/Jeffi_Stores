@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
@@ -23,20 +22,12 @@ interface CampaignRow {
   last_run_at: string | null
 }
 
-const EMPTY_FORM = { name: '', kind: '', description: '', subject_template: '', body_template: '' }
-
 export default function CampaignsListClient() {
   const { showToast } = useToast()
   const confirm = useConfirm()
-  const router = useRouter()
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
-  const [showNew, setShowNew] = useState(false)
-  const [newForm, setNewForm] = useState(EMPTY_FORM)
-  const [creating, setCreating] = useState(false)
-  const [aiPrompt, setAiPrompt] = useState('')
-  const [aiGenerating, setAiGenerating] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -92,62 +83,6 @@ export default function CampaignsListClient() {
     }
   }
 
-  async function generateWithAI() {
-    if (!aiPrompt.trim()) return
-    setAiGenerating(true)
-    try {
-      const res = await fetch('/api/admin/campaigns/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ prompt: aiPrompt.trim(), campaignName: newForm.name }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setNewForm(f => ({
-          ...f,
-          name: f.name.trim() ? f.name : (data.name || f.name),
-          kind: f.kind.trim() ? f.kind : (data.kind || f.kind),
-          subject_template: data.subject_template,
-          body_template: data.body_template,
-        }))
-        showToast('Template generated', 'success')
-      } else {
-        showToast(data.error || 'Generation failed', 'error')
-      }
-    } finally {
-      setAiGenerating(false)
-    }
-  }
-
-  async function createCampaign() {
-    if (!newForm.name.trim() || !newForm.kind.trim()) {
-      showToast('Name and kind are required', 'error')
-      return
-    }
-    setCreating(true)
-    try {
-      const res = await fetch('/api/admin/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(newForm),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setShowNew(false)
-        setNewForm(EMPTY_FORM)
-        setAiPrompt('')
-        showToast('Campaign created', 'success')
-        router.push(`/admin/campaigns/${data.kind}`)
-      } else {
-        showToast(data.error || 'Failed to create', 'error')
-      }
-    } finally {
-      setCreating(false)
-    }
-  }
-
   function rate(num: number, den: number) {
     if (den === 0) return '—'
     return `${((num / den) * 100).toFixed(1)}%`
@@ -158,125 +93,13 @@ export default function CampaignsListClient() {
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={() => setShowNew(true)}
+        <Link
+          href="/admin/campaigns/new"
           className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
         >
           + New Campaign
-        </button>
+        </Link>
       </div>
-
-      {showNew && (
-        <div className="bg-surface-elevated rounded-xl border border-accent-300 dark:border-accent-700 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground">New Campaign</h3>
-            <button
-              type="button"
-              onClick={() => { setShowNew(false); setNewForm(EMPTY_FORM); setAiPrompt('') }}
-              className="text-foreground-muted hover:text-foreground text-lg leading-none"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Campaign name</label>
-              <input
-                type="text"
-                value={newForm.name}
-                onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Summer Sale"
-                className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Kind (slug)</label>
-              <input
-                type="text"
-                value={newForm.kind}
-                onChange={e => setNewForm(f => ({ ...f, kind: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') }))}
-                placeholder="e.g. summer_sale"
-                className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-              />
-              <p className="text-[10px] text-foreground-muted mt-1">Unique identifier — lowercase letters, numbers, underscores</p>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Description (optional)</label>
-            <input
-              type="text"
-              value={newForm.description}
-              onChange={e => setNewForm(f => ({ ...f, description: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-            />
-          </div>
-
-          <div className="border border-border-default rounded-lg p-4 space-y-3 bg-surface">
-            <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Generate template with AI</p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={aiPrompt}
-                onChange={e => setAiPrompt(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && generateWithAI()}
-                placeholder="Describe the campaign email you want…"
-                className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-              />
-              <button
-                type="button"
-                onClick={generateWithAI}
-                disabled={aiGenerating || !aiPrompt.trim()}
-                className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
-              >
-                {aiGenerating ? 'Generating…' : 'Generate'}
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Subject template</label>
-            <input
-              type="text"
-              value={newForm.subject_template}
-              onChange={e => setNewForm(f => ({ ...f, subject_template: e.target.value }))}
-              placeholder="Hi {firstName}, here's your offer!"
-              className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Body template (HTML)</label>
-            <textarea
-              value={newForm.body_template}
-              onChange={e => setNewForm(f => ({ ...f, body_template: e.target.value }))}
-              rows={8}
-              placeholder="<p>Hi {firstName},</p>"
-              className="w-full px-3 py-2 text-xs font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => { setShowNew(false); setNewForm(EMPTY_FORM); setAiPrompt('') }}
-              className="px-4 py-2 text-sm text-foreground-secondary hover:text-foreground transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={createCampaign}
-              disabled={creating || !newForm.name.trim() || !newForm.kind.trim()}
-              className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-            >
-              {creating ? 'Creating…' : 'Create campaign'}
-            </button>
-          </div>
-        </div>
-      )}
 
       {campaigns.filter(c => c.kind !== 'broadcast').map(c => (
         <div key={c.kind} className="bg-surface-elevated rounded-xl border border-border-default p-5">
