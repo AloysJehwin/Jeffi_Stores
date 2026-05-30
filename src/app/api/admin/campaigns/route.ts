@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
+import { queryMany, query, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,4 +27,34 @@ export async function GET(req: NextRequest) {
   `)
 
   return NextResponse.json({ campaigns })
+}
+
+export async function POST(req: NextRequest) {
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  const body = await req.json()
+  const name = typeof body.name === 'string' ? body.name.trim() : ''
+  const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') : ''
+  if (!name || !kind) return NextResponse.json({ error: 'name and kind are required' }, { status: 400 })
+
+  const exists = await queryOne(`SELECT kind FROM campaigns WHERE kind = $1`, [kind])
+  if (exists) return NextResponse.json({ error: 'A campaign with that kind already exists' }, { status: 409 })
+
+  const description = typeof body.description === 'string' ? body.description.trim() || null : null
+  const delay_hours = Math.max(0, Math.min(720, parseInt(body.delay_hours ?? '0', 10) || 0))
+  const discount_percent = Math.max(0, Math.min(100, parseInt(body.discount_percent ?? '0', 10) || 0))
+  const subject_template = typeof body.subject_template === 'string' ? body.subject_template.slice(0, 500) : `${name} — special offer for {firstName}`
+  const body_template = typeof body.body_template === 'string' ? body.body_template.slice(0, 50000) : `<p>Hi {firstName},</p><p>${name}</p>`
+
+  await query(
+    `INSERT INTO campaigns (kind, name, description, enabled, delay_hours, discount_percent, subject_template, body_template)
+     VALUES ($1, $2, $3, FALSE, $4, $5, $6, $7)`,
+    [kind, name, description, delay_hours, discount_percent, subject_template, body_template]
+  )
+
+  return NextResponse.json({ success: true, kind })
 }

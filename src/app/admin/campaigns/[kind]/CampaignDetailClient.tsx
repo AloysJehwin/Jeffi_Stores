@@ -11,6 +11,7 @@ interface Campaign {
   enabled: boolean
   delay_hours: number
   discount_percent: number
+  coupon_id: string | null
   subject_template: string
   body_template: string
   last_run_at: string | null
@@ -28,6 +29,14 @@ interface RecentSend {
   bounced_at: string | null
   user_email: string | null
   user_name: string | null
+}
+
+interface CouponOption {
+  id: string
+  code: string
+  discount_type: string
+  discount_value: number
+  description: string | null
 }
 
 const SAMPLE_VARS: Record<string, string | number> = {
@@ -57,23 +66,39 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [saving, setSaving] = useState(false)
   const [testEmail, setTestEmail] = useState('')
   const [testBusy, setTestBusy] = useState(false)
-  const [form, setForm] = useState<{ enabled: boolean; delay_hours: number; discount_percent: number; subject_template: string; body_template: string } | null>(null)
+  const [coupons, setCoupons] = useState<CouponOption[]>([])
+  const [form, setForm] = useState<{
+    enabled: boolean
+    delay_hours: number
+    discount_percent: number
+    coupon_id: string | null
+    subject_template: string
+    body_template: string
+  } | null>(null)
 
   async function load() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/campaigns/${kind}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
+      const [campaignRes, couponsRes] = await Promise.all([
+        fetch(`/api/admin/campaigns/${kind}`, { credentials: 'include' }),
+        fetch('/api/admin/coupons?is_active=true&limit=100', { credentials: 'include' }),
+      ])
+      if (campaignRes.ok) {
+        const data = await campaignRes.json()
         setCampaign(data.campaign)
         setRecentSends(data.recentSends || [])
         setForm({
           enabled: data.campaign.enabled,
           delay_hours: data.campaign.delay_hours,
           discount_percent: data.campaign.discount_percent,
+          coupon_id: data.campaign.coupon_id || null,
           subject_template: data.campaign.subject_template,
           body_template: data.campaign.body_template,
         })
+      }
+      if (couponsRes.ok) {
+        const cd = await couponsRes.json()
+        setCoupons(cd.coupons || [])
       }
     } finally {
       setLoading(false)
@@ -126,8 +151,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
   if (loading || !campaign || !form) return <p className="text-sm text-foreground-muted">Loading…</p>
 
-  const previewSubject = renderTemplate(form.subject_template, SAMPLE_VARS)
-  const previewBody = renderTemplate(form.body_template, SAMPLE_VARS)
+  const selectedCoupon = coupons.find(c => c.id === form.coupon_id)
+  const previewVars = selectedCoupon
+    ? { ...SAMPLE_VARS, couponCode: selectedCoupon.code, discountPercent: selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value : 0 }
+    : SAMPLE_VARS
+  const previewSubject = renderTemplate(form.subject_template, previewVars)
+  const previewBody = renderTemplate(form.body_template, previewVars)
 
   function status(s: RecentSend): { label: string; color: string } {
     if (s.bounced_at) return { label: 'Bounced', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' }
@@ -185,8 +214,32 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               onChange={e => setForm({ ...form, discount_percent: parseInt(e.target.value || '0', 10) })}
               className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
-            <p className="text-[10px] text-foreground-muted mt-1">For win-back; auto-generates a unique single-use coupon</p>
+            <p className="text-[10px] text-foreground-muted mt-1">Auto-generates a unique per-user coupon if no coupon is assigned below</p>
           </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+            Assign coupon
+          </label>
+          <select
+            value={form.coupon_id || ''}
+            onChange={e => setForm({ ...form, coupon_id: e.target.value || null })}
+            className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+          >
+            <option value="">None — use discount % to auto-generate</option>
+            {coupons.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.code} — {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
+                {c.description ? ` (${c.description})` : ''}
+              </option>
+            ))}
+          </select>
+          {selectedCoupon && (
+            <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-1">
+              This coupon will be injected as {'{couponCode}'} in the template for all recipients.
+            </p>
+          )}
         </div>
 
         <div className="mt-4">

@@ -61,6 +61,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { kind: stri
       vals.push(n)
     }
   }
+  if ('coupon_id' in body) {
+    updates.push(`coupon_id = $${i++}`)
+    vals.push(body.coupon_id || null)
+  }
   if (typeof body.subject_template === 'string' && body.subject_template.trim()) {
     updates.push(`subject_template = $${i++}`)
     vals.push(body.subject_template.slice(0, 500))

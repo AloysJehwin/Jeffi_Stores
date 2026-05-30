@@ -7,6 +7,7 @@ import {
   alreadySentForReference,
   recordSent,
   generateCouponForUser,
+  getAssignedCouponCode,
   buildUnsubscribeUrl,
   renderTemplate,
   wrapWithTracking,
@@ -77,6 +78,26 @@ async function fetchUserContext(userId: string): Promise<UserContext | null> {
   )
 }
 
+async function resolveCoupon(campaign: Campaign, userId: string): Promise<{ couponCode: string; discountPercent: number }> {
+  if (campaign.coupon_id) {
+    const info = await getAssignedCouponCode(campaign.coupon_id)
+    if (info) {
+      const pct = info.discountType === 'percentage' ? info.discountValue : 0
+      return { couponCode: info.code, discountPercent: pct }
+    }
+  }
+  if (campaign.discount_percent > 0) {
+    const code = await generateCouponForUser({
+      userId,
+      campaignKind: campaign.kind as CampaignKind,
+      discountPercent: campaign.discount_percent,
+      expiresInDays: 14,
+    })
+    if (code) return { couponCode: code, discountPercent: campaign.discount_percent }
+  }
+  return { couponCode: '', discountPercent: campaign.discount_percent }
+}
+
 export async function sendAbandonedCartEmail(userId: string, cartItems: Array<{ name: string; quantity: number; price: number }>) {
   const campaign = await getCampaign('abandoned_cart')
   const user = await fetchUserContext(userId)
@@ -87,6 +108,8 @@ export async function sendAbandonedCartEmail(userId: string, cartItems: Array<{ 
     .map(i => `<li>${i.quantity} × ${i.name} (₹${Math.round(i.price)})</li>`)
     .join('')
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -95,6 +118,8 @@ export async function sendAbandonedCartEmail(userId: string, cartItems: Array<{ 
       firstName: user.first_name || 'there',
       itemCount: cartItems.length,
       cartItems: `<ul>${itemsHtml}</ul>`,
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/cart`,
     },
   })
@@ -105,6 +130,8 @@ export async function sendAbandonedCheckoutEmail(userId: string, order: { id: st
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -113,6 +140,8 @@ export async function sendAbandonedCheckoutEmail(userId: string, order: { id: st
       firstName: user.first_name || 'there',
       orderNumber: order.order_number,
       total: Number(order.total_amount).toFixed(2),
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/cart`,
     },
   })
@@ -123,6 +152,8 @@ export async function sendPostPurchaseEmail(userId: string, order: { id: string;
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -130,6 +161,8 @@ export async function sendPostPurchaseEmail(userId: string, order: { id: string;
     vars: {
       firstName: user.first_name || 'there',
       orderNumber: order.order_number,
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/account/orders/${order.id}`,
     },
   })
@@ -140,6 +173,8 @@ export async function sendReviewReminderEmail(userId: string, order: { id: strin
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -147,6 +182,8 @@ export async function sendReviewReminderEmail(userId: string, order: { id: strin
     vars: {
       firstName: user.first_name || 'there',
       orderNumber: order.order_number,
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/account/orders/${order.id}`,
     },
   })
@@ -157,16 +194,9 @@ export async function sendWinbackEmail(userId: string, kind: 'winback_90' | 'win
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
-  let couponCode = ''
-  if (campaign.discount_percent > 0) {
-    const code = await generateCouponForUser({
-      userId,
-      campaignKind: kind,
-      discountPercent: campaign.discount_percent,
-      expiresInDays: 14,
-    })
-    if (!code) return { ok: false, reason: 'coupon_failed' }
-    couponCode = code
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+  if ((campaign.coupon_id || campaign.discount_percent > 0) && !couponCode) {
+    return { ok: false, reason: 'coupon_failed' }
   }
 
   return sendCampaignEmail({
@@ -175,7 +205,7 @@ export async function sendWinbackEmail(userId: string, kind: 'winback_90' | 'win
     referenceId: null,
     vars: {
       firstName: user.first_name || 'there',
-      discountPercent: campaign.discount_percent,
+      discountPercent,
       couponCode,
       ctaUrl: `${APP_URL}/products`,
     },
@@ -187,6 +217,8 @@ export async function sendRestockEmail(userId: string, product: { id: string; na
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -194,6 +226,8 @@ export async function sendRestockEmail(userId: string, product: { id: string; na
     vars: {
       firstName: user.first_name || 'there',
       productName: product.name,
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/products/${product.slug}`,
     },
   })
@@ -209,6 +243,8 @@ export async function sendPriceDropEmail(
   const user = await fetchUserContext(userId)
   if (!campaign || !user) return { ok: false, reason: 'precond' }
 
+  const { couponCode, discountPercent } = await resolveCoupon(campaign, userId)
+
   return sendCampaignEmail({
     campaign,
     user,
@@ -218,6 +254,8 @@ export async function sendPriceDropEmail(
       productName: product.name,
       oldPrice: Math.round(oldPrice).toString(),
       newPrice: Math.round(newPrice).toString(),
+      couponCode,
+      discountPercent,
       ctaUrl: `${APP_URL}/products/${product.slug}`,
     },
   })
