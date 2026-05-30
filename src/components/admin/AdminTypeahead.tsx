@@ -62,7 +62,6 @@ export default function AdminTypeahead({
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const [loading, setLoading] = useState(false)
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const typedValueRef = useRef(value)
@@ -92,10 +91,6 @@ export default function AdminTypeahead({
         if (res.ok) {
           const data = await res.json()
           const newItems = data.items || []
-          if (newItems.length > 0 && containerRef.current) {
-            const r = containerRef.current.getBoundingClientRect()
-            setDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width })
-          }
           setItems(newItems)
           setOpen(newItems.length > 0)
         }
@@ -174,6 +169,8 @@ export default function AdminTypeahead({
 
   const defaultInputCls = 'w-full px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted'
 
+  const rect = containerRef.current?.getBoundingClientRect()
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <div className="relative">
@@ -183,11 +180,7 @@ export default function AdminTypeahead({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (items.length > 0 && containerRef.current) {
-              const r = containerRef.current.getBoundingClientRect()
-              setDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width })
-              setOpen(true)
-            }
+            if (items.length > 0) setOpen(true)
           }}
           placeholder={placeholder}
           disabled={disabled}
@@ -206,13 +199,13 @@ export default function AdminTypeahead({
         </span>
       </div>
 
-      {open && items.length > 0 && dropdownPos && (
+      {open && items.length > 0 && rect && (
         <div
           style={{
             position: 'fixed',
-            top: dropdownPos.top,
-            left: dropdownPos.left,
-            width: dropdownPos.width,
+            top: rect.bottom + 4,
+            left: rect.left,
+            width: rect.width,
             zIndex: 99999,
           }}
           className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto"
