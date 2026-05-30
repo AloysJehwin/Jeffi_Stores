@@ -74,10 +74,10 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="bg-surface-elevated rounded-2xl border border-border-default p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] flex flex-col"
+            className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4 shrink-0">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-border-default">
               <div>
                 <h2 className="text-base font-semibold text-foreground">Biggest Drops (7d)</h2>
                 <p className="text-xs text-foreground-muted mt-0.5">{items.length} customers with sharp health decline</p>
@@ -92,25 +92,31 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
                 </svg>
               </button>
             </div>
-            <div className="overflow-y-auto divide-y divide-border-default flex-1">
-              {items.map(c => <Row key={c.id} c={c} large />)}
-            </div>
-            <div className="pt-4 shrink-0 border-t border-border-default mt-2">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Campaign</h3>
-                <Link
-                  href="/admin/campaigns/winback_90"
-                  className="text-xs text-accent-500 hover:text-accent-600 font-medium"
-                  onClick={() => setOpen(false)}
-                >
-                  Open campaign page →
-                </Link>
+            <div className="flex flex-1 min-h-0 divide-x divide-border-default">
+              <div className="flex flex-col w-2/5 shrink-0">
+                <div className="overflow-y-auto flex-1 px-6 py-4 divide-y divide-border-default">
+                  {items.map(c => <Row key={c.id} c={c} large />)}
+                </div>
               </div>
-              <CrmCampaignPanel
-                defaultKind="winback_90"
-                recipientCount={items.length}
-                onClose={() => setOpen(false)}
-              />
+              <div className="flex flex-col flex-1 min-w-0">
+                <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
+                  <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Campaign</h3>
+                  <Link
+                    href="/admin/campaigns/winback_90"
+                    className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+                    onClick={() => setOpen(false)}
+                  >
+                    Open campaign page →
+                  </Link>
+                </div>
+                <div className="overflow-y-auto flex-1 px-6 pb-6">
+                  <CrmCampaignPanel
+                    defaultKind="winback_90"
+                    recipientCount={items.length}
+                    onClose={() => setOpen(false)}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
