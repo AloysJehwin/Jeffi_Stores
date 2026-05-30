@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 interface SuggestItem {
   id: string
@@ -62,17 +62,21 @@ export default function AdminTypeahead({
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const [loading, setLoading] = useState(false)
-  const [rect, setRect] = useState<DOMRect | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const typedValueRef = useRef(value)
   const skipFetchRef = useRef(false)
 
-  useLayoutEffect(() => {
-    if (open && inputRef.current) {
-      setRect(inputRef.current.getBoundingClientRect())
+  useEffect(() => {
+    const main = document.querySelector('main')
+    if (!main) return
+    if (open) {
+      main.style.overflowY = 'hidden'
+    } else {
+      main.style.overflowY = ''
     }
-  }, [open, items])
+    return () => { main.style.overflowY = '' }
+  }, [open])
 
   useEffect(() => {
     if (skipFetchRef.current) {
@@ -115,7 +119,7 @@ export default function AdminTypeahead({
 
   useEffect(() => {
     function onOutsideClick(e: MouseEvent) {
-      if (inputRef.current && !inputRef.current.closest('div')?.contains(e.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
     }
@@ -177,10 +181,9 @@ export default function AdminTypeahead({
   const defaultInputCls = 'w-full px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted'
 
   return (
-    <div className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative ${className}`}>
       <div className="relative">
         <input
-          ref={inputRef}
           type="text"
           value={value}
           onChange={e => onChange(e.target.value)}
@@ -205,17 +208,8 @@ export default function AdminTypeahead({
         </span>
       </div>
 
-      {open && items.length > 0 && rect && (
-        <div
-          style={{
-            position: 'fixed',
-            top: rect.bottom + 4,
-            left: rect.left,
-            width: rect.width,
-            zIndex: 99999,
-          }}
-          className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto"
-        >
+      {open && items.length > 0 && (
+        <div className="absolute left-0 top-full mt-1 w-full bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto z-[200]">
           {items.map((item, idx) => (
             <button
               key={item.id}

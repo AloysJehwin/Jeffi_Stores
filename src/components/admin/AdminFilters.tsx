@@ -67,7 +67,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
   }
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 mb-6 sticky top-0 z-10">
+    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 mb-6 sticky top-0 z-[200]">
       {/* Mobile toggle */}
       <button
         type="button"
