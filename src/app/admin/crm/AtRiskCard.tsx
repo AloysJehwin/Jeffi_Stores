@@ -45,18 +45,13 @@ export default function AtRiskCard({ items }: { items: AtRiskEntry[] }) {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Just Crossed Into At-Risk</h2>
           <div className="flex items-center gap-3">
-            {hasMore && (
+            {items.length > 0 && (
               <button
                 onClick={() => setOpen(true)}
                 className="text-xs text-accent-500 hover:text-accent-600 font-medium"
               >
-                View all ({items.length}) →
+                {hasMore ? `View all (${items.length}) →` : 'View all →'}
               </button>
-            )}
-            {!hasMore && (
-              <Link href="/admin/customers?segment=at_risk" className="text-xs text-accent-500 hover:text-accent-600 font-medium">
-                View all →
-              </Link>
             )}
           </div>
         </div>

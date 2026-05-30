@@ -45,18 +45,13 @@ export default function DormantCard({ items }: { items: DormantEntry[] }) {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Dormant — Top by LTV</h2>
           <div className="flex items-center gap-3">
-            {hasMore && (
+            {items.length > 0 && (
               <button
                 onClick={() => setOpen(true)}
                 className="text-xs text-accent-500 hover:text-accent-600 font-medium"
               >
-                View all ({items.length}) →
+                {hasMore ? `View all (${items.length}) →` : 'View all →'}
               </button>
-            )}
-            {!hasMore && (
-              <Link href="/admin/customers?segment=dormant" className="text-xs text-accent-500 hover:text-accent-600 font-medium">
-                View all →
-              </Link>
             )}
           </div>
         </div>
