@@ -10,20 +10,9 @@ import DormantCard from './DormantCard'
 import RecentNotesCard from './RecentNotesCard'
 import RecentTagsCard from './RecentTagsCard'
 import RecentSignupsCard from './RecentSignupsCard'
+import SegmentsCard from './SegmentsCard'
 
 export const dynamic = 'force-dynamic'
-
-const SEGMENT_META: Record<string, { label: string; color: string; href: string }> = {
-  vip:      { label: 'VIP',          color: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',         href: '/admin/customers?segment=vip' },
-  loyal:    { label: 'Loyal',        color: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700', href: '/admin/customers?segment=loyal' },
-  repeat:   { label: 'Repeat',       color: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',                href: '/admin/customers?segment=repeat' },
-  one_time: { label: 'One-time',     color: 'bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700',                  href: '/admin/customers?segment=one_time' },
-  new:      { label: 'New (<30d)',   color: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700',  href: '/admin/customers?segment=new' },
-  at_risk:  { label: 'At Risk',      color: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700',  href: '/admin/customers?segment=at_risk' },
-  dormant:  { label: 'Dormant',      color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700',                    href: '/admin/customers?segment=dormant' },
-  b2b:      { label: 'B2B',          color: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700',  href: '/admin/customers?segment=b2b' },
-  lead:     { label: 'Lead',         color: 'bg-pink-100 text-pink-800 border-pink-300 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-700',              href: '/admin/customers?segment=lead' },
-}
 
 
 export default async function CrmDashboardPage() {
@@ -100,27 +89,7 @@ export default async function CrmDashboardPage() {
       )}
 
       {/* Segment chips */}
-      <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-        <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Segments</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {(['vip','loyal','b2b','repeat','new','at_risk','dormant','one_time','lead'] as const).map(key => {
-            const meta = SEGMENT_META[key]
-            const count = s[key] as number
-            return (
-              <Link
-                key={key}
-                href={meta.href}
-                className={`group rounded-xl border px-4 py-3 transition-all hover:shadow-md hover:-translate-y-0.5 ${meta.color}`}
-              >
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide opacity-80">{meta.label}</span>
-                  <span className="text-2xl font-bold tabular-nums">{count.toLocaleString('en-IN')}</span>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
-      </div>
+      <SegmentsCard segments={s} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <AtRiskCard items={data.crossingAtRisk} />
