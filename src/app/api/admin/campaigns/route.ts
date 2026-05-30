@@ -12,21 +12,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const campaigns = await queryMany(`
-    SELECT
-      c.*,
-      COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind), 0) AS total_sent,
-      COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.opened_at IS NOT NULL), 0) AS total_opened,
-      COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.clicked_at IS NOT NULL), 0) AS total_clicked,
-      COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.converted_at IS NOT NULL), 0) AS total_converted,
-      COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.unsubscribed_at IS NOT NULL), 0) AS total_unsubscribed,
-      COALESCE((SELECT SUM(o.total_amount) FROM email_campaigns_sent ecs JOIN orders o ON o.id = ecs.conversion_order_id WHERE ecs.campaign_kind = c.kind), 0) AS revenue_attributed,
-      (SELECT MAX(sent_at) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND sent_at > NOW() - INTERVAL '24 hours') AS sent_last_24h
-    FROM campaigns c
-    ORDER BY c.name
-  `)
+  const { searchParams } = new URL(req.url)
+  const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
+  const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10))
 
-  return NextResponse.json({ campaigns })
+  const [campaigns, countRow] = await Promise.all([
+    queryMany(`
+      SELECT
+        c.*,
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind), 0) AS total_sent,
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.opened_at IS NOT NULL), 0) AS total_opened,
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.clicked_at IS NOT NULL), 0) AS total_clicked,
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.converted_at IS NOT NULL), 0) AS total_converted,
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.unsubscribed_at IS NOT NULL), 0) AS total_unsubscribed,
+        COALESCE((SELECT SUM(o.total_amount) FROM email_campaigns_sent ecs JOIN orders o ON o.id = ecs.conversion_order_id WHERE ecs.campaign_kind = c.kind), 0) AS revenue_attributed,
+        (SELECT MAX(sent_at) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND sent_at > NOW() - INTERVAL '24 hours') AS sent_last_24h
+      FROM campaigns c
+      ORDER BY c.name
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]),
+    queryOne<{ total: string }>('SELECT COUNT(*) AS total FROM campaigns'),
+  ])
+
+  return NextResponse.json({ campaigns, total: parseInt(countRow?.total || '0', 10), limit, offset })
 }
 
 export async function POST(req: NextRequest) {

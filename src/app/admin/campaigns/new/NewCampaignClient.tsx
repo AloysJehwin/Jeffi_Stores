@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 
 interface CouponOption {
   id: string
@@ -115,6 +116,13 @@ export default function NewCampaignClient() {
   }
 
   const selectedCoupon = coupons.find(c => c.id === form.coupon_id)
+  const couponOptions: import('@/components/admin/AdminSelect').SelectOption[] = [
+    { value: '', label: 'None — use discount % to auto-generate' },
+    ...coupons.map(c => ({
+      value: c.id,
+      label: `${c.code} — ${c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}${c.description ? ` (${c.description})` : ''}`,
+    })),
+  ]
   const previewVars = selectedCoupon
     ? { ...SAMPLE_VARS, couponCode: selectedCoupon.code, discountPercent: selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value : 0 }
     : SAMPLE_VARS
@@ -211,20 +219,12 @@ export default function NewCampaignClient() {
 
           <div>
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">Assign coupon</label>
-            <select
+            <AdminSelect
               value={form.coupon_id || ''}
-              onChange={e => setForm(f => ({ ...f, coupon_id: e.target.value || null }))}
-              onFocus={loadCoupons}
-              className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-            >
-              <option value="">None — use discount % to auto-generate</option>
-              {coupons.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.code} — {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
-                  {c.description ? ` (${c.description})` : ''}
-                </option>
-              ))}
-            </select>
+              options={couponOptions}
+              onChange={v => { loadCoupons(); setForm(f => ({ ...f, coupon_id: v || null })) }}
+              sm
+            />
             {selectedCoupon && (
               <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-1">
                 This coupon will be injected as {'{couponCode}'} in the template for all recipients.

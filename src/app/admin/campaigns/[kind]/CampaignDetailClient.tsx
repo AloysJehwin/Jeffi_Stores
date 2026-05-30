@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 
 interface Campaign {
   kind: string
@@ -67,6 +68,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [testEmail, setTestEmail] = useState('')
   const [testBusy, setTestBusy] = useState(false)
   const [coupons, setCoupons] = useState<CouponOption[]>([])
+  const [sendsOffset, setSendsOffset] = useState(0)
+  const [sendsTotal, setSendsTotal] = useState(0)
+  const SENDS_LIMIT = 20
   const [form, setForm] = useState<{
     enabled: boolean
     delay_hours: number
@@ -76,17 +80,18 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     body_template: string
   } | null>(null)
 
-  async function load() {
+  async function load(sOff = sendsOffset) {
     setLoading(true)
     try {
       const [campaignRes, couponsRes] = await Promise.all([
-        fetch(`/api/admin/campaigns/${kind}`, { credentials: 'include' }),
+        fetch(`/api/admin/campaigns/${kind}?offset=${sOff}`, { credentials: 'include' }),
         fetch('/api/admin/coupons?is_active=true&limit=100', { credentials: 'include' }),
       ])
       if (campaignRes.ok) {
         const data = await campaignRes.json()
         setCampaign(data.campaign)
         setRecentSends(data.recentSends || [])
+        setSendsTotal(data.total || 0)
         setForm({
           enabled: data.campaign.enabled,
           delay_hours: data.campaign.delay_hours,
@@ -105,7 +110,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     }
   }
 
-  useEffect(() => { load() }, [kind])
+  useEffect(() => { load(0) }, [kind])
 
   async function save() {
     if (!form) return
@@ -118,7 +123,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         body: JSON.stringify(form),
       })
       if (res.ok) {
-        await load()
+        await load(sendsOffset)
         router.refresh()
         showToast('Campaign settings saved', 'success')
       } else {
@@ -150,6 +155,14 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   }
 
   if (loading || !campaign || !form) return <p className="text-sm text-foreground-muted">Loading…</p>
+
+  const couponOptions: SelectOption[] = [
+    { value: '', label: 'None — use discount % to auto-generate' },
+    ...coupons.map(c => ({
+      value: c.id,
+      label: `${c.code} — ${c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}${c.description ? ` (${c.description})` : ''}`,
+    })),
+  ]
 
   const selectedCoupon = coupons.find(c => c.id === form.coupon_id)
   const previewVars = selectedCoupon
@@ -222,19 +235,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
             Assign coupon
           </label>
-          <select
+          <AdminSelect
             value={form.coupon_id || ''}
-            onChange={e => setForm({ ...form, coupon_id: e.target.value || null })}
-            className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-          >
-            <option value="">None — use discount % to auto-generate</option>
-            {coupons.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.code} — {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
-                {c.description ? ` (${c.description})` : ''}
-              </option>
-            ))}
-          </select>
+            options={couponOptions}
+            onChange={v => setForm({ ...form, coupon_id: v || null })}
+            sm
+          />
           {selectedCoupon && (
             <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-1">
               This coupon will be injected as {'{couponCode}'} in the template for all recipients.
@@ -312,25 +318,48 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
       <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
         <div className="px-5 py-3 border-b border-border-default">
-          <h3 className="text-sm font-semibold text-foreground">Recent sends ({recentSends.length})</h3>
+          <h3 className="text-sm font-semibold text-foreground">Recent sends ({sendsTotal})</h3>
         </div>
         {recentSends.length === 0 ? (
           <p className="p-8 text-sm text-foreground-muted text-center">No sends yet</p>
         ) : (
-          <div className="divide-y divide-border-default">
-            {recentSends.map(s => {
-              const st = status(s)
-              return (
-                <div key={s.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-foreground truncate">{s.user_name || s.user_email}</p>
-                    <p className="text-[10px] text-foreground-muted">{new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+          <>
+            <div className="divide-y divide-border-default">
+              {recentSends.map(s => {
+                const st = status(s)
+                return (
+                  <div key={s.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-foreground truncate">{s.user_name || s.user_email}</p>
+                      <p className="text-[10px] text-foreground-muted">{new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
                   </div>
-                  <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
+                )
+              })}
+            </div>
+            {sendsTotal > SENDS_LIMIT && (
+              <div className="px-5 py-3 border-t border-border-default flex items-center justify-between text-sm text-foreground-muted">
+                <span>Showing {sendsOffset + 1}–{Math.min(sendsOffset + SENDS_LIMIT, sendsTotal)} of {sendsTotal}</span>
+                <div className="flex gap-2">
+                  <button
+                    disabled={sendsOffset === 0}
+                    onClick={() => { const o = sendsOffset - SENDS_LIMIT; setSendsOffset(o); load(o) }}
+                    className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    disabled={sendsOffset + SENDS_LIMIT >= sendsTotal}
+                    onClick={() => { const o = sendsOffset + SENDS_LIMIT; setSendsOffset(o); load(o) }}
+                    className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                  >
+                    Next
+                  </button>
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

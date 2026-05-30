@@ -28,21 +28,25 @@ export default function CampaignsListClient() {
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
+  const [offset, setOffset] = useState(0)
+  const [total, setTotal] = useState(0)
+  const LIMIT = 20
 
-  async function load() {
+  async function load(off = offset) {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/campaigns', { credentials: 'include' })
+      const res = await fetch(`/api/admin/campaigns?limit=${LIMIT}&offset=${off}`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setCampaigns(data.campaigns || [])
+        setTotal(data.total || 0)
       }
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(0) }, [])
 
   async function toggle(c: CampaignRow) {
     setBusy(c.kind)
@@ -53,7 +57,7 @@ export default function CampaignsListClient() {
         credentials: 'include',
         body: JSON.stringify({ enabled: !c.enabled }),
       })
-      await load()
+      await load(offset)
     } finally {
       setBusy(null)
     }
@@ -77,7 +81,7 @@ export default function CampaignsListClient() {
         res.ok ? `Sent ${data.totalSent ?? 0} email(s).` : (data.error || 'Failed'),
         res.ok ? 'success' : 'error'
       )
-      await load()
+      await load(offset)
     } finally {
       setBusy(null)
     }
@@ -187,6 +191,28 @@ export default function CampaignsListClient() {
           </div>
         </div>
       ))}
+
+      {total > LIMIT && (
+        <div className="flex items-center justify-between pt-1 text-sm text-foreground-muted">
+          <span>Showing {offset + 1}–{Math.min(offset + LIMIT, total)} of {total}</span>
+          <div className="flex gap-2">
+            <button
+              disabled={offset === 0}
+              onClick={() => { const o = offset - LIMIT; setOffset(o); load(o) }}
+              className="px-3 py-1.5 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              disabled={offset + LIMIT >= total}
+              onClick={() => { const o = offset + LIMIT; setOffset(o); load(o) }}
+              className="px-3 py-1.5 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
