@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 
 interface SuggestItem {
   id: string
@@ -63,23 +62,11 @@ export default function AdminTypeahead({
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const [loading, setLoading] = useState(false)
-  const [portalReady, setPortalReady] = useState(false)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const portalRef = useRef<HTMLDivElement | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const typedValueRef = useRef(value)
   const skipFetchRef = useRef(false)
-
-  useEffect(() => {
-    const el = document.createElement('div')
-    document.body.appendChild(el)
-    portalRef.current = el
-    setPortalReady(true)
-    return () => {
-      document.body.removeChild(el)
-      portalRef.current = null
-    }
-  }, [])
 
   useEffect(() => {
     if (skipFetchRef.current) {
@@ -105,6 +92,10 @@ export default function AdminTypeahead({
         if (res.ok) {
           const data = await res.json()
           const newItems = data.items || []
+          if (newItems.length > 0 && containerRef.current) {
+            const r = containerRef.current.getBoundingClientRect()
+            setDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width })
+          }
           setItems(newItems)
           setOpen(newItems.length > 0)
         }
@@ -122,10 +113,7 @@ export default function AdminTypeahead({
 
   useEffect(() => {
     function onOutsideClick(e: MouseEvent) {
-      if (
-        containerRef.current && !containerRef.current.contains(e.target as Node) &&
-        portalRef.current && !portalRef.current.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false)
       }
     }
@@ -184,16 +172,6 @@ export default function AdminTypeahead({
     }
   }
 
-  const rect = containerRef.current?.getBoundingClientRect()
-  const dropdownStyle: React.CSSProperties = rect ? {
-    position: 'fixed',
-    top: rect.bottom + 4,
-    left: rect.left,
-    width: rect.width,
-    pointerEvents: 'auto',
-    zIndex: 2147483647,
-  } : {}
-
   const defaultInputCls = 'w-full px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted'
 
   return (
@@ -205,7 +183,11 @@ export default function AdminTypeahead({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (items.length > 0) setOpen(true)
+            if (items.length > 0 && containerRef.current) {
+              const r = containerRef.current.getBoundingClientRect()
+              setDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width })
+              setOpen(true)
+            }
           }}
           placeholder={placeholder}
           disabled={disabled}
@@ -224,8 +206,17 @@ export default function AdminTypeahead({
         </span>
       </div>
 
-      {portalReady && open && items.length > 0 && portalRef.current && createPortal(
-        <div style={dropdownStyle} className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto">
+      {open && items.length > 0 && dropdownPos && (
+        <div
+          style={{
+            position: 'fixed',
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            width: dropdownPos.width,
+            zIndex: 99999,
+          }}
+          className="bg-surface-elevated rounded-lg shadow-xl border border-border-default overflow-hidden max-h-64 overflow-y-auto"
+        >
           {items.map((item, idx) => (
             <button
               key={item.id}
@@ -246,8 +237,7 @@ export default function AdminTypeahead({
               </svg>
             </button>
           ))}
-        </div>,
-        portalRef.current
+        </div>
       )}
     </div>
   )
