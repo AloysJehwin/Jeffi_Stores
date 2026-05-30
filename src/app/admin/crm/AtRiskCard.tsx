@@ -83,7 +83,7 @@ export default function AtRiskCard({ items }: { items: AtRiskEntry[] }) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col"
+            className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-border-default">
@@ -102,8 +102,8 @@ export default function AtRiskCard({ items }: { items: AtRiskEntry[] }) {
               </button>
             </div>
             <div className="flex flex-1 min-h-0 divide-x divide-border-default">
-              <div className="flex flex-col w-2/5 shrink-0">
-                <div className="overflow-y-auto flex-1 px-6 py-4 divide-y divide-border-default">
+              <div className="flex flex-col w-2/5 shrink-0 bg-surface-secondary/30">
+                <div className="px-6 pt-4 pb-2 shrink-0 border-b border-border-default"><h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Customers</h3></div><div className="overflow-y-auto flex-1 px-6 py-4 divide-y divide-border-default">
                   {items.map(c => <Row key={c.id} c={c} large />)}
                 </div>
               </div>
