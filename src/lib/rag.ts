@@ -146,32 +146,45 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
   const vec = await embed(query)
   const vecLiteral = toVectorLiteral(vec)
 
-  const sql = `
-    WITH ranked AS (
-      SELECT
-        source_table,
-        source_id,
-        1 - (embedding <=> $1::vector) AS similarity
+  const productSql = `
+    SELECT source_id, 1 - (embedding <=> $1::vector) AS similarity
       FROM embeddings
-      WHERE source_table IN ('products', 'product_variants')
-      ORDER BY embedding <=> $1::vector
-      LIMIT $2
-    )
-    SELECT * FROM ranked
+     WHERE source_table = 'products'
+     ORDER BY embedding <=> $1::vector
+     LIMIT $2
   `
-  const result = await runWithHnswTuning(sql, [vecLiteral, limit * 2])
+  const variantSql = `
+    SELECT source_id, 1 - (embedding <=> $1::vector) AS similarity
+      FROM embeddings
+     WHERE source_table = 'product_variants'
+     ORDER BY embedding <=> $1::vector
+     LIMIT $2
+  `
+  const [productResult, variantResult] = await Promise.all([
+    runWithHnswTuning(productSql, [vecLiteral, limit]),
+    runWithHnswTuning(variantSql, [vecLiteral, limit]),
+  ])
 
-  const seen = new Set<string>()
-  const out: SimilarProductId[] = []
-  for (const row of result.rows) {
+  const merged: SimilarProductId[] = []
+  for (const row of productResult.rows) {
     const sim = typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity
-    if (row.source_table === 'products') {
-      if (seen.has(row.source_id)) continue
-      seen.add(row.source_id)
-      out.push({ productId: row.source_id, similarity: sim, matchedVia: 'products', variantId: null })
-    } else {
-      out.push({ productId: '', similarity: sim, matchedVia: 'product_variants', variantId: row.source_id })
+    merged.push({ productId: row.source_id, similarity: sim, matchedVia: 'products', variantId: null })
+  }
+  for (const row of variantResult.rows) {
+    const sim = typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity
+    merged.push({ productId: '', similarity: sim, matchedVia: 'product_variants', variantId: row.source_id })
+  }
+
+  merged.sort((a, b) => b.similarity - a.similarity)
+
+  const seenProducts = new Set<string>()
+  const out: SimilarProductId[] = []
+  for (const r of merged) {
+    if (r.matchedVia === 'products') {
+      if (seenProducts.has(r.productId)) continue
+      seenProducts.add(r.productId)
     }
+    out.push(r)
     if (out.length >= limit) break
   }
   return out

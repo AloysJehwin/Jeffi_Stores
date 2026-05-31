@@ -1,6 +1,7 @@
 import { query, queryMany, queryOne } from './db'
 import { aiChat } from './ai-client'
 import { findSimilarProductIds } from './rag'
+import { VARIANT_MIN_PRICE_SQL } from './queries'
 
 const MODEL_TAG = 'ai-client'
 const DAILY_LIMIT = 10
@@ -66,7 +67,8 @@ export async function searchCandidatesViaRag(userQuery: string, limit = 20): Pro
 
   const rows = await queryMany<ProductCandidate>(
     `SELECT
-       p.id::text, p.name, p.slug, p.sku, p.base_price::text AS base_price,
+       p.id::text, p.name, p.slug, p.sku,
+       COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS base_price,
        p.short_description, p.inventory_quantity,
        b.name AS brand_name,
        c.name AS category_name,
@@ -95,7 +97,8 @@ export async function searchCandidates(userQuery: string, limit = 50): Promise<P
   const sql = `
     WITH ranked AS (
       SELECT
-        p.id, p.name, p.slug, p.sku, p.base_price::text AS base_price,
+        p.id, p.name, p.slug, p.sku,
+        COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS base_price,
         p.short_description, p.inventory_quantity,
         b.name AS brand_name,
         c.name AS category_name,
@@ -133,7 +136,8 @@ export async function searchCandidates(userQuery: string, limit = 50): Promise<P
 
   return queryMany<ProductCandidate>(
     `SELECT
-       p.id, p.name, p.slug, p.sku, p.base_price::text AS base_price,
+       p.id, p.name, p.slug, p.sku,
+       COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS base_price,
        p.short_description, p.inventory_quantity,
        b.name AS brand_name,
        c.name AS category_name,
