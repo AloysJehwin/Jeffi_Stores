@@ -4,6 +4,10 @@ import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { aiChat, AiClientError } from '@/lib/ai-client'
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
+import {
+  loadApprovedDynamicTool, listApprovedDynamicTools,
+  runReadonlySql, buildDynamicEmailProposal, bumpInvocationCount,
+} from '@/lib/admin-agent/dynamic-tools'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -32,11 +36,34 @@ function buildSystemPrompt(): string {
     return `- ${t.name}${t.mutating ? ' [MUTATING]' : ''}: ${t.description}\n  args: { ${props} }`
   }).join('\n')
 
+  return buildSystemPromptBody(toolList, '')
+}
+
+async function buildSystemPromptWithDynamic(): Promise<string> {
+  const builtins = TOOLS.map(t => {
+    const props = Object.entries(t.inputSchema.properties || {}).map(([k, v]: [string, any]) => {
+      const req = (t.inputSchema.required || []).includes(k) ? '*' : ''
+      return `${k}${req}: ${v.type}${v.description ? ` — ${v.description}` : ''}`
+    }).join(', ')
+    return `- ${t.name}${t.mutating ? ' [MUTATING]' : ''}: ${t.description}\n  args: { ${props} }`
+  }).join('\n')
+
+  const dynamics = await listApprovedDynamicTools()
+  const dynamicList = dynamics.length === 0 ? '' : '\n\nDynamic tools (approved by admin earlier; same approval queue applies):\n' +
+    dynamics.map(d => {
+      const props = Object.entries((d.args_schema as any)?.properties || {}).map(([k, v]: [string, any]) => `${k}: ${v?.type || 'string'}`).join(', ')
+      return `- ${d.name}${d.kind === 'templated_email' ? ' [MUTATING]' : ''}: ${d.description}\n  args: { ${props} }`
+    }).join('\n')
+
+  return buildSystemPromptBody(builtins, dynamicList)
+}
+
+function buildSystemPromptBody(toolList: string, dynamicList: string): string {
   return `You are the Jeffi Stores admin assistant. You help store operators run their business by answering questions and proposing actions. The user is a logged-in admin.
 
 You have access to these tools. Tools marked [MUTATING] propose an action; the admin must click Approve before anything happens. Read-only tools execute immediately.
 
-${toolList}
+${toolList}${dynamicList}
 
 To call a tool, emit exactly this XML block on its own line, with valid JSON inside:
 <tool_use name="TOOL_NAME">
@@ -54,6 +81,7 @@ Hard rules:
 - run_sql_readonly is for ad-hoc questions only. Write tight queries against tables you know exist (products, orders, order_items, users, categories, brands, campaigns, email_campaigns_sent, customer_activity). It is sandboxed (read-only, 5s timeout, 100-row cap, no admin/payment_methods access) so do not worry about damage, but do worry about confusing yourself with overly clever joins.
 - Be concise. No marketing speak. No "Great question!" filler. Numbers and bullet points beat paragraphs.
 - If the user's request is ambiguous, ask one short clarifying question instead of guessing.
+- propose_new_tool: only call when the user asks for a recurring capability that no existing tool covers. Do not propose duplicates of tools that already exist.
 
 Marketing email confirmations (CRITICAL — emails to customers go to real inboxes):
 - For "send a mail about X products" / "announce new products" requests, NEVER jump straight to propose_product_announcement_email.
@@ -117,7 +145,7 @@ export async function POST(req: NextRequest) {
     [conversationId, HISTORY_TRUNCATE]
   )
 
-  const systemPrompt = buildSystemPrompt()
+  const systemPrompt = await buildSystemPromptWithDynamic()
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
     { role: 'system', content: systemPrompt },
   ]
@@ -158,14 +186,45 @@ export async function POST(req: NextRequest) {
       const toolOutputs: string[] = []
       for (const c of calls) {
         const tool = getTool(c.name)
-        if (!tool) {
-          const err = `Unknown tool: ${c.name}`
-          toolCallRecords.push({ tool: c.name, input: {}, output: err, isError: true })
-          toolOutputs.push(`<tool_result name="${c.name}">${err}</tool_result>`)
-          continue
-        }
         let parsed: Record<string, unknown> = {}
         try { parsed = JSON.parse(c.rawInput || '{}') } catch {}
+
+        if (!tool) {
+          const dynamic = await loadApprovedDynamicTool(c.name)
+          if (!dynamic) {
+            const err = `Unknown tool: ${c.name}`
+            toolCallRecords.push({ tool: c.name, input: parsed, output: err, isError: true })
+            toolOutputs.push(`<tool_result name="${c.name}">${err}</tool_result>`)
+            continue
+          }
+          try {
+            if (dynamic.kind === 'readonly_sql') {
+              const out = await runReadonlySql(dynamic, parsed)
+              await bumpInvocationCount(dynamic.id)
+              toolCallRecords.push({ tool: c.name, input: parsed, output: out })
+              toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(out).slice(0, 8000)}</tool_result>`)
+            } else {
+              const proposal = await buildDynamicEmailProposal(dynamic, parsed)
+              const inserted = await queryOne<{ id: string }>(
+                `INSERT INTO admin_agent_actions (admin_id, conversation_id, kind, payload, status)
+                 VALUES ($1, $2, $3, $4::jsonb, 'proposed')
+                 RETURNING id`,
+                [admin.adminId, conversationId, proposal.kind, JSON.stringify(proposal.payload)]
+              )
+              if (inserted) {
+                proposedActions.push({ id: inserted.id, kind: proposal.kind, payload: proposal.payload, confirmation: proposal.confirmation })
+              }
+              toolCallRecords.push({ tool: c.name, input: parsed, output: proposal })
+              toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify({ ...proposal, action_id: inserted?.id })}</tool_result>`)
+            }
+          } catch (err: any) {
+            const msg = String(err?.message || err)
+            toolCallRecords.push({ tool: c.name, input: parsed, output: msg, isError: true })
+            toolOutputs.push(`<tool_result name="${c.name}">Error: ${msg}</tool_result>`)
+          }
+          continue
+        }
+
         try {
           const out = await tool.handler(parsed)
           toolCallRecords.push({ tool: c.name, input: parsed, output: out })

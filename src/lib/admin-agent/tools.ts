@@ -778,8 +778,108 @@ export const TOOLS: ToolDef[] = [
       }
     },
   },
+  {
+    name: 'propose_new_tool',
+    description: 'Propose a new admin-agent capability when no existing tool fits the user\'s ask. Use ONLY when the user describes a recurring action you cannot do with the existing tools — e.g. "I want to be able to send a refund email" or "give me a way to query monthly revenue per category". The proposed tool will be reviewed and approved separately by an admin BEFORE it can be invoked. Hard limits: kind must be readonly_sql (a single SELECT, no writes) OR templated_email (sends a templated email). The admin will see the source_prompt, name, args, and template before approving.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'snake_case name unique to this tool. Should describe the action.' },
+        description: { type: 'string', description: 'One-sentence description of what the tool does and when to use it.' },
+        kind: { type: 'string', description: 'readonly_sql or templated_email' },
+        argsSchema: { type: 'string', description: 'JSON-encoded JSON schema describing the args. Stringify the object — do not embed it raw.' },
+        sqlTemplate: { type: 'string', description: 'For kind=readonly_sql: a single SELECT statement. Use $1, $2 etc. for args in declared order. No semicolons. No DML/DDL. Must reference real tables.' },
+        emailSubject: { type: 'string', description: 'For kind=templated_email: the subject line. May reference {{argName}}.' },
+        emailBody: { type: 'string', description: 'For kind=templated_email: plain-text body. May reference {{argName}}.' },
+        emailRecipientArg: { type: 'string', description: 'For kind=templated_email: the args key whose value is the recipient email.' },
+        sourcePrompt: { type: 'string', description: 'The original user request that motivated this proposal. Used in the audit trail.' },
+      },
+      required: ['name', 'description', 'kind', 'argsSchema', 'sourcePrompt'],
+    },
+    mutating: true,
+    handler: async (input) => {
+      const name = String(input.name || '').trim().toLowerCase()
+      const description = String(input.description || '').trim()
+      const kind = String(input.kind || '').toLowerCase()
+      const sourcePrompt = String(input.sourcePrompt || '').trim()
+      if (!/^[a-z][a-z0-9_]{2,40}$/.test(name)) throw new Error('name must be snake_case, 3-40 chars')
+      if (!description || description.length < 10) throw new Error('description too short')
+      if (!sourcePrompt) throw new Error('sourcePrompt is required for the audit trail')
+      if (!['readonly_sql', 'templated_email'].includes(kind)) {
+        throw new Error('kind must be readonly_sql or templated_email')
+      }
+
+      let argsSchema: Record<string, unknown>
+      try { argsSchema = JSON.parse(String(input.argsSchema || '{}')) } catch { throw new Error('argsSchema must be valid JSON') }
+      if (typeof argsSchema !== 'object' || argsSchema === null) throw new Error('argsSchema must be a JSON object')
+
+      let sqlTemplate: string | null = null
+      let emailTemplate: { subject: string; body: string; recipientArg: string } | null = null
+
+      if (kind === 'readonly_sql') {
+        sqlTemplate = String(input.sqlTemplate || '').trim().replace(/;\s*$/, '')
+        if (!sqlTemplate) throw new Error('sqlTemplate is required for kind=readonly_sql')
+        if (sqlTemplate.includes(';')) throw new Error('semicolons not allowed in sqlTemplate')
+        if (!/^(with\b|select\b)/i.test(sqlTemplate)) throw new Error('sqlTemplate must start with SELECT or WITH')
+        if (SQL_DML_RE.test(sqlTemplate)) throw new Error('sqlTemplate contains forbidden DML/DDL keywords')
+        if (SQL_BLOCKLIST_RE.test(sqlTemplate)) throw new Error('sqlTemplate references forbidden tables/columns')
+      } else {
+        const subject = String(input.emailSubject || '').trim()
+        const body = String(input.emailBody || '').trim()
+        const recipientArg = String(input.emailRecipientArg || '').trim()
+        if (!subject || !body || !recipientArg) {
+          throw new Error('emailSubject, emailBody, emailRecipientArg required for kind=templated_email')
+        }
+        if (subject.length > 120) throw new Error('emailSubject too long (max 120)')
+        if (body.length > 4000) throw new Error('emailBody too long (max 4000)')
+        emailTemplate = { subject, body, recipientArg }
+      }
+
+      const exists = await queryOne<{ id: string }>(
+        `SELECT id::text FROM admin_agent_proposed_tools WHERE name = $1 AND status IN ('proposed','approved') LIMIT 1`,
+        [name]
+      )
+      if (exists) {
+        return { proposed: false, info: `A ${exists.id ? 'tool' : 'proposal'} named "${name}" already exists. Pick a different name or use the existing one.` }
+      }
+
+      return {
+        proposed: true,
+        kind: 'register_dynamic_tool',
+        payload: {
+          name,
+          description,
+          dynamicKind: kind,
+          argsSchema,
+          sqlTemplate,
+          emailTemplate,
+          sourcePrompt,
+        },
+        confirmation: `Register a new ${kind === 'readonly_sql' ? 'read-only SQL' : 'templated email'} tool called "${name}"? It will only become callable after a SECOND admin approval on the proposed-tools review page.`,
+      }
+    },
+  },
 ]
 
 export function getTool(name: string): ToolDef | null {
   return TOOLS.find(t => t.name === name) || null
 }
+
+interface DynamicToolRow {
+  id: string
+  name: string
+  description: string
+  args_schema: Record<string, unknown>
+  kind: 'readonly_sql' | 'templated_email'
+}
+
+export async function getApprovedDynamicTools(): Promise<DynamicToolRow[]> {
+  const rows = await queryMany<DynamicToolRow>(
+    `SELECT id::text, name, description, args_schema, kind
+       FROM admin_agent_proposed_tools
+      WHERE status = 'approved'
+      ORDER BY name ASC`
+  )
+  return rows
+}
+

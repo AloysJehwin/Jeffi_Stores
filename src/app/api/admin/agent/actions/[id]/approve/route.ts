@@ -114,6 +114,58 @@ async function executeAction(action: AgentAction): Promise<{ result: any; error:
         error: failed > 0 && sent === 0 ? `All ${failed} sends failed` : null,
       }
     }
+    case 'register_dynamic_tool': {
+      const { name, description, dynamicKind, argsSchema, sqlTemplate, emailTemplate, sourcePrompt } = action.payload
+      const inserted = await queryOne<{ id: string }>(
+        `INSERT INTO admin_agent_proposed_tools
+           (proposed_by_admin_id, source_prompt, name, description, args_schema, kind,
+            sql_template, email_template, status)
+         VALUES ($1::uuid, $2, $3, $4, $5::jsonb, $6, $7, $8::jsonb, 'proposed')
+         ON CONFLICT (name) WHERE status = 'approved' DO NOTHING
+         RETURNING id::text`,
+        [
+          action.admin_id,
+          sourcePrompt,
+          name,
+          description,
+          JSON.stringify(argsSchema || {}),
+          dynamicKind,
+          sqlTemplate || null,
+          emailTemplate ? JSON.stringify(emailTemplate) : null,
+        ]
+      )
+      if (!inserted) return { result: null, error: 'A tool with this name is already approved' }
+      return {
+        result: { proposedToolId: inserted.id, name, kind: dynamicKind, reviewUrl: `/admin/agent/proposed-tools` },
+        error: null,
+      }
+    }
+    case 'send_dynamic_email': {
+      const { toolId, toolName, toEmail, subject, body } = action.payload as {
+        toolId: string; toolName: string; toEmail: string; subject: string; body: string
+      }
+      if (!toEmail || !subject || !body) {
+        return { result: null, error: 'Missing required fields' }
+      }
+      const { transporter } = await import('@/lib/email')
+      try {
+        const info = await transporter.sendMail({
+          from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+          to: toEmail,
+          subject,
+          text: body,
+        })
+        await query(
+          `UPDATE admin_agent_proposed_tools
+              SET invocation_count = invocation_count + 1, last_invoked_at = NOW()
+            WHERE id = $1::uuid`,
+          [toolId]
+        )
+        return { result: { sentTo: toEmail, toolName, messageId: info.messageId }, error: null }
+      } catch (err: any) {
+        return { result: null, error: String(err?.message || 'Send failed') }
+      }
+    }
     default:
       return { result: null, error: `Unknown action kind: ${action.kind}` }
   }
