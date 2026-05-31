@@ -6,6 +6,7 @@ import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import AdminMobileNav from '@/components/admin/AdminMobileNav'
 import AdminSidebarNav from '@/components/admin/AdminSidebarNav'
+import AdminAgentTrigger from '@/components/admin/AdminAgentTrigger'
 import ThemeToggle from '@/components/ThemeToggle'
 import SessionGuard from '@/components/admin/SessionGuard'
 
@@ -134,6 +135,7 @@ export default async function AdminLayout({
               </div>
             </div>
             <ThemeToggle variant="admin" />
+            <AdminAgentTrigger canUse={role === 'super_admin' || scopes.includes('agent')} />
             <form action={logoutAction}>
               <button
                 type="submit"
