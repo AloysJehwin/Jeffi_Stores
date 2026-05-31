@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query } from '@/lib/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
+import { aiChat, AiClientError } from '@/lib/ai-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,35 +60,36 @@ export async function POST(req: NextRequest) {
   if (!userPrompt) return NextResponse.json({ error: 'prompt is required' }, { status: 400 })
   if (userPrompt.length > 2000) return NextResponse.json({ error: 'prompt too long (max 2000 chars)' }, { status: 400 })
 
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'OpenAI not configured' }, { status: 500 })
+  let aiText = ''
+  let provider = ''
+  let model = ''
+  let latencyMs = 0
+  let fallbackUsed = false
 
-  const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
+  try {
+    const r = await aiChat({
+      modelHint: 'sql',
+      jsonMode: true,
+      temperature: 0.2,
+      maxTokens: 1500,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.2,
-      max_tokens: 1500,
-      response_format: { type: 'json_object' },
-    }),
-  })
-
-  if (!aiRes.ok) {
-    const errBody = await aiRes.json().catch(() => ({}))
+    })
+    aiText = r.content
+    provider = r.provider
+    model = r.model
+    latencyMs = r.latencyMs
+    fallbackUsed = r.fallbackUsed
+  } catch (err) {
+    const message = err instanceof AiClientError ? err.message : 'AI request failed'
     await query(
       `INSERT INTO scenario_audit_log (admin_id, action, ai_prompt, result) VALUES ($1, 'ai_generate_failed', $2, $3::jsonb)`,
-      [admin.id, userPrompt, JSON.stringify({ error: errBody?.error?.message || 'OpenAI request failed', status: aiRes.status })]
+      [admin.id, userPrompt, JSON.stringify({ error: message })]
     ).catch(() => {})
-    return NextResponse.json({ error: errBody?.error?.message || 'OpenAI request failed' }, { status: 502 })
+    return NextResponse.json({ error: message }, { status: 502 })
   }
-
-  const aiData = await aiRes.json()
-  const aiText = aiData.choices?.[0]?.message?.content || ''
 
   let parsed: { sql?: string; explanation?: string }
   try {
@@ -95,7 +97,7 @@ export async function POST(req: NextRequest) {
   } catch {
     await query(
       `INSERT INTO scenario_audit_log (admin_id, action, ai_prompt, ai_response, result) VALUES ($1, 'ai_generate_unparseable', $2, $3, $4::jsonb)`,
-      [admin.id, userPrompt, aiText, JSON.stringify({ error: 'unparseable JSON' })]
+      [admin.id, userPrompt, aiText, JSON.stringify({ error: 'unparseable JSON', provider, model })]
     ).catch(() => {})
     return NextResponse.json({ error: 'AI returned unparseable JSON' }, { status: 502 })
   }
@@ -107,14 +109,17 @@ export async function POST(req: NextRequest) {
   const validation = validateScenarioSql(parsed.sql)
 
   await query(
-    `INSERT INTO scenario_audit_log (admin_id, action, ai_prompt, ai_response, generated_sql, validation)
-     VALUES ($1, 'ai_generate', $2, $3, $4, $5::jsonb)`,
-    [admin.id, userPrompt, aiText, parsed.sql, JSON.stringify(validation)]
+    `INSERT INTO scenario_audit_log (admin_id, action, ai_prompt, ai_response, generated_sql, validation, result)
+     VALUES ($1, 'ai_generate', $2, $3, $4, $5::jsonb, $6::jsonb)`,
+    [admin.id, userPrompt, aiText, parsed.sql, JSON.stringify(validation), JSON.stringify({ provider, model, latencyMs, fallbackUsed })]
   ).catch(() => {})
 
   return NextResponse.json({
     sql: parsed.sql,
     explanation: parsed.explanation || '',
     validation,
+    provider,
+    model,
+    fallbackUsed,
   })
 }

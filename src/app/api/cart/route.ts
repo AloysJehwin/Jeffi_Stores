@@ -3,6 +3,7 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { jwtVerify } from 'jose'
 import { getUserIdForSession } from '@/lib/guest-user'
+import { recordImplicitSignal } from '@/lib/ai-feedback'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET not set") })())
 
@@ -142,6 +143,7 @@ export async function POST(request: NextRequest) {
     if (existingItem) {
       const newQuantity = Number(existingItem.quantity) + Number(quantity)
       await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [newQuantity, existingItem.id])
+      recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
       return NextResponse.json({ message: 'Cart updated', quantity: newQuantity })
     }
 
@@ -149,6 +151,7 @@ export async function POST(request: NextRequest) {
       'INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
       [userId, productId, variantId || null, subVariantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
     )
+    recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
     return NextResponse.json({ message: 'Item added to cart' })
   } catch {
     return NextResponse.json({ error: 'Failed to add to cart' }, { status: 500 })

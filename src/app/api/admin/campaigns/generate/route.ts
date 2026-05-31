@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { aiChat, AiClientError } from '@/lib/ai-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,9 +14,6 @@ export async function POST(req: NextRequest) {
 
   const { prompt, campaignName } = await req.json()
   if (!prompt?.trim()) return NextResponse.json({ error: 'prompt is required' }, { status: 400 })
-
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'OpenAI not configured' }, { status: 500 })
 
   const systemPrompt = `You are an email marketing copywriter for Jeffi Stores, an Indian e-commerce store.
 Generate an email campaign template. Return ONLY valid JSON with exactly four keys:
@@ -31,31 +29,23 @@ Keep the HTML clean, mobile-friendly, and brand-appropriate. Use inline styles o
   const userPrompt = `Campaign: ${campaignName || 'New Campaign'}
 Prompt: ${prompt.trim()}`
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
+  let text = ''
+  try {
+    const r = await aiChat({
+      modelHint: 'copy',
+      jsonMode: true,
+      temperature: 0.7,
+      maxTokens: 2000,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.7,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' },
-    }),
-  })
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}))
-    return NextResponse.json({ error: err?.error?.message || 'OpenAI request failed' }, { status: 502 })
+    })
+    text = r.content
+  } catch (err) {
+    const message = err instanceof AiClientError ? err.message : 'AI request failed'
+    return NextResponse.json({ error: message }, { status: 502 })
   }
-
-  const data = await response.json()
-  const text = data.choices?.[0]?.message?.content || ''
 
   let parsed: { name?: string; kind?: string; subject_template?: string; body_template?: string }
   try {

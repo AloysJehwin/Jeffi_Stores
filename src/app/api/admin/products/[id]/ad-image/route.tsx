@@ -93,8 +93,8 @@ export async function GET(
         <div style={{ width: W, height: H * 0.70, position: 'relative', display: 'flex', overflow: 'hidden' }}>
           {product.primary_image
             ? <img src={product.primary_image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <div style={{ width: '100%', height: '100%', backgroundColor: '#1a1d26', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ fontSize: 140, display: 'flex' }}>📦</div>
+            : <div style={{ width: '100%', height: '100%', backgroundColor: '#1a1d26', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4a5568', fontSize: 36, letterSpacing: 2 }}>
+                NO IMAGE
               </div>
           }
           {/* Fade bottom of image into dark panel */}

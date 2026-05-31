@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
+import { AlertTriangle, Check } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
@@ -611,10 +612,11 @@ export default function InvoicesClient() {
                   <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">Payment status will be <strong>Unpaid</strong> — credit sale</p>
                 )}
                 {paymentMode === 'credit' && creditWarning && (
-                  <div className="mt-2 px-3 py-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-xs text-yellow-700 dark:text-yellow-300">
-                    ⚠ {creditWarning.creditLimit > 0
+                  <div className="mt-2 px-3 py-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-xs text-yellow-700 dark:text-yellow-300 flex items-start gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    <span>{creditWarning.creditLimit > 0
                       ? `Credit limit warning: ₹${creditWarning.outstanding.toLocaleString('en-IN')} outstanding of ₹${creditWarning.creditLimit.toLocaleString('en-IN')} limit`
-                      : `₹${creditWarning.outstanding.toLocaleString('en-IN')} already outstanding for this customer`}
+                      : `₹${creditWarning.outstanding.toLocaleString('en-IN')} already outstanding for this customer`}</span>
                   </div>
                 )}
               </div>
@@ -924,8 +926,8 @@ export default function InvoicesClient() {
                       </td>
                       <td className="px-4 py-3">
                         {inv.irn ? (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
-                            {inv.irn_status === 'generated' ? 'IRN ✓' : 'Stub'}
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1 ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
+                            {inv.irn_status === 'generated' ? <><Check className="w-3 h-3" /> IRN</> : 'Stub'}
                           </span>
                         ) : (
                           <span className="text-xs text-foreground-muted">—</span>
@@ -1096,8 +1098,8 @@ export default function InvoicesClient() {
                       </span>
                     )}
                     {inv.irn && (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
-                        {inv.irn_status === 'generated' ? 'IRN ✓' : 'IRN Stub'}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1 ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
+                        {inv.irn_status === 'generated' ? <><Check className="w-3 h-3" /> IRN</> : 'IRN Stub'}
                       </span>
                     )}
                   </div>
@@ -1246,8 +1248,8 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
               {inv.source === 'online' ? 'Online' : 'Offline'}
             </span>
             {inv.irn && (
-              <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
-                {inv.irn_status === 'generated' ? 'IRN ✓' : 'IRN Stub'}
+              <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full inline-flex items-center gap-1 ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>
+                {inv.irn_status === 'generated' ? <><Check className="w-3 h-3" /> IRN</> : 'IRN Stub'}
               </span>
             )}
           </div>

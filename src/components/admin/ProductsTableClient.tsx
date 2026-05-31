@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { Star } from 'lucide-react'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
@@ -67,7 +68,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                                 {product.is_active ? 'Active' : 'Inactive'}
                               </span>
                               {product.is_featured && (
-                                <span className="px-1.5 py-0.5 text-xs rounded-full font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">★ Featured</span>
+                                <span className="px-1.5 py-0.5 text-xs rounded-full font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
                               )}
                             </div>
                           </div>
@@ -142,7 +143,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                       </div>
                     </HoverCard>
                     {product.is_featured && (
-                      <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mt-0.5">★ Featured</div>
+                      <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mt-0.5 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</div>
                     )}
                   </div>
                 </div>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Check, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 
 interface Validation {
@@ -148,7 +149,7 @@ export default function NewScenarioClient() {
                   active ? 'bg-accent-500 text-white' :
                   'bg-zinc-200 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400'
                 }`}>
-                  {done ? '✓' : idx + 1}
+                  {done ? <Check className="w-3.5 h-3.5" /> : idx + 1}
                 </span>
                 <span className={`text-xs font-medium ${active ? 'text-foreground' : 'text-foreground-muted'}`}>{label}</span>
                 {idx < 3 && <span className="w-6 h-px bg-border-default" />}
@@ -229,7 +230,7 @@ export default function NewScenarioClient() {
                 ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800'
                 : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
             }`}>
-              <p className="font-semibold mb-1">{validationOk ? '✓ Safety filter passed' : '✗ Rejected by safety filter'}</p>
+              <p className="font-semibold mb-1 inline-flex items-center gap-1">{validationOk ? <><Check className="w-3.5 h-3.5" /> Safety filter passed</> : <><X className="w-3.5 h-3.5" /> Rejected by safety filter</>}</p>
               {validationOk && validation.tablesReferenced && (
                 <p>Tables referenced: <code className="font-mono">{validation.tablesReferenced.join(', ')}</code></p>
               )}

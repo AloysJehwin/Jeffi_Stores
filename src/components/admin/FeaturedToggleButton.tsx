@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Star } from 'lucide-react'
 
 interface Props {
   productId: string
@@ -58,7 +59,7 @@ export default function FeaturedToggleButton({ productId, isFeatured, featuredCo
             : 'bg-surface-secondary text-foreground-muted hover:bg-yellow-50 hover:text-yellow-700'
         } ${loading ? 'opacity-60 cursor-wait' : ''}`}
       >
-        <span>{optimistic ? '★' : '☆'}</span>
+        <Star className={`w-3 h-3 ${optimistic ? 'fill-current' : ''}`} />
         <span>{optimistic ? 'Featured' : 'Feature'}</span>
       </button>
       {error && (

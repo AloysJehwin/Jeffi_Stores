@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import Image from 'next/image'
+import { Star, X, Paperclip, Lock, PartyPopper, Camera } from 'lucide-react'
 
 interface CustomField {
   id: string
@@ -38,9 +39,10 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
           key={star}
           type="button"
           onClick={() => onChange(star)}
-          className={`text-2xl transition-colors ${star <= value ? 'text-yellow-400' : 'text-gray-300'}`}
+          className={`transition-colors ${star <= value ? 'text-yellow-400' : 'text-gray-300'}`}
+          aria-label={`${star} star`}
         >
-          ★
+          <Star className={`w-7 h-7 ${star <= value ? 'fill-current' : ''}`} />
         </button>
       ))}
     </div>
@@ -70,12 +72,13 @@ function ImageFieldUpload({ fieldId, label, required }: { fieldId: string; label
             <button
               type="button"
               onClick={e => { e.stopPropagation(); setPreview(null); if (ref.current) ref.current.value = '' }}
-              className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center"
-            >✕</button>
+              aria-label="Remove file"
+              className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
+            ><X className="w-3.5 h-3.5" /></button>
           </div>
         ) : (
           <div className="text-center py-3">
-            <p className="text-2xl mb-1">📎</p>
+            <Paperclip className="w-7 h-7 mx-auto mb-1 text-foreground-muted" />
             <p className="text-sm text-gray-500">Tap to upload</p>
             <p className="text-xs text-gray-400">JPEG, PNG · max 5MB</p>
           </div>
@@ -155,7 +158,7 @@ export default function FormClient({ form }: { form: ReviewForm }) {
     return (
       <div className="min-h-[calc(100vh-48px)] bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <p className="text-4xl mb-4">🔒</p>
+          <Lock className="w-10 h-10 mx-auto mb-4 text-foreground-muted" />
           <h1 className="text-xl font-bold text-gray-800 mb-2">Form Closed</h1>
           <p className="text-gray-500">This form is no longer accepting submissions.</p>
         </div>
@@ -171,7 +174,7 @@ export default function FormClient({ form }: { form: ReviewForm }) {
     return (
       <div className="min-h-[calc(100vh-48px)] bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center space-y-5">
-          <div className="text-5xl">🎉</div>
+          <PartyPopper className="w-12 h-12 mx-auto text-emerald-500" />
           <h2 className="text-2xl font-bold text-gray-800">Thank You!</h2>
           <p className="text-gray-500">Your review screenshot has been received. Here&apos;s your reward:</p>
 
@@ -307,12 +310,13 @@ export default function FormClient({ form }: { form: ReviewForm }) {
                       <button
                         type="button"
                         onClick={e => { e.stopPropagation(); setFile(null); setPreview(null) }}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center hover:bg-red-600"
-                      >✕</button>
+                        aria-label="Remove file"
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
+                      ><X className="w-3.5 h-3.5" /></button>
                     </div>
                   ) : (
                     <div className="text-center py-4">
-                      <p className="text-3xl mb-2">📸</p>
+                      <Camera className="w-9 h-9 mx-auto mb-2 text-foreground-muted" />
                       <p className="text-sm text-gray-500">Tap to upload screenshot</p>
                       <p className="text-xs text-gray-400 mt-0.5">JPEG, PNG · max 5MB</p>
                     </div>
@@ -337,12 +341,13 @@ export default function FormClient({ form }: { form: ReviewForm }) {
                       <button
                         type="button"
                         onClick={e => { e.stopPropagation(); setFile(null); setPreview(null) }}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center hover:bg-red-600"
-                      >✕</button>
+                        aria-label="Remove file"
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
+                      ><X className="w-3.5 h-3.5" /></button>
                     </div>
                   ) : (
                     <div className="text-center py-4">
-                      <p className="text-3xl mb-2">📎</p>
+                      <Paperclip className="w-9 h-9 mx-auto mb-2 text-foreground-muted" />
                       <p className="text-sm text-gray-500">Tap to attach a photo</p>
                       <p className="text-xs text-gray-400 mt-0.5">JPEG, PNG · max 5MB</p>
                     </div>

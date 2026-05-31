@@ -1,5 +1,6 @@
 'use client'
 
+import { Package } from 'lucide-react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 interface ProductImageProps {
@@ -10,8 +11,8 @@ interface ProductImageProps {
 export default function ProductImage({ thumbnailUrl, altText }: ProductImageProps) {
   if (!thumbnailUrl) {
     return (
-      <div className="h-10 w-10 rounded bg-surface-secondary flex items-center justify-center text-foreground-muted text-xs">
-        📦
+      <div className="h-10 w-10 rounded bg-surface-secondary flex items-center justify-center text-foreground-muted">
+        <Package className="w-4 h-4" />
       </div>
     )
   }

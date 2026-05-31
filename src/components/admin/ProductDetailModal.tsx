@@ -2,6 +2,7 @@
 
 import React, { useEffect, useCallback, useState } from 'react'
 import Link from 'next/link'
+import { Package, Star } from 'lucide-react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
 interface Props {
@@ -138,7 +139,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                       className="w-full h-full object-contain"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-foreground-muted text-4xl">📦</div>
+                    <div className="w-full h-full flex items-center justify-center text-foreground-muted"><Package className="w-12 h-12" /></div>
                   )}
                 </div>
                 {images.length > 1 && (
@@ -164,7 +165,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                     {p.is_active ? 'Active' : 'Inactive'}
                   </span>
                   {p.is_featured && (
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">★ Featured</span>
+                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
                   )}
                   {stock === 0 && (
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Out of Stock</span>

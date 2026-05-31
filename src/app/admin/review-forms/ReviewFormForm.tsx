@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Star, MessageSquare, FileText, X } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from '@/components/forms/FormsPreview'
 import Toggle from '@/components/ui/Toggle'
@@ -22,10 +24,10 @@ interface CustomField {
 
 type TemplateType = 'google_review' | 'product_feedback' | 'testimonial'
 
-const TEMPLATES: { value: TemplateType; label: string; icon: string; description: string }[] = [
-  { value: 'google_review', label: 'Google Review', icon: '⭐', description: 'Send customers to Google, then collect their screenshot' },
-  { value: 'product_feedback', label: 'Product Feedback', icon: '💬', description: 'Collect ratings and written feedback on a purchase' },
-  { value: 'testimonial', label: 'Testimonial', icon: '📝', description: 'Gather a written testimonial with optional photo' },
+const TEMPLATES: { value: TemplateType; label: string; Icon: LucideIcon; description: string }[] = [
+  { value: 'google_review', label: 'Google Review', Icon: Star, description: 'Send customers to Google, then collect their screenshot' },
+  { value: 'product_feedback', label: 'Product Feedback', Icon: MessageSquare, description: 'Collect ratings and written feedback on a purchase' },
+  { value: 'testimonial', label: 'Testimonial', Icon: FileText, description: 'Gather a written testimonial with optional photo' },
 ]
 
 interface ReviewFormFormProps {
@@ -146,7 +148,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
                     : 'border-border-default hover:border-accent-500/50'
                 }`}
               >
-                <span className="text-xl">{t.icon}</span>
+                <span className="text-xl"><t.Icon className="w-5 h-5" /></span>
                 <span className={`text-sm font-semibold ${templateType === t.value ? 'text-accent-500' : 'text-foreground'}`}>{t.label}</span>
                 <span className="text-xs text-foreground-muted leading-snug">{t.description}</span>
               </button>
@@ -231,7 +233,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 shrink-0">
                   <Toggle checked={field.required} onChange={v => updateField(field.id, { required: v })} label="Req" size="sm" />
-                  <button type="button" onClick={() => removeField(field.id)} className="text-red-400 hover:text-red-500 text-sm leading-none">✕</button>
+                  <button type="button" onClick={() => removeField(field.id)} className="text-red-400 hover:text-red-500 leading-none" aria-label="Remove field"><X className="w-4 h-4" /></button>
                 </div>
               </div>
             ))}

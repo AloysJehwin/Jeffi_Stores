@@ -15,6 +15,7 @@ import {
 } from '@/lib/order-commit'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
+import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 
 export async function POST(request: NextRequest) {
   try {
@@ -183,6 +184,8 @@ async function commitDraft(args: {
     metadata: { orderNumber: created.order_number, total: created.total_amount, itemCount: orderItems?.length || 0 },
   }).catch(() => {})
 
+  recordImplicitSignalsForProducts(args.userId, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
+
   if (Number(created.total_amount) >= 50000) {
     createAutoTask({
       userId: args.userId,
@@ -282,6 +285,8 @@ async function markLegacyOrderPaid(args: {
     sendOrderConfirmationEmail(user.email, updatedOrder || order, orderItems || [], invoicePdfBuffer).catch(() => {})
     sendNewOrderNotification(updatedOrder || order, orderItems || [], user).catch(() => {})
     sendPaymentStatusUpdate(user.email, userName, order.order_number, args.orderId, 'paid', parseFloat(order.total_amount)).catch(() => {})
+
+    recordImplicitSignalsForProducts(args.userId, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
   }
 
   return NextResponse.json({

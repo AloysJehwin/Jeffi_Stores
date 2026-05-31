@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
+import { Check } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -850,7 +851,7 @@ export default function QuotationsClient() {
           <span className="text-xs text-foreground-secondary animate-pulse">Saving…</span>
         )}
         {autoSaveStatus === 'saved' && (
-          <span className="text-xs text-green-600 dark:text-green-400">✓ Saved</span>
+          <span className="text-xs text-green-600 dark:text-green-400 inline-flex items-center gap-1"><Check className="w-3 h-3" /> Saved</span>
         )}
         {!isFinal && (
           <button onClick={() => save('final')} disabled={saving}

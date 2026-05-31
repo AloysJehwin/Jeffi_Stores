@@ -129,6 +129,7 @@ The repo is cloned from `git@github.com:AloysJehwin/Jeffi_Stores.git` (configure
 
 - `0 3 * * *` — `certbot renew --quiet --deploy-hook 'docker restart jeffi-nginx'`
 - `30 2 * * *` — Nightly Google Merchant Center sync via `GET /api/admin/merchant/sync` with `Authorization: Bearer $CRON_SECRET`
+- `30 1 * * *` — Daily ops briefing via `GET /api/cron/daily-briefing` (02:30 UTC = 08:00 IST). Sends an HTML summary email to all active admins. Idempotent (skips if already sent today). See [docs/DAILY_BRIEFING.md](docs/DAILY_BRIEFING.md).
 
 ### In-app Schedules (run inside the Next.js process via `src/instrumentation.ts`)
 

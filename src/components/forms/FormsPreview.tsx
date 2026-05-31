@@ -1,3 +1,5 @@
+import { Star, Camera, Paperclip, Check } from 'lucide-react'
+
 interface CustomField {
   id: string
   label: string
@@ -18,7 +20,7 @@ function StarPreview() {
   return (
     <div className="flex gap-1">
       {[1, 2, 3, 4, 5].map(s => (
-        <span key={s} className="text-xl text-gray-300">★</span>
+        <Star key={s} className="w-5 h-5 text-gray-300" />
       ))}
     </div>
   )
@@ -47,8 +49,8 @@ export default function FormsPreview({ title, description, templateType, googleR
                 <p className="text-xs text-gray-400">It takes less than a minute!</p>
               </div>
             </div>
-            <div className="w-full py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold text-center opacity-80">
-              Open Google Review Page {googleReviewUrl ? '✓' : ''}
+            <div className="w-full py-2.5 bg-blue-500 text-white rounded-xl text-sm font-semibold text-center opacity-80 inline-flex items-center justify-center gap-1">
+              Open Google Review Page {googleReviewUrl ? <Check className="w-3.5 h-3.5" /> : null}
             </div>
           </div>
         )}
@@ -102,7 +104,7 @@ export default function FormsPreview({ title, description, templateType, googleR
               <div>
                 <p className="text-xs font-medium text-gray-600 mb-1">Screenshot of your review *</p>
                 <div className="border-2 border-dashed border-gray-200 rounded-xl p-3 text-center">
-                  <p className="text-xl">📸</p>
+                  <Camera className="w-6 h-6 mx-auto text-gray-400" />
                   <p className="text-xs text-gray-400">Tap to upload</p>
                 </div>
               </div>
@@ -119,7 +121,7 @@ export default function FormsPreview({ title, description, templateType, googleR
                 )}
                 {field.type === 'image' && (
                   <div className="border-2 border-dashed border-gray-200 rounded-xl p-3 text-center">
-                    <p className="text-lg">📎</p>
+                    <Paperclip className="w-5 h-5 mx-auto text-gray-400" />
                     <p className="text-xs text-gray-400">Upload image</p>
                   </div>
                 )}

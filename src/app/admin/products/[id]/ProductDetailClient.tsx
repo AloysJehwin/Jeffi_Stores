@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { Star } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 
 function formatINR(n: number) {
@@ -132,7 +133,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
             : <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-secondary text-foreground-secondary">Inactive</span>
           }
           {p.is_featured && (
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">★ Featured</span>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
           )}
           <Link href={`/admin/products/${p.id}/analytics`} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Analytics

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { Check } from 'lucide-react'
 
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -160,7 +161,7 @@ export default function EditSupplierPage() {
                   maxLength={11}
                 />
                 {ifscLookup === 'loading' && <span className="absolute right-2 top-2.5 text-xs text-foreground-secondary">…</span>}
-                {ifscLookup === 'ok' && <span className="absolute right-2 top-2.5 text-xs text-green-600 dark:text-green-400">✓</span>}
+                {ifscLookup === 'ok' && <Check className="absolute right-2 top-2.5 w-4 h-4 text-green-600 dark:text-green-400" />}
                 {ifscLookup === 'error' && <span className="absolute right-2 top-2.5 text-xs text-red-500">?</span>}
               </div>
             </div>
