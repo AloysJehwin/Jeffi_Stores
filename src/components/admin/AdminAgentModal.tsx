@@ -29,12 +29,26 @@ interface ToolCall {
   isError?: boolean
 }
 
+interface PickerOption {
+  id: string
+  label: string
+  sublabel?: string
+}
+
+interface Picker {
+  choice_kind: string
+  options: PickerOption[]
+  note?: string
+}
+
 interface ChatTurn {
   id: string
   role: 'user' | 'assistant'
   content: string
   toolCalls?: ToolCall[]
   proposedActions?: ProposedAction[]
+  pickers?: Picker[]
+  pickerResolved?: boolean
 }
 
 const SLASH_COMMANDS: { command: string; example: string; description: string }[] = [
@@ -117,12 +131,19 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
         content: data.message,
         toolCalls: data.toolCalls,
         proposedActions: (data.proposedActions || []).map((a: any) => ({ ...a, status: 'proposed' as const })),
+        pickers: data.pickers || [],
       }])
     } catch (err: any) {
       showToast(err?.message || 'Network error', 'error')
     } finally {
       setLoading(false)
     }
+  }
+
+  async function pickOption(turnId: string, picker: Picker, option: PickerOption) {
+    setTurns(prev => prev.map(t => t.id !== turnId ? t : { ...t, pickerResolved: true }))
+    const followUp = `Use ${picker.choice_kind} id ${option.id} (${option.label}) for the previous request.`
+    sendMessage(followUp)
   }
 
   async function decideAction(turnId: string, actionId: string, decision: 'approve' | 'reject') {
@@ -238,6 +259,28 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                             ))}
                           </ul>
                         </details>
+                      )}
+                      {turn.pickers && turn.pickers.length > 0 && !turn.pickerResolved && (
+                        <div className="mt-3 space-y-2">
+                          {turn.pickers.map((picker, pi) => (
+                            <div key={pi} className="rounded-lg border border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/10 p-3">
+                              <p className="text-xs font-semibold text-accent-900 dark:text-accent-200 mb-2">Pick a {picker.choice_kind}{picker.note ? ` — ${picker.note}` : ''}</p>
+                              <div className="space-y-1">
+                                {picker.options.map(opt => (
+                                  <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => pickOption(turn.id, picker, opt)}
+                                    className="w-full text-left px-3 py-1.5 rounded-md hover:bg-accent-100 dark:hover:bg-accent-900/30 transition-colors"
+                                  >
+                                    <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                                    {opt.sublabel && <p className="text-[11px] text-foreground-muted">{opt.sublabel}</p>}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                       {turn.proposedActions && turn.proposedActions.length > 0 && (
                         <div className="mt-3 space-y-2">

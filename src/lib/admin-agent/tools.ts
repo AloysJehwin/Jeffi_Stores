@@ -1,8 +1,43 @@
+import { Pool } from 'pg'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { embed } from '@/lib/rag'
 
 function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
+
+const FORBIDDEN_TABLES = [
+  'admins',
+  'admin_agent_messages',
+  'admin_agent_actions',
+  'admin_sessions',
+  'payment_methods',
+  'razorpay_webhooks',
+  'webhook_events',
+  'schema_migrations',
+]
+const FORBIDDEN_COLUMNS = ['password_hash', 'password', 'totp_secret', 'reset_token', 'razorpay_signature']
+const SQL_BLOCKLIST_RE = new RegExp(
+  `\\b(${[...FORBIDDEN_TABLES, ...FORBIDDEN_COLUMNS].join('|')})\\b`,
+  'i'
+)
+const SQL_DML_RE = /\b(insert|update|delete|drop|truncate|alter|create|grant|revoke|copy|vacuum|analyze|reindex|comment|cluster|lock|listen|notify|set\s+role|reset\s+role)\b/i
+
+let _readonlyPool: Pool | null = null
+function getReadonlyPool(): Pool {
+  if (!_readonlyPool) {
+    const conn = process.env.DATABASE_URL
+    if (!conn) throw new Error('DATABASE_URL not configured')
+    _readonlyPool = new Pool({
+      connectionString: conn,
+      max: 2,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+      ssl: /amazonaws|sslmode=require/.test(conn) ? { rejectUnauthorized: false } : undefined,
+    })
+    _readonlyPool.on('error', () => {})
+  }
+  return _readonlyPool
+}
 
 export interface ToolInputSchema {
   type: 'object'
@@ -386,6 +421,181 @@ export const TOOLS: ToolDef[] = [
         kind: 'mark_order_shipped',
         payload: { orderId: o.id, orderNumber: o.order_number, awbNumber: awbNumber || null },
         confirmation: `Mark order ${o.order_number} as shipped${awbNumber ? ` with AWB ${awbNumber}` : ''}?`,
+      }
+    },
+  },
+  {
+    name: 'list_admin_tools',
+    description: 'Introspection. Returns the names, descriptions, and mutating-flag of every tool the admin agent itself has access to. Use when the user asks "what can you do?" or wants a capabilities tour.',
+    inputSchema: { type: 'object', properties: {} },
+    mutating: false,
+    handler: async () => {
+      return {
+        tools: TOOLS.map(t => ({
+          name: t.name,
+          description: t.description,
+          mutating: t.mutating,
+          args: Object.keys(t.inputSchema.properties || {}),
+        })),
+        count: TOOLS.length,
+      }
+    },
+  },
+  {
+    name: 'run_sql_readonly',
+    description: 'Run a single read-only SELECT against the live database for ad-hoc questions the other tools do not cover. Auto-wrapped in a READ ONLY transaction with a 5-second statement timeout; writes, DDL, and access to admins/payment_methods/password columns are blocked. Returns up to 100 rows. Prefer the dedicated tools when one fits.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sql: { type: 'string', description: 'A single SELECT statement. No semicolons except at the end. No CTE writes.' },
+      },
+      required: ['sql'],
+    },
+    mutating: false,
+    handler: async ({ sql }) => {
+      const raw = String(sql || '').trim().replace(/;\s*$/, '')
+      if (!raw) throw new Error('sql is required')
+      if (raw.length > 4000) throw new Error('sql too long (max 4000 chars)')
+      if (raw.includes(';')) throw new Error('semicolons not allowed inside the statement')
+      if (!/^(with\b|select\b)/i.test(raw)) throw new Error('only SELECT or WITH...SELECT is permitted')
+      if (SQL_DML_RE.test(raw)) throw new Error('write/DDL keywords are forbidden')
+      if (SQL_BLOCKLIST_RE.test(raw)) throw new Error('query references a forbidden table or column')
+
+      const guarded = `${raw} LIMIT 100`
+      const pool = getReadonlyPool()
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN READ ONLY')
+        await client.query("SET LOCAL statement_timeout = '5s'")
+        const result = await client.query(guarded)
+        await client.query('ROLLBACK')
+        return {
+          rowCount: result.rowCount ?? result.rows.length,
+          fields: result.fields?.map(f => f.name) || [],
+          rows: result.rows.slice(0, 100),
+          truncated: (result.rowCount ?? result.rows.length) >= 100,
+        }
+      } catch (err: any) {
+        try { await client.query('ROLLBACK') } catch {}
+        throw new Error(`SQL error: ${err?.message || err}`)
+      } finally {
+        client.release()
+      }
+    },
+  },
+  {
+    name: 'find_customer_orders',
+    description: 'Look up a customer by name or email and return their orders, ordered by most recent first. Use when the user references "Aloys Jehwin\'s recent order" without an order number — call this first, then ask the admin to pick an order via the disambiguation flow.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        customerQuery: { type: 'string', description: 'Customer name or email fragment.' },
+        limit: { type: 'integer', default: 10, minimum: 1, maximum: 50 },
+      },
+      required: ['customerQuery'],
+    },
+    mutating: false,
+    handler: async ({ customerQuery, limit }) => {
+      const lim = clamp(typeof limit === 'number' ? limit : 10, 1, 50)
+      const q = String(customerQuery || '').trim()
+      if (!q) throw new Error('customerQuery is required')
+      const customers = await queryMany<{
+        id: string; email: string; first_name: string | null; last_name: string | null
+      }>(
+        `SELECT id::text, email, first_name, last_name
+           FROM users
+          WHERE email ILIKE $1
+             OR first_name ILIKE $1
+             OR last_name ILIKE $1
+             OR (first_name || ' ' || last_name) ILIKE $1
+          ORDER BY (CASE WHEN email ILIKE $1 THEN 0 ELSE 1 END), created_at DESC
+          LIMIT 5`,
+        [`%${q}%`]
+      )
+      if (customers.length === 0) {
+        return { customers: [], orders: [], note: 'No matching customer found.' }
+      }
+      if (customers.length > 1) {
+        return {
+          needs_choice: true,
+          choice_kind: 'customer',
+          options: customers.map(c => ({
+            id: c.id,
+            label: `${(c.first_name || '') + ' ' + (c.last_name || '')}`.trim() || c.email,
+            sublabel: c.email,
+          })),
+          note: 'Multiple customers match — ask the admin to pick one.',
+        }
+      }
+      const c = customers[0]
+      const orders = await queryMany<{
+        id: string; order_number: string; status: string; payment_status: string;
+        total_amount: string; created_at: string
+      }>(
+        `SELECT id::text, order_number, status, payment_status, total_amount::text, created_at
+           FROM orders
+          WHERE user_id = $1::uuid
+          ORDER BY created_at DESC
+          LIMIT $2`,
+        [c.id, lim]
+      )
+      return {
+        customer: { id: c.id, email: c.email, name: `${c.first_name || ''} ${c.last_name || ''}`.trim() },
+        orders,
+      }
+    },
+  },
+  {
+    name: 'propose_order_delay_email',
+    description: 'Propose sending a delivery-delay notification email to the customer of a specific order. The admin must approve before it sends. Use when the user says things like "tell customer X their order #Y will be delayed by N days because Z". If the order number is missing, call find_customer_orders first and ask the admin to pick one.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        orderId: { type: 'string', description: 'Order UUID.' },
+        orderNumber: { type: 'string', description: 'Alternative to orderId. Either is fine.' },
+        delayDays: { type: 'integer', description: 'Number of days the order will be delayed (1-90).', minimum: 1, maximum: 90 },
+        reason: { type: 'string', description: 'Customer-facing reason. Keep it brief and honest. e.g. "courier strike", "stock shortage from supplier", "weather disruption".' },
+      },
+      required: ['delayDays', 'reason'],
+    },
+    mutating: true,
+    handler: async ({ orderId, orderNumber, delayDays, reason }) => {
+      const days = clamp(typeof delayDays === 'number' ? delayDays : 0, 1, 90)
+      const reasonText = String(reason || '').trim()
+      if (!reasonText) throw new Error('reason is required')
+      if (reasonText.length > 280) throw new Error('reason too long (max 280 chars)')
+      if (!orderId && !orderNumber) throw new Error('Provide orderId or orderNumber')
+
+      const order = await queryOne<{
+        id: string; order_number: string; status: string; user_id: string;
+        customer_email: string; customer_name: string;
+      }>(
+        `SELECT o.id::text, o.order_number, o.status, o.user_id::text,
+                u.email AS customer_email,
+                COALESCE(NULLIF(TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')), ''), u.email) AS customer_name
+           FROM orders o
+           LEFT JOIN users u ON u.id = o.user_id
+          WHERE o.id = $1::uuid OR o.order_number = $2
+          LIMIT 1`,
+        [orderId || '00000000-0000-0000-0000-000000000000', orderNumber || '']
+      )
+      if (!order) throw new Error('Order not found')
+      if (!order.customer_email) throw new Error('Order has no customer email on file')
+      if (['delivered', 'cancelled'].includes(order.status)) {
+        return { proposed: false, info: `Order ${order.order_number} is already ${order.status}; delay email not appropriate.` }
+      }
+      return {
+        proposed: true,
+        kind: 'send_order_delay_email',
+        payload: {
+          orderId: order.id,
+          orderNumber: order.order_number,
+          customerEmail: order.customer_email,
+          customerName: order.customer_name,
+          delayDays: days,
+          reason: reasonText,
+        },
+        confirmation: `Email ${order.customer_email} that order ${order.order_number} will be delayed by ${days} day${days === 1 ? '' : 's'}: "${reasonText}"?`,
       }
     },
   },

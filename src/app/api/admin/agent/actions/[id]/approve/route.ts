@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne } from '@/lib/db'
 import { sendTestCampaignEmail } from '@/lib/automation-emails'
+import { sendOrderDelayNotification } from '@/lib/email'
 import type { CampaignKind } from '@/lib/marketing'
 
 export const dynamic = 'force-dynamic'
@@ -45,6 +46,21 @@ async function executeAction(action: AgentAction): Promise<{ result: any; error:
       )
       if (!updated) return { result: null, error: 'Order not found or already shipped/delivered/cancelled' }
       return { result: updated, error: null }
+    }
+    case 'send_order_delay_email': {
+      const { customerEmail, customerName, orderNumber, delayDays, reason } = action.payload
+      if (!customerEmail || !orderNumber || !delayDays || !reason) {
+        return { result: null, error: 'Missing required fields in payload' }
+      }
+      const r = await sendOrderDelayNotification({
+        toEmail: customerEmail,
+        customerName: customerName || 'there',
+        orderNumber,
+        delayDays: Number(delayDays),
+        reason: String(reason),
+      })
+      if (!r.success) return { result: null, error: 'Send failed' }
+      return { result: { sentTo: customerEmail, orderNumber, delayDays, messageId: r.messageId }, error: null }
     }
     default:
       return { result: null, error: `Unknown action kind: ${action.kind}` }

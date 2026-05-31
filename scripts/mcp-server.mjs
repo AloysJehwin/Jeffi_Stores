@@ -419,6 +419,92 @@ const TOOLS = [
       }
     },
   },
+  {
+    name: 'list_tools',
+    description: 'Return the names + descriptions of every tool this MCP server exposes. Use when an MCP client asks "what can you do?".',
+    inputSchema: { type: 'object', properties: {} },
+    handler: async () => {
+      return { tools: TOOLS.map(t => ({ name: t.name, description: t.description, args: Object.keys(t.inputSchema.properties || {}) })) }
+    },
+  },
+  {
+    name: 'find_customer_orders',
+    description: 'Look up a customer by name or email and return their orders, most-recent first. Use when an MCP client references "Aloys Jehwin\'s recent order" without an order number.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        customerQuery: { type: 'string' },
+        limit: { type: 'integer', default: 10, minimum: 1, maximum: 50 },
+      },
+      required: ['customerQuery'],
+    },
+    handler: async ({ customerQuery, limit = 10 }) => {
+      const lim = clamp(limit, 1, 50)
+      const q = String(customerQuery || '').trim()
+      if (!q) throw new Error('customerQuery is required')
+      const cust = await appPool.query(
+        `SELECT id::text, email, first_name, last_name FROM users
+          WHERE email ILIKE $1 OR first_name ILIKE $1 OR last_name ILIKE $1
+             OR (first_name || ' ' || last_name) ILIKE $1
+          ORDER BY (CASE WHEN email ILIKE $1 THEN 0 ELSE 1 END), created_at DESC
+          LIMIT 5`,
+        [`%${q}%`]
+      )
+      if (cust.rows.length === 0) return { customers: [], orders: [], note: 'No match.' }
+      if (cust.rows.length > 1) return { customers: cust.rows, orders: [], note: 'Multiple matches — disambiguate.' }
+      const c = cust.rows[0]
+      const orders = await appPool.query(
+        `SELECT id::text, order_number, status, payment_status, total_amount::text, created_at
+           FROM orders WHERE user_id = $1::uuid ORDER BY created_at DESC LIMIT $2`,
+        [c.id, lim]
+      )
+      return {
+        customer: { id: c.id, email: c.email, name: `${c.first_name || ''} ${c.last_name || ''}`.trim() },
+        orders: orders.rows,
+      }
+    },
+  },
+  {
+    name: 'run_sql_readonly',
+    description: 'Run a single read-only SELECT for ad-hoc questions the dedicated tools do not cover. Auto-wrapped in BEGIN READ ONLY with a 5s timeout, capped at 100 rows. Writes/DDL and access to admins/payment_methods/password columns are blocked.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        sql: { type: 'string' },
+      },
+      required: ['sql'],
+    },
+    handler: async ({ sql }) => {
+      const FORBIDDEN = /\b(admins|admin_agent_messages|admin_agent_actions|admin_sessions|payment_methods|razorpay_webhooks|webhook_events|password_hash|password|totp_secret|reset_token)\b/i
+      const DML = /\b(insert|update|delete|drop|truncate|alter|create|grant|revoke|copy|vacuum|analyze|reindex|comment|cluster|lock|listen|notify|set\s+role|reset\s+role)\b/i
+      const raw = String(sql || '').trim().replace(/;\s*$/, '')
+      if (!raw) throw new Error('sql is required')
+      if (raw.length > 4000) throw new Error('sql too long (max 4000 chars)')
+      if (raw.includes(';')) throw new Error('semicolons not allowed inside the statement')
+      if (!/^(with\b|select\b)/i.test(raw)) throw new Error('only SELECT or WITH...SELECT is permitted')
+      if (DML.test(raw)) throw new Error('write/DDL keywords forbidden')
+      if (FORBIDDEN.test(raw)) throw new Error('query references a forbidden table or column')
+      const guarded = `${raw} LIMIT 100`
+      const client = await appPool.connect()
+      try {
+        await client.query('BEGIN READ ONLY')
+        await client.query(`SET LOCAL statement_timeout = '5s'`)
+        const result = await client.query(guarded)
+        await client.query('ROLLBACK')
+        return {
+          rowCount: result.rowCount ?? result.rows.length,
+          fields: result.fields?.map(f => f.name) || [],
+          rows: result.rows.slice(0, 100),
+          truncated: (result.rowCount ?? result.rows.length) >= 100,
+        }
+      } catch (err) {
+        try { await client.query('ROLLBACK') } catch {}
+        throw new Error(`SQL error: ${err.message || err}`)
+      } finally {
+        client.release()
+      }
+    },
+  },
 ]
 
 const server = new Server(

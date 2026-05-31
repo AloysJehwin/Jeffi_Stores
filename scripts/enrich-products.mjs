@@ -134,17 +134,16 @@ async function fetchCandidates() {
      LEFT JOIN categories c ON c.id = p.category_id
      LEFT JOIN brands b     ON b.id = p.brand_id
      WHERE p.is_active = TRUE
-       AND (p.description IS NULL OR length(p.description) < $1)
        AND p.ai_enriched_at IS NULL
        AND NOT EXISTS (
          SELECT 1 FROM product_ai_enrichment_log l
          WHERE l.product_id = p.id
            AND l.status IN ('proposed','approved')
-           AND l.proposed_at > NOW() - ($2 || ' days')::interval
+           AND l.proposed_at > NOW() - ($1 || ' days')::interval
        )
      ORDER BY p.sales_count DESC NULLS LAST, p.created_at DESC
-     LIMIT $3`,
-    [MIN_DESC_CHARS, RESTAGE_DAYS, LIMIT]
+     LIMIT $2`,
+    [RESTAGE_DAYS, LIMIT]
   )
   return rows
 }

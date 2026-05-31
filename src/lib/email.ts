@@ -2077,3 +2077,59 @@ export async function sendOrderAutoCancelledAdminNotification(order: any, redire
     return { success: false, error }
   }
 }
+
+export async function sendOrderDelayNotification(args: {
+  toEmail: string
+  customerName: string
+  orderNumber: string
+  delayDays: number
+  reason: string
+}) {
+  const { toEmail, customerName, orderNumber, delayDays, reason } = args
+  const dayLabel = delayDays === 1 ? 'day' : 'days'
+  const subject = `Update on your Jeffi Stores order ${orderNumber}`
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${subject}</title></head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:32px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+        <tr><td style="background:#1a3a4a;padding:20px 28px;color:#ffffff;font-weight:700;font-size:18px;">Jeffi Stores</td></tr>
+        <tr><td style="padding:28px 28px 8px;font-size:16px;line-height:1.5;">
+          <p style="margin:0 0 16px;">Hi ${customerName},</p>
+          <p style="margin:0 0 16px;">We're writing to let you know that your order <strong>${orderNumber}</strong> will be delayed by approximately <strong>${delayDays} ${dayLabel}</strong>.</p>
+          <p style="margin:0 0 16px;"><strong>Reason:</strong> ${reason}</p>
+          <p style="margin:0 0 16px;">We're sorry for the inconvenience. We'll send you another update as soon as the situation changes, and your order is on its way.</p>
+          <p style="margin:0 0 16px;">If you have any questions, just reply to this email and we'll get back to you.</p>
+          <p style="margin:24px 0 0;color:#475569;">Thank you for your patience,<br>The Jeffi Stores team</p>
+        </td></tr>
+        <tr><td style="padding:20px 28px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;">This is an automated update about order ${orderNumber}. Please do not reply with sensitive information.</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+  const text = `Hi ${customerName},
+
+Your order ${orderNumber} will be delayed by approximately ${delayDays} ${dayLabel}.
+
+Reason: ${reason}
+
+We're sorry for the inconvenience. We'll send another update as soon as the situation changes.
+
+If you have any questions, just reply to this email.
+
+— The Jeffi Stores team`
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      to: toEmail,
+      subject,
+      html,
+      text,
+    })
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}

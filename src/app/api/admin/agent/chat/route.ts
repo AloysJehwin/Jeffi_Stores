@@ -49,6 +49,9 @@ Hard rules:
 - Use real values from the tools, never invent product ids, order numbers, prices, or stock counts.
 - For mutating actions, the tool returns {proposed: true, ...} — your final message should describe what was proposed and tell the user "I've proposed this — review the action card to approve or reject."
 - If a tool says {proposed: false, info: ...}, no action was created; relay the info to the user.
+- If a tool returns {needs_choice: true, options: [...]}, the UI is showing the user a picker; just write a short final message like "Multiple matches — pick one above" and stop. Do NOT guess.
+- Prefer the dedicated tools over run_sql_readonly when one fits — they are faster and pre-formatted.
+- run_sql_readonly is for ad-hoc questions only. Write tight queries against tables you know exist (products, orders, order_items, users, categories, brands, campaigns, email_campaigns_sent, customer_activity). It is sandboxed (read-only, 5s timeout, 100-row cap, no admin/payment_methods access) so do not worry about damage, but do worry about confusing yourself with overly clever joins.
 - Be concise. No marketing speak. No "Great question!" filler. Numbers and bullet points beat paragraphs.
 - If the user's request is ambiguous, ask one short clarifying question instead of guessing.
 - Currency is INR (₹). Dates assume Asia/Kolkata.
@@ -117,6 +120,7 @@ export async function POST(req: NextRequest) {
 
   const toolCallRecords: ToolCallRecord[] = []
   const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
+  const pickers: Array<{ choice_kind: string; options: Array<{ id: string; label: string; sublabel?: string }>; note?: string }> = []
   let finalText = ''
   let provider = ''
   let model = ''
@@ -169,6 +173,14 @@ export async function POST(req: NextRequest) {
               proposedActions.push({ id: inserted.id, kind: o.kind, payload: o.payload, confirmation: o.confirmation })
             }
             toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify({ ...o, action_id: inserted?.id })}</tool_result>`)
+          } else if (out && typeof out === 'object' && (out as any).needs_choice === true) {
+            const o = out as any
+            pickers.push({
+              choice_kind: o.choice_kind,
+              options: o.options || [],
+              note: o.note,
+            })
+            toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(out).slice(0, 4000)}</tool_result>`)
           } else {
             toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(out).slice(0, 8000)}</tool_result>`)
           }
@@ -201,6 +213,7 @@ export async function POST(req: NextRequest) {
     message: finalText,
     toolCalls: toolCallRecords,
     proposedActions,
+    pickers,
     provider,
     model,
   })
