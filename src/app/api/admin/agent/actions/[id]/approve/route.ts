@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { sendTestCampaignEmail } from '@/lib/automation-emails'
 import { sendOrderDelayNotification, sendProductAnnouncementEmail } from '@/lib/email'
+import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import type { CampaignKind } from '@/lib/marketing'
 
 export const dynamic = 'force-dynamic'
@@ -72,7 +73,9 @@ async function executeAction(action: AgentAction): Promise<{ result: any; error:
       const products = await queryMany<{
         id: string; name: string; slug: string; price: string; short_description: string | null; primary_image_url: string | null
       }>(
-        `SELECT p.id::text, p.name, p.slug, p.base_price::text AS price, p.short_description,
+        `SELECT p.id::text, p.name, p.slug,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                p.short_description,
                 (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order ASC LIMIT 1) AS primary_image_url
            FROM products p WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
         [productIds]

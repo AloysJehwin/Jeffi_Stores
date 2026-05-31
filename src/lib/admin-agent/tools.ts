@@ -1,5 +1,6 @@
 import { Pool } from 'pg'
 import { query, queryMany, queryOne } from '@/lib/db'
+import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import { embed } from '@/lib/rag'
 
 function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
@@ -90,7 +91,9 @@ export const TOOLS: ToolDef[] = [
       }
       if (productIds.length === 0) return { products: [], note: 'No matches found.' }
       const rows = await queryMany(
-        `SELECT p.id::text, p.name, p.slug, p.sku, p.base_price::text AS price, p.inventory_quantity AS stock,
+        `SELECT p.id::text, p.name, p.slug, p.sku,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                p.inventory_quantity AS stock,
                 b.name AS brand, c.name AS category
          FROM products p LEFT JOIN brands b ON b.id = p.brand_id LEFT JOIN categories c ON c.id = p.category_id
          WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
@@ -112,7 +115,8 @@ export const TOOLS: ToolDef[] = [
       if (!id && !slug) throw new Error('Provide id or slug')
       const row = await queryOne(
         `SELECT p.id::text, p.name, p.slug, p.sku, p.short_description, p.description,
-                p.base_price::text AS price, p.mrp::text AS mrp, p.gst_percentage,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                p.mrp::text AS mrp, p.gst_percentage,
                 p.inventory_quantity AS stock, p.is_active, p.hsn_code,
                 b.name AS brand, c.name AS category
          FROM products p LEFT JOIN brands b ON b.id = p.brand_id LEFT JOIN categories c ON c.id = p.category_id
@@ -168,8 +172,10 @@ export const TOOLS: ToolDef[] = [
       const ids = rows.map(x => x.source_id)
       if (ids.length === 0) return { products: [] }
       const out = await queryMany(
-        `SELECT id::text, name, slug, sku, base_price::text AS price, inventory_quantity AS stock
-         FROM products WHERE id = ANY($1::uuid[]) AND is_active = TRUE`,
+        `SELECT p.id::text, p.name, p.slug, p.sku,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                p.inventory_quantity AS stock
+         FROM products p WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
         [ids]
       )
       return { products: out }
@@ -305,7 +311,9 @@ export const TOOLS: ToolDef[] = [
       const lim = clamp(typeof limit === 'number' ? limit : 50, 1, 200)
       const t = clamp(typeof threshold === 'number' ? threshold : 10, 0, 1000)
       const rows = await queryMany(
-        `SELECT p.id::text, p.name, p.sku, p.inventory_quantity AS stock, p.base_price::text AS price, b.name AS brand
+        `SELECT p.id::text, p.name, p.sku, p.inventory_quantity AS stock,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                b.name AS brand
          FROM products p LEFT JOIN brands b ON b.id = p.brand_id
          WHERE p.is_active = TRUE AND p.inventory_quantity <= $1
          ORDER BY p.inventory_quantity ASC, p.name ASC LIMIT $2`,
@@ -612,7 +620,8 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ limit }) => {
       const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
       const rows = await queryMany(
-        `SELECT p.id::text, p.name, p.slug, p.sku, p.base_price::text AS price,
+        `SELECT p.id::text, p.name, p.slug, p.sku,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
                 p.short_description, p.inventory_quantity AS stock,
                 b.name AS brand, c.name AS category, p.created_at
            FROM products p
@@ -639,7 +648,8 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ limit }) => {
       const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
       const rows = await queryMany(
-        `SELECT p.id::text, p.name, p.slug, p.sku, p.base_price::text AS price,
+        `SELECT p.id::text, p.name, p.slug, p.sku,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
                 p.short_description, p.inventory_quantity AS stock,
                 b.name AS brand, c.name AS category, p.sales_count
            FROM products p
@@ -721,8 +731,10 @@ export const TOOLS: ToolDef[] = [
       const products = await queryMany<{
         id: string; name: string; slug: string; price: string; short_description: string | null
       }>(
-        `SELECT id::text, name, slug, base_price::text AS price, short_description
-           FROM products WHERE id = ANY($1::uuid[]) AND is_active = TRUE`,
+        `SELECT p.id::text, p.name, p.slug,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                p.short_description
+           FROM products p WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
         [ids]
       )
       if (products.length !== ids.length) {
