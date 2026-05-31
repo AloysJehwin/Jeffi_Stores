@@ -15,9 +15,9 @@ async function adminToken() {
 }
 
 const QUERIES = [
-  'show me the 5 most recent customers as a customer list',
-  'show me 4 featured products as a product grid',
-  'list 3 recent orders',
+  'show me 3 featured products',
+  'how do we resolve a product\'s price when it has variants? read the canonical helper if needed',
+  'list customers who joined in the last 5 days, real users only',
 ]
 
 const token = await adminToken()

@@ -82,12 +82,15 @@ Hard rules:
 - run_sql_readonly is for ad-hoc questions only. Write tight queries against tables you know exist (products, orders, order_items, users, categories, brands, campaigns, email_campaigns_sent, customer_activity). It is sandboxed (read-only, 5s timeout, 100-row cap, no admin/payment_methods access) so do not worry about damage, but do worry about confusing yourself with overly clever joins.
 - Be concise. No marketing speak. No "Great question!" filler. Numbers and bullet points beat paragraphs.
 - If the user's request is ambiguous, ask one short clarifying question instead of guessing.
-- describe_schema + run_sql_readonly: when the user asks for data the dedicated tools don't cover, first call describe_schema to learn what columns exist, then call run_sql_readonly with a tight SELECT. Do NOT guess column names.
+- describe_schema + run_sql_readonly: this is your DEFAULT for any read query. The dedicated read tools above only cover ~10 common scenarios; for ANY other read (coupons, brands, categories, recent products, featured products, list of recent customers, etc.) you should describe_schema first to confirm column names, then run_sql_readonly with a tight SELECT. Do NOT ask the user to add a new tool — you already have the primitives.
+- search_products is for natural-language semantic search ("hex bolts for steel", "tools for plumbing"). It is NOT for filter queries like "featured products" / "newly added" / "low stock" / "top sellers" — those should ALWAYS use run_sql_readonly with the right WHERE clause (is_featured, created_at DESC, inventory_quantity, sales_count).
+- list_repo_files + read_repo_file: when you need to understand domain logic — variant pricing, image URL construction, email template structure, campaign kinds, scope semantics — list and read the canonical files. Useful starting points: src/lib/queries.ts (canonical SQL fragments like VARIANT_MIN_PRICE_SQL), src/lib/email.ts (email senders + transporter), src/lib/marketing.ts (campaign kinds), src/lib/scopes.ts (scope keys), src/lib/email-templates.ts if it exists. Files matching password|secret|token are blocked. Do this BEFORE writing complex SQL or rendering email content — the codebase has the answer for things like "how does the storefront resolve a variant's price?"
 - list_admin_api_routes + call_admin_api: when the user asks you to CREATE, UPDATE or DELETE something the dedicated tools don't cover, FIRST call list_admin_api_routes to find the real path, then call_admin_api with the right HTTP method. Do NOT guess endpoints — if list_admin_api_routes doesn't return what you expect, fall back to run_sql_readonly for read-only inspection or tell the user the action isn't possible. POST/PUT/PATCH/DELETE go through the approval queue. GET runs immediately.
+- Stall prevention: NEVER write a sentence like "I'll fetch X now" or "let me check that" without immediately emitting the matching <tool_use> block in the SAME response. The user only sees what you actually call. If you find yourself promising, stop and emit the tool call.
 
 Marketing email confirmations (CRITICAL — emails to customers go to real inboxes):
 - For "send a mail about X products" / "announce new products" requests, NEVER jump straight to propose_product_announcement_email.
-- Step 1: pick the product list (use get_recent_products for "newly added", get_featured_products for "featured", search_products for category-specific). Show the admin the list. End your message with TWO clear questions in one go: "(a) Use these N products or pick differently? (b) Send to whom — all opted-in customers, recent buyers (last 90 days), or one test email?". This way the admin can confirm both in one reply.
+- Step 1: pick the product list (use search_products for category-specific, or write a SELECT via run_sql_readonly for "newly added"/"featured"/"top sellers"/"low stock" — tables: products, with columns is_featured, sales_count, created_at). Show the admin the list. End your message with TWO clear questions in one go: "(a) Use these N products or pick differently? (b) Send to whom — all opted-in customers, recent buyers (last 90 days), or one test email?". This way the admin can confirm both in one reply.
 - If the user already specified the recipient inline (e.g. "test mail to [email protected]") then audience=test_only and testEmail is given — only ask about products, then call estimate_email_audience and propose_product_announcement_email in the next turn.
 - Step 2: once both products and audience are confirmed, call estimate_email_audience to count recipients. Show the count back: "This will reach 1,568 customers — confirm to proceed."
 - Step 3: only after the admin confirms BOTH the products AND the audience, draft a subject + intro line and call propose_product_announcement_email. The action card then asks final approval before any email leaves the server.
@@ -239,6 +242,16 @@ export async function POST(req: NextRequest) {
       const { calls, remainder } = parseToolCalls(r.content)
 
       if (calls.length === 0) {
+        const stallRe = /\b(let me|i'?ll|i will|now i|first,? i|i'?m going to|let's start|hold on|please hold|fetching|i'?ll fetch|i'?ll check|i'?ll look|i'?ll retrieve|moment)\b/i
+        const isShortPromise = (remainder || r.content).length < 280 && stallRe.test(remainder || r.content)
+        if (isShortPromise && iter < MAX_ITERATIONS - 1) {
+          messages.push({ role: 'assistant', content: r.content })
+          messages.push({
+            role: 'user',
+            content: '[system] You promised an action but did not emit a <tool_use> block. Emit the tool call now in this same response. Do not narrate further.',
+          })
+          continue
+        }
         const ui = parseUiBlocks(remainder || r.content)
         finalText = ui.remainder
         finalUiBlocks = ui.blocks

@@ -237,35 +237,6 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
-    name: 'list_recent_customers',
-    description: 'List the most-recently-registered customers, ordered by created_at DESC. Use for "show me recent customers" / "give me the last N customers" queries. By default excludes guest checkouts (where is_guest=true OR email starts with guest_); set includeGuests=true to override.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: { type: 'integer', default: 10, minimum: 1, maximum: 50 },
-        includeGuests: { type: 'string', description: 'true to include guest checkouts; default false (real registered customers only)' },
-      },
-    },
-    mutating: false,
-    handler: async ({ limit, includeGuests }) => {
-      const lim = clamp(typeof limit === 'number' ? limit : 10, 1, 50)
-      const wantGuests = String(includeGuests || '').toLowerCase() === 'true'
-      const guestFilter = wantGuests ? '' : `AND u.is_guest IS NOT TRUE AND u.email NOT LIKE 'guest_%'`
-      const rows = await queryMany(
-        `SELECT u.id::text, u.email, u.first_name, u.last_name, u.phone,
-                u.is_guest, u.marketing_opt_out, u.created_at,
-                COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id), 0)::int AS total_orders,
-                COALESCE((SELECT SUM(o.total_amount) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::text AS lifetime_value
-           FROM users u
-          WHERE u.email IS NOT NULL ${guestFilter}
-          ORDER BY u.created_at DESC
-          LIMIT $1`,
-        [lim]
-      )
-      return { customers: rows, count: rows.length, guestsExcluded: !wantGuests }
-    },
-  },
-  {
     name: 'get_recent_orders',
     description: 'Recent orders, optionally filtered by user, status, or days back.',
     inputSchema: {
@@ -637,62 +608,6 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
-    name: 'get_recent_products',
-    description: 'Top N most-recently-added active products by created_at DESC. Use for "newly added products" / "what is new" queries.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: { type: 'integer', default: 5, minimum: 1, maximum: 20 },
-      },
-    },
-    mutating: false,
-    handler: async ({ limit }) => {
-      const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
-      const rows = await queryMany(
-        `SELECT p.id::text, p.name, p.slug, p.sku,
-                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.short_description, p.inventory_quantity AS stock,
-                b.name AS brand, c.name AS category, p.created_at
-           FROM products p
-           LEFT JOIN brands b ON b.id = p.brand_id
-           LEFT JOIN categories c ON c.id = p.category_id
-          WHERE p.is_active = TRUE
-          ORDER BY p.created_at DESC
-          LIMIT $1`,
-        [lim]
-      )
-      return { products: rows, count: rows.length }
-    },
-  },
-  {
-    name: 'get_featured_products',
-    description: 'Active products curated as featured (is_featured=true), ordered by sales_count DESC. Use when the user asks for "featured products" / "showcase products".',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: { type: 'integer', default: 5, minimum: 1, maximum: 20 },
-      },
-    },
-    mutating: false,
-    handler: async ({ limit }) => {
-      const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
-      const rows = await queryMany(
-        `SELECT p.id::text, p.name, p.slug, p.sku,
-                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.short_description, p.inventory_quantity AS stock,
-                b.name AS brand, c.name AS category, p.sales_count
-           FROM products p
-           LEFT JOIN brands b ON b.id = p.brand_id
-           LEFT JOIN categories c ON c.id = p.category_id
-          WHERE p.is_active = TRUE AND p.is_featured = TRUE
-          ORDER BY p.sales_count DESC NULLS LAST, p.created_at DESC
-          LIMIT $1`,
-        [lim]
-      )
-      return { products: rows, count: rows.length }
-    },
-  },
-  {
     name: 'estimate_email_audience',
     description: 'Count how many customers would receive a marketing email under a given audience filter, BEFORE proposing a blast. Always call this first so the admin sees the blast radius. Filters: "all_opted_in", "recent_buyers" (placed an order in the last 90 days), or "test_only" (single email).',
     inputSchema: {
@@ -847,6 +762,108 @@ export const TOOLS: ToolDef[] = [
       )
       const filtered = cols.filter(c => !FORBIDDEN_COLUMNS.includes(c.column_name.toLowerCase()))
       return { table: t, columns: filtered, hidden: cols.length - filtered.length }
+    },
+  },
+  {
+    name: 'list_repo_files',
+    description: 'List source files under a project-relative directory so you can find canonical helpers (queries, email templates, API contracts). Use this to discover what files exist BEFORE read_repo_file. Common useful directories: src/lib, src/lib/email-templates, src/app/api/admin, database/schema. Forbidden: .env files, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dir: { type: 'string', description: 'Project-relative directory, e.g. "src/lib" or "src/app/api/admin"' },
+        pattern: { type: 'string', description: 'Optional substring filter on file names' },
+      },
+      required: ['dir'],
+    },
+    mutating: false,
+    handler: async ({ dir, pattern }) => {
+      const fs = await import('node:fs/promises')
+      const path = await import('node:path')
+      const requested = String(dir || '').trim().replace(/^\/+/, '')
+      if (!requested || requested.includes('..') || requested.startsWith('/')) {
+        throw new Error('Invalid dir — must be project-relative')
+      }
+      const FORBIDDEN = /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
+      if (FORBIDDEN.test(requested)) throw new Error('Path is forbidden')
+      const root = path.resolve(process.cwd(), requested)
+      const projectRoot = path.resolve(process.cwd())
+      if (!root.startsWith(projectRoot + path.sep) && root !== projectRoot) {
+        throw new Error('Path escapes project root')
+      }
+      const filter = String(pattern || '').toLowerCase()
+      const out: { path: string; size: number }[] = []
+      async function walk(d: string, depth: number) {
+        if (depth > 4 || out.length > 100) return
+        let entries
+        try { entries = await fs.readdir(d, { withFileTypes: true }) } catch { return }
+        for (const ent of entries) {
+          if (out.length > 100) return
+          const full = path.join(d, ent.name)
+          const rel = path.relative(projectRoot, full).replace(/\\/g, '/')
+          if (FORBIDDEN.test(rel)) continue
+          if (ent.isDirectory()) {
+            if (ent.name === 'node_modules' || ent.name === '.next' || ent.name === '.git') continue
+            await walk(full, depth + 1)
+          } else if (ent.isFile()) {
+            if (filter && !ent.name.toLowerCase().includes(filter)) continue
+            try {
+              const stat = await fs.stat(full)
+              out.push({ path: rel, size: stat.size })
+            } catch {}
+          }
+        }
+      }
+      await walk(root, 0)
+      out.sort((a, b) => a.path.localeCompare(b.path))
+      return { files: out, count: out.length, truncated: out.length >= 100 }
+    },
+  },
+  {
+    name: 'read_repo_file',
+    description: 'Read a project source file to learn how something is implemented (canonical SQL fragments, email helpers, API contracts, business rules). Use this when you need to understand domain quirks before generating SQL or rendering output. Returns up to 8KB of content. Forbidden: .env*, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Project-relative file path, e.g. "src/lib/queries.ts"' },
+        offset: { type: 'integer', description: 'Byte offset to start reading from (for files larger than 8KB)' },
+      },
+      required: ['path'],
+    },
+    mutating: false,
+    handler: async ({ path: filePath, offset }) => {
+      const fs = await import('node:fs/promises')
+      const path = await import('node:path')
+      const requested = String(filePath || '').trim().replace(/^\/+/, '')
+      if (!requested || requested.includes('..') || requested.startsWith('/')) {
+        throw new Error('Invalid path — must be project-relative')
+      }
+      const FORBIDDEN = /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
+      if (FORBIDDEN.test(requested)) throw new Error('File is forbidden')
+      const projectRoot = path.resolve(process.cwd())
+      const full = path.resolve(projectRoot, requested)
+      if (!full.startsWith(projectRoot + path.sep)) throw new Error('Path escapes project root')
+      const start = Math.max(0, typeof offset === 'number' ? offset : 0)
+      const MAX = 8 * 1024
+      try {
+        const handle = await fs.open(full, 'r')
+        try {
+          const stat = await handle.stat()
+          const buf = Buffer.alloc(Math.min(MAX, Math.max(0, stat.size - start)))
+          const { bytesRead } = await handle.read(buf, 0, buf.length, start)
+          const text = buf.subarray(0, bytesRead).toString('utf8')
+          return {
+            path: requested,
+            size: stat.size,
+            offset: start,
+            bytesRead,
+            content: text,
+            truncated: start + bytesRead < stat.size,
+          }
+        } finally { await handle.close() }
+      } catch (err: any) {
+        if (err?.code === 'ENOENT') throw new Error(`File not found: ${requested}`)
+        throw err
+      }
     },
   },
   {
