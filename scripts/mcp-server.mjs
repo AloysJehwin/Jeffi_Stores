@@ -41,7 +41,43 @@ const RAG_PG = {
 }
 
 const APP_PG_URL = process.env.DATABASE_URL
-const APP_PG = APP_PG_URL ? { connectionString: APP_PG_URL, max: 4, statement_timeout: 5000 } : RAG_PG
+const USE_IAM = process.env.RDS_IAM_AUTH === 'true'
+
+let APP_PG
+if (USE_IAM) {
+  const { Signer } = await import('@aws-sdk/rds-signer')
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const certCandidates = [
+    path.join('/opt/jeffi-stores/certs/global-bundle.pem'),
+    path.join(process.cwd(), 'certs', 'global-bundle.pem'),
+  ]
+  const certPath = certCandidates.find(p => fs.existsSync(p))
+  const signer = new Signer({
+    hostname: process.env.RDS_HOST,
+    port: parseInt(process.env.RDS_PORT || '5432', 10),
+    region: process.env.AWS_REGION || 'us-east-1',
+    username: process.env.RDS_USER,
+  })
+  APP_PG = {
+    host: process.env.RDS_HOST,
+    port: parseInt(process.env.RDS_PORT || '5432', 10),
+    user: process.env.RDS_USER,
+    database: process.env.RDS_DB,
+    password: () => signer.getAuthToken(),
+    ssl: certPath
+      ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
+      : { rejectUnauthorized: false },
+    max: 4,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    statement_timeout: 5000,
+  }
+} else if (APP_PG_URL) {
+  APP_PG = { connectionString: APP_PG_URL, max: 4, statement_timeout: 5000 }
+} else {
+  APP_PG = RAG_PG
+}
 
 const ragPool = new pg.Pool(RAG_PG)
 const appPool = new pg.Pool(APP_PG)
