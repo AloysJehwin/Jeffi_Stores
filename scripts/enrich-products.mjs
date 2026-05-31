@@ -33,7 +33,11 @@ const args = Object.fromEntries(
   })
 )
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:bbI5gNureU15E43j2wQbJCHykvO5@localhost:5433/jeffi_stores'
+const DATABASE_URL = process.env.DATABASE_URL
+if (!DATABASE_URL) {
+  console.error('DATABASE_URL env var is required')
+  process.exit(1)
+}
 const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.110.153.68:11434').replace(/\/$/, '')
 const OLLAMA_MODEL = process.env.OLLAMA_COPY_MODEL || 'llama3.1:8b-instruct-q4_K_M'
 const MIN_DESC_CHARS = parseInt(process.env.ENRICH_MIN_DESC_CHARS || '40', 10)

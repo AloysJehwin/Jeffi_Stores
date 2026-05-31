@@ -29,9 +29,9 @@ export class AiClientError extends Error {
 const PROVIDER = (process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'ollama'
 const FALLBACK_ENABLED = process.env.OLLAMA_FALLBACK_TO_OPENAI === 'true'
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '')
-const OLLAMA_SQL_MODEL = process.env.OLLAMA_SQL_MODEL || 'qwen2.5-coder:14b'
-const OLLAMA_COPY_MODEL = process.env.OLLAMA_COPY_MODEL || 'llama3.1:8b-instruct-q4_K_M'
 const OLLAMA_AGENT_MODEL = process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
+const OLLAMA_SQL_MODEL = process.env.OLLAMA_SQL_MODEL || OLLAMA_AGENT_MODEL
+const OLLAMA_COPY_MODEL = process.env.OLLAMA_COPY_MODEL || OLLAMA_AGENT_MODEL
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 const OLLAMA_HEALTH_TIMEOUT_MS = 2000
 const OLLAMA_REQUEST_TIMEOUT_MS = 60_000
