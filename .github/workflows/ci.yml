@@ -390,6 +390,7 @@ jobs:
               add_recommended_product_ids_to_ai_queries.sql
               add_ai_briefing_log.sql
               add_admin_agent.sql
+              add_product_ai_enrichment.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')

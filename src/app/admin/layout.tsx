@@ -53,6 +53,7 @@ export default async function AdminLayout({
   const navLinks = [
     { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard' },
     { href: '/admin/products', label: 'Products', scope: 'products', group: 'Catalogue' },
+    { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'products', group: 'Catalogue' },
     { href: '/admin/categories', label: 'Categories', scope: 'categories', group: 'Catalogue' },
     { href: '/admin/brands', label: 'Brands', scope: 'brands', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders', group: 'Sales' },
