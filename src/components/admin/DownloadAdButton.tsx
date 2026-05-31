@@ -18,7 +18,7 @@ export default function DownloadAdButton({ productId, productName, productSlug }
     setSharing(true)
     try {
       const productUrl = `https://jeffistores.in/products/${productSlug || ''}`
-      const message = `*${productName}*\n\nShop now 👉 ${productUrl}`
+      const message = `*${productName}*\n\nShop now → ${productUrl}`
 
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 

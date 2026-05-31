@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { CheckCircle } from 'lucide-react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 
 interface OrderDetails {
@@ -102,7 +103,7 @@ function OrderConfirmationPage() {
       <div className="container mx-auto px-4 max-w-3xl">
         {/* Success Message */}
         <div className="bg-green-50 dark:bg-green-900/30 border-2 border-green-200 dark:border-green-800 rounded-lg p-4 sm:p-6 lg:p-8 mb-8 text-center">
-          <div className="text-green-500 text-6xl mb-4">✓</div>
+          <div className="flex justify-center mb-4"><CheckCircle className="w-16 h-16 text-green-500" /></div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Order Confirmed!</h1>
           <p className="text-foreground-secondary mb-4">
             Thank you for your purchase. Your order has been successfully placed.

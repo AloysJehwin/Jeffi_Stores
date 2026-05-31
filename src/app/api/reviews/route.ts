@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         userId: user.userId,
         sourceKind: 'respond_review',
         sourceRefId: review.id,
-        title: `Respond to ${rating}★ review on ${product?.name || 'product'}`,
+        title: `Respond to ${rating}-star review on ${product?.name || 'product'}`,
         description: comment.trim().slice(0, 500),
         priority: 'high',
         dueInDays: 1,

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { Star } from 'lucide-react'
 
 interface CustomField {
   id: string
@@ -30,7 +31,7 @@ function StarDisplay({ value }: { value: number }) {
   return (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map(s => (
-        <span key={s} className={`text-sm ${s <= value ? 'text-yellow-400' : 'text-gray-300'}`}>★</span>
+        <Star key={s} className={`w-3.5 h-3.5 ${s <= value ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
       ))}
     </div>
   )

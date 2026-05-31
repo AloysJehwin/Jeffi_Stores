@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { Star, Check, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
 import Toggle from '@/components/ui/Toggle'
@@ -2312,7 +2313,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           >
                             <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
                             <span className="absolute top-0 right-0 text-[10px] sm:text-[9px] bg-black/60 text-white px-1 leading-4 font-bold">{imgIdx + 1}</span>
-                            {img.is_primary && <span className="absolute top-0 left-0 text-[10px] sm:text-[9px] bg-accent-500 text-white px-1 leading-4">★</span>}
+                            {img.is_primary && <span className="absolute top-0 left-0 bg-accent-500 text-white px-1 py-0.5 leading-none"><Star className="w-2.5 h-2.5 fill-current" /></span>}
                             {arr.length > 1 && (
                               <div className="absolute inset-x-0 bottom-0 flex justify-between px-0.5 pb-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
                                 <button
@@ -2338,8 +2339,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                               </div>
                             )}
                             <div className="absolute inset-x-0 top-4 bottom-6 sm:inset-0 sm:top-0 sm:bottom-0 bg-black/50 sm:bg-black/0 sm:group-hover:bg-black/50 transition-opacity flex items-center justify-center gap-1">
-                              {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 text-base sm:text-xs leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Set primary">★</button>}
-                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 text-base sm:text-xs leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Delete">✕</button>
+                              {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Set primary"><Star className="w-4 h-4" /></button>}
+                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Delete"><X className="w-4 h-4" /></button>
                             </div>
                           </div>
                         ))}
@@ -2554,8 +2555,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: wholeExNum, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || s.sku }) : s) }))
                                       }
                                       setSubVariantEditId(null); setSubVariantEditDraft(null)
-                                    }} className="text-green-500 hover:text-green-700 leading-none font-bold text-sm">✓</button>
-                                    <button type="button" onClick={() => { setSubVariantEditId(null); setSubVariantEditDraft(null) }} className="text-foreground-muted hover:text-foreground leading-none">✕</button>
+                                    }} className="text-green-500 hover:text-green-700 leading-none" aria-label="Save"><Check className="w-3.5 h-3.5" /></button>
+                                    <button type="button" onClick={() => { setSubVariantEditId(null); setSubVariantEditDraft(null) }} className="text-foreground-muted hover:text-foreground leading-none" aria-label="Cancel"><X className="w-3.5 h-3.5" /></button>
                                   </td>
                                 </>) : (<>
                                   <td className="py-1.5 pr-2">{sv.sub_variant_name}</td>
@@ -2569,7 +2570,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1.5 pr-2 font-mono text-foreground-muted">{sv.sku}</td>
                                   <td className="py-1.5 flex items-center gap-2">
                                     <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', wholeprice_incl: sv.wholeprice_ex_gst != null ? exToIncl(String(sv.wholeprice_ex_gst), gstRate) : '', wholeprice_ex_gst: sv.wholeprice_ex_gst != null ? String(sv.wholeprice_ex_gst) : '', stock: String(sv.stock_quantity ?? 0), sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
-                                    <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none">✕</button>
+                                    <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none" aria-label="Delete"><X className="w-3.5 h-3.5" /></button>
                                   </td>
                                 </>)}
                               </tr>

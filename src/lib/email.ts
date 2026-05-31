@@ -1232,7 +1232,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
               
               <div class="info-row">
                 <span class="info-label">Rating:</span>
-                <span class="stars">${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)} (${review.rating}/5)</span>
+                <span class="stars">${review.rating}/5</span>
               </div>
               
               ${review.is_verified_purchase ? `

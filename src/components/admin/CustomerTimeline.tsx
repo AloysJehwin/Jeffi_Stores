@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import {
+  ShoppingCart, Package, CreditCard, Undo2, Tag, StickyNote, MessageSquare,
+  Unlock, Sparkles, MapPin, User, Flag, CheckCircle, Check, Circle,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 interface ActivityEvent {
   id: string
@@ -17,25 +22,25 @@ interface ActivityEvent {
   actor_username: string | null
 }
 
-const KIND_META: Record<string, { icon: string; color: string; label: string }> = {
-  order_placed:     { icon: '🛒', color: 'bg-blue-500',   label: 'Order placed' },
-  order_status:     { icon: '📦', color: 'bg-indigo-500', label: 'Order status' },
-  payment_status:   { icon: '💳', color: 'bg-emerald-500', label: 'Payment' },
-  return_requested: { icon: '↩️', color: 'bg-purple-500', label: 'Return' },
-  return_status:    { icon: '↩️', color: 'bg-purple-500', label: 'Return status' },
-  tag_added:        { icon: '🏷️', color: 'bg-cyan-500',   label: 'Tag added' },
-  tag_removed:      { icon: '🏷️', color: 'bg-zinc-500',   label: 'Tag removed' },
-  note_added:       { icon: '📝', color: 'bg-amber-500',  label: 'Note' },
-  support_message:  { icon: '💬', color: 'bg-sky-500',    label: 'Support' },
-  login:            { icon: '🔓', color: 'bg-zinc-500',   label: 'Login' },
-  signup:           { icon: '✨', color: 'bg-pink-500',   label: 'Signup' },
-  address_added:    { icon: '📍', color: 'bg-zinc-500',   label: 'Address' },
-  address_updated:  { icon: '📍', color: 'bg-zinc-500',   label: 'Address' },
-  profile_updated:  { icon: '👤', color: 'bg-zinc-500',   label: 'Profile' },
-  flagged:          { icon: '🚩', color: 'bg-red-500',    label: 'Flagged' },
-  unflagged:        { icon: '✅', color: 'bg-green-500',  label: 'Reactivated' },
-  task_created:     { icon: '✓',  color: 'bg-violet-500', label: 'Task' },
-  task_completed:   { icon: '✓',  color: 'bg-green-500',  label: 'Task done' },
+const KIND_META: Record<string, { Icon: LucideIcon; color: string; label: string }> = {
+  order_placed:     { Icon: ShoppingCart,  color: 'bg-blue-500',    label: 'Order placed' },
+  order_status:     { Icon: Package,       color: 'bg-indigo-500',  label: 'Order status' },
+  payment_status:   { Icon: CreditCard,    color: 'bg-emerald-500', label: 'Payment' },
+  return_requested: { Icon: Undo2,         color: 'bg-purple-500',  label: 'Return' },
+  return_status:    { Icon: Undo2,         color: 'bg-purple-500',  label: 'Return status' },
+  tag_added:        { Icon: Tag,           color: 'bg-cyan-500',    label: 'Tag added' },
+  tag_removed:      { Icon: Tag,           color: 'bg-zinc-500',    label: 'Tag removed' },
+  note_added:       { Icon: StickyNote,    color: 'bg-amber-500',   label: 'Note' },
+  support_message:  { Icon: MessageSquare, color: 'bg-sky-500',     label: 'Support' },
+  login:            { Icon: Unlock,        color: 'bg-zinc-500',    label: 'Login' },
+  signup:           { Icon: Sparkles,      color: 'bg-pink-500',    label: 'Signup' },
+  address_added:    { Icon: MapPin,        color: 'bg-zinc-500',    label: 'Address' },
+  address_updated:  { Icon: MapPin,        color: 'bg-zinc-500',    label: 'Address' },
+  profile_updated:  { Icon: User,          color: 'bg-zinc-500',    label: 'Profile' },
+  flagged:          { Icon: Flag,          color: 'bg-red-500',     label: 'Flagged' },
+  unflagged:        { Icon: CheckCircle,   color: 'bg-green-500',   label: 'Reactivated' },
+  task_created:     { Icon: Check,         color: 'bg-violet-500',  label: 'Task' },
+  task_completed:   { Icon: Check,         color: 'bg-green-500',   label: 'Task done' },
 }
 
 function relTime(iso: string) {
@@ -138,12 +143,13 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
               <div className="relative space-y-3">
                 <div className="absolute left-[15px] top-1 bottom-1 w-px bg-border-default" aria-hidden />
                 {items.map(e => {
-                  const meta = KIND_META[e.kind] || { icon: '•', color: 'bg-zinc-500', label: e.kind }
+                  const meta = KIND_META[e.kind] || { Icon: Circle, color: 'bg-zinc-500', label: e.kind }
+                  const Icon = meta.Icon
                   const link = refLink(e)
                   const content = (
                     <>
-                      <div className={`relative z-10 w-8 h-8 rounded-full ${meta.color} flex items-center justify-center text-sm shrink-0 ring-4 ring-surface-elevated`}>
-                        {meta.icon}
+                      <div className={`relative z-10 w-8 h-8 rounded-full ${meta.color} flex items-center justify-center text-white shrink-0 ring-4 ring-surface-elevated`}>
+                        <Icon className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0 pt-0.5">
                         <p className="text-sm text-foreground break-words">{e.summary}</p>
