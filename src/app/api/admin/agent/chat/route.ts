@@ -12,7 +12,7 @@ import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
-const MAX_ITERATIONS = 5
+const MAX_ITERATIONS = 8
 const HISTORY_TRUNCATE = 20
 
 interface IncomingMessage {
@@ -73,6 +73,7 @@ To call a tool, emit exactly this XML block on its own line, with valid JSON ins
 After the system runs the tool you will receive its output and can decide your next step. You may call multiple tools in sequence (max ${MAX_ITERATIONS} per turn). When you have enough information to answer the user, write the final answer in plain text — no XML.
 
 Hard rules:
+- ALWAYS call a tool when the user asks for data. Do not write "I'll fetch…" or "Let me check…" or "Please hold on" without immediately emitting the <tool_use> block in the same response. The user's request is not answered until a tool runs. If you find yourself promising to do something, stop and emit the tool call instead.
 - Use real values from the tools, never invent product ids, order numbers, prices, or stock counts.
 - For mutating actions, the tool returns {proposed: true, ...} — your final message should describe what was proposed and tell the user "I've proposed this — review the action card to approve or reject."
 - If a tool says {proposed: false, info: ...}, no action was created; relay the info to the user.
@@ -81,29 +82,48 @@ Hard rules:
 - run_sql_readonly is for ad-hoc questions only. Write tight queries against tables you know exist (products, orders, order_items, users, categories, brands, campaigns, email_campaigns_sent, customer_activity). It is sandboxed (read-only, 5s timeout, 100-row cap, no admin/payment_methods access) so do not worry about damage, but do worry about confusing yourself with overly clever joins.
 - Be concise. No marketing speak. No "Great question!" filler. Numbers and bullet points beat paragraphs.
 - If the user's request is ambiguous, ask one short clarifying question instead of guessing.
-- propose_new_tool: only call when the user asks for a recurring capability that no existing tool covers. Do not propose duplicates of tools that already exist.
+- describe_schema + run_sql_readonly: when the user asks for data the dedicated tools don't cover, first call describe_schema to learn what columns exist, then call run_sql_readonly with a tight SELECT. Do NOT guess column names.
+- list_admin_api_routes + call_admin_api: when the user asks you to CREATE, UPDATE or DELETE something the dedicated tools don't cover, FIRST call list_admin_api_routes to find the real path, then call_admin_api with the right HTTP method. Do NOT guess endpoints — if list_admin_api_routes doesn't return what you expect, fall back to run_sql_readonly for read-only inspection or tell the user the action isn't possible. POST/PUT/PATCH/DELETE go through the approval queue. GET runs immediately.
 
 Marketing email confirmations (CRITICAL — emails to customers go to real inboxes):
 - For "send a mail about X products" / "announce new products" requests, NEVER jump straight to propose_product_announcement_email.
-- Step 1: pick the product list (use get_recent_products for "newly added", get_featured_products for "featured", search_products for category-specific). Show the admin the list and ask "Want me to use these N products, or pick differently?".
-- Step 2: ask "Send to whom? Options: all opted-in customers, recent buyers (last 90 days), or one test email?".
-- Step 3: call estimate_email_audience to count recipients. Show the count back: "This will reach 1,568 customers — confirm to proceed."
-- Step 4: only after the admin confirms BOTH the products AND the audience, draft a subject + intro line and call propose_product_announcement_email. The action card then asks final approval before any email leaves the server.
+- Step 1: pick the product list (use get_recent_products for "newly added", get_featured_products for "featured", search_products for category-specific). Show the admin the list. End your message with TWO clear questions in one go: "(a) Use these N products or pick differently? (b) Send to whom — all opted-in customers, recent buyers (last 90 days), or one test email?". This way the admin can confirm both in one reply.
+- If the user already specified the recipient inline (e.g. "test mail to [email protected]") then audience=test_only and testEmail is given — only ask about products, then call estimate_email_audience and propose_product_announcement_email in the next turn.
+- Step 2: once both products and audience are confirmed, call estimate_email_audience to count recipients. Show the count back: "This will reach 1,568 customers — confirm to proceed."
+- Step 3: only after the admin confirms BOTH the products AND the audience, draft a subject + intro line and call propose_product_announcement_email. The action card then asks final approval before any email leaves the server.
 - For audience=test_only, always include the testEmail you collected from the admin.
+- IMPORTANT: when waiting for the admin's reply, end your message with the actual question(s) and stop. Do NOT type "I'll wait" or "let me know" without the explicit questions, because the chat won't render hidden state.
 
 Currency is INR (₹). Dates assume Asia/Kolkata.
 
-Formatting (the UI renders markdown + entity links):
-- When you mention an entity, wrap it in a deep-link token so the UI can route to the admin page:
-    Product:   [[product:<id>|<name>]]            e.g. [[product:7a8b...|BRADMAG35 Magnetic Drilling Machine]]
-    Order:     [[order:<id>|<order_number>]]      e.g. [[order:f12...|JS-2024-001]]
-    Customer:  [[customer:<id>|<name or email>]]
-    Campaign:  [[campaign:<kind>|<name>]]         e.g. [[campaign:abandoned_cart|Abandoned Cart]]
-  Use the id/order_number/kind from the tool output verbatim. The label can be any human text.
-- Use markdown: **bold**, lists with - or 1./2./3., headings with ## .
-- Tables are fine: | col | col |\\n| --- | --- |\\n| v | v |.
-- Prefer a compact table when listing 3+ products / orders / customers (columns: name as link, sku/order#, key metric).
-- Stock = inventory_quantity. Show "Out of stock" if 0, otherwise the number.`
+Formatting — generative UI (PREFERRED):
+- For ANY data display (products, customers, orders, tables, lists, key-value summaries) AND for confirmations, emit a JSON block of structured UI components instead of markdown. The UI renders these as proper React components with deep links and styling.
+- Wrap the JSON in <ui_blocks>...</ui_blocks>. Inside is a JSON array of blocks. Example:
+    <ui_blocks>[
+      {"type":"heading","value":"Featured products","level":2},
+      {"type":"product_grid","products":[{"id":"abc-uuid","name":"Hydraulic Trolley Jack","sku":"TAP-HTJ15","price":"2773.73","stock":0}]},
+      {"type":"text","value":"Use any of these for the announcement?","weight":"normal"}
+    ]</ui_blocks>
+- Available block types and their props:
+    text:             {value: string, weight?: "normal"|"bold"|"muted"}
+    heading:          {value: string, level?: 1|2|3}
+    kv_pairs:         {pairs: [{key, value}]}
+    table:            {headers: [string], rows: [[any]]}
+    product_grid:     {products: [{id, name, sku?, price?, image_url?, stock?, subtitle?}]}
+    customer_list:    {customers: [{id, name?, email, total_orders?, lifetime_value?, phone?}]}
+    order_list:       {orders: [{id, order_number, status, total?, created_at?, customer_name?}]}
+    choice_picker:    {choice_kind, options: [{id, label, sublabel?}], note?}
+    callout:          {tone: "info"|"warn"|"error"|"success", message, title?}
+    code_block:       {content, language?}
+    link_button:      {label, href}
+    image_card:       {image_url, title?, subtitle?, href?}
+- IMPORTANT: ids in product_grid/customer_list/order_list MUST be the real UUIDs from tool output. They become deep links to /admin/<entity>/<id>.
+- Free-text outside <ui_blocks> is rendered as a plain paragraph above the blocks. Use it sparingly — for greetings, brief framing, or follow-up questions.
+- Fallback for casual text: if you're just answering a yes/no question or asking a follow-up, plain text is fine.
+- Currency is INR (₹). Dates assume Asia/Kolkata.
+
+Legacy (kept for backwards compatibility, but prefer ui_blocks):
+- Markdown bold (**bold**), lists (-, 1.), headings (##), pipe tables, and [[product:<id>|name]] / [[order:<id>|num]] / [[customer:<id>|name]] / [[campaign:<kind>|name]] tokens still render correctly. Use these only when ui_blocks doesn't fit.`
 }
 
 function parseToolCalls(text: string): { calls: { name: string; rawInput: string }[]; remainder: string } {
@@ -116,6 +136,47 @@ function parseToolCalls(text: string): { calls: { name: string; rawInput: string
   }
   remainder = text.replace(re, '').trim()
   return { calls, remainder }
+}
+
+function parseUiBlocks(text: string): { blocks: any[]; remainder: string } {
+  const re = /<ui_blocks>\s*([\s\S]*?)\s*<\/ui_blocks>/g
+  let blocks: any[] = []
+  let m
+  while ((m = re.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(m[1])
+      if (Array.isArray(parsed)) blocks = blocks.concat(parsed)
+      else if (parsed && Array.isArray(parsed.blocks)) blocks = blocks.concat(parsed.blocks)
+    } catch {}
+  }
+  const remainder = text.replace(re, '').trim()
+  return { blocks, remainder }
+}
+
+async function invokeAdminApiInternal(
+  method: string,
+  path: string,
+  body: string | null,
+  req: NextRequest
+): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const cookieHeader = req.headers.get('cookie') || ''
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
+  const url = new URL(path, origin).toString()
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        Cookie: cookieHeader,
+        'Content-Type': 'application/json',
+      },
+      body: method === 'GET' || method === 'HEAD' ? undefined : (body || undefined),
+    })
+    let parsed: unknown
+    try { parsed = await res.json() } catch { parsed = await res.text().catch(() => null) }
+    return { ok: res.ok, status: res.status, body: parsed }
+  } catch (err: any) {
+    return { ok: false, status: 0, body: { error: String(err?.message || err) } }
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -159,6 +220,7 @@ export async function POST(req: NextRequest) {
   const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
   const pickers: Array<{ choice_kind: string; options: Array<{ id: string; label: string; sublabel?: string }>; note?: string }> = []
   let finalText = ''
+  let finalUiBlocks: any[] = []
   let provider = ''
   let model = ''
 
@@ -177,7 +239,9 @@ export async function POST(req: NextRequest) {
       const { calls, remainder } = parseToolCalls(r.content)
 
       if (calls.length === 0) {
-        finalText = remainder || r.content
+        const ui = parseUiBlocks(remainder || r.content)
+        finalText = ui.remainder
+        finalUiBlocks = ui.blocks
         break
       }
 
@@ -229,7 +293,12 @@ export async function POST(req: NextRequest) {
           const out = await tool.handler(parsed)
           toolCallRecords.push({ tool: c.name, input: parsed, output: out })
 
-          if (tool.mutating && out && typeof out === 'object' && (out as any).proposed === true) {
+          if (out && typeof out === 'object' && (out as any).marker === '__call_admin_api_immediate__') {
+            const o = out as any
+            const apiOut = await invokeAdminApiInternal(o.method, o.path, null, req)
+            toolCallRecords[toolCallRecords.length - 1] = { tool: c.name, input: parsed, output: apiOut, isError: !apiOut.ok }
+            toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(apiOut).slice(0, 8000)}</tool_result>`)
+          } else if (tool.mutating && out && typeof out === 'object' && (out as any).proposed === true) {
             const o = out as any
             const inserted = await queryOne<{ id: string }>(
               `INSERT INTO admin_agent_actions (admin_id, conversation_id, kind, payload, status)
@@ -266,7 +335,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 502 })
   }
 
-  if (!finalText) {
+  if (!finalText && finalUiBlocks.length === 0) {
     finalText = 'I ran into the iteration limit before reaching a final answer. Try a simpler question or break it into steps.'
   }
 
@@ -279,6 +348,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     conversationId,
     message: finalText,
+    uiBlocks: finalUiBlocks,
     toolCalls: toolCallRecords,
     proposedActions,
     pickers,

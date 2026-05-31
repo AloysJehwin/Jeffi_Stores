@@ -18,7 +18,7 @@ interface AgentAction {
   status: string
 }
 
-async function executeAction(action: AgentAction): Promise<{ result: any; error: string | null }> {
+async function executeAction(action: AgentAction, cookieHeader: string): Promise<{ result: any; error: string | null }> {
   switch (action.kind) {
     case 'send_test_email': {
       const { campaignKind, toEmail } = action.payload
@@ -166,6 +166,33 @@ async function executeAction(action: AgentAction): Promise<{ result: any; error:
         return { result: null, error: String(err?.message || 'Send failed') }
       }
     }
+    case 'call_admin_api': {
+      const { method, path, body } = action.payload as { method: string; path: string; body: string | null }
+      const FORBIDDEN_PATH_RE = /^\/api\/admin\/(agent\/|team\b|admins\b|auth\b|settings\/admins)/
+      if (!path?.startsWith('/api/admin/') || FORBIDDEN_PATH_RE.test(path)) {
+        return { result: null, error: 'Path not permitted at execution time' }
+      }
+      if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        return { result: null, error: 'Method not permitted at execution time' }
+      }
+      const origin = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
+      const url = new URL(path, origin).toString()
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { Cookie: cookieHeader, 'Content-Type': 'application/json' },
+          body: body || undefined,
+        })
+        let parsed: unknown
+        try { parsed = await res.json() } catch { parsed = await res.text().catch(() => null) }
+        return {
+          result: { method, path, status: res.status, ok: res.ok, body: parsed },
+          error: res.ok ? null : `Upstream returned ${res.status}`,
+        }
+      } catch (err: any) {
+        return { result: null, error: String(err?.message || 'API call failed') }
+      }
+    }
     default:
       return { result: null, error: `Unknown action kind: ${action.kind}` }
   }
@@ -195,7 +222,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     [admin.adminId, params.id]
   )
 
-  const { result, error } = await executeAction(action)
+  const cookieHeader = req.headers.get('cookie') || ''
+  const { result, error } = await executeAction(action, cookieHeader)
 
   await query(
     `UPDATE admin_agent_actions
