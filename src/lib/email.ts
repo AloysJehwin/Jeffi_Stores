@@ -2133,3 +2133,73 @@ If you have any questions, just reply to this email.
     return { success: false, error }
   }
 }
+
+interface AnnouncementProduct {
+  id: string
+  name: string
+  slug: string
+  price: string
+  short_description: string | null
+  primary_image_url?: string | null
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+export async function sendProductAnnouncementEmail(args: {
+  toEmail: string
+  customerName?: string
+  subject: string
+  intro: string
+  products: AnnouncementProduct[]
+}) {
+  const { toEmail, customerName, subject, intro, products } = args
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://jeffistores.in'
+  const cards = products.map(p => `
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#ffffff;">
+      <tr>
+        ${p.primary_image_url ? `<td width="120" style="vertical-align:top;padding:12px;"><img src="${escapeHtml(p.primary_image_url)}" alt="" width="100" height="100" style="display:block;border-radius:6px;object-fit:cover;"></td>` : ''}
+        <td style="padding:14px 16px 14px ${p.primary_image_url ? '0' : '16px'};vertical-align:top;">
+          <a href="${siteUrl}/products/${escapeHtml(p.slug)}" style="text-decoration:none;color:#1a3a4a;font-weight:600;font-size:15px;">${escapeHtml(p.name)}</a>
+          ${p.short_description ? `<p style="margin:4px 0 6px;color:#475569;font-size:13px;line-height:1.4;">${escapeHtml(p.short_description.slice(0, 140))}</p>` : ''}
+          <p style="margin:6px 0 0;font-weight:600;color:#0f172a;font-size:14px;">₹${escapeHtml(p.price)}</p>
+        </td>
+      </tr>
+    </table>`).join('')
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:24px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
+        <tr><td style="background:#1a3a4a;padding:18px 24px;color:#ffffff;font-weight:700;font-size:18px;">Jeffi Stores</td></tr>
+        <tr><td style="padding:24px 20px 8px;">
+          <p style="margin:0 0 12px;font-size:15px;">Hi ${escapeHtml(customerName || 'there')},</p>
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#334155;">${escapeHtml(intro)}</p>
+          ${cards}
+          <p style="margin:18px 0 0;font-size:13px;color:#64748b;">Visit <a href="${siteUrl}" style="color:#1a3a4a;">jeffistores.in</a> for the full catalogue.</p>
+        </td></tr>
+        <tr><td style="padding:18px 24px;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0;">You are receiving this because you opted in to product updates from Jeffi Stores. To stop receiving these, reply to this email with "unsubscribe".</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`
+
+  const textProducts = products.map(p => `• ${p.name} — ₹${p.price}\n  ${siteUrl}/products/${p.slug}`).join('\n\n')
+  const text = `Hi ${customerName || 'there'},\n\n${intro}\n\n${textProducts}\n\nVisit ${siteUrl} for the full catalogue.\n\n— Jeffi Stores`
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      to: toEmail,
+      subject,
+      html,
+      text,
+    })
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}

@@ -599,6 +599,173 @@ export const TOOLS: ToolDef[] = [
       }
     },
   },
+  {
+    name: 'get_recent_products',
+    description: 'Top N most-recently-added active products by created_at DESC. Use for "newly added products" / "what is new" queries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', default: 5, minimum: 1, maximum: 20 },
+      },
+    },
+    mutating: false,
+    handler: async ({ limit }) => {
+      const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
+      const rows = await queryMany(
+        `SELECT p.id::text, p.name, p.slug, p.sku, p.base_price::text AS price,
+                p.short_description, p.inventory_quantity AS stock,
+                b.name AS brand, c.name AS category, p.created_at
+           FROM products p
+           LEFT JOIN brands b ON b.id = p.brand_id
+           LEFT JOIN categories c ON c.id = p.category_id
+          WHERE p.is_active = TRUE
+          ORDER BY p.created_at DESC
+          LIMIT $1`,
+        [lim]
+      )
+      return { products: rows, count: rows.length }
+    },
+  },
+  {
+    name: 'get_featured_products',
+    description: 'Active products curated as featured (is_featured=true), ordered by sales_count DESC. Use when the user asks for "featured products" / "showcase products".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', default: 5, minimum: 1, maximum: 20 },
+      },
+    },
+    mutating: false,
+    handler: async ({ limit }) => {
+      const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
+      const rows = await queryMany(
+        `SELECT p.id::text, p.name, p.slug, p.sku, p.base_price::text AS price,
+                p.short_description, p.inventory_quantity AS stock,
+                b.name AS brand, c.name AS category, p.sales_count
+           FROM products p
+           LEFT JOIN brands b ON b.id = p.brand_id
+           LEFT JOIN categories c ON c.id = p.category_id
+          WHERE p.is_active = TRUE AND p.is_featured = TRUE
+          ORDER BY p.sales_count DESC NULLS LAST, p.created_at DESC
+          LIMIT $1`,
+        [lim]
+      )
+      return { products: rows, count: rows.length }
+    },
+  },
+  {
+    name: 'estimate_email_audience',
+    description: 'Count how many customers would receive a marketing email under a given audience filter, BEFORE proposing a blast. Always call this first so the admin sees the blast radius. Filters: "all_opted_in", "recent_buyers" (placed an order in the last 90 days), or "test_only" (single email).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        audience: { type: 'string', description: 'all_opted_in | recent_buyers | test_only' },
+        testEmail: { type: 'string', description: 'Required when audience=test_only.' },
+      },
+      required: ['audience'],
+    },
+    mutating: false,
+    handler: async ({ audience, testEmail }) => {
+      const a = String(audience || '').toLowerCase()
+      if (a === 'test_only') {
+        const email = String(testEmail || '').trim()
+        if (!email.includes('@')) throw new Error('testEmail must be a valid email when audience=test_only')
+        return { audience: 'test_only', count: 1, sample: [email] }
+      }
+      if (a === 'all_opted_in') {
+        const r = await queryOne<{ n: number }>(
+          `SELECT COUNT(*)::int AS n FROM users
+            WHERE email IS NOT NULL AND marketing_opt_out IS NOT TRUE`
+        )
+        return { audience: 'all_opted_in', count: r?.n || 0 }
+      }
+      if (a === 'recent_buyers') {
+        const r = await queryOne<{ n: number }>(
+          `SELECT COUNT(DISTINCT u.id)::int AS n
+             FROM users u
+             JOIN orders o ON o.user_id = u.id
+            WHERE u.email IS NOT NULL AND u.marketing_opt_out IS NOT TRUE
+              AND o.created_at > NOW() - INTERVAL '90 days'`
+        )
+        return { audience: 'recent_buyers', count: r?.n || 0 }
+      }
+      throw new Error('audience must be one of: all_opted_in, recent_buyers, test_only')
+    },
+  },
+  {
+    name: 'propose_product_announcement_email',
+    description: 'Propose a marketing-style email featuring a list of products to a chosen audience. The admin must approve before it sends. ALWAYS call estimate_email_audience first so the user sees the blast radius. Provide a short subject + intro line; the email template will render product cards. For audience=test_only, also pass testEmail.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        productIds: { type: 'array', description: 'UUIDs of products to feature (1-10).' },
+        audience: { type: 'string', description: 'all_opted_in | recent_buyers | test_only' },
+        testEmail: { type: 'string', description: 'Required when audience=test_only.' },
+        subject: { type: 'string', description: 'Email subject line. Keep under 80 chars.' },
+        intro: { type: 'string', description: 'One short sentence shown above the product cards. Keep under 240 chars.' },
+      },
+      required: ['productIds', 'audience', 'subject', 'intro'],
+    },
+    mutating: true,
+    handler: async ({ productIds, audience, testEmail, subject, intro }) => {
+      const ids = Array.isArray(productIds) ? productIds.map(String).filter(Boolean) : []
+      if (ids.length < 1 || ids.length > 10) throw new Error('Provide 1-10 productIds')
+      const audKey = String(audience || '').toLowerCase()
+      if (!['all_opted_in', 'recent_buyers', 'test_only'].includes(audKey)) {
+        throw new Error('audience must be all_opted_in, recent_buyers, or test_only')
+      }
+      const subj = String(subject || '').trim()
+      const intr = String(intro || '').trim()
+      if (!subj || subj.length > 80) throw new Error('subject required, max 80 chars')
+      if (!intr || intr.length > 240) throw new Error('intro required, max 240 chars')
+      const products = await queryMany<{
+        id: string; name: string; slug: string; price: string; short_description: string | null
+      }>(
+        `SELECT id::text, name, slug, base_price::text AS price, short_description
+           FROM products WHERE id = ANY($1::uuid[]) AND is_active = TRUE`,
+        [ids]
+      )
+      if (products.length !== ids.length) {
+        return { proposed: false, info: `Only ${products.length} of ${ids.length} ids resolved to active products. Re-check the ids.` }
+      }
+      let audCount = 0
+      let testTo: string | null = null
+      if (audKey === 'test_only') {
+        const e = String(testEmail || '').trim()
+        if (!e.includes('@')) throw new Error('testEmail required when audience=test_only')
+        testTo = e
+        audCount = 1
+      } else if (audKey === 'all_opted_in') {
+        const r = await queryOne<{ n: number }>(
+          `SELECT COUNT(*)::int AS n FROM users
+            WHERE email IS NOT NULL AND marketing_opt_out IS NOT TRUE`
+        )
+        audCount = r?.n || 0
+      } else {
+        const r = await queryOne<{ n: number }>(
+          `SELECT COUNT(DISTINCT u.id)::int AS n
+             FROM users u JOIN orders o ON o.user_id = u.id
+            WHERE u.email IS NOT NULL AND u.marketing_opt_out IS NOT TRUE
+              AND o.created_at > NOW() - INTERVAL '90 days'`
+        )
+        audCount = r?.n || 0
+      }
+      return {
+        proposed: true,
+        kind: 'send_product_announcement_email',
+        payload: {
+          productIds: products.map(p => p.id),
+          productNames: products.map(p => p.name),
+          audience: audKey,
+          testEmail: testTo,
+          subject: subj,
+          intro: intr,
+          audienceCount: audCount,
+        },
+        confirmation: `Send "${subj}" featuring ${products.length} product${products.length === 1 ? '' : 's'} to ${audCount} recipient${audCount === 1 ? '' : 's'} (${audKey === 'test_only' ? testTo : audKey})?`,
+      }
+    },
+  },
 ]
 
 export function getTool(name: string): ToolDef | null {

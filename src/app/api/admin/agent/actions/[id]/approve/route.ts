@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { query, queryOne } from '@/lib/db'
+import { query, queryMany, queryOne } from '@/lib/db'
 import { sendTestCampaignEmail } from '@/lib/automation-emails'
-import { sendOrderDelayNotification } from '@/lib/email'
+import { sendOrderDelayNotification, sendProductAnnouncementEmail } from '@/lib/email'
 import type { CampaignKind } from '@/lib/marketing'
 
 export const dynamic = 'force-dynamic'
@@ -61,6 +61,55 @@ async function executeAction(action: AgentAction): Promise<{ result: any; error:
       })
       if (!r.success) return { result: null, error: 'Send failed' }
       return { result: { sentTo: customerEmail, orderNumber, delayDays, messageId: r.messageId }, error: null }
+    }
+    case 'send_product_announcement_email': {
+      const { productIds, audience, testEmail, subject, intro } = action.payload as {
+        productIds: string[]; audience: string; testEmail: string | null; subject: string; intro: string
+      }
+      if (!Array.isArray(productIds) || productIds.length === 0) {
+        return { result: null, error: 'productIds missing' }
+      }
+      const products = await queryMany<{
+        id: string; name: string; slug: string; price: string; short_description: string | null; primary_image_url: string | null
+      }>(
+        `SELECT p.id::text, p.name, p.slug, p.base_price::text AS price, p.short_description,
+                (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order ASC LIMIT 1) AS primary_image_url
+           FROM products p WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
+        [productIds]
+      )
+      if (products.length === 0) return { result: null, error: 'No active products resolved' }
+
+      let recipients: { email: string; name: string }[] = []
+      if (audience === 'test_only') {
+        if (!testEmail) return { result: null, error: 'testEmail missing' }
+        recipients = [{ email: testEmail, name: 'there' }]
+      } else if (audience === 'all_opted_in') {
+        recipients = await queryMany(
+          `SELECT email, COALESCE(NULLIF(TRIM(first_name || ' ' || COALESCE(last_name,'')), ''), email) AS name
+             FROM users WHERE email IS NOT NULL AND marketing_opt_out IS NOT TRUE`
+        ) as any
+      } else if (audience === 'recent_buyers') {
+        recipients = await queryMany(
+          `SELECT DISTINCT u.email, COALESCE(NULLIF(TRIM(u.first_name || ' ' || COALESCE(u.last_name,'')), ''), u.email) AS name
+             FROM users u JOIN orders o ON o.user_id = u.id
+            WHERE u.email IS NOT NULL AND u.marketing_opt_out IS NOT TRUE
+              AND o.created_at > NOW() - INTERVAL '90 days'`
+        ) as any
+      } else {
+        return { result: null, error: `Unknown audience: ${audience}` }
+      }
+
+      let sent = 0, failed = 0
+      for (const r of recipients) {
+        const out = await sendProductAnnouncementEmail({
+          toEmail: r.email, customerName: r.name, subject, intro, products,
+        })
+        if (out.success) sent++; else failed++
+      }
+      return {
+        result: { audience, recipients: recipients.length, sent, failed, productCount: products.length },
+        error: failed > 0 && sent === 0 ? `All ${failed} sends failed` : null,
+      }
     }
     default:
       return { result: null, error: `Unknown action kind: ${action.kind}` }
