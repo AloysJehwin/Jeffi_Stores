@@ -42,7 +42,12 @@ const LIMIT = parseInt(args.limit || '25', 10)
 const DRY_RUN = args['dry-run'] === 'true'
 const PRODUCT_FILTER = args.product || null
 
-const pool = new pg.Pool({ connectionString: DATABASE_URL, max: 4 })
+const NEEDS_SSL = /amazonaws|sslmode=require|localhost:5433/.test(DATABASE_URL)
+const pool = new pg.Pool({
+  connectionString: DATABASE_URL,
+  max: 4,
+  ssl: NEEDS_SSL ? { rejectUnauthorized: false } : undefined,
+})
 
 const SYSTEM_PROMPT = `You write concise product copy for an Indian B2B/B2C hardware and tools store (jeffistores.com).
 Given a product's name, category, and existing description, produce:
