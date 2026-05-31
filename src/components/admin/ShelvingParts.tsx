@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Check, X } from 'lucide-react'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 
@@ -218,8 +219,8 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
                 onChange={e => setNewQty(e.target.value)}
                 className="w-16 px-2 py-1 rounded-lg border border-border-default bg-surface text-foreground text-sm text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
               />
-              <button onClick={saveQty} disabled={saving} className="w-7 h-7 flex items-center justify-center rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs font-bold transition-colors disabled:opacity-50">✓</button>
-              <button onClick={() => setEditing(false)} className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-default hover:bg-surface-secondary text-foreground-secondary text-xs transition-colors">✗</button>
+              <button onClick={saveQty} disabled={saving} aria-label="Save" className="w-7 h-7 flex items-center justify-center rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setEditing(false)} aria-label="Cancel" className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-default hover:bg-surface-secondary text-foreground-secondary transition-colors"><X className="w-3.5 h-3.5" /></button>
             </div>
           ) : (
             <button

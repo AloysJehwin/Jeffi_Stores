@@ -144,6 +144,13 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/settings'],
     group: 'Settings',
   },
+  {
+    key: 'agent',
+    label: 'AI Agent',
+    description: 'Use the AI admin assistant; can chat, run tools, and propose mutating actions for approval',
+    routes: [],
+    group: 'AI',
+  },
 ]
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
@@ -185,6 +192,8 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/mailer')) return 'mailer'
   if (pathname.startsWith('/api/admin/suggest')) return null
   if (pathname.startsWith('/api/admin/traffic')) return 'dashboard'
+  if (pathname.startsWith('/api/admin/agent')) return 'agent'
+  if (pathname.startsWith('/api/admin/catalog-enrichment')) return 'products'
   if (pathname.startsWith('/api/brands')) return 'brands'
   if (pathname.startsWith('/api/customers')) return 'customers'
 

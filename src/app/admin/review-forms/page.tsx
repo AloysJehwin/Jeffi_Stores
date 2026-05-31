@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Star, MessageSquare, FileText } from 'lucide-react'
 import { queryMany, queryCount } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
@@ -84,12 +85,16 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                   <tr key={f.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground">{f.title}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium inline-flex items-center gap-1 ${
                         f.template_type === 'google_review' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
                         f.template_type === 'product_feedback' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
                         'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
                       }`}>
-                        {f.template_type === 'google_review' ? '⭐ Google' : f.template_type === 'product_feedback' ? '💬 Feedback' : '📝 Testimonial'}
+                        {f.template_type === 'google_review'
+                          ? <><Star className="w-3 h-3 fill-current" /> Google</>
+                          : f.template_type === 'product_feedback'
+                          ? <><MessageSquare className="w-3 h-3" /> Feedback</>
+                          : <><FileText className="w-3 h-3" /> Testimonial</>}
                       </span>
                     </td>
                     <td className="px-4 py-3 max-w-[260px]">

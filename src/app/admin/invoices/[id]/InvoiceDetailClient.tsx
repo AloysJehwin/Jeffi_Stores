@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Check } from 'lucide-react'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -125,8 +126,8 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             {o.irn && (
               <div className="flex justify-between gap-4">
                 <span className="text-foreground-secondary">IRN</span>
-                <span className={`text-xs font-medium ${o.irn_status === 'generated' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
-                  {o.irn_status === 'generated' ? '✓ Generated' : 'Stub'}
+                <span className={`text-xs font-medium inline-flex items-center gap-1 ${o.irn_status === 'generated' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                  {o.irn_status === 'generated' ? <><Check className="w-3 h-3" /> Generated</> : 'Stub'}
                 </span>
               </div>
             )}

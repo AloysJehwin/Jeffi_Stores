@@ -1,7 +1,9 @@
 import { query, queryMany, queryOne } from './db'
+import { aiChat } from './ai-client'
+import { findSimilarProductIds } from './rag'
+import { VARIANT_MIN_PRICE_SQL } from './queries'
 
-const OPENAI_API = 'https://api.openai.com/v1/chat/completions'
-const MODEL = 'gpt-4o-mini'
+const MODEL_TAG = 'ai-client'
 const DAILY_LIMIT = 10
 
 export interface ProductCandidate {
@@ -21,12 +23,6 @@ export interface Recommendation {
   product: ProductCandidate
   quantity: number
   reason: string
-}
-
-export interface AssistantResult {
-  summary: string
-  recommendations: Recommendation[]
-  responseMs: number
 }
 
 const STOPWORDS = new Set([
@@ -50,6 +46,44 @@ function escapeForFts(input: string): string {
   return tokenize(input).map(w => `${w}:*`).join(' | ')
 }
 
+export async function searchCandidatesViaRag(userQuery: string, limit = 20): Promise<ProductCandidate[]> {
+  const ids = await findSimilarProductIds(userQuery, limit)
+  if (ids.length === 0) return []
+
+  const productIds = ids.filter(i => i.productId).map(i => i.productId)
+  const variantIds = ids.filter(i => i.variantId).map(i => i.variantId as string)
+
+  const productsByVariant = variantIds.length > 0
+    ? await queryMany<{ id: string; product_id: string }>(
+        `SELECT id::text, product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`,
+        [variantIds]
+      )
+    : []
+  for (const r of productsByVariant) {
+    if (r.product_id && !productIds.includes(r.product_id)) productIds.push(r.product_id)
+  }
+
+  if (productIds.length === 0) return []
+
+  const rows = await queryMany<ProductCandidate>(
+    `SELECT
+       p.id::text, p.name, p.slug, p.sku,
+       COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS base_price,
+       p.short_description, p.inventory_quantity,
+       b.name AS brand_name,
+       c.name AS category_name,
+       (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.display_order ASC LIMIT 1) AS primary_image_url
+     FROM products p
+     LEFT JOIN brands b ON b.id = p.brand_id
+     LEFT JOIN categories c ON c.id = p.category_id
+     WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
+    [productIds]
+  )
+
+  const order = new Map(productIds.map((id, i) => [id, i]))
+  return rows.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
+}
+
 export async function searchCandidates(userQuery: string, limit = 50): Promise<ProductCandidate[]> {
   const tokens = tokenize(userQuery)
   const tsQuery = tokens.map(w => `${w}:*`).join(' | ')
@@ -63,7 +97,8 @@ export async function searchCandidates(userQuery: string, limit = 50): Promise<P
   const sql = `
     WITH ranked AS (
       SELECT
-        p.id, p.name, p.slug, p.sku, p.base_price::text AS base_price,
+        p.id, p.name, p.slug, p.sku,
+        COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS base_price,
         p.short_description, p.inventory_quantity,
         b.name AS brand_name,
         c.name AS category_name,
@@ -101,7 +136,8 @@ export async function searchCandidates(userQuery: string, limit = 50): Promise<P
 
   return queryMany<ProductCandidate>(
     `SELECT
-       p.id, p.name, p.slug, p.sku, p.base_price::text AS base_price,
+       p.id, p.name, p.slug, p.sku,
+       COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS base_price,
        p.short_description, p.inventory_quantity,
        b.name AS brand_name,
        c.name AS category_name,
@@ -131,21 +167,12 @@ export async function getRemainingQuota(userId: string): Promise<{ used: number;
   return { used, remaining: Math.max(0, DAILY_LIMIT - used), resetAt: tomorrow }
 }
 
-interface OpenAIChoice {
-  message: { content: string }
-  finish_reason: string
-}
-
-interface OpenAIResponse {
-  choices: OpenAIChoice[]
-  usage: { prompt_tokens: number; completion_tokens: number }
-}
-
-async function callOpenAI(userQuery: string, candidates: ProductCandidate[]): Promise<{
+async function callRanker(userQuery: string, candidates: ProductCandidate[]): Promise<{
   summary: string
   recommendations: { product_id: string; quantity: number; reason: string }[]
-  promptTokens: number
-  completionTokens: number
+  provider: string
+  model: string
+  latencyMs: number
 }> {
   const systemPrompt = `You are a hardware product specialist for Jeffi Stores, an Indian industrial-hardware shop. A customer describes a project, intent, or just a vague topic. Your job: pick relevant products from the CATALOG below.
 
@@ -156,7 +183,9 @@ Hard rules:
 - Suggest realistic quantities for the project scale. If unclear, default to a sensible small batch (e.g. 4-10 fasteners, 1-2 tools).
 - Keep "reason" short (under 25 words): WHY this product fits, WHAT it would be used for.
 - "summary" = 1-2 sentences. Acknowledge the user's intent, then describe what you're suggesting overall.
-- Never return an empty recommendations array. If nothing seems perfect, pick the most relevant 3 anyway and explain how they might help.`
+- Never return an empty recommendations array. If nothing seems perfect, pick the most relevant 3 anyway and explain how they might help.
+
+Output ONLY a JSON object: {"summary": "...", "recommendations": [{"product_id": "...", "quantity": 1, "reason": "..."}]}`
 
   const compactCatalog = candidates.map(c => ({
     id: c.id,
@@ -168,74 +197,35 @@ Hard rules:
     description: c.short_description?.slice(0, 200),
   }))
 
-  const body = {
-    model: MODEL,
+  const r = await aiChat({
+    modelHint: 'copy',
+    jsonMode: true,
+    temperature: 0.4,
+    maxTokens: 2000,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: `CUSTOMER PROJECT: ${userQuery}\n\nCATALOG (${candidates.length} products):\n${JSON.stringify(compactCatalog, null, 0)}` },
     ],
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'recommendations',
-        strict: true,
-        schema: {
-          type: 'object',
-          properties: {
-            summary: { type: 'string' },
-            recommendations: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  product_id: { type: 'string' },
-                  quantity: { type: 'integer', minimum: 1 },
-                  reason: { type: 'string' },
-                },
-                required: ['product_id', 'quantity', 'reason'],
-                additionalProperties: false,
-              },
-            },
-          },
-          required: ['summary', 'recommendations'],
-          additionalProperties: false,
-        },
-      },
-    },
-    temperature: 0.4,
-  }
-
-  const res = await fetch(OPENAI_API, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify(body),
   })
 
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '')
-    throw new Error(`OpenAI ${res.status}: ${errText.slice(0, 200)}`)
-  }
-
-  const data = (await res.json()) as OpenAIResponse
-  const content = data.choices[0]?.message?.content
-  if (!content) throw new Error('Empty AI response')
-
-  const parsed = JSON.parse(content) as { summary: string; recommendations: { product_id: string; quantity: number; reason: string }[] }
+  const parsed = JSON.parse(r.content) as { summary?: string; recommendations?: { product_id: string; quantity: number; reason: string }[] }
   return {
     summary: parsed.summary ?? '',
     recommendations: parsed.recommendations ?? [],
-    promptTokens: data.usage?.prompt_tokens ?? 0,
-    completionTokens: data.usage?.completion_tokens ?? 0,
+    provider: r.provider,
+    model: r.model,
+    latencyMs: r.latencyMs,
   }
 }
 
-function estimateCostInr(promptTokens: number, completionTokens: number): number {
-  const promptUsd = (promptTokens / 1_000_000) * 0.15
-  const completionUsd = (completionTokens / 1_000_000) * 0.60
-  return Math.round((promptUsd + completionUsd) * 88 * 10000) / 10000
+export interface AssistantResult {
+  aiQueryId: string | null
+  summary: string
+  recommendations: Recommendation[]
+  responseMs: number
+  source: 'rag' | 'keyword' | 'none'
+  provider: string
+  model: string
 }
 
 export async function recommendProducts(userId: string, userQuery: string): Promise<AssistantResult> {
@@ -246,29 +236,46 @@ export async function recommendProducts(userId: string, userQuery: string): Prom
     throw new Error(`Daily limit reached (${DAILY_LIMIT} queries). Resets at midnight.`)
   }
 
-  const candidates = await searchCandidates(userQuery, 50)
+  let candidates: ProductCandidate[] = []
+  let source: 'rag' | 'keyword' | 'none' = 'none'
+
+  try {
+    candidates = await searchCandidatesViaRag(userQuery, 20)
+    if (candidates.length > 0) source = 'rag'
+  } catch {
+    candidates = []
+  }
 
   if (candidates.length === 0) {
-    await query(
+    candidates = await searchCandidates(userQuery, 50)
+    if (candidates.length > 0) source = 'keyword'
+  }
+
+  if (candidates.length === 0) {
+    const inserted = await queryOne<{ id: string }>(
       `INSERT INTO ai_queries (user_id, query_text, candidate_count, recommended_count, response_ms, model)
-       VALUES ($1, $2, 0, 0, $3, $4)`,
-      [userId, userQuery.slice(0, 1000), Date.now() - start, MODEL]
-    ).catch(() => {})
+       VALUES ($1, $2, 0, 0, $3, $4) RETURNING id`,
+      [userId, userQuery.slice(0, 1000), Date.now() - start, MODEL_TAG]
+    ).catch(() => null)
     return {
+      aiQueryId: inserted?.id ?? null,
       summary: "I couldn't find anything in our catalog matching that description. Try different keywords or browse by category.",
       recommendations: [],
       responseMs: Date.now() - start,
+      source: 'none',
+      provider: '',
+      model: '',
     }
   }
 
-  let aiResult: Awaited<ReturnType<typeof callOpenAI>>
+  let aiResult: Awaited<ReturnType<typeof callRanker>>
   try {
-    aiResult = await callOpenAI(userQuery, candidates)
+    aiResult = await callRanker(userQuery, candidates)
   } catch (err: any) {
     await query(
       `INSERT INTO ai_queries (user_id, query_text, candidate_count, recommended_count, response_ms, model, error)
        VALUES ($1, $2, $3, 0, $4, $5, $6)`,
-      [userId, userQuery.slice(0, 1000), candidates.length, Date.now() - start, MODEL, String(err?.message ?? err).slice(0, 500)]
+      [userId, userQuery.slice(0, 1000), candidates.length, Date.now() - start, MODEL_TAG, String(err?.message ?? err).slice(0, 500)]
     ).catch(() => {})
     throw new Error('AI service unavailable. Please try again.')
   }
@@ -283,18 +290,22 @@ export async function recommendProducts(userId: string, userQuery: string): Prom
     .filter((r): r is Recommendation => r !== null)
 
   const responseMs = Date.now() - start
-  const cost = estimateCostInr(aiResult.promptTokens, aiResult.completionTokens)
 
-  await query(
+  const inserted = await queryOne<{ id: string }>(
     `INSERT INTO ai_queries
-       (user_id, query_text, candidate_count, recommended_count, response_ms, model, prompt_tokens, completion_tokens, cost_inr)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [userId, userQuery.slice(0, 1000), candidates.length, recommendations.length, responseMs, MODEL, aiResult.promptTokens, aiResult.completionTokens, cost]
-  ).catch(() => {})
+       (user_id, query_text, candidate_count, recommended_count, response_ms, model, recommended_product_ids)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::uuid[])
+     RETURNING id`,
+    [userId, userQuery.slice(0, 1000), candidates.length, recommendations.length, responseMs, `${aiResult.provider}:${aiResult.model}`, recommendations.map(r => r.product.id)]
+  ).catch(() => null)
 
   return {
+    aiQueryId: inserted?.id ?? null,
     summary: aiResult.summary,
     recommendations,
     responseMs,
+    source,
+    provider: aiResult.provider,
+    model: aiResult.model,
   }
 }

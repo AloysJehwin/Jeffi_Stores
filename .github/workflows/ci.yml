@@ -386,6 +386,12 @@ jobs:
               add_ai_assistant_log.sql
               add_scenarios_to_campaigns.sql
               add_custom_scenarios.sql
+              add_ai_feedback.sql
+              add_recommended_product_ids_to_ai_queries.sql
+              add_ai_briefing_log.sql
+              add_admin_agent.sql
+              add_product_ai_enrichment.sql
+              add_admin_agent_proposed_tools.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')

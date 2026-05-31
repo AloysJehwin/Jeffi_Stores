@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Smartphone, Tablet as TabletIcon, Monitor } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 const FUNNEL_LABELS: Record<string, string> = {
   home: 'Homepage', categories: 'Categories', category: 'Category Page',
@@ -13,8 +15,8 @@ const FUNNEL_COLORS: Record<string, string> = {
   product: 'bg-purple-500', cart: 'bg-amber-500', checkout: 'bg-orange-500', order_placed: 'bg-green-500',
 }
 
-const DEVICE_ICONS: Record<string, string> = {
-  Mobile: '📱', Tablet: '🖥️', Desktop: '💻',
+const DEVICE_ICONS: Record<string, LucideIcon> = {
+  Mobile: Smartphone, Tablet: TabletIcon, Desktop: Monitor,
 }
 
 const BROWSER_COLORS: Record<string, string> = {
@@ -485,11 +487,12 @@ export default function TrafficClient() {
                     {data.devices.map(d => {
                       const total = data.devices.reduce((s, x) => s + x.sessions, 0)
                       const pct = total > 0 ? Math.round((d.sessions / total) * 100) : 0
+                      const DeviceIcon = DEVICE_ICONS[d.type] || Monitor
                       return (
                         <div key={d.type}>
                           <div className="flex justify-between items-center text-sm mb-1.5">
                             <span className="font-medium text-foreground flex items-center gap-2">
-                              <span>{DEVICE_ICONS[d.type] || '🖥️'}</span>
+                              <DeviceIcon className="w-4 h-4 text-foreground-muted" />
                               {d.type}
                             </span>
                             <span className="text-foreground-secondary text-xs">{d.sessions.toLocaleString()} <span className="text-foreground-muted">({pct}%)</span></span>
