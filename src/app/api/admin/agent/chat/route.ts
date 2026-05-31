@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
   try {
     for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
       const r = await aiChat({
-        modelHint: 'copy',
+        modelHint: 'agent',
         jsonMode: false,
         temperature: 0.2,
         maxTokens: 1500,
