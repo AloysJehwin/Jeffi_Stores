@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bot, X, Send, MessageSquare, Slash, LayoutGrid, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import AdminAgentMessage from './AdminAgentMessage'
 
 interface Props {
   isOpen: boolean
@@ -223,7 +224,9 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                         ? 'bg-accent-500 text-white'
                         : 'bg-surface-secondary text-foreground'
                     }`}>
-                      <p className="whitespace-pre-wrap leading-relaxed">{turn.content}</p>
+                      {turn.role === 'user'
+                        ? <p className="whitespace-pre-wrap leading-relaxed">{turn.content}</p>
+                        : <AdminAgentMessage text={turn.content} />}
                       {turn.toolCalls && turn.toolCalls.length > 0 && (
                         <details className="mt-2 text-[10px] opacity-70">
                           <summary className="cursor-pointer">{turn.toolCalls.length} tool call{turn.toolCalls.length === 1 ? '' : 's'}</summary>

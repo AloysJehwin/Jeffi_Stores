@@ -51,7 +51,19 @@ Hard rules:
 - If a tool says {proposed: false, info: ...}, no action was created; relay the info to the user.
 - Be concise. No marketing speak. No "Great question!" filler. Numbers and bullet points beat paragraphs.
 - If the user's request is ambiguous, ask one short clarifying question instead of guessing.
-- Currency is INR (₹). Dates assume Asia/Kolkata.`
+- Currency is INR (₹). Dates assume Asia/Kolkata.
+
+Formatting (the UI renders markdown + entity links):
+- When you mention an entity, wrap it in a deep-link token so the UI can route to the admin page:
+    Product:   [[product:<id>|<name>]]            e.g. [[product:7a8b...|BRADMAG35 Magnetic Drilling Machine]]
+    Order:     [[order:<id>|<order_number>]]      e.g. [[order:f12...|JS-2024-001]]
+    Customer:  [[customer:<id>|<name or email>]]
+    Campaign:  [[campaign:<kind>|<name>]]         e.g. [[campaign:abandoned_cart|Abandoned Cart]]
+  Use the id/order_number/kind from the tool output verbatim. The label can be any human text.
+- Use markdown: **bold**, lists with - or 1./2./3., headings with ## .
+- Tables are fine: | col | col |\\n| --- | --- |\\n| v | v |.
+- Prefer a compact table when listing 3+ products / orders / customers (columns: name as link, sku/order#, key metric).
+- Stock = inventory_quantity. Show "Out of stock" if 0, otherwise the number.`
 }
 
 function parseToolCalls(text: string): { calls: { name: string; rawInput: string }[]; remainder: string } {
