@@ -68,6 +68,11 @@ export async function collectBriefingData(): Promise<BriefingData> {
       count: string; paid_count: string; cancelled_count: string; pending_count: string
       revenue: string; avg_order_value: string
     }>(`
+      WITH bounds AS (
+        SELECT
+          (date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata') - INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata' AS lo,
+           date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata')                    AT TIME ZONE 'Asia/Kolkata' AS hi
+      )
       SELECT
         COUNT(*)::text AS count,
         COUNT(*) FILTER (WHERE payment_status = 'paid')::text AS paid_count,
@@ -75,19 +80,22 @@ export async function collectBriefingData(): Promise<BriefingData> {
         COUNT(*) FILTER (WHERE status = 'pending' AND payment_status != 'paid')::text AS pending_count,
         COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0)::text AS revenue,
         COALESCE(AVG(total_amount) FILTER (WHERE payment_status = 'paid'), 0)::text AS avg_order_value
-      FROM orders
-      WHERE created_at >= (CURRENT_DATE - INTERVAL '1 day' AT TIME ZONE 'Asia/Kolkata')
-        AND created_at <  (CURRENT_DATE                AT TIME ZONE 'Asia/Kolkata')
+      FROM orders, bounds
+      WHERE created_at >= bounds.lo AND created_at < bounds.hi
     `, []),
     queryOne<{ avg_revenue: string; avg_orders: string }>(`
-      WITH daily AS (
+      WITH bounds AS (
         SELECT
-          (created_at AT TIME ZONE 'Asia/Kolkata')::date AS d,
+          (date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata') - INTERVAL '8 days') AT TIME ZONE 'Asia/Kolkata' AS lo,
+          (date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata') - INTERVAL '1 day')  AT TIME ZONE 'Asia/Kolkata' AS hi
+      ),
+      daily AS (
+        SELECT
+          ((created_at AT TIME ZONE 'Asia/Kolkata')::date) AS d,
           SUM(total_amount) FILTER (WHERE payment_status = 'paid') AS revenue,
           COUNT(*) AS orders
-        FROM orders
-        WHERE created_at >= (CURRENT_DATE - INTERVAL '8 days' AT TIME ZONE 'Asia/Kolkata')
-          AND created_at <  (CURRENT_DATE - INTERVAL '1 day'  AT TIME ZONE 'Asia/Kolkata')
+        FROM orders, bounds
+        WHERE created_at >= bounds.lo AND created_at < bounds.hi
         GROUP BY 1
       )
       SELECT
@@ -96,16 +104,20 @@ export async function collectBriefingData(): Promise<BriefingData> {
       FROM daily
     `, []),
     queryMany<{ product_id: string; product_name: string; qty: string; revenue: string }>(`
+      WITH bounds AS (
+        SELECT
+          (date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata') - INTERVAL '1 day') AT TIME ZONE 'Asia/Kolkata' AS lo,
+           date_trunc('day', NOW() AT TIME ZONE 'Asia/Kolkata')                    AT TIME ZONE 'Asia/Kolkata' AS hi
+      )
       SELECT
         oi.product_id::text,
         oi.product_name,
         SUM(oi.quantity)::text AS qty,
         SUM(oi.total_price)::text AS revenue
       FROM order_items oi
-      JOIN orders o ON o.id = oi.order_id
+      JOIN orders o ON o.id = oi.order_id, bounds
       WHERE o.payment_status = 'paid'
-        AND o.created_at >= (CURRENT_DATE - INTERVAL '1 day' AT TIME ZONE 'Asia/Kolkata')
-        AND o.created_at <  (CURRENT_DATE                AT TIME ZONE 'Asia/Kolkata')
+        AND o.created_at >= bounds.lo AND o.created_at < bounds.hi
       GROUP BY oi.product_id, oi.product_name
       ORDER BY SUM(oi.total_price) DESC
       LIMIT 5
