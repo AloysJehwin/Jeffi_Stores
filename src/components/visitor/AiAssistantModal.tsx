@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { ThumbsUp, ThumbsDown, Send, X } from 'lucide-react'
 
 interface ProductCandidate {
   id: string
@@ -24,6 +25,7 @@ interface Recommendation {
 }
 
 interface AssistantResponse {
+  aiQueryId?: string | null
   summary: string
   recommendations: Recommendation[]
   quota?: { used: number; remaining: number }
@@ -34,6 +36,8 @@ interface Props {
   isOpen: boolean
   onClose: () => void
 }
+
+type Verdict = 'helpful' | 'not_helpful'
 
 const SAMPLE_PROMPTS = [
   'I\'m building a wooden table — what fasteners do I need?',
@@ -50,6 +54,10 @@ export default function AiAssistantModal({ isOpen, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AssistantResponse | null>(null)
   const [quota, setQuota] = useState<{ used: number; remaining: number } | null>(null)
+  const [perCardVerdict, setPerCardVerdict] = useState<Record<string, Verdict>>({})
+  const [overallVerdict, setOverallVerdict] = useState<Verdict | null>(null)
+  const [openComment, setOpenComment] = useState<string | null>(null)
+  const [commentText, setCommentText] = useState('')
 
   useEffect(() => {
     if (!isOpen) return
@@ -75,8 +83,50 @@ export default function AiAssistantModal({ isOpen, onClose }: Props) {
       setQuery('')
       setResult(null)
       setLoading(false)
+      setPerCardVerdict({})
+      setOverallVerdict(null)
+      setOpenComment(null)
+      setCommentText('')
     }
   }, [isOpen])
+
+  async function postFeedback(payload: { signal: string; productId?: string; comment?: string }) {
+    if (!result?.aiQueryId) return
+    try {
+      await fetch('/api/ai-assistant/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ aiQueryId: result.aiQueryId, ...payload }),
+      })
+    } catch {}
+  }
+
+  function handleCardThumb(productId: string, verdict: Verdict) {
+    setPerCardVerdict(prev => ({ ...prev, [productId]: verdict }))
+    postFeedback({ signal: verdict, productId })
+    if (verdict === 'not_helpful') {
+      setOpenComment(productId)
+      setCommentText('')
+    }
+  }
+
+  function handleOverallThumb(verdict: Verdict) {
+    if (overallVerdict) return
+    setOverallVerdict(verdict)
+    postFeedback({ signal: verdict === 'helpful' ? 'overall_helpful' : 'overall_not_helpful' })
+  }
+
+  function handleClickAttribution(productId: string) {
+    postFeedback({ signal: 'clicked', productId })
+  }
+
+  function submitComment(productId: string) {
+    if (!commentText.trim()) return
+    postFeedback({ signal: 'not_helpful', productId, comment: commentText.trim() })
+    setOpenComment(null)
+    setCommentText('')
+  }
 
   async function submit(e?: React.FormEvent) {
     if (e) e.preventDefault()
@@ -234,57 +284,162 @@ export default function AiAssistantModal({ isOpen, onClose }: Props) {
                   <div className="space-y-2.5">
                     {result.recommendations.map(rec => {
                       const price = parseFloat(rec.product.base_price)
+                      const verdict = perCardVerdict[rec.product.id]
+                      const commentOpen = openComment === rec.product.id
                       return (
                         <div
                           key={rec.product.id}
-                          className="flex gap-3 p-3 border border-border-default rounded-lg hover:border-accent-500 hover:bg-surface-secondary/40 transition-colors"
+                          className="border border-border-default rounded-lg hover:border-accent-500 hover:bg-surface-secondary/40 transition-colors"
                         >
-                          <Link href={`/products/${rec.product.slug}`} onClick={onClose} className="shrink-0">
-                            {rec.product.primary_image_url ? (
-                              <Image
-                                src={rec.product.primary_image_url}
-                                alt={rec.product.name}
-                                width={64}
-                                height={64}
-                                className="w-16 h-16 rounded-lg object-cover bg-surface-secondary"
-                                unoptimized
-                              />
-                            ) : (
-                              <div className="w-16 h-16 rounded-lg bg-surface-secondary" />
-                            )}
-                          </Link>
-                          <div className="flex-1 min-w-0">
+                          <div className="flex gap-3 p-3">
                             <Link
                               href={`/products/${rec.product.slug}`}
-                              onClick={onClose}
-                              className="block text-sm font-medium text-foreground hover:text-accent-500 line-clamp-2"
+                              onClick={() => { handleClickAttribution(rec.product.id); onClose() }}
+                              className="shrink-0"
                             >
-                              {rec.product.name}
+                              {rec.product.primary_image_url ? (
+                                <Image
+                                  src={rec.product.primary_image_url}
+                                  alt={rec.product.name}
+                                  width={64}
+                                  height={64}
+                                  className="w-16 h-16 rounded-lg object-cover bg-surface-secondary"
+                                  unoptimized
+                                />
+                              ) : (
+                                <div className="w-16 h-16 rounded-lg bg-surface-secondary" />
+                              )}
                             </Link>
-                            <p className="text-xs text-foreground-muted mt-0.5">
-                              {rec.product.brand_name && <span>{rec.product.brand_name} · </span>}
-                              ₹{Math.round(price).toLocaleString('en-IN')}
-                            </p>
-                            <p className="text-xs text-foreground-secondary mt-1.5 line-clamp-2">{rec.reason}</p>
+                            <div className="flex-1 min-w-0">
+                              <Link
+                                href={`/products/${rec.product.slug}`}
+                                onClick={() => { handleClickAttribution(rec.product.id); onClose() }}
+                                className="block text-sm font-medium text-foreground hover:text-accent-500 line-clamp-2"
+                              >
+                                {rec.product.name}
+                              </Link>
+                              <p className="text-xs text-foreground-muted mt-0.5">
+                                {rec.product.brand_name && <span>{rec.product.brand_name} · </span>}
+                                ₹{Math.round(price).toLocaleString('en-IN')}
+                              </p>
+                              <p className="text-xs text-foreground-secondary mt-1.5 line-clamp-2">{rec.reason}</p>
+                              <div className="mt-2 flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleCardThumb(rec.product.id, 'helpful')}
+                                  disabled={!!verdict}
+                                  className={`p-1 rounded transition-colors ${
+                                    verdict === 'helpful'
+                                      ? 'bg-accent-100 text-accent-600 dark:bg-accent-900/40 dark:text-accent-400'
+                                      : 'text-foreground-muted hover:text-accent-500 hover:bg-surface-secondary disabled:opacity-30'
+                                  }`}
+                                  aria-label="Helpful"
+                                  title="Helpful"
+                                >
+                                  <ThumbsUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCardThumb(rec.product.id, 'not_helpful')}
+                                  disabled={!!verdict}
+                                  className={`p-1 rounded transition-colors ${
+                                    verdict === 'not_helpful'
+                                      ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+                                      : 'text-foreground-muted hover:text-red-500 hover:bg-surface-secondary disabled:opacity-30'
+                                  }`}
+                                  aria-label="Not helpful"
+                                  title="Not helpful"
+                                >
+                                  <ThumbsDown className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1.5 shrink-0">
+                              <span className="px-2 py-0.5 bg-accent-500/10 text-accent-600 dark:text-accent-400 text-xs font-bold rounded">
+                                × {rec.quantity}
+                              </span>
+                              <Link
+                                href={`/products/${rec.product.slug}`}
+                                onClick={() => { handleClickAttribution(rec.product.id); onClose() }}
+                                className="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold rounded-lg transition-all active:scale-95 whitespace-nowrap inline-flex items-center gap-1"
+                              >
+                                View
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                              </Link>
+                            </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1.5 shrink-0">
-                            <span className="px-2 py-0.5 bg-accent-500/10 text-accent-600 dark:text-accent-400 text-xs font-bold rounded">
-                              × {rec.quantity}
-                            </span>
-                            <Link
-                              href={`/products/${rec.product.slug}`}
-                              onClick={onClose}
-                              className="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold rounded-lg transition-all active:scale-95 whitespace-nowrap inline-flex items-center gap-1"
-                            >
-                              View
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                              </svg>
-                            </Link>
-                          </div>
+                          {commentOpen && (
+                            <div className="px-3 pb-3 -mt-1">
+                              <div className="flex gap-2 items-start bg-surface-secondary rounded-lg p-2">
+                                <textarea
+                                  value={commentText}
+                                  onChange={e => setCommentText(e.target.value)}
+                                  placeholder="What would have been better?"
+                                  rows={2}
+                                  maxLength={500}
+                                  className="flex-1 text-xs bg-transparent text-foreground placeholder:text-foreground-muted focus:outline-none resize-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => submitComment(rec.product.id)}
+                                  disabled={!commentText.trim()}
+                                  className="p-1.5 rounded bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors"
+                                  aria-label="Send comment"
+                                  title="Send"
+                                >
+                                  <Send className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setOpenComment(null); setCommentText('') }}
+                                  className="p-1.5 rounded text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
+                                  aria-label="Cancel"
+                                  title="Cancel"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
+                  </div>
+                )}
+
+                {result.aiQueryId && result.recommendations.length > 0 && (
+                  <div className="border-t border-border-default pt-3 flex items-center justify-center gap-3">
+                    <span className="text-xs text-foreground-muted">Was this helpful?</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOverallThumb('helpful')}
+                      disabled={!!overallVerdict}
+                      className={`p-1.5 rounded transition-colors ${
+                        overallVerdict === 'helpful'
+                          ? 'bg-accent-100 text-accent-600 dark:bg-accent-900/40 dark:text-accent-400'
+                          : 'text-foreground-muted hover:text-accent-500 hover:bg-surface-secondary disabled:opacity-30'
+                      }`}
+                      aria-label="Overall helpful"
+                      title="Overall helpful"
+                    >
+                      <ThumbsUp className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOverallThumb('not_helpful')}
+                      disabled={!!overallVerdict}
+                      className={`p-1.5 rounded transition-colors ${
+                        overallVerdict === 'not_helpful'
+                          ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+                          : 'text-foreground-muted hover:text-red-500 hover:bg-surface-secondary disabled:opacity-30'
+                      }`}
+                      aria-label="Overall not helpful"
+                      title="Overall not helpful"
+                    >
+                      <ThumbsDown className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
               </div>

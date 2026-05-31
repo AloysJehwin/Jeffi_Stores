@@ -3,6 +3,7 @@ import { query, queryOne, withTransaction } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
 import { isInterState, calculateGST } from '@/lib/gst'
+import { recordImplicitSignal } from '@/lib/ai-feedback'
 
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
@@ -211,6 +212,8 @@ export async function POST(request: NextRequest) {
       sendOrderConfirmationEmail(user.email, order, orderItems, null).catch(() => {})
       sendNewOrderNotification(order, orderItems, user).catch(() => {})
     }
+
+    recordImplicitSignal(userId, item.productId, 'purchased').catch(() => {})
 
     return NextResponse.json({
       message: 'Order created successfully',

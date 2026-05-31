@@ -5,6 +5,7 @@ import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/emai
 import { isInterState, calculateGST } from '@/lib/gst'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
+import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
@@ -328,6 +329,8 @@ export async function POST(request: NextRequest) {
       summary: `Placed order #${order.order_number} — ₹${Number(order.total_amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
       metadata: { orderNumber: order.order_number, total: order.total_amount, itemCount: orderItems.length },
     }).catch(() => {})
+
+    recordImplicitSignalsForProducts(userId, orderItems.map(i => i.product_id), 'purchased').catch(() => {})
 
     if (Number(order.total_amount) >= 50000) {
       createAutoTask({

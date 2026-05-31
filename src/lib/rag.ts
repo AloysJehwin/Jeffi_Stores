@@ -123,6 +123,48 @@ export async function findSimilarProducts(query: string, limit = 5): Promise<Rag
   return findSimilar(query, { limit, sourceTables: ['products', 'product_variants'] })
 }
 
+export interface SimilarProductId {
+  productId: string
+  similarity: number
+  matchedVia: 'products' | 'product_variants'
+  variantId: string | null
+}
+
+export async function findSimilarProductIds(query: string, limit = 20): Promise<SimilarProductId[]> {
+  const vec = await embed(query)
+  const vecLiteral = toVectorLiteral(vec)
+
+  const sql = `
+    WITH ranked AS (
+      SELECT
+        source_table,
+        source_id,
+        1 - (embedding <=> $1::vector) AS similarity
+      FROM embeddings
+      WHERE source_table IN ('products', 'product_variants')
+      ORDER BY embedding <=> $1::vector
+      LIMIT $2
+    )
+    SELECT * FROM ranked
+  `
+  const result = await getPool().query(sql, [vecLiteral, limit * 2])
+
+  const seen = new Set<string>()
+  const out: SimilarProductId[] = []
+  for (const row of result.rows) {
+    const sim = typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity
+    if (row.source_table === 'products') {
+      if (seen.has(row.source_id)) continue
+      seen.add(row.source_id)
+      out.push({ productId: row.source_id, similarity: sim, matchedVia: 'products', variantId: null })
+    } else {
+      out.push({ productId: '', similarity: sim, matchedVia: 'product_variants', variantId: row.source_id })
+    }
+    if (out.length >= limit) break
+  }
+  return out
+}
+
 export async function findSimilarCustomers(query: string, limit = 5): Promise<RagResult[]> {
   return findSimilar(query, { limit, sourceTable: 'users' })
 }
