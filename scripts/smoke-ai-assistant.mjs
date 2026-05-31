@@ -63,14 +63,22 @@ async function embed(text) {
 async function ragHits(query, k = 3) {
   const v = await embed(query)
   const lit = '[' + v.join(',') + ']'
-  const { rows } = await razer.query(
-    `SELECT source_table, source_id, 1 - (embedding <=> $1::vector) AS sim
-       FROM embeddings
-      WHERE source_table IN ('products','product_variants')
-      ORDER BY embedding <=> $1::vector
-      LIMIT $2`,
-    [lit, k * 2]
-  )
+  const c = await razer.connect()
+  let rows
+  try {
+    await c.query(`SET LOCAL hnsw.ef_search = 200`)
+    const r = await c.query(
+      `SELECT source_table, source_id, 1 - (embedding <=> $1::vector) AS sim
+         FROM embeddings
+        WHERE source_table IN ('products','product_variants')
+        ORDER BY embedding <=> $1::vector
+        LIMIT $2`,
+      [lit, k * 2]
+    )
+    rows = r.rows
+  } finally {
+    c.release()
+  }
   const productIds = []
   for (const r of rows) {
     if (r.source_table === 'products' && !productIds.includes(r.source_id)) productIds.push(r.source_id)

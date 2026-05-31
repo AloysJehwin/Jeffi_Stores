@@ -109,7 +109,7 @@ export async function findSimilar(
     LIMIT $${limitIdx}
   `
 
-  const result = await getPool().query(sql, params)
+  const result = await runWithHnswTuning(sql, params)
   return result.rows.map((row) => ({
     source_table: row.source_table,
     source_id: row.source_id,
@@ -117,6 +117,18 @@ export async function findSimilar(
     similarity: typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity,
     metadata: row.metadata ?? {},
   }))
+}
+
+const HNSW_EF_SEARCH = parseInt(process.env.RAG_HNSW_EF_SEARCH || '200', 10)
+
+async function runWithHnswTuning(sql: string, params: unknown[]) {
+  const client = await getPool().connect()
+  try {
+    await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH}`)
+    return await client.query(sql, params)
+  } finally {
+    client.release()
+  }
 }
 
 export async function findSimilarProducts(query: string, limit = 5): Promise<RagResult[]> {
@@ -147,7 +159,7 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
     )
     SELECT * FROM ranked
   `
-  const result = await getPool().query(sql, [vecLiteral, limit * 2])
+  const result = await runWithHnswTuning(sql, [vecLiteral, limit * 2])
 
   const seen = new Set<string>()
   const out: SimilarProductId[] = []
