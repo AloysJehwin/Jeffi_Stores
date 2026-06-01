@@ -110,6 +110,8 @@ export async function POST(request: NextRequest) {
 
   try {
     await withTransaction(async (client) => {
+      const inflationId = crypto.randomUUID()
+      await client.query(`SELECT set_config('audit.inflation_id', $1, true)`, [inflationId])
       const snapshotProducts: any[] = []
       for (const p of products) {
         const before: Record<string, number | null> = {}
@@ -176,9 +178,9 @@ export async function POST(request: NextRequest) {
       }
 
       await client.query(
-        `INSERT INTO price_inflation_log (category_id, category_name, percentage, applied_fields, product_count, applied_by, snapshot)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [category_id, category_name, percentage, validFields, products.length, (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username) || 'admin', JSON.stringify(snapshotProducts)]
+        `INSERT INTO price_inflation_log (id, category_id, category_name, percentage, applied_fields, product_count, applied_by, snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [inflationId, category_id, category_name, percentage, validFields, products.length, (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username) || 'admin', JSON.stringify(snapshotProducts)]
       )
     })
   } catch (e: any) {

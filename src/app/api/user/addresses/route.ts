@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
+import { logActivity } from '@/lib/activity'
 
-// Get user's addresses
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateUser(request)
@@ -18,13 +18,11 @@ export async function GET(request: NextRequest) {
     )
 
     return NextResponse.json({ addresses: addresses || [] })
-  } catch (error) {
-    console.error('Error in addresses API:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// Create new address
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateUser(request)
@@ -49,7 +47,6 @@ export async function POST(request: NextRequest) {
       is_default,
     } = body
 
-    // Validate and normalize phone
     if (!phone) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })
     }
@@ -60,7 +57,6 @@ export async function POST(request: NextRequest) {
     }
     const normalizedPhone = `+91${cleanedPhone}`
 
-    // If this is set as default, unset other defaults
     if (is_default) {
       await query(
         'UPDATE addresses SET is_default = false WHERE user_id = $1 AND address_type = $2',
@@ -80,9 +76,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create address' }, { status: 500 })
     }
 
+    logActivity({
+      userId,
+      kind: 'address_added',
+      referenceId: address.id,
+      referenceType: 'addresses',
+      summary: `Added ${address_type || 'a'} address: ${city}, ${state}`,
+      metadata: { address_type, city, state, postal_code },
+    }).catch(() => {})
+
     return NextResponse.json({ address })
-  } catch (error) {
-    console.error('Error in addresses API:', error)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

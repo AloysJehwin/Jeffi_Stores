@@ -1,0 +1,36 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
+import { queryMany, queryOne } from '@/lib/db'
+
+export const dynamic = 'force-dynamic'
+
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'agent')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  const owner = await queryOne<{ admin_id: string }>(
+    `SELECT admin_id::text FROM admin_agent_messages
+      WHERE conversation_id = $1::uuid LIMIT 1`,
+    [params.id]
+  )
+  if (!owner) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+  if (owner.admin_id !== admin.adminId) {
+    return NextResponse.json({ error: 'Not your conversation' }, { status: 403 })
+  }
+
+  const messages = await queryMany<{
+    id: string; role: string; content: string; tool_calls: any; created_at: string
+  }>(
+    `SELECT id::text, role, content, tool_calls, created_at::text
+       FROM admin_agent_messages
+      WHERE conversation_id = $1::uuid
+      ORDER BY created_at ASC`,
+    [params.id]
+  )
+
+  return NextResponse.json({ messages })
+}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT } from 'jose'
 import { queryOne, query } from '@/lib/db'
 import { cookies } from 'next/headers'
+import { logActivity } from '@/lib/activity'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -86,6 +87,9 @@ export async function POST(request: NextRequest) {
          RETURNING *`,
         [email, firstName, lastName, googleId]
       )
+      if (user) {
+        logActivity({ userId: user.id, kind: 'signup', summary: 'Signed up via Google', metadata: { provider: 'google' } }).catch(() => {})
+      }
     } else {
       if (!user.google_id) {
         await query('UPDATE users SET google_id = $1, auth_provider = $2 WHERE id = $3', [googleId, 'google', user.id])
@@ -94,6 +98,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Account is inactive' }, { status: 403 })
       }
       await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
+      logActivity({ userId: user.id, kind: 'login', summary: 'Logged in via Google', metadata: { provider: 'google' } }).catch(() => {})
     }
 
     if (!user) return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })

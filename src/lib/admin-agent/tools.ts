@@ -2,6 +2,11 @@ import { Pool } from 'pg'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import { embed } from '@/lib/rag'
+import { SALES_TOOLS } from './tools/sales'
+import { MARKETING_TOOLS } from './tools/marketing'
+import { CATALOG_TOOLS } from './tools/catalog'
+import { CUSTOMER_OPS_TOOLS } from './tools/customer-ops'
+import { OPERATIONS_TOOLS } from './tools/operations'
 
 function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
@@ -779,107 +784,262 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
-    name: 'propose_new_tool',
-    description: 'Propose a new admin-agent capability when no existing tool fits the user\'s ask. Use ONLY when the user describes a recurring action you cannot do with the existing tools — e.g. "I want to be able to send a refund email" or "give me a way to query monthly revenue per category". The proposed tool will be reviewed and approved separately by an admin BEFORE it can be invoked. Hard limits: kind must be readonly_sql (a single SELECT, no writes) OR templated_email (sends a templated email). The admin will see the source_prompt, name, args, and template before approving.',
+    name: 'describe_schema',
+    description: 'Read database schema. Returns the column list for a given table, or the full table list if no table is named. Use BEFORE writing run_sql_readonly queries against unfamiliar tables. Sensitive tables (admins, payment_methods, agent internals) are filtered out.',
     inputSchema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'snake_case name unique to this tool. Should describe the action.' },
-        description: { type: 'string', description: 'One-sentence description of what the tool does and when to use it.' },
-        kind: { type: 'string', description: 'readonly_sql or templated_email' },
-        argsSchema: { type: 'string', description: 'JSON-encoded JSON schema describing the args. Stringify the object — do not embed it raw.' },
-        sqlTemplate: { type: 'string', description: 'For kind=readonly_sql: a single SELECT statement. Use $1, $2 etc. for args in declared order. No semicolons. No DML/DDL. Must reference real tables.' },
-        emailSubject: { type: 'string', description: 'For kind=templated_email: the subject line. May reference {{argName}}.' },
-        emailBody: { type: 'string', description: 'For kind=templated_email: plain-text body. May reference {{argName}}.' },
-        emailRecipientArg: { type: 'string', description: 'For kind=templated_email: the args key whose value is the recipient email.' },
-        sourcePrompt: { type: 'string', description: 'The original user request that motivated this proposal. Used in the audit trail.' },
+        table: { type: 'string', description: 'Table name. Omit to list all tables.' },
       },
-      required: ['name', 'description', 'kind', 'argsSchema', 'sourcePrompt'],
+    },
+    mutating: false,
+    handler: async ({ table }) => {
+      const t = String(table || '').trim()
+      if (!t) {
+        const rows = await queryMany<{ table_name: string; n_cols: number }>(
+          `SELECT t.table_name::text,
+                  (SELECT COUNT(*)::int FROM information_schema.columns c
+                    WHERE c.table_schema = 'public' AND c.table_name = t.table_name) AS n_cols
+             FROM information_schema.tables t
+            WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+              AND t.table_name NOT IN (${FORBIDDEN_TABLES.map((_, i) => `$${i + 1}`).join(',')})
+            ORDER BY t.table_name`,
+          FORBIDDEN_TABLES
+        )
+        return { tables: rows, count: rows.length }
+      }
+      if (!/^[a-z_][a-z0-9_]{0,63}$/i.test(t)) throw new Error('Invalid table name')
+      if (FORBIDDEN_TABLES.includes(t.toLowerCase())) {
+        return { error: `Table "${t}" is not accessible.` }
+      }
+      const cols = await queryMany<{
+        column_name: string; data_type: string; is_nullable: string; column_default: string | null
+      }>(
+        `SELECT column_name::text, data_type::text, is_nullable::text, column_default::text
+           FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = $1
+          ORDER BY ordinal_position`,
+        [t]
+      )
+      const filtered = cols.filter(c => !FORBIDDEN_COLUMNS.includes(c.column_name.toLowerCase()))
+      return { table: t, columns: filtered, hidden: cols.length - filtered.length }
+    },
+  },
+  {
+    name: 'list_repo_files',
+    description: 'List source files under a project-relative directory so you can find canonical helpers (queries, email templates, API contracts). Use this to discover what files exist BEFORE read_repo_file. Common useful directories: src/lib, src/lib/email-templates, src/app/api/admin, database/schema. Forbidden: .env files, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        dir: { type: 'string', description: 'Project-relative directory, e.g. "src/lib" or "src/app/api/admin"' },
+        pattern: { type: 'string', description: 'Optional substring filter on file names' },
+      },
+      required: ['dir'],
+    },
+    mutating: false,
+    handler: async ({ dir, pattern }) => {
+      const fs = await import('node:fs/promises')
+      const path = await import('node:path')
+      const requested = String(dir || '').trim().replace(/^\/+/, '')
+      if (!requested || requested.includes('..') || requested.startsWith('/')) {
+        throw new Error('Invalid dir — must be project-relative')
+      }
+      const FORBIDDEN = /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
+      if (FORBIDDEN.test(requested)) throw new Error('Path is forbidden')
+      const root = path.resolve(process.cwd(), requested)
+      const projectRoot = path.resolve(process.cwd())
+      if (!root.startsWith(projectRoot + path.sep) && root !== projectRoot) {
+        throw new Error('Path escapes project root')
+      }
+      const filter = String(pattern || '').toLowerCase()
+      const out: { path: string; size: number }[] = []
+      async function walk(d: string, depth: number) {
+        if (depth > 4 || out.length > 100) return
+        let entries
+        try { entries = await fs.readdir(d, { withFileTypes: true }) } catch { return }
+        for (const ent of entries) {
+          if (out.length > 100) return
+          const full = path.join(d, ent.name)
+          const rel = path.relative(projectRoot, full).replace(/\\/g, '/')
+          if (FORBIDDEN.test(rel)) continue
+          if (ent.isDirectory()) {
+            if (ent.name === 'node_modules' || ent.name === '.next' || ent.name === '.git') continue
+            await walk(full, depth + 1)
+          } else if (ent.isFile()) {
+            if (filter && !ent.name.toLowerCase().includes(filter)) continue
+            try {
+              const stat = await fs.stat(full)
+              out.push({ path: rel, size: stat.size })
+            } catch {}
+          }
+        }
+      }
+      await walk(root, 0)
+      out.sort((a, b) => a.path.localeCompare(b.path))
+      return { files: out, count: out.length, truncated: out.length >= 100 }
+    },
+  },
+  {
+    name: 'read_repo_file',
+    description: 'Read a project source file to learn how something is implemented (canonical SQL fragments, email helpers, API contracts, business rules). Use this when you need to understand domain quirks before generating SQL or rendering output. Returns up to 8KB of content. Forbidden: .env*, lib/jwt.ts, lib/auth*, lib/db.ts, anything matching password|secret|token|api_key.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Project-relative file path, e.g. "src/lib/queries.ts"' },
+        offset: { type: 'integer', description: 'Byte offset to start reading from (for files larger than 8KB)' },
+      },
+      required: ['path'],
+    },
+    mutating: false,
+    handler: async ({ path: filePath, offset }) => {
+      const fs = await import('node:fs/promises')
+      const path = await import('node:path')
+      const requested = String(filePath || '').trim().replace(/^\/+/, '')
+      if (!requested || requested.includes('..') || requested.startsWith('/')) {
+        throw new Error('Invalid path — must be project-relative')
+      }
+      const FORBIDDEN = /(^|\/)(\.env[^/]*|node_modules|\.git|\.next|lib\/jwt\.ts|lib\/auth[^/]*|lib\/db\.ts)(\/|$)|password|secret|token|api_key|access_key/i
+      if (FORBIDDEN.test(requested)) throw new Error('File is forbidden')
+      const projectRoot = path.resolve(process.cwd())
+      const full = path.resolve(projectRoot, requested)
+      if (!full.startsWith(projectRoot + path.sep)) throw new Error('Path escapes project root')
+      const start = Math.max(0, typeof offset === 'number' ? offset : 0)
+      const MAX = 8 * 1024
+      try {
+        const handle = await fs.open(full, 'r')
+        try {
+          const stat = await handle.stat()
+          const buf = Buffer.alloc(Math.min(MAX, Math.max(0, stat.size - start)))
+          const { bytesRead } = await handle.read(buf, 0, buf.length, start)
+          const text = buf.subarray(0, bytesRead).toString('utf8')
+          return {
+            path: requested,
+            size: stat.size,
+            offset: start,
+            bytesRead,
+            content: text,
+            truncated: start + bytesRead < stat.size,
+          }
+        } finally { await handle.close() }
+      } catch (err: any) {
+        if (err?.code === 'ENOENT') throw new Error(`File not found: ${requested}`)
+        throw err
+      }
+    },
+  },
+  {
+    name: 'list_admin_api_routes',
+    description: 'List the real /api/admin/* routes that exist in the codebase. Returns paths and the HTTP methods exported by each route file. Use BEFORE call_admin_api so you do not guess endpoints. Filter results with the optional pathContains substring.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pathContains: { type: 'string', description: 'Substring filter (e.g. "brands", "orders/", "campaigns").' },
+      },
+    },
+    mutating: false,
+    handler: async ({ pathContains }) => {
+      const fs = await import('node:fs/promises')
+      const path = await import('node:path')
+      const root = path.resolve(process.cwd(), 'src/app/api/admin')
+      const filter = String(pathContains || '').toLowerCase()
+      const FORBIDDEN_PATH_RE = /^\/api\/admin\/(agent\/|team\b|admins\b|auth\b|settings\/admins)/
+
+      async function walk(dir: string, acc: string[]) {
+        let entries
+        try { entries = await fs.readdir(dir, { withFileTypes: true }) } catch { return }
+        for (const ent of entries) {
+          const full = path.join(dir, ent.name)
+          if (ent.isDirectory()) await walk(full, acc)
+          else if (ent.name === 'route.ts' || ent.name === 'route.tsx') acc.push(full)
+        }
+      }
+
+      const files: string[] = []
+      await walk(root, files)
+
+      const results: { path: string; methods: string[] }[] = []
+      for (const f of files) {
+        const rel = '/api/admin' + f.slice(root.length).replace(/\/route\.tsx?$/, '')
+        if (FORBIDDEN_PATH_RE.test(rel)) continue
+        if (filter && !rel.toLowerCase().includes(filter)) continue
+        let src: string
+        try { src = await fs.readFile(f, 'utf8') } catch { continue }
+        const methods: string[] = []
+        for (const m of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
+          if (new RegExp(`export\\s+(async\\s+)?function\\s+${m}\\b`).test(src)) methods.push(m)
+        }
+        if (methods.length) results.push({ path: rel, methods })
+      }
+      results.sort((a, b) => a.path.localeCompare(b.path))
+      return { routes: results, count: results.length }
+    },
+  },
+  {
+    name: 'call_admin_api',
+    description: 'Call any /api/admin/* endpoint as the current admin. GET/HEAD requests run immediately and return the response. POST/PUT/PATCH/DELETE requests are PROPOSED — they queue an admin_agent_action that the admin must approve before the call fires. Use this when an existing dedicated tool does not cover the user\'s ask. Path must start with /api/admin/. Forbidden subpaths: /api/admin/agent/*, /api/admin/team*, /api/admin/admins*, /api/admin/auth*. Body cap 16KB.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        method: { type: 'string', description: 'GET, HEAD, POST, PUT, PATCH, or DELETE' },
+        path: { type: 'string', description: 'Absolute path starting with /api/admin/, e.g. /api/admin/quotations or /api/admin/orders/123' },
+        body: { type: 'string', description: 'JSON-stringified request body (for POST/PUT/PATCH). Omit for GET/DELETE.' },
+        queryString: { type: 'string', description: 'Query string fragment (e.g. "status=pending&limit=10"). Omit if not needed.' },
+      },
+      required: ['method', 'path'],
     },
     mutating: true,
     handler: async (input) => {
-      const name = String(input.name || '').trim().toLowerCase()
-      const description = String(input.description || '').trim()
-      const kind = String(input.kind || '').toLowerCase()
-      const sourcePrompt = String(input.sourcePrompt || '').trim()
-      if (!/^[a-z][a-z0-9_]{2,40}$/.test(name)) throw new Error('name must be snake_case, 3-40 chars')
-      if (!description || description.length < 10) throw new Error('description too short')
-      if (!sourcePrompt) throw new Error('sourcePrompt is required for the audit trail')
-      if (!['readonly_sql', 'templated_email'].includes(kind)) {
-        throw new Error('kind must be readonly_sql or templated_email')
+      const method = String(input.method || '').trim().toUpperCase()
+      const rawPath = String(input.path || '').trim()
+      const queryString = String(input.queryString || '').trim()
+      const bodyStr = String(input.body || '').trim()
+
+      if (!['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        throw new Error(`Unsupported method: ${method}`)
+      }
+      if (!rawPath.startsWith('/api/admin/')) {
+        throw new Error('Path must start with /api/admin/')
+      }
+      const FORBIDDEN_PATH_RE = /^\/api\/admin\/(agent\/|team\b|admins\b|auth\b|settings\/admins)/
+      if (FORBIDDEN_PATH_RE.test(rawPath)) {
+        throw new Error('Path is not accessible to the agent (forbidden subpath)')
+      }
+      if (rawPath.includes('..') || rawPath.includes('://')) {
+        throw new Error('Path is malformed')
+      }
+      if (bodyStr.length > 16 * 1024) throw new Error('Body too large (max 16KB)')
+      if (bodyStr) {
+        try { JSON.parse(bodyStr) } catch { throw new Error('body must be valid JSON') }
       }
 
-      let argsSchema: Record<string, unknown>
-      try { argsSchema = JSON.parse(String(input.argsSchema || '{}')) } catch { throw new Error('argsSchema must be valid JSON') }
-      if (typeof argsSchema !== 'object' || argsSchema === null) throw new Error('argsSchema must be a JSON object')
+      const fullPath = queryString ? `${rawPath}?${queryString}` : rawPath
+      const isRead = method === 'GET' || method === 'HEAD'
 
-      let sqlTemplate: string | null = null
-      let emailTemplate: { subject: string; body: string; recipientArg: string } | null = null
-
-      if (kind === 'readonly_sql') {
-        sqlTemplate = String(input.sqlTemplate || '').trim().replace(/;\s*$/, '')
-        if (!sqlTemplate) throw new Error('sqlTemplate is required for kind=readonly_sql')
-        if (sqlTemplate.includes(';')) throw new Error('semicolons not allowed in sqlTemplate')
-        if (!/^(with\b|select\b)/i.test(sqlTemplate)) throw new Error('sqlTemplate must start with SELECT or WITH')
-        if (SQL_DML_RE.test(sqlTemplate)) throw new Error('sqlTemplate contains forbidden DML/DDL keywords')
-        if (SQL_BLOCKLIST_RE.test(sqlTemplate)) throw new Error('sqlTemplate references forbidden tables/columns')
-      } else {
-        const subject = String(input.emailSubject || '').trim()
-        const body = String(input.emailBody || '').trim()
-        const recipientArg = String(input.emailRecipientArg || '').trim()
-        if (!subject || !body || !recipientArg) {
-          throw new Error('emailSubject, emailBody, emailRecipientArg required for kind=templated_email')
+      if (isRead) {
+        return {
+          proposed: false,
+          executeImmediate: true,
+          method, path: fullPath,
+          marker: '__call_admin_api_immediate__',
         }
-        if (subject.length > 120) throw new Error('emailSubject too long (max 120)')
-        if (body.length > 4000) throw new Error('emailBody too long (max 4000)')
-        emailTemplate = { subject, body, recipientArg }
-      }
-
-      const exists = await queryOne<{ id: string }>(
-        `SELECT id::text FROM admin_agent_proposed_tools WHERE name = $1 AND status IN ('proposed','approved') LIMIT 1`,
-        [name]
-      )
-      if (exists) {
-        return { proposed: false, info: `A ${exists.id ? 'tool' : 'proposal'} named "${name}" already exists. Pick a different name or use the existing one.` }
       }
 
       return {
         proposed: true,
-        kind: 'register_dynamic_tool',
-        payload: {
-          name,
-          description,
-          dynamicKind: kind,
-          argsSchema,
-          sqlTemplate,
-          emailTemplate,
-          sourcePrompt,
-        },
-        confirmation: `Register a new ${kind === 'readonly_sql' ? 'read-only SQL' : 'templated email'} tool called "${name}"? It will only become callable after a SECOND admin approval on the proposed-tools review page.`,
+        kind: 'call_admin_api',
+        payload: { method, path: fullPath, body: bodyStr || null },
+        confirmation: `${method} ${fullPath}${bodyStr ? ` with body (${bodyStr.length} bytes)` : ''} — admin must approve before the call fires.`,
       }
     },
   },
+  ...SALES_TOOLS,
+  ...MARKETING_TOOLS,
+  ...CATALOG_TOOLS,
+  ...CUSTOMER_OPS_TOOLS,
+  ...OPERATIONS_TOOLS,
 ]
 
 export function getTool(name: string): ToolDef | null {
   return TOOLS.find(t => t.name === name) || null
-}
-
-interface DynamicToolRow {
-  id: string
-  name: string
-  description: string
-  args_schema: Record<string, unknown>
-  kind: 'readonly_sql' | 'templated_email'
-}
-
-export async function getApprovedDynamicTools(): Promise<DynamicToolRow[]> {
-  const rows = await queryMany<DynamicToolRow>(
-    `SELECT id::text, name, description, args_schema, kind
-       FROM admin_agent_proposed_tools
-      WHERE status = 'approved'
-      ORDER BY name ASC`
-  )
-  return rows
 }
 

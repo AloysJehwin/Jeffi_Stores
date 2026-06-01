@@ -258,7 +258,7 @@ export default function AdminUserActions({
 
       {editing && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setEditing(false) }}
         >
           <div className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default w-full max-w-lg flex flex-col max-h-[90vh]">

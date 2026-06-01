@@ -2,8 +2,11 @@ import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg'
 import path from 'path'
 import fs from 'fs'
 import { Signer } from '@aws-sdk/rds-signer'
+import { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext } from './audit-context'
 
 let pool: Pool | null = null
+
+export { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext }
 
 function makeRdsSigner(host: string, port: number, user: string, region: string): () => Promise<string> {
   const signer = new Signer({ hostname: host, port, region, username: user })
@@ -50,8 +53,47 @@ function getPool(): Pool {
   return pool
 }
 
+function isMutation(text: string): boolean {
+  const t = text.trimStart().toUpperCase()
+  return t.startsWith('INSERT') || t.startsWith('UPDATE') || t.startsWith('DELETE')
+}
+
+async function getRequestAdminId(): Promise<string | null> {
+  const local = getCurrentAuditAdminId()
+  if (local) return local
+  try {
+    const { cookies } = await import('next/headers')
+    const token = (await cookies()).get('admin_token')?.value
+    if (!token) return null
+    const { jwtVerify } = await import('jose')
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET || '')
+    const { payload } = await jwtVerify(token, secret)
+    return typeof payload.adminId === 'string' ? payload.adminId : null
+  } catch {
+    return null
+  }
+}
+
 export async function query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
   const p = getPool()
+  if (isMutation(text)) {
+    const adminId = await getRequestAdminId()
+    if (adminId) {
+      const client = await p.connect()
+      try {
+        await client.query('BEGIN')
+        await client.query(`SELECT set_config('audit.admin_id', $1, true)`, [adminId])
+        const result = await client.query<T>(text, params)
+        await client.query('COMMIT')
+        return result
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {})
+        throw err
+      } finally {
+        client.release()
+      }
+    }
+  }
   return p.query<T>(text, params)
 }
 
@@ -71,13 +113,28 @@ export async function queryCount(text: string, params?: any[]): Promise<number> 
 }
 
 export async function getClient(): Promise<PoolClient> {
-  return getPool().connect()
+  const client = await getPool().connect()
+  const adminId = await getRequestAdminId()
+  if (adminId) {
+    await client.query(`SELECT set_config('audit.admin_id', $1, false)`, [adminId]).catch(() => {})
+    const originalRelease = client.release.bind(client)
+    ;(client as any).release = (err?: Error | boolean) => {
+      client.query(`SELECT set_config('audit.admin_id', '', false)`).catch(() => {}).finally(() => {
+        originalRelease(err as any)
+      })
+    }
+  }
+  return client
 }
 
 export async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await getClient()
   try {
     await client.query('BEGIN')
+    const adminId = await getRequestAdminId()
+    if (adminId) {
+      await client.query(`SELECT set_config('audit.admin_id', $1, true)`, [adminId])
+    }
     const result = await fn(client)
     await client.query('COMMIT')
     return result

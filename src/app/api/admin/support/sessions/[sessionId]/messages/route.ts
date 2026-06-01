@@ -73,6 +73,7 @@ export async function POST(
       referenceId: params.sessionId,
       referenceType: 'support_sessions',
       summary: `Admin replied: ${message.trim().length > 100 ? message.trim().slice(0, 100) + '…' : message.trim()}`,
+      metadata: { from: 'admin' },
     }).catch(() => {})
 
     if (isFirstAgentMessage) {

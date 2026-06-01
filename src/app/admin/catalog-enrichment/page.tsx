@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle, XCircle, Loader2, Sparkles } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 interface Item {
   id: string
@@ -70,16 +71,17 @@ export default function CatalogEnrichmentPage() {
           <Sparkles className="w-5 h-5 text-accent-500" />
           <h1 className="text-xl font-bold text-foreground">Catalog Enrichment Queue</h1>
         </div>
-        <select
+        <AdminSelect
+          sm
           value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value as any)}
-          className="px-3 py-1.5 text-sm bg-surface border border-border-default rounded-lg text-foreground"
-        >
-          <option value="proposed">Proposed</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="all">All</option>
-        </select>
+          onChange={v => setStatusFilter(v as 'proposed' | 'approved' | 'rejected' | 'all')}
+          options={[
+            { value: 'proposed', label: 'Proposed' },
+            { value: 'approved', label: 'Approved' },
+            { value: 'rejected', label: 'Rejected' },
+            { value: 'all', label: 'All' },
+          ]}
+        />
       </div>
 
       {loading && (

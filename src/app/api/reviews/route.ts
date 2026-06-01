@@ -3,6 +3,7 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendNewReviewNotification } from '@/lib/email'
 import { uploadReviewImage } from '@/lib/s3'
+import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 
 export async function GET(request: NextRequest) {
@@ -130,6 +131,16 @@ export async function POST(request: NextRequest) {
        RETURNING *`,
       [productId, user.userId, rating, title?.trim() || null, comment.trim(), !!hasPurchased, false]
     )
+
+    const reviewedProduct = await queryOne<{ name: string }>('SELECT name FROM products WHERE id = $1', [productId])
+    logActivity({
+      userId: user.userId,
+      kind: 'review_submitted',
+      referenceId: review.id,
+      referenceType: 'product_reviews',
+      summary: `Submitted ${rating}-star review for "${reviewedProduct?.name || 'a product'}"`,
+      metadata: { rating, productId, verified: !!hasPurchased },
+    }).catch(() => {})
 
     const imageFiles = formData.getAll('images') as File[]
     const validImages = imageFiles.filter(f => f && f.size > 0).slice(0, 3)
