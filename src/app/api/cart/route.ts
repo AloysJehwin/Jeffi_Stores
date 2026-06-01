@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { jwtVerify } from 'jose'
 import { getUserIdForSession } from '@/lib/guest-user'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
+import { logActivity } from '@/lib/activity'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET not set") })())
 
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
     const { userId } = await resolveUserId(cookieStore)
 
     const product = await queryOne(
-      'SELECT id, base_price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
+      'SELECT id, name, base_price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
       [productId]
     )
     if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -144,6 +145,23 @@ export async function POST(request: NextRequest) {
       const newQuantity = Number(existingItem.quantity) + Number(quantity)
       await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [newQuantity, existingItem.id])
       recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
+      const authToken1 = cookieStore.get('auth_token')?.value
+      if (authToken1) {
+        try {
+          const { payload } = await jwtVerify(authToken1, JWT_SECRET)
+          const realUserId = payload.userId as string
+          if (realUserId) {
+            logActivity({
+              userId: realUserId,
+              kind: 'cart_item_added',
+              referenceId: productId,
+              referenceType: 'products',
+              summary: `Added "${product.name}" to cart${quantity > 1 ? ` (×${quantity})` : ''}`,
+              metadata: { productId, quantity, variantId: variantId || null, buyMode },
+            }).catch(() => {})
+          }
+        } catch {}
+      }
       return NextResponse.json({ message: 'Cart updated', quantity: newQuantity })
     }
 
@@ -152,6 +170,25 @@ export async function POST(request: NextRequest) {
       [userId, productId, variantId || null, subVariantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
     )
     recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
+
+    const authToken2 = cookieStore.get('auth_token')?.value
+    if (authToken2) {
+      try {
+        const { payload } = await jwtVerify(authToken2, JWT_SECRET)
+        const realUserId = payload.userId as string
+        if (realUserId) {
+          logActivity({
+            userId: realUserId,
+            kind: 'cart_item_added',
+            referenceId: productId,
+            referenceType: 'products',
+            summary: `Added "${product.name}" to cart${quantity > 1 ? ` (×${quantity})` : ''}`,
+            metadata: { productId, quantity, variantId: variantId || null, buyMode },
+          }).catch(() => {})
+        }
+      } catch {}
+    }
+
     return NextResponse.json({ message: 'Item added to cart' })
   } catch {
     return NextResponse.json({ error: 'Failed to add to cart' }, { status: 500 })
@@ -203,7 +240,25 @@ export async function DELETE(request: NextRequest) {
     const { userId, sessionId, authUserId } = await resolveUserId(cookieStore)
     if (!sessionId && !authUserId) return NextResponse.json({ error: 'Session not found' }, { status: 401 })
 
+    const cartItem = await queryOne<{ product_id: string; product_name: string }>(
+      `SELECT ci.product_id::text, p.name AS product_name
+         FROM cart_items ci JOIN products p ON p.id = ci.product_id
+        WHERE ci.id = $1 AND ci.user_id = $2`,
+      [cartItemId, userId]
+    )
+
     await query('DELETE FROM cart_items WHERE id = $1 AND user_id = $2', [cartItemId, userId])
+
+    if (cartItem && authUserId) {
+      logActivity({
+        userId: authUserId,
+        kind: 'cart_item_removed',
+        referenceId: cartItem.product_id,
+        referenceType: 'products',
+        summary: `Removed "${cartItem.product_name}" from cart`,
+      }).catch(() => {})
+    }
+
     return NextResponse.json({ message: 'Item removed from cart' })
   } catch {
     return NextResponse.json({ error: 'Failed to remove from cart' }, { status: 500 })

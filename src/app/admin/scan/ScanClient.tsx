@@ -554,7 +554,7 @@ export default function ScanClient() {
       )}
 
       {stage === 'shipping' && order && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60">
+        <div className="fixed inset-0 z-[300] flex flex-col justify-end bg-black/60">
           <div className="bg-gray-900 rounded-t-3xl p-6 flex flex-col gap-4">
             <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-1" />
             <h3 className="text-lg font-bold text-white">Mark as Shipped</h3>

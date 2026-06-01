@@ -5,6 +5,7 @@ import { sendReturnStatusEmail, sendPaymentStatusUpdate } from '@/lib/email'
 import { logStockMovement } from '@/lib/inventory'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
+import { logActivity } from '@/lib/activity'
 
 export async function POST(
   request: NextRequest,
@@ -87,6 +88,16 @@ export async function POST(
           priority: 'high',
           dueInDays: 1,
         }).catch(() => {})
+
+        logActivity({
+          userId: order.user_id,
+          actorId: admin.adminId,
+          kind: 'return_status',
+          referenceId: orderId,
+          referenceType: 'orders',
+          summary: `${returnRequest.type === 'replacement' ? 'Replacement' : 'Return'} approved for #${order.order_number}`,
+          metadata: { return_type: returnRequest.type, status: 'return_approved' },
+        }).catch(() => {})
       }
 
       return NextResponse.json({ success: true, newStatus: 'return_approved' })
@@ -115,6 +126,18 @@ export async function POST(
       }
 
       completeAutoTask('review_return', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+
+      if (order.user_id) {
+        logActivity({
+          userId: order.user_id,
+          actorId: admin.adminId,
+          kind: 'return_status',
+          referenceId: orderId,
+          referenceType: 'orders',
+          summary: `${returnRequest.type === 'replacement' ? 'Replacement' : 'Return'} rejected for #${order.order_number}: ${adminNotes.trim()}`,
+          metadata: { return_type: returnRequest.type, status: 'return_rejected', notes: adminNotes.trim() },
+        }).catch(() => {})
+      }
 
       return NextResponse.json({ success: true, newStatus: 'return_rejected' })
     }
@@ -150,6 +173,16 @@ export async function POST(
           title: `Inspect returned item & process refund for #${order.order_number}`,
           priority: 'high',
           dueInDays: 2,
+        }).catch(() => {})
+
+        logActivity({
+          userId: order.user_id,
+          actorId: admin.adminId,
+          kind: 'return_status',
+          referenceId: orderId,
+          referenceType: 'orders',
+          summary: `Return parcel received for #${order.order_number}`,
+          metadata: { return_type: returnRequest.type, status: 'return_received', tracking: returnTrackingNumber || null },
         }).catch(() => {})
       }
 
@@ -241,6 +274,18 @@ export async function POST(
 
               completeAutoTask('inspect_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
 
+              if (order.user_id) {
+                logActivity({
+                  userId: order.user_id,
+                  actorId: admin.adminId,
+                  kind: 'return_status',
+                  referenceId: orderId,
+                  referenceType: 'orders',
+                  summary: `Refund processed for #${order.order_number} (₹${parseFloat(order.total_amount).toFixed(0)})`,
+                  metadata: { return_type: 'refund', status: 'returned', amount: parseFloat(order.total_amount) },
+                }).catch(() => {})
+              }
+
               return NextResponse.json({ success: true, newStatus: 'returned', refundFailed: false })
             } catch {
               refundFailed = true
@@ -286,6 +331,20 @@ export async function POST(
         })
 
         completeAutoTask('inspect_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+
+        if (order.user_id) {
+          logActivity({
+            userId: order.user_id,
+            actorId: admin.adminId,
+            kind: 'return_status',
+            referenceId: orderId,
+            referenceType: 'orders',
+            summary: refundFailed
+              ? `Refund failed for #${order.order_number} — manual intervention needed`
+              : `Return marked complete for #${order.order_number}`,
+            metadata: { return_type: 'refund', status: 'returned', refundFailed },
+          }).catch(() => {})
+        }
 
         return NextResponse.json({ success: true, newStatus: 'returned', refundFailed })
       }
@@ -415,6 +474,18 @@ export async function POST(
         }
 
         completeAutoTask('inspect_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+
+        if (order.user_id) {
+          logActivity({
+            userId: order.user_id,
+            actorId: admin.adminId,
+            kind: 'return_status',
+            referenceId: orderId,
+            referenceType: 'orders',
+            summary: `Replacement order #${newOrderNumber!} created for return on #${order.order_number}`,
+            metadata: { return_type: 'replacement', status: 'returned', replacement_order_id: newOrderId!, replacement_order_number: newOrderNumber! },
+          }).catch(() => {})
+        }
 
         return NextResponse.json({ success: true, newStatus: 'returned', replacementOrderId: newOrderId!, replacementOrderNumber: newOrderNumber! })
       }

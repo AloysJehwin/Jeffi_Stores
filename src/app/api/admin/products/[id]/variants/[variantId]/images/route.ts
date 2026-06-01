@@ -51,8 +51,20 @@ export async function POST(request: NextRequest, { params }: Params) {
         [body.gallery_image_id]
       )
       if (!gimg) return NextResponse.json({ error: 'Gallery image not found' }, { status: 404 })
-      const imageUrl = gimg.s3_key ? getS3Url(gimg.s3_key) : gimg.image_url
-      const thumbnailUrl = gimg.s3_thumbnail_key ? getS3Url(gimg.s3_thumbnail_key) : gimg.thumbnail_url
+      const imageUrl = gimg.image_url || (gimg.s3_key ? getS3Url(gimg.s3_key) : null)
+      const thumbnailUrl = gimg.thumbnail_url || (gimg.s3_thumbnail_key ? getS3Url(gimg.s3_thumbnail_key) : null)
+      if (!imageUrl) return NextResponse.json({ error: 'Gallery image has no usable URL' }, { status: 400 })
+
+      try {
+        const head = await fetch(imageUrl, { method: 'HEAD' })
+        if (!head.ok) {
+          return NextResponse.json({
+            error: `Gallery image file is missing from storage (HTTP ${head.status}). The original file may have been deleted. Please re-upload it.`
+          }, { status: 410 })
+        }
+      } catch {
+        return NextResponse.json({ error: 'Could not reach gallery image storage. Try again or re-upload the image.' }, { status: 502 })
+      }
       const image = await queryOne(
         `INSERT INTO variant_images
            (variant_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,

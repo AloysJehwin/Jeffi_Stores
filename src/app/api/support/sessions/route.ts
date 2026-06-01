@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { sendSupportEscalationEmail } from '@/lib/email'
+import { logActivity } from '@/lib/activity'
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,6 +43,14 @@ export async function POST(request: NextRequest) {
       `INSERT INTO support_sessions (user_id) VALUES ($1) RETURNING id, status, created_at`,
       [authUser.userId]
     )
+
+    logActivity({
+      userId: authUser.userId,
+      kind: 'support_session_started',
+      referenceId: session.id,
+      referenceType: 'support_sessions',
+      summary: 'Started a support chat',
+    }).catch(() => {})
 
     const user = await queryOne(
       `SELECT first_name, last_name, email FROM users WHERE id = $1`,

@@ -3,6 +3,7 @@ import { queryOne, query } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { sendPaymentStatusUpdate } from '@/lib/email'
+import { logActivity } from '@/lib/activity'
 
 export async function POST(
   request: NextRequest,
@@ -18,7 +19,7 @@ export async function POST(
 
     const order = await queryOne(`
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
-        o.customer_name, o.customer_email, o.original_order_id,
+        o.customer_name, o.customer_email, o.user_id, o.original_order_id,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -84,6 +85,18 @@ export async function POST(
         userEmail, userName, order.order_number, orderId,
         'refunded', parseFloat(order.total_amount)
       ).catch(() => {})
+    }
+
+    if (order.user_id) {
+      logActivity({
+        userId: order.user_id,
+        actorId: admin.adminId,
+        kind: 'payment_status',
+        referenceId: orderId,
+        referenceType: 'orders',
+        summary: `Refund issued for #${order.order_number} (₹${parseFloat(order.total_amount).toFixed(0)})`,
+        metadata: { payment_status: 'refunded', amount: parseFloat(order.total_amount), refundId: refund.id },
+      }).catch(() => {})
     }
 
     return NextResponse.json({ success: true, refundId: refund.id })

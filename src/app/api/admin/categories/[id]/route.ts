@@ -29,6 +29,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const replDays     = replacement_allowed  == null ? null : Math.max(1, parseInt(replacement_window_days) || 7)
 
 
+  const before = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [params.id])
+
   await query(
     `UPDATE categories SET
       name = $1, slug = $2, description = $3, parent_category_id = $4,
@@ -48,6 +50,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   revalidatePath('/admin/categories')
 
-  const updated = await queryOne('SELECT * FROM categories WHERE id = $1', [params.id])
+  const updated = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [params.id])
+
   return NextResponse.json(updated)
 }

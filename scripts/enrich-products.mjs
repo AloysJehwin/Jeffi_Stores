@@ -19,7 +19,7 @@
  * Env:
  *   DATABASE_URL                postgres://... (live RDS via tunnel by default)
  *   OLLAMA_BASE_URL             default http://100.110.153.68:11434 (Razer)
- *   OLLAMA_COPY_MODEL           default llama3.1:8b-instruct-q4_K_M
+ *   OLLAMA_COPY_MODEL           default qwen3:14b (was llama3.1 — removed from Razer in May 2026)
  *   ENRICH_MIN_DESC_CHARS       default 40 — products with shorter desc are picked
  *   ENRICH_RESTAGE_DAYS         default 90 — re-propose if existing log row is older
  */
@@ -39,7 +39,7 @@ if (!DATABASE_URL) {
   process.exit(1)
 }
 const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.110.153.68:11434').replace(/\/$/, '')
-const OLLAMA_MODEL = process.env.OLLAMA_COPY_MODEL || 'llama3.1:8b-instruct-q4_K_M'
+const OLLAMA_MODEL = process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
 const MIN_DESC_CHARS = parseInt(process.env.ENRICH_MIN_DESC_CHARS || '40', 10)
 const RESTAGE_DAYS = parseInt(process.env.ENRICH_RESTAGE_DAYS || '90', 10)
 const LIMIT = parseInt(args.limit || '25', 10)

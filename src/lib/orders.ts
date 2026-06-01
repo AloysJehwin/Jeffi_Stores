@@ -1,6 +1,7 @@
 import { queryOne, queryMany, query } from './db'
 import { sendOrderAutoCancelledEmail, sendOrderAutoCancelledAdminNotification, sendOrderStatusUpdate } from './email'
 import { createAutoTask } from './auto-tasks'
+import { logActivity } from './activity'
 
 export const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 
@@ -126,6 +127,19 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
       }
     }
 
+    if (order.user_id) {
+      logActivity({
+        userId: order.user_id,
+        kind: 'order_status',
+        referenceId: orderId,
+        referenceType: 'orders',
+        summary: opts.reason === 'auto_cancel_unpaid'
+          ? `Order #${order.order_number} auto-cancelled (payment timeout)`
+          : `Cancelled order #${order.order_number}`,
+        metadata: { order_status: 'cancelled', reason: opts.reason },
+      }).catch(() => {})
+    }
+
     return { success: true, directCancel: true, restoredToCart: restoreToCart }
   }
 
@@ -133,6 +147,17 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
     `UPDATE orders SET status = 'cancel_requested', updated_at = NOW() WHERE id = $1`,
     [orderId]
   )
+
+  if (order.user_id) {
+    logActivity({
+      userId: order.user_id,
+      kind: 'order_status',
+      referenceId: orderId,
+      referenceType: 'orders',
+      summary: `Requested cancellation for #${order.order_number}`,
+      metadata: { order_status: 'cancel_requested' },
+    }).catch(() => {})
+  }
 
   const user = order.users
   const userEmail = user?.email || order.customer_email

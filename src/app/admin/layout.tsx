@@ -54,7 +54,6 @@ export default async function AdminLayout({
     { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard' },
     { href: '/admin/products', label: 'Products', scope: 'products', group: 'Catalogue' },
     { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'products', group: 'Catalogue' },
-    { href: '/admin/agent/proposed-tools', label: 'AI Proposed Tools', scope: 'agent', group: 'Catalogue', superAdminOnly: true },
     { href: '/admin/categories', label: 'Categories', scope: 'categories', group: 'Catalogue' },
     { href: '/admin/brands', label: 'Brands', scope: 'brands', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders', group: 'Sales' },
@@ -79,6 +78,7 @@ export default async function AdminLayout({
     { href: '/admin/campaigns', label: 'Campaigns', scope: 'mailer', group: 'Marketing' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews', group: 'Marketing' },
     { href: '/admin/inflation', label: 'Inflation', scope: 'inflation', group: 'Settings' },
+    { href: '/admin/audit', label: 'Audit Log', scope: 'settings', group: 'Settings', superAdminOnly: true },
     { href: '/admin/team', label: 'Team Members', scope: 'settings', group: 'Settings', superAdminOnly: true },
     { href: '/admin/settings', label: 'Settings', scope: 'settings', group: 'Settings' },
   ]

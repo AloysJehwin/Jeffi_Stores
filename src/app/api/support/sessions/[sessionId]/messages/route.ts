@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
 import { queryMany, queryOne } from '@/lib/db'
+import { logActivity } from '@/lib/activity'
 
 const CLOSING_PHRASES = [
   'thank you for contacting',
@@ -76,6 +77,17 @@ export async function POST(
        RETURNING id, sender, message, created_at`,
       [params.sessionId, message.trim()]
     )
+
+    const trimmed = message.trim()
+    const preview = trimmed.length > 80 ? trimmed.slice(0, 80) + '…' : trimmed
+    logActivity({
+      userId: authUser.userId,
+      kind: 'support_message',
+      referenceId: params.sessionId,
+      referenceType: 'support_sessions',
+      summary: `Customer: ${preview}`,
+      metadata: { from: 'customer' },
+    }).catch(() => {})
 
     return NextResponse.json({ message: msg })
   } catch {

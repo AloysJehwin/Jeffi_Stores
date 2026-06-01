@@ -150,7 +150,7 @@ export default function InflationClient({ categories }: { categories: Category[]
   const categoryOptions: SelectOption[] = topCategories.flatMap(parent => {
     const subs = subCategories.filter(s => s.parent_category_id === parent.id)
     return [
-      { value: parent.id, label: parent.name },
+      { value: parent.id, label: parent.name, group: parent.name },
       ...subs.map(s => ({ value: s.id, label: s.name, group: parent.name, indent: true })),
     ]
   })

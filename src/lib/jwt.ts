@@ -95,7 +95,7 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     if (!payload.adminId || typeof payload.adminId !== 'string') return null
-    return {
+    const result = {
       adminId: payload.adminId as string,
       username: payload.username as string,
       first_name: payload.first_name as string | undefined,
@@ -103,6 +103,13 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
       role: payload.role as string,
       scopes: (payload.scopes as string[]) || [],
     }
+    if (typeof process !== 'undefined' && process.versions?.node) {
+      try {
+        const mod = await import('./audit-context')
+        mod.setAuditAdminId(result.adminId)
+      } catch {}
+    }
+    return result
   } catch {
     return null
   }

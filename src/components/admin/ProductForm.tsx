@@ -193,6 +193,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   })
   const [variantImageUploading, setVariantImageUploading] = useState<Record<string, boolean>>({})
   const [variantImageError, setVariantImageError] = useState<string | null>(null)
+  const [variantImagePendingAdds, setVariantImagePendingAdds] = useState<Record<string, number>>({})
+  const [variantImageDeleting, setVariantImageDeleting] = useState<Record<string, boolean>>({})
   const variantImageDragIndex = useRef<number | null>(null)
   const variantImageDragOverIndex = useRef<number | null>(null)
   const [variantGalleryOpen, setVariantGalleryOpen] = useState(false)
@@ -559,12 +561,21 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function deleteVariantImage(variantId: string, imageId: string) {
     if (!productId) return
-    await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageId }),
-    })
-    setVariantImagesMap(m => ({ ...m, [variantId]: (m[variantId] || []).filter((img: any) => img.id !== imageId) }))
+    setVariantImageDeleting(m => ({ ...m, [imageId]: true }))
+    try {
+      await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId }),
+      })
+      setVariantImagesMap(m => ({ ...m, [variantId]: (m[variantId] || []).filter((img: any) => img.id !== imageId) }))
+    } finally {
+      setVariantImageDeleting(m => {
+        const n = { ...m }
+        delete n[imageId]
+        return n
+      })
+    }
   }
 
   async function setVariantImagePrimary(variantId: string, imageId: string) {
@@ -629,19 +640,26 @@ export default function ProductForm({ categories, brands, action, product, produ
     setVariantGalleryOpen(false)
     setVariantGallerySelected([])
     setVariantImageError(null)
+    const vid = variantPopupId
+    setVariantImagePendingAdds(m => ({ ...m, [vid]: (m[vid] || 0) + toAdd.length }))
     for (const galleryImageId of toAdd) {
-      const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/images`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gallery_image_id: galleryImageId }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setVariantImagesMap(m => ({ ...m, [variantPopupId]: [...(m[variantPopupId] || []), data.image] }))
-      } else {
-        const err = await res.json().catch(() => ({}))
-        setVariantImageError(err.error || `Failed to add image (${res.status})`)
-        break
+      try {
+        const res = await fetch(`/api/admin/products/${productId}/variants/${vid}/images`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gallery_image_id: galleryImageId }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setVariantImagesMap(m => ({ ...m, [vid]: [...(m[vid] || []), data.image] }))
+        } else {
+          const err = await res.json().catch(() => ({}))
+          setVariantImageError(err.error || `Failed to add image (${res.status})`)
+          setVariantImagePendingAdds(m => ({ ...m, [vid]: Math.max(0, (m[vid] || 0) - (toAdd.length - toAdd.indexOf(galleryImageId))) }))
+          return
+        }
+      } finally {
+        setVariantImagePendingAdds(m => ({ ...m, [vid]: Math.max(0, (m[vid] || 0) - 1) }))
       }
     }
   }
@@ -866,15 +884,24 @@ export default function ProductForm({ categories, brands, action, product, produ
             required
             defaultValue={product?.category_id}
             placeholder="Select a category"
-            options={leafCategories.map(cat => {
-              const parent = cat.parent_category_id ? categories.find(c => c.id === cat.parent_category_id) : null
-              return {
-                value: cat.id,
-                label: cat.name,
-                group: parent ? parent.name : cat.name,
-                indent: !!parent,
-              }
-            })}
+            options={(() => {
+              const opts = leafCategories.map(cat => {
+                const parent = cat.parent_category_id ? categories.find(c => c.id === cat.parent_category_id) : null
+                return {
+                  value: cat.id,
+                  label: cat.name,
+                  group: parent ? parent.name : 'Top-level',
+                  indent: !!parent,
+                  _hasParent: !!parent,
+                }
+              })
+              opts.sort((a, b) => {
+                if (a._hasParent !== b._hasParent) return a._hasParent ? -1 : 1
+                if (a.group !== b.group) return a.group.localeCompare(b.group)
+                return a.label.localeCompare(b.label)
+              })
+              return opts.map(({ _hasParent, ...rest }) => rest)
+            })()}
           />
 
           {/* Brand */}
@@ -2022,7 +2049,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         const prevVariant = navIndex > 0 ? activeVariants[navIndex - 1] : null
         const nextVariant = navIndex < activeVariants.length - 1 ? activeVariants[navIndex + 1] : null
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setVariantPopupId(null)}>
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60" onClick={() => setVariantPopupId(null)}>
             <div className="bg-surface rounded-xl border border-border-default shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
@@ -2340,11 +2367,22 @@ export default function ProductForm({ categories, brands, action, product, produ
                             )}
                             <div className="absolute inset-x-0 top-4 bottom-6 sm:inset-0 sm:top-0 sm:bottom-0 bg-black/50 sm:bg-black/0 sm:group-hover:bg-black/50 transition-opacity flex items-center justify-center gap-1">
                               {!img.is_primary && <button type="button" onClick={() => setVariantImagePrimary(variantPopupId, img.id)} className="text-yellow-300 hover:text-yellow-100 leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Set primary"><Star className="w-4 h-4" /></button>}
-                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} className="text-red-300 hover:text-red-100 leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Delete"><X className="w-4 h-4" /></button>
+                              <button type="button" onClick={() => deleteVariantImage(variantPopupId, img.id)} disabled={!!variantImageDeleting[img.id]} className="text-red-300 hover:text-red-100 leading-none sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-50" title="Delete"><X className="w-4 h-4" /></button>
                             </div>
+                            {variantImageDeleting[img.id] && (
+                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
+                                <svg className="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                              </div>
+                            )}
                           </div>
                         ))}
-                        {(variantImagesMap[variantPopupId] || []).length < 5 && (
+                        {Array.from({ length: variantImagePendingAdds[variantPopupId] || 0 }).map((_, k) => (
+                          <div key={`pending-${k}`} className="relative w-20 h-20 sm:w-16 sm:h-16 rounded border border-border-default bg-surface-secondary flex items-center justify-center overflow-hidden">
+                            <div className="absolute inset-0 animate-pulse bg-surface-tertiary/40" />
+                            <svg className="relative w-5 h-5 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                          </div>
+                        ))}
+                        {(variantImagesMap[variantPopupId] || []).length + (variantImagePendingAdds[variantPopupId] || 0) < 5 && (
                           <label className={`w-20 h-20 sm:w-16 sm:h-16 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${variantImageUploading[variantPopupId] ? 'opacity-50 pointer-events-none' : ''}`}>
                             <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVariantImageFile(variantPopupId, f); e.target.value = '' }} />
                             {variantImageUploading[variantPopupId] ? <svg className="w-4 h-4 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
@@ -2466,7 +2504,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                         <button
                           type="button"
                           onClick={addVariantImagesFromGallery}
-                          disabled={variantGallerySelected.length === 0}
+                          disabled={variantGallerySelected.length === 0 || (variantImagePendingAdds[variantPopupId || ''] || 0) > 0}
                           className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:bg-surface-secondary disabled:text-foreground-muted text-white rounded-lg text-sm font-semibold transition-colors"
                         >
                           {variantGallerySelected.length > 0 ? `Add ${variantGallerySelected.length} Image${variantGallerySelected.length > 1 ? 's' : ''}` : 'Add Images'}

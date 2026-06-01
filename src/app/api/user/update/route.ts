@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
+import { logActivity } from '@/lib/activity'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -37,6 +38,13 @@ export async function PATCH(request: NextRequest) {
     if (!updatedUser) {
       return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 })
     }
+
+    logActivity({
+      userId,
+      kind: 'profile_updated',
+      summary: 'Updated profile',
+      metadata: { fields: ['firstName', 'lastName', 'phone'].filter(f => body[f] !== undefined) },
+    }).catch(() => {})
 
     const user = {
       id: updatedUser.id,

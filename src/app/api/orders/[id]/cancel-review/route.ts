@@ -5,6 +5,7 @@ import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
 import { logStockMovement } from '@/lib/inventory'
+import { logActivity } from '@/lib/activity'
 
 export async function POST(
   request: NextRequest,
@@ -249,6 +250,20 @@ export async function POST(
         null,
         newStatus === 'cancel_rejected' ? note.trim() : undefined
       ).catch(() => {})
+    }
+
+    if (order.user_id) {
+      logActivity({
+        userId: order.user_id,
+        actorId: admin.adminId,
+        kind: 'order_status',
+        referenceId: orderId,
+        referenceType: 'orders',
+        summary: newStatus === 'cancelled'
+          ? `Cancellation approved for #${order.order_number}${refundFailed ? ' (refund failed)' : ''}`
+          : `Cancellation rejected for #${order.order_number}: ${note.trim()}`,
+        metadata: { order_status: newStatus, action, note: note?.trim() || null, refundFailed },
+      }).catch(() => {})
     }
 
     return NextResponse.json({ success: true, newStatus, refundFailed })

@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Bot, X, Send, MessageSquare, Slash, LayoutGrid, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { Bot, X, Send, MessageSquare, Slash, LayoutGrid, CheckCircle, XCircle, Loader2, Maximize2, Minimize2, Plus, History } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminAgentMessage from './AdminAgentMessage'
+import AdminAgentBlocks, { type UiBlock } from './AdminAgentBlocks'
 
 interface Props {
   isOpen: boolean
@@ -49,6 +50,7 @@ interface ChatTurn {
   proposedActions?: ProposedAction[]
   pickers?: Picker[]
   pickerResolved?: boolean
+  uiBlocks?: UiBlock[]
 }
 
 const SLASH_COMMANDS: { command: string; example: string; description: string }[] = [
@@ -68,6 +70,14 @@ const TOOL_PALETTE: { label: string; description: string; prompt: string }[] = [
   { label: 'New customers this week', description: 'Last 7 days', prompt: 'Show me customers who signed up in the last 7 days, ordered by recency' },
 ]
 
+interface ConversationListItem {
+  id: string
+  title: string | null
+  preview: string | null
+  last_message_at: string
+  message_count: number
+}
+
 export default function AdminAgentModal({ isOpen, onClose }: Props) {
   const { showToast } = useToast()
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -77,10 +87,52 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [turns, setTurns] = useState<ChatTurn[]>([])
+  const [maximized, setMaximized] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [conversations, setConversations] = useState<ConversationListItem[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
+  async function loadConversations() {
+    setLoadingHistory(true)
+    try {
+      const res = await fetch('/api/admin/agent/conversations?limit=30', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setConversations(data.items || [])
+      }
+    } finally { setLoadingHistory(false) }
+  }
+
+  async function loadConversation(id: string) {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/admin/agent/conversations/${id}/messages`, { credentials: 'include' })
+      if (!res.ok) { showToast('Failed to load conversation', 'error'); return }
+      const data = await res.json()
+      const restored: ChatTurn[] = (data.messages || []).map((m: any) => ({
+        id: m.id || crypto.randomUUID(),
+        role: m.role,
+        content: m.content,
+        toolCalls: m.tool_calls || undefined,
+      }))
+      setTurns(restored)
+      setConversationId(id)
+      setShowHistory(false)
+    } finally { setLoading(false) }
+  }
+
+  function newChat() {
+    setTurns([])
+    setConversationId(null)
+    setInput('')
+    setShowHistory(false)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
 
   useEffect(() => {
     if (!isOpen) return
     const t = setTimeout(() => inputRef.current?.focus(), 50)
+    loadConversations()
     return () => clearTimeout(t)
   }, [isOpen])
 
@@ -90,6 +142,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
       setTurns([])
       setConversationId(null)
       setLoading(false)
+      setShowHistory(false)
     }
   }, [isOpen])
 
@@ -132,6 +185,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
         toolCalls: data.toolCalls,
         proposedActions: (data.proposedActions || []).map((a: any) => ({ ...a, status: 'proposed' as const })),
         pickers: data.pickers || [],
+        uiBlocks: data.uiBlocks || [],
       }])
     } catch (err: any) {
       showToast(err?.message || 'Network error', 'error')
@@ -192,9 +246,15 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="fixed left-1/2 -translate-x-1/2 top-3 sm:top-5 z-50 w-[min(820px,calc(100vw-2rem))]">
-        <div className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border-default">
+      <div
+        className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all ${
+          maximized
+            ? 'top-3 w-[calc(100vw-1.5rem)] h-[calc(100vh-1.5rem)]'
+            : 'top-3 sm:top-5 w-[min(1100px,calc(100vw-1.5rem))]'
+        }`}
+      >
+        <div className={`bg-surface-elevated rounded-2xl border border-border-default shadow-2xl overflow-hidden flex flex-col ${maximized ? 'h-full' : ''}`}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-500 to-secondary-500 flex items-center justify-center">
                 <Bot className="w-4 h-4 text-white" />
@@ -204,9 +264,35 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                 <p className="text-[10px] text-foreground-muted">Read-only chat + admin-approved actions</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors" aria-label="Close">
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={newChat}
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
+                title="New chat"
+                aria-label="New chat"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowHistory(s => !s)}
+                className={`p-1.5 rounded-lg transition-colors ${showHistory ? 'bg-surface-secondary text-foreground' : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
+                title="Chat history"
+                aria-label="Chat history"
+              >
+                <History className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setMaximized(m => !m)}
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
+                title={maximized ? 'Restore' : 'Maximize'}
+                aria-label={maximized ? 'Restore' : 'Maximize'}
+              >
+                {maximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+              <button onClick={onClose} className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-1 px-2 border-b border-border-default">
@@ -231,8 +317,42 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
           </div>
 
           {tab === 'chat' && (
-            <>
-              <div ref={scrollRef} className="max-h-[min(540px,calc(100vh-13rem))] overflow-y-auto p-4 space-y-3">
+            <div className={`flex ${maximized ? 'flex-1' : ''} min-h-0`}>
+              {showHistory && (
+                <aside className="w-64 border-r border-border-default bg-surface-secondary/50 flex flex-col shrink-0">
+                  <div className="px-3 py-2 border-b border-border-default flex items-center justify-between">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Chat history</p>
+                    <button
+                      onClick={loadConversations}
+                      disabled={loadingHistory}
+                      className="text-[10px] text-foreground-muted hover:text-foreground"
+                    >
+                      {loadingHistory ? '...' : 'refresh'}
+                    </button>
+                  </div>
+                  <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                    {conversations.length === 0 && !loadingHistory && (
+                      <p className="text-[11px] text-foreground-muted p-2">No past conversations.</p>
+                    )}
+                    {conversations.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => loadConversation(c.id)}
+                        className={`w-full text-left px-2 py-1.5 rounded transition-colors text-xs ${
+                          c.id === conversationId ? 'bg-accent-500/10 border border-accent-500/30' : 'hover:bg-surface-secondary'
+                        }`}
+                      >
+                        <p className="font-medium text-foreground truncate">{c.title || c.preview?.slice(0, 60) || 'Untitled chat'}</p>
+                        <p className="text-[10px] text-foreground-muted">
+                          {new Date(c.last_message_at).toLocaleString()} · {c.message_count} msg
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </aside>
+              )}
+              <div className="flex-1 flex flex-col min-w-0">
+              <div ref={scrollRef} className={`overflow-y-auto p-4 space-y-3 ${maximized ? 'flex-1' : 'max-h-[min(620px,calc(100vh-12rem))]'}`}>
                 {turns.length === 0 && !loading && (
                   <div className="text-center py-8">
                     <p className="text-sm text-foreground-muted">Ask me anything about the store. I can search products, look up orders, summarise customers, propose actions for your approval.</p>
@@ -247,7 +367,23 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                     }`}>
                       {turn.role === 'user'
                         ? <p className="whitespace-pre-wrap leading-relaxed">{turn.content}</p>
-                        : <AdminAgentMessage text={turn.content} />}
+                        : (
+                          <>
+                            {turn.content && <AdminAgentMessage text={turn.content} />}
+                            {turn.uiBlocks && turn.uiBlocks.length > 0 && (
+                              <div className={turn.content ? 'mt-3' : ''}>
+                                <AdminAgentBlocks
+                                  blocks={turn.uiBlocks}
+                                  pickerResolved={turn.pickerResolved}
+                                  onPickOption={(kind, option) => {
+                                    setTurns(prev => prev.map(t => t.id !== turn.id ? t : { ...t, pickerResolved: true }))
+                                    sendMessage(`Use ${kind} id ${option.id} (${option.label}) for the previous request.`)
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </>
+                        )}
                       {turn.toolCalls && turn.toolCalls.length > 0 && (
                         <details className="mt-2 text-[10px] opacity-70">
                           <summary className="cursor-pointer">{turn.toolCalls.length} tool call{turn.toolCalls.length === 1 ? '' : 's'}</summary>
@@ -352,11 +488,12 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                   <Send className="w-4 h-4" />
                 </button>
               </div>
-            </>
+              </div>
+            </div>
           )}
 
           {tab === 'slash' && (
-            <div className="p-4 space-y-2 max-h-[min(540px,calc(100vh-13rem))] overflow-y-auto">
+            <div className={`p-4 space-y-2 overflow-y-auto ${maximized ? 'flex-1' : 'max-h-[min(620px,calc(100vh-12rem))]'}`}>
               <p className="text-xs text-foreground-muted mb-2">Quick commands. Click to send.</p>
               {SLASH_COMMANDS.map(cmd => (
                 <button
@@ -372,7 +509,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
           )}
 
           {tab === 'tools' && (
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[min(540px,calc(100vh-13rem))] overflow-y-auto">
+            <div className={`p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto ${maximized ? 'flex-1' : 'max-h-[min(620px,calc(100vh-12rem))]'}`}>
               {TOOL_PALETTE.map(t => (
                 <button
                   key={t.label}

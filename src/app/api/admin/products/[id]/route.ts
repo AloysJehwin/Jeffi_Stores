@@ -33,5 +33,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   ])
   revalidatePath('/admin/products')
   revalidatePath('/admin/categories')
+
   return NextResponse.json({ ok: true })
 }

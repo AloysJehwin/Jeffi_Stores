@@ -316,7 +316,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
   const totalLabels = selected.size * copies
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"/>
       <div
         className={`relative bg-surface-elevated w-full sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] flex flex-col transition-all ${
