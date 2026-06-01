@@ -613,6 +613,62 @@ export const TOOLS: ToolDef[] = [
     },
   },
   {
+    name: 'get_recent_products',
+    description: 'Top N most-recently-added active products by created_at DESC. Use for "newly added products" / "what is new" queries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', default: 5, minimum: 1, maximum: 20 },
+      },
+    },
+    mutating: false,
+    handler: async ({ limit }) => {
+      const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
+      const rows = await queryMany(
+        `SELECT p.id::text, p.name, p.slug, p.sku,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                p.short_description, p.inventory_quantity AS stock,
+                b.name AS brand, c.name AS category, p.created_at
+           FROM products p
+           LEFT JOIN brands b ON b.id = p.brand_id
+           LEFT JOIN categories c ON c.id = p.category_id
+          WHERE p.is_active = TRUE
+          ORDER BY p.created_at DESC
+          LIMIT $1`,
+        [lim]
+      )
+      return { products: rows, count: rows.length }
+    },
+  },
+  {
+    name: 'get_featured_products',
+    description: 'Active products curated as featured (is_featured=true), ordered by sales_count DESC. Use when the user asks for "featured products" / "showcase products".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'integer', default: 5, minimum: 1, maximum: 20 },
+      },
+    },
+    mutating: false,
+    handler: async ({ limit }) => {
+      const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
+      const rows = await queryMany(
+        `SELECT p.id::text, p.name, p.slug, p.sku,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                p.short_description, p.inventory_quantity AS stock,
+                b.name AS brand, c.name AS category, p.sales_count
+           FROM products p
+           LEFT JOIN brands b ON b.id = p.brand_id
+           LEFT JOIN categories c ON c.id = p.category_id
+          WHERE p.is_active = TRUE AND p.is_featured = TRUE
+          ORDER BY p.sales_count DESC NULLS LAST, p.created_at DESC
+          LIMIT $1`,
+        [lim]
+      )
+      return { products: rows, count: rows.length }
+    },
+  },
+  {
     name: 'estimate_email_audience',
     description: 'Count how many customers would receive a marketing email under a given audience filter, BEFORE proposing a blast. Always call this first so the admin sees the blast radius. Filters: "all_opted_in", "recent_buyers" (placed an order in the last 90 days), or "test_only" (single email).',
     inputSchema: {
