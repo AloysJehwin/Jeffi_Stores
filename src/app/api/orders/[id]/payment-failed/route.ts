@@ -3,6 +3,7 @@ import { queryOne, query } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendPaymentStatusUpdate, sendPaymentFailedAdminNotification } from '@/lib/email'
 import { createAutoTask } from '@/lib/auto-tasks'
+import { logActivity } from '@/lib/activity'
 
 export async function POST(
   request: NextRequest,
@@ -18,7 +19,6 @@ export async function POST(
     const body = await request.json().catch(() => ({}))
     const errorDescription = body?.errorDescription || ''
 
-    // Fetch order — must belong to the authenticated user
     const order = await queryOne(`
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
         o.customer_name, o.customer_email, o.customer_phone,
@@ -32,26 +32,22 @@ export async function POST(
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    // Don't process if already paid or cancelled
     if (order.payment_status === 'paid' || order.status === 'cancelled') {
       return NextResponse.json({ success: true })
     }
 
-    // Update payment record to failed
     await query(
       `UPDATE payments SET status = 'failed', updated_at = NOW()
        WHERE order_id = $1 AND status = 'pending'`,
       [orderId]
     )
 
-    // Update order payment status to failed
     await query(
       `UPDATE orders SET payment_status = 'failed', updated_at = NOW()
        WHERE id = $1 AND payment_status != 'paid'`,
       [orderId]
     )
 
-    // Send emails (fire-and-forget)
     const user = order.users
     const userEmail = user?.email || order.customer_email
     const userName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : order.customer_name
@@ -64,11 +60,10 @@ export async function POST(
         orderId,
         'failed',
         parseFloat(order.total_amount)
-      ).catch(err => console.error('Failed to send payment failed email:', err))
+      ).catch(() => {})
     }
 
-    sendPaymentFailedAdminNotification(order, errorDescription)
-      .catch(err => console.error('Failed to send admin payment failed notification:', err))
+    sendPaymentFailedAdminNotification(order, errorDescription).catch(() => {})
 
     createAutoTask({
       userId: authUser.userId,
@@ -80,9 +75,17 @@ export async function POST(
       dueInDays: 1,
     }).catch(() => {})
 
+    logActivity({
+      userId: authUser.userId,
+      kind: 'payment_status',
+      referenceId: orderId,
+      referenceType: 'orders',
+      summary: `Payment failed for #${order.order_number}${errorDescription ? `: ${errorDescription}` : ''}`,
+      metadata: { payment_status: 'failed', error: errorDescription },
+    }).catch(() => {})
+
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Payment failed recording error:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to record payment failure' }, { status: 500 })
   }
 }

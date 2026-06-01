@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
+import { logActivity } from '@/lib/activity'
 
 export async function PATCH(
   request: NextRequest,
@@ -62,6 +63,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Address not found' }, { status: 404 })
     }
 
+    logActivity({
+      userId,
+      kind: 'address_updated',
+      referenceId: addressId,
+      referenceType: 'addresses',
+      summary: `Updated ${address_type || 'an'} address: ${city}, ${state}`,
+      metadata: { address_type, city, state, postal_code },
+    }).catch(() => {})
+
     return NextResponse.json({ address })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -101,6 +111,14 @@ export async function DELETE(
       'DELETE FROM addresses WHERE id = $1 AND user_id = $2',
       [addressId, userId]
     )
+
+    logActivity({
+      userId,
+      kind: 'address_removed',
+      referenceId: addressId,
+      referenceType: 'addresses',
+      summary: 'Removed an address',
+    }).catch(() => {})
 
     return NextResponse.json({ message: 'Address deleted successfully' })
   } catch {

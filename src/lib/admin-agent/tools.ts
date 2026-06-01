@@ -2,6 +2,11 @@ import { Pool } from 'pg'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import { embed } from '@/lib/rag'
+import { SALES_TOOLS } from './tools/sales'
+import { MARKETING_TOOLS } from './tools/marketing'
+import { CATALOG_TOOLS } from './tools/catalog'
+import { CUSTOMER_OPS_TOOLS } from './tools/customer-ops'
+import { OPERATIONS_TOOLS } from './tools/operations'
 
 function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
@@ -971,27 +976,14 @@ export const TOOLS: ToolDef[] = [
       }
     },
   },
+  ...SALES_TOOLS,
+  ...MARKETING_TOOLS,
+  ...CATALOG_TOOLS,
+  ...CUSTOMER_OPS_TOOLS,
+  ...OPERATIONS_TOOLS,
 ]
 
 export function getTool(name: string): ToolDef | null {
   return TOOLS.find(t => t.name === name) || null
-}
-
-interface DynamicToolRow {
-  id: string
-  name: string
-  description: string
-  args_schema: Record<string, unknown>
-  kind: 'readonly_sql' | 'templated_email'
-}
-
-export async function getApprovedDynamicTools(): Promise<DynamicToolRow[]> {
-  const rows = await queryMany<DynamicToolRow>(
-    `SELECT id::text, name, description, args_schema, kind
-       FROM admin_agent_proposed_tools
-      WHERE status = 'approved'
-      ORDER BY name ASC`
-  )
-  return rows
 }
 

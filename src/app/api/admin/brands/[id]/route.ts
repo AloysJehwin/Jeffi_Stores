@@ -34,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   revalidatePath('/admin/brands')
 
-  const updated = await queryOne('SELECT * FROM brands WHERE id = $1', [params.id])
+  const updated = await queryOne<any>('SELECT * FROM brands WHERE id = $1', [params.id])
+
   return NextResponse.json(updated)
 }

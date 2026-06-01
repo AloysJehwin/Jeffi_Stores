@@ -4,10 +4,6 @@ import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { aiChat, AiClientError } from '@/lib/ai-client'
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
-import {
-  loadApprovedDynamicTool, listApprovedDynamicTools,
-  runReadonlySql, buildDynamicEmailProposal, bumpInvocationCount,
-} from '@/lib/admin-agent/dynamic-tools'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -48,14 +44,7 @@ async function buildSystemPromptWithDynamic(): Promise<string> {
     return `- ${t.name}${t.mutating ? ' [MUTATING]' : ''}: ${t.description}\n  args: { ${props} }`
   }).join('\n')
 
-  const dynamics = await listApprovedDynamicTools()
-  const dynamicList = dynamics.length === 0 ? '' : '\n\nDynamic tools (approved by admin earlier; same approval queue applies):\n' +
-    dynamics.map(d => {
-      const props = Object.entries((d.args_schema as any)?.properties || {}).map(([k, v]: [string, any]) => `${k}: ${v?.type || 'string'}`).join(', ')
-      return `- ${d.name}${d.kind === 'templated_email' ? ' [MUTATING]' : ''}: ${d.description}\n  args: { ${props} }`
-    }).join('\n')
-
-  return buildSystemPromptBody(builtins, dynamicList)
+  return buildSystemPromptBody(builtins, '')
 }
 
 function buildSystemPromptBody(toolList: string, dynamicList: string): string {
@@ -267,38 +256,9 @@ export async function POST(req: NextRequest) {
         try { parsed = JSON.parse(c.rawInput || '{}') } catch {}
 
         if (!tool) {
-          const dynamic = await loadApprovedDynamicTool(c.name)
-          if (!dynamic) {
-            const err = `Unknown tool: ${c.name}`
-            toolCallRecords.push({ tool: c.name, input: parsed, output: err, isError: true })
-            toolOutputs.push(`<tool_result name="${c.name}">${err}</tool_result>`)
-            continue
-          }
-          try {
-            if (dynamic.kind === 'readonly_sql') {
-              const out = await runReadonlySql(dynamic, parsed)
-              await bumpInvocationCount(dynamic.id)
-              toolCallRecords.push({ tool: c.name, input: parsed, output: out })
-              toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(out).slice(0, 8000)}</tool_result>`)
-            } else {
-              const proposal = await buildDynamicEmailProposal(dynamic, parsed)
-              const inserted = await queryOne<{ id: string }>(
-                `INSERT INTO admin_agent_actions (admin_id, conversation_id, kind, payload, status)
-                 VALUES ($1, $2, $3, $4::jsonb, 'proposed')
-                 RETURNING id`,
-                [admin.adminId, conversationId, proposal.kind, JSON.stringify(proposal.payload)]
-              )
-              if (inserted) {
-                proposedActions.push({ id: inserted.id, kind: proposal.kind, payload: proposal.payload, confirmation: proposal.confirmation })
-              }
-              toolCallRecords.push({ tool: c.name, input: parsed, output: proposal })
-              toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify({ ...proposal, action_id: inserted?.id })}</tool_result>`)
-            }
-          } catch (err: any) {
-            const msg = String(err?.message || err)
-            toolCallRecords.push({ tool: c.name, input: parsed, output: msg, isError: true })
-            toolOutputs.push(`<tool_result name="${c.name}">Error: ${msg}</tool_result>`)
-          }
+          const err = `Unknown tool: ${c.name}`
+          toolCallRecords.push({ tool: c.name, input: parsed, output: err, isError: true })
+          toolOutputs.push(`<tool_result name="${c.name}">${err}</tool_result>`)
           continue
         }
 

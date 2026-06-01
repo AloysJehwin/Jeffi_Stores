@@ -1,4 +1,8 @@
 import { query } from './db'
+import { categoryFor } from './activity-shared'
+
+export { categoryFor }
+export type { ActivityCategory } from './activity-shared'
 
 export type ActivityKind =
   | 'order_placed'
@@ -10,15 +14,28 @@ export type ActivityKind =
   | 'tag_removed'
   | 'note_added'
   | 'support_message'
+  | 'support_session_started'
   | 'login'
+  | 'logout'
   | 'signup'
   | 'address_added'
   | 'address_updated'
+  | 'address_removed'
   | 'profile_updated'
+  | 'password_changed'
+  | 'wishlist_added'
+  | 'wishlist_removed'
+  | 'review_submitted'
+  | 'cart_abandoned'
+  | 'cart_item_added'
+  | 'cart_item_removed'
+  | 'product_viewed'
   | 'flagged'
   | 'unflagged'
   | 'task_created'
   | 'task_completed'
+  | 'marketing_opted_out'
+  | 'marketing_opted_in'
 
 interface LogActivityParams {
   userId: string
@@ -46,5 +63,12 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
         JSON.stringify(params.metadata ?? {}),
       ]
     )
-  } catch {}
+  } catch (err: any) {
+    try {
+      await query(
+        `INSERT INTO _debug_log (source, payload) VALUES ($1, $2)`,
+        ['logActivity', JSON.stringify({ kind: params.kind, userId: params.userId, summary: params.summary, msg: err?.message, code: err?.code, detail: err?.detail })]
+      )
+    } catch {}
+  }
 }

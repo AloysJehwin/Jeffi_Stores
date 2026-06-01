@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       kind: 'login',
       summary: 'Logged in via OTP',
+      metadata: { provider: 'otp' },
     }).catch(() => {})
 
     const cookieStore = await cookies()

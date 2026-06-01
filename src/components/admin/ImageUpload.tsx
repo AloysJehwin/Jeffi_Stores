@@ -368,7 +368,7 @@ export default function ImageUpload({
       )}
 
       {showGallery && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/50 p-4">
+        <div className="fixed inset-0 z-[300] flex items-center justify-center backdrop-blur-sm bg-black/50 p-4">
           <div className="bg-surface-elevated rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Choose from Gallery</h2>

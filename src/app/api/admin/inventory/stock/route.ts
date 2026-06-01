@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { getStockLedger, getStockValuation, logStockMovement } from '@/lib/inventory'
-import { getClient } from '@/lib/db'
+import { getClient, queryOne } from '@/lib/db'
+import { logAdminAudit } from '@/lib/admin-audit'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,6 +87,19 @@ export async function PATCH(request: NextRequest) {
       })
 
       await client.query('COMMIT')
+
+      const product = await queryOne<{ name: string }>('SELECT name FROM products WHERE id = $1', [product_id])
+      logAdminAudit({
+        adminId: admin.adminId,
+        action: 'inventory_adjust',
+        entityType: 'inventory',
+        entityId: product_id,
+        summary: `Adjusted stock for "${product?.name || 'product'}" from ${currentQty} to ${new_quantity}${sub_variant_id ? ' (sub-variant)' : variant_id ? ' (variant)' : ''}`,
+        diff: { quantity: { from: currentQty, to: new_quantity } },
+        metadata: { product_id, variant_id: variant_id || null, sub_variant_id: sub_variant_id || null, change, notes: notes || null },
+        request,
+      }).catch(() => {})
+
       return NextResponse.json({ success: true })
     } catch (e) {
       await client.query('ROLLBACK')

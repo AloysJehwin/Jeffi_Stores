@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { query, queryMany } from '@/lib/db'
+import { query, queryMany, queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { cookies } from 'next/headers'
 import { getUserIdForSession } from '@/lib/guest-user'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { logActivity } from '@/lib/activity'
 
 async function resolveUserId(request: NextRequest): Promise<string> {
   const auth = await authenticateUser(request)
@@ -64,6 +65,18 @@ export async function POST(request: NextRequest) {
       [userId, productId]
     )
 
+    const auth = await authenticateUser(request)
+    if (auth?.userId) {
+      const product = await queryOne<{ name: string }>('SELECT name FROM products WHERE id = $1', [productId])
+      logActivity({
+        userId: auth.userId,
+        kind: 'wishlist_added',
+        referenceId: productId,
+        referenceType: 'products',
+        summary: `Added "${product?.name || 'a product'}" to wishlist`,
+      }).catch(() => {})
+    }
+
     return NextResponse.json({ message: 'Item added to wishlist' })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to add to wishlist' }, { status: 500 })
@@ -81,6 +94,18 @@ export async function DELETE(request: NextRequest) {
       'DELETE FROM wishlist_items WHERE product_id = $1 AND user_id = $2',
       [productId, userId]
     )
+
+    const auth = await authenticateUser(request)
+    if (auth?.userId && productId) {
+      const product = await queryOne<{ name: string }>('SELECT name FROM products WHERE id = $1', [productId])
+      logActivity({
+        userId: auth.userId,
+        kind: 'wishlist_removed',
+        referenceId: productId,
+        referenceType: 'products',
+        summary: `Removed "${product?.name || 'a product'}" from wishlist`,
+      }).catch(() => {})
+    }
 
     return NextResponse.json({ message: 'Item removed from wishlist' })
   } catch (error) {
