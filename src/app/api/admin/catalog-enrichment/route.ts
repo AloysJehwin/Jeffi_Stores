@@ -24,6 +24,12 @@ export async function GET(req: NextRequest) {
     source_desc: string | null
     ai_description: string
     ai_use_cases: string[]
+    ai_keywords: string[] | null
+    ai_who_uses_it: string | null
+    ai_application: string | null
+    ai_product_type: string | null
+    ai_features: string[] | null
+    ai_search_tags: string[] | null
     model: string
     status: string
     proposed_at: string
@@ -33,6 +39,8 @@ export async function GET(req: NextRequest) {
     `SELECT l.id::text, l.product_id::text,
             p.name AS product_name, p.slug AS product_slug,
             l.source_desc, l.ai_description, l.ai_use_cases,
+            l.ai_keywords, l.ai_who_uses_it, l.ai_application,
+            l.ai_product_type, l.ai_features, l.ai_search_tags,
             l.model, l.status, l.proposed_at, l.promoted_at, l.error
        FROM product_ai_enrichment_log l
        JOIN products p ON p.id = l.product_id

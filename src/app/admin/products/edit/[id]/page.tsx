@@ -5,6 +5,93 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { generateProductSku, generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 
+function triggerEnrichment(productId: string) {
+  const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.110.153.68:11434').replace(/\/$/, '')
+  const OLLAMA_MODEL = process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
+  const SYSTEM_PROMPT = `You write product intelligence data for an Indian B2B/B2C hardware and tools store (jeffistores.com).
+Given a product name, category, brand, and description, produce ALL of the following fields:
+1. ai_description: A clear 1-2 sentence customer-facing description. No marketing fluff.
+2. ai_use_cases: 4-10 short buyer search-intent phrases (e.g. "hang picture frame"). Lowercase, 1-4 words.
+3. ai_keywords: 5-12 synonyms and alternate names buyers use. Lowercase.
+4. ai_who_uses_it: Short phrase on who buys this (e.g. "electricians, contractors, DIY homeowners").
+5. ai_application: One sentence on where/how it is used.
+6. ai_product_type: Normalized product type in 1-3 words (e.g. "Wall Anchor").
+7. ai_features: 3-8 key features or specs as short phrases.
+8. ai_search_tags: 5-15 broader semantic search tags.
+Rules: Only use facts from input. All arrays lowercase, no duplicates. Strict JSON only.
+Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai_who_uses_it":"...","ai_application":"...","ai_product_type":"...","ai_features":["..."],"ai_search_tags":["..."]}`
+
+  ;(async () => {
+    try {
+      const product = await queryOne<{
+        name: string; description: string | null; sku: string | null
+        category_name: string | null; brand_name: string | null
+        material: string | null; size: string | null
+      }>(
+        `SELECT p.name, p.description, p.sku, p.material, p.size,
+                c.name AS category_name, b.name AS brand_name
+           FROM products p
+           LEFT JOIN categories c ON c.id = p.category_id
+           LEFT JOIN brands b ON b.id = p.brand_id
+          WHERE p.id = $1::uuid`,
+        [productId]
+      )
+      if (!product) return
+
+      const userPrompt = [
+        `Name: ${product.name}`,
+        product.category_name ? `Category: ${product.category_name}` : null,
+        product.brand_name ? `Brand: ${product.brand_name}` : null,
+        product.sku ? `SKU: ${product.sku}` : null,
+        product.description ? `Existing description: ${product.description}` : 'Existing description: (empty)',
+        product.material ? `Material: ${product.material}` : null,
+        product.size ? `Size: ${product.size}` : null,
+      ].filter(Boolean).join('\n')
+
+      const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: OLLAMA_MODEL, stream: false, format: 'json',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          options: { temperature: 0.3 },
+        }),
+      })
+      if (!res.ok) return
+      const data = await res.json() as { message?: { content?: string } }
+      const raw = data.message?.content || ''
+      let obj: Record<string, unknown>
+      try { obj = JSON.parse(raw) } catch { const m = raw.match(/\{[\s\S]*\}/); if (!m) return; obj = JSON.parse(m[0]) }
+      const desc = String(obj.ai_description || '').trim()
+      const cleanArr = (v: unknown, max = 40, n = 15) => !Array.isArray(v) ? [] :
+        [...new Set((v as unknown[]).map(c => String(c).toLowerCase().trim()).filter(c => c && c.length <= max))].slice(0, n)
+      const use_cases = cleanArr(obj.ai_use_cases, 50, 12)
+      if (!desc || desc.length < 20 || use_cases.length < 2) return
+
+      await query(
+        `INSERT INTO product_ai_enrichment_log
+           (product_id, source_name, source_desc,
+            ai_description, ai_use_cases, ai_keywords, ai_who_uses_it,
+            ai_application, ai_product_type, ai_features, ai_search_tags,
+            model, status)
+         VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'proposed')`,
+        [productId, product.name, product.description || null,
+         desc, use_cases, cleanArr(obj.ai_keywords, 50, 15),
+         String(obj.ai_who_uses_it || '').trim().slice(0, 300),
+         String(obj.ai_application || '').trim().slice(0, 500),
+         String(obj.ai_product_type || '').trim().slice(0, 100),
+         cleanArr(obj.ai_features, 100, 10), cleanArr(obj.ai_search_tags, 50, 20),
+         OLLAMA_MODEL]
+      )
+    } catch {
+      void 0
+    }
+  })()
+}
+
 async function updateProduct(productId: string, formData: FormData) {
   'use server'
 
@@ -351,6 +438,7 @@ async function updateProduct(productId: string, formData: FormData) {
     syncProductToSheet(productId).catch(() => {})
     const { syncProductToMerchant } = await import('@/lib/merchant/sync')
     syncProductToMerchant(productId).catch(() => {})
+    triggerEnrichment(productId)
 
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
