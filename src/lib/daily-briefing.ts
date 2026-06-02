@@ -255,6 +255,7 @@ export async function narrate(data: BriefingData): Promise<string> {
 
 const FROM = `"Jeffi Store's Ops" <${process.env.SES_FROM_EMAIL || 'ops@jeffistores.in'}>`
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
+const ADMIN_URL = process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'
 
 function fmtINR(n: number): string {
   return `₹${Math.round(n).toLocaleString('en-IN')}`
@@ -388,7 +389,7 @@ export function renderBriefingEmail(data: BriefingData, narration: string): { su
         <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
           Abandoned checkouts (24h): <span style="color:#1f2937;font-weight:600;">${data.abandoned_checkouts_24h}</span>
           &nbsp;·&nbsp;
-          <a href="${BASE_URL}/admin" style="color:#e07b3f;text-decoration:none;">Open admin →</a>
+          <a href="${ADMIN_URL}/admin" style="color:#e07b3f;text-decoration:none;">Open admin →</a>
         </p>
       </td></tr>
     </table>
