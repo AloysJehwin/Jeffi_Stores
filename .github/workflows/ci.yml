@@ -330,12 +330,19 @@ jobs:
               sudo dnf install -y postgresql15 || sudo yum install -y postgresql
             fi
 
-            # Extract DB credentials from the live .env so CI never goes stale
-            ENV_FILE="/opt/jeffi-stores/.env"
-            if [[ ! -f "$ENV_FILE" ]]; then
-              echo "ERROR: $ENV_FILE not found on server."
+            # Extract DB credentials from the live env file so CI never goes stale
+            ENV_FILE=""
+            for candidate in /opt/jeffi-stores/.env.production /opt/jeffi-stores/.env; do
+              if [[ -f "$candidate" ]]; then
+                ENV_FILE="$candidate"
+                break
+              fi
+            done
+            if [[ -z "$ENV_FILE" ]]; then
+              echo "ERROR: No .env.production or .env found under /opt/jeffi-stores"
               exit 1
             fi
+            echo "Using env file: $ENV_FILE"
             DB_URL=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2-)
             if [[ -z "$DB_URL" ]]; then
               echo "ERROR: DATABASE_URL not found in $ENV_FILE"
