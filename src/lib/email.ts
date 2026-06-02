@@ -2156,6 +2156,13 @@ export async function sendProductAnnouncementEmail(args: {
 }) {
   const { toEmail, customerName, subject, intro, products } = args
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://jeffistores.in'
+  const cleanIntro = intro
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    .replace(/\[([^\]]+)\]\(https?:[^)]+\)/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/<\/?[a-z][^>]*>/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
   const cards = products.map(p => `
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#ffffff;">
       <tr>
@@ -2177,7 +2184,7 @@ export async function sendProductAnnouncementEmail(args: {
         <tr><td style="background:#1a3a4a;padding:18px 24px;color:#ffffff;font-weight:700;font-size:18px;">Jeffi Stores</td></tr>
         <tr><td style="padding:24px 20px 8px;">
           <p style="margin:0 0 12px;font-size:15px;">Hi ${escapeHtml(customerName || 'there')},</p>
-          <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#334155;">${escapeHtml(intro)}</p>
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#334155;">${escapeHtml(cleanIntro)}</p>
           ${cards}
           <p style="margin:18px 0 0;font-size:13px;color:#64748b;">Visit <a href="${siteUrl}" style="color:#1a3a4a;">jeffistores.in</a> for the full catalogue.</p>
         </td></tr>
@@ -2188,7 +2195,7 @@ export async function sendProductAnnouncementEmail(args: {
 </body></html>`
 
   const textProducts = products.map(p => `• ${p.name} — ₹${p.price}\n  ${siteUrl}/products/${p.slug}`).join('\n\n')
-  const text = `Hi ${customerName || 'there'},\n\n${intro}\n\n${textProducts}\n\nVisit ${siteUrl} for the full catalogue.\n\n— Jeffi Stores`
+  const text = `Hi ${customerName || 'there'},\n\n${cleanIntro}\n\n${textProducts}\n\nVisit ${siteUrl} for the full catalogue.\n\n— Jeffi Stores`
 
   try {
     const info = await transporter.sendMail({

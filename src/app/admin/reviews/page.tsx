@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
@@ -365,7 +366,7 @@ export default function AdminReviewsPage() {
       )}
 
       {/* Lightbox */}
-      {lightboxUrl && (
+      {lightboxUrl && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4"
           onClick={() => setLightboxUrl(null)}
@@ -384,7 +385,8 @@ export default function AdminReviewsPage() {
           >
             ×
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

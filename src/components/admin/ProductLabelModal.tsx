@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { LABEL_SIZES, LabelSpec, LabelSize } from '@/lib/label-sizes'
 
 interface LabelEntry {
@@ -315,7 +316,9 @@ export default function ProductLabelModal({ product, onClose }: Props) {
 
   const totalLabels = selected.size * copies
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"/>
       <div
@@ -519,6 +522,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

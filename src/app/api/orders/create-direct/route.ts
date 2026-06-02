@@ -4,6 +4,7 @@ import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
 import { isInterState, calculateGST } from '@/lib/gst'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
+import { resolveBuyNowItem, quoteShipping, validateCouponForUser, loadAddress } from '@/lib/order-commit'
 
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
@@ -23,12 +24,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { shippingAddress, notes, paymentMethod, couponId, discountAmount: rawDiscount, shippingAmount: rawShipping, item } = body
+    const { shippingAddress, notes, paymentMethod, couponId, item, addressId } = body
     const isRazorpayPayment = paymentMethod === 'razorpay'
-    const appliedDiscount = typeof rawDiscount === 'number' && rawDiscount > 0 ? rawDiscount : 0
-    const appliedShipping = typeof rawShipping === 'number' && rawShipping > 0 ? Math.round(rawShipping * 100) / 100 : 0
+    const isCod = false
+    if (paymentMethod !== 'razorpay') {
+      return NextResponse.json({ error: 'Only Razorpay payment is supported' }, { status: 400 })
+    }
 
-    if (!item || !item.productId || !item.qty || !item.price) {
+    if (!item || !item.productId || !item.qty) {
       return NextResponse.json({ error: 'Item details are required' }, { status: 400 })
     }
 
@@ -48,21 +51,31 @@ export async function POST(request: NextRequest) {
       }, { status: 409 })
     }
 
+    const resolved = await resolveBuyNowItem({
+      productId: String(item.productId),
+      variantId: item.variantId || null,
+      subVariantId: item.subVariantId || null,
+      qty: Number(item.qty),
+      buyMode: item.buyMode,
+      buyUnit: item.buyUnit,
+    })
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
+
     const product = await queryOne<any>(
       `SELECT p.*, p.gst_percentage, p.hsn_code FROM products p WHERE p.id = $1`,
-      [item.productId]
+      [resolved.item.productId]
     )
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    const variant = item.variantId
-      ? await queryOne<any>('SELECT * FROM product_variants WHERE id = $1', [item.variantId])
+    const variant = resolved.item.variantId
+      ? await queryOne<any>('SELECT * FROM product_variants WHERE id = $1', [resolved.item.variantId])
       : null
 
-    const unitPrice = parseFloat(item.price)
-    const qty = parseFloat(item.qty)
-    const itemTotal = unitPrice * qty
+    const unitPrice = resolved.item.price
+    const qty = resolved.item.qty
+    const itemTotal = Math.round(unitPrice * qty * 100) / 100
     const subtotal = itemTotal
 
     const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
@@ -70,6 +83,22 @@ export async function POST(request: NextRequest) {
     if (minOrderAmount > 0 && subtotal < minOrderAmount) {
       return NextResponse.json({ error: `Minimum order value is ₹${minOrderAmount}` }, { status: 400 })
     }
+
+    let appliedDiscount = 0
+    if (couponId) {
+      const result = await validateCouponForUser({ couponId, userId, subtotal })
+      if (result.ok) appliedDiscount = result.appliedDiscount
+    }
+
+    const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
+    const appliedShipping = destinationPin
+      ? await quoteShipping({
+          destinationPin,
+          items: [{ productId: resolved.item.productId, variantId: resolved.item.variantId, quantity: resolved.item.qty }],
+          subtotal,
+          isCod,
+        })
+      : 0
 
     const gstRate = parseFloat(product.gst_percentage || '0')
 

@@ -12,8 +12,80 @@ const ENTITY_ROUTES: Record<string, (id: string) => string> = {
 
 const ENTITY_RE = /\[\[(product|order|customer|campaign):([^|\]]+)\|([^\]]+)\]\]/g
 const BOLD_RE = /\*\*([^*]+)\*\*/g
+const IMAGE_MD_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
+const LINK_MD_RE = /(?<!\!)\[([^\]]+)\]\(([^)\s]+)\)/g
 
 function renderInline(text: string, keyPrefix: string): ReactNode[] {
+  type Token =
+    | { kind: 'text'; value: string }
+    | { kind: 'img'; alt: string; src: string }
+    | { kind: 'link'; label: string; href: string }
+  const tokens: Token[] = [{ kind: 'text', value: text }]
+
+  const afterImg: Token[] = []
+  for (const t of tokens) {
+    if (t.kind !== 'text') { afterImg.push(t); continue }
+    let last = 0
+    IMAGE_MD_RE.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = IMAGE_MD_RE.exec(t.value)) !== null) {
+      if (m.index > last) afterImg.push({ kind: 'text', value: t.value.slice(last, m.index) })
+      afterImg.push({ kind: 'img', alt: m[1] || '', src: m[2] })
+      last = m.index + m[0].length
+    }
+    if (last < t.value.length) afterImg.push({ kind: 'text', value: t.value.slice(last) })
+  }
+
+  const afterLink: Token[] = []
+  for (const t of afterImg) {
+    if (t.kind !== 'text') { afterLink.push(t); continue }
+    let last = 0
+    LINK_MD_RE.lastIndex = 0
+    let m: RegExpExecArray | null
+    while ((m = LINK_MD_RE.exec(t.value)) !== null) {
+      if (m.index > last) afterLink.push({ kind: 'text', value: t.value.slice(last, m.index) })
+      afterLink.push({ kind: 'link', label: m[1], href: m[2] })
+      last = m.index + m[0].length
+    }
+    if (last < t.value.length) afterLink.push({ kind: 'text', value: t.value.slice(last) })
+  }
+
+  const out: ReactNode[] = []
+  let idx = 0
+  for (const t of afterLink) {
+    if (t.kind === 'img') {
+      out.push(
+        <img
+          key={`${keyPrefix}-img${idx++}`}
+          src={t.src}
+          alt={t.alt}
+          loading="lazy"
+          className="inline-block w-12 h-12 rounded border border-border-default object-cover align-middle mr-1"
+        />
+      )
+      continue
+    }
+    if (t.kind === 'link') {
+      const isExternal = /^https?:\/\//i.test(t.href)
+      out.push(
+        <a
+          key={`${keyPrefix}-a${idx++}`}
+          href={t.href}
+          target={isExternal ? '_blank' : undefined}
+          rel={isExternal ? 'noreferrer noopener' : undefined}
+          className="text-accent-600 dark:text-accent-400 underline decoration-dotted underline-offset-2 hover:decoration-solid"
+        >
+          {t.label}
+        </a>
+      )
+      continue
+    }
+    out.push(...renderInlineText(t.value, `${keyPrefix}-t${idx++}`))
+  }
+  return out
+}
+
+function renderInlineText(text: string, keyPrefix: string): ReactNode[] {
   const out: ReactNode[] = []
   let lastIndex = 0
   let match: RegExpExecArray | null

@@ -17,6 +17,7 @@ interface ScenarioOption {
   kind: string
   name: string
   description: string
+  trigger?: string
   default_parameters: Record<string, number | boolean | string>
 }
 
@@ -94,11 +95,20 @@ export default function NewCampaignClient() {
     if (!aiPrompt.trim()) return
     setAiGenerating(true)
     try {
+      const scenario = scenarios.find(s => s.kind === form.scenario_kind)
       const res = await fetch('/api/admin/campaigns/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ prompt: aiPrompt.trim(), campaignName: form.name }),
+        body: JSON.stringify({
+          prompt: aiPrompt.trim(),
+          campaignName: form.name,
+          scenarioKind: form.scenario_kind || null,
+          scenarioName: scenario?.name || null,
+          scenarioDescription: scenario?.description || null,
+          scenarioTrigger: scenario?.trigger || null,
+          discountPercent: form.discount_percent || 0,
+        }),
       })
       const data = await res.json()
       if (res.ok) {

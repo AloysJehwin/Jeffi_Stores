@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
   const description = typeof body.description === 'string' ? body.description.trim() : ''
   const aiPrompt = typeof body.ai_prompt === 'string' ? body.ai_prompt.trim() : ''
   const sql = typeof body.generated_sql === 'string' ? body.generated_sql.trim() : ''
+  const productSqlRaw = typeof body.product_sql === 'string' ? body.product_sql.trim() : ''
   const dryRunCount = typeof body.dry_run_count === 'number' ? body.dry_run_count : null
   const parameters = body.parameters && typeof body.parameters === 'object' ? body.parameters : {}
   const kind = typeof body.kind === 'string' && body.kind.trim() ? slugify(body.kind) : slugify(name)
@@ -32,13 +33,22 @@ export async function POST(req: NextRequest) {
   if (!sql) return NextResponse.json({ error: 'generated_sql is required' }, { status: 400 })
   if (dryRunCount === null) return NextResponse.json({ error: 'dry_run_count is required — run a dry-run first' }, { status: 400 })
 
-  const validation = validateScenarioSql(sql)
+  const validation = validateScenarioSql(sql, 'audience')
   if (!validation.ok) {
     await query(
       `INSERT INTO scenario_audit_log (admin_id, scenario_kind, action, generated_sql, validation) VALUES ($1, $2, 'save_rejected', $3, $4::jsonb)`,
       [admin.id, kind, sql, JSON.stringify(validation)]
     ).catch(() => {})
     return NextResponse.json({ error: validation.reason, validation }, { status: 400 })
+  }
+
+  let productSqlNormalized: string | null = null
+  if (productSqlRaw) {
+    const pv = validateScenarioSql(productSqlRaw, 'products')
+    if (!pv.ok) {
+      return NextResponse.json({ error: `product_sql: ${pv.reason}`, productValidation: pv }, { status: 400 })
+    }
+    productSqlNormalized = pv.normalized
   }
 
   const existing = await queryOne(`SELECT kind FROM scenarios WHERE kind = $1`, [kind])
@@ -54,9 +64,9 @@ export async function POST(req: NextRequest) {
         [kind, name, description || null, JSON.stringify(parameters)]
       )
       await client.query(
-        `INSERT INTO custom_scenarios (kind, name, description, ai_prompt, generated_sql, dry_run_count, dry_run_at, approved_by, approved_at, enabled, parameters)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, NOW(), FALSE, $8::jsonb)`,
-        [kind, name, description || null, aiPrompt, validation.normalized, dryRunCount, admin.id, JSON.stringify(parameters)]
+        `INSERT INTO custom_scenarios (kind, name, description, ai_prompt, generated_sql, product_sql, dry_run_count, dry_run_at, approved_by, approved_at, enabled, parameters)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, NOW(), FALSE, $9::jsonb)`,
+        [kind, name, description || null, aiPrompt, validation.normalized, productSqlNormalized, dryRunCount, admin.id, JSON.stringify(parameters)]
       )
     })
   } catch (err: any) {

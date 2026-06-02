@@ -5,6 +5,7 @@ import {
   fetchProductImageUrl,
   resolveCoupon,
   sendCampaignEmail,
+  renderHeroProduct,
 } from '@/lib/automation-emails'
 import type { ScenarioModule } from '../types'
 
@@ -62,6 +63,14 @@ export const priceDrop: ScenarioModule<Params, Row> = {
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
     const productImageUrl = await fetchProductImageUrl(row.product_id)
+    const productUrl = `${APP_URL}/products/${row.product_slug}`
+    const productCard = renderHeroProduct({
+      name: row.product_name,
+      imageUrl: productImageUrl,
+      productUrl,
+      oldPrice,
+      newPrice,
+    })
 
     const result = await sendCampaignEmail({
       campaign,
@@ -71,11 +80,12 @@ export const priceDrop: ScenarioModule<Params, Row> = {
         firstName: user.first_name || 'there',
         productName: row.product_name,
         productImageUrl,
+        productCard,
         oldPrice: Math.round(oldPrice).toString(),
         newPrice: Math.round(newPrice).toString(),
         couponCode,
         discountPercent,
-        ctaUrl: `${APP_URL}/products/${row.product_slug}`,
+        ctaUrl: productUrl,
       },
     })
 

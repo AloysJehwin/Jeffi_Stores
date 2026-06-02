@@ -1,5 +1,7 @@
 'use client'
 
+import { createPortal } from 'react-dom'
+
 import { useState } from 'react'
 
 interface Distribution {
@@ -57,7 +59,7 @@ export default function HealthDistributionCard({ distribution }: { distribution:
         <Bars d={distribution} />
       </div>
 
-      {expanded && (
+      {expanded && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => setExpanded(false)}
@@ -81,7 +83,7 @@ export default function HealthDistributionCard({ distribution }: { distribution:
             <Bars d={distribution} tall />
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   )
 }

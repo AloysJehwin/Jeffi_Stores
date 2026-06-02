@@ -87,7 +87,7 @@ function extractCteNames(sql: string): Set<string> {
   return out
 }
 
-export function validateScenarioSql(rawSql: string): SqlValidation {
+export function validateScenarioSql(rawSql: string, intent: 'audience' | 'products' = 'audience'): SqlValidation {
   if (typeof rawSql !== 'string') return { ok: false, reason: 'SQL must be a string' }
   const trimmed = rawSql.trim()
   if (!trimmed) return { ok: false, reason: 'SQL is empty' }
@@ -150,16 +150,81 @@ export function validateScenarioSql(rawSql: string): SqlValidation {
   }
   const selectClause = selectMatch[1].trim()
   const cols = selectClause.split(',').map(c => c.trim().toLowerCase())
-  const looksLikeUserId = cols.every(c =>
-    /^(distinct\s+)?(u\.|users\.|orders\.|o\.|wi\.|ci\.|pr\.)?(user_)?id(\s+as\s+[a-z_]+)?$/i.test(c) ||
-    /^(distinct\s+)?u\.id$/i.test(c) ||
-    /^id$/i.test(c) ||
-    /^user_id$/i.test(c)
-  )
-  if (!looksLikeUserId) {
-    return {
-      ok: false,
-      reason: 'SELECT clause must return only user id or user_id (no other columns). Got: ' + selectClause,
+
+  if (intent === 'audience') {
+    const looksLikeUserId = cols.every(c =>
+      /^(distinct\s+)?(u\.|users\.|orders\.|o\.|wi\.|ci\.|pr\.)?(user_)?id(\s+as\s+[a-z_]+)?$/i.test(c) ||
+      /^(distinct\s+)?u\.id$/i.test(c) ||
+      /^id$/i.test(c) ||
+      /^user_id$/i.test(c)
+    )
+    if (!looksLikeUserId) {
+      return {
+        ok: false,
+        reason: 'SELECT clause must return only user id or user_id (no other columns). Got: ' + selectClause,
+      }
+    }
+
+    const placeholders = new Set<string>()
+    let pm: RegExpExecArray | null
+    const pre = /\$([0-9]+)/g
+    while ((pm = pre.exec(stripped)) !== null) {
+      placeholders.add(pm[1])
+    }
+    const required = ['1', '2', '3']
+    const missing = required.filter(p => !placeholders.has(p))
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        reason: `Audience SQL must bind $1 (campaign_kind), $2 (cooldown days), and $3 (LIMIT). Missing: ${missing.map(p => '$' + p).join(', ')}. Add the cooldown NOT EXISTS clause and end with LIMIT $3.`,
+      }
+    }
+    const extras = Array.from(placeholders).filter(p => !required.includes(p))
+    if (extras.length > 0) {
+      return {
+        ok: false,
+        reason: `Audience SQL may only bind $1, $2, $3. Found extras: ${extras.map(p => '$' + p).join(', ')}.`,
+      }
+    }
+    if (!/limit\s+\$3\b/i.test(stripped)) {
+      return {
+        ok: false,
+        reason: 'Audience SQL must end with `LIMIT $3` so the runner can cap recipients per sweep.',
+      }
+    }
+    if (!/email_campaigns_sent/i.test(stripped) || !/sent_at\s*>\s*now\(\)\s*-\s*\(\$2\s*\|\|\s*'\s*days'\s*\)\s*::\s*interval/i.test(stripped)) {
+      return {
+        ok: false,
+        reason: 'Audience SQL must include the frequency-cap clause: NOT EXISTS (SELECT 1 FROM email_campaigns_sent WHERE campaign_kind = $1 AND user_id = u.id AND sent_at > NOW() - ($2 || \' days\')::interval).',
+      }
+    }
+  } else {
+    const ALLOWED_PRODUCT_COLS = new Set([
+      'product_id', 'id', 'name', 'product_name', 'slug', 'product_slug',
+      'image_url', 'price', 'base_price', 'old_price', 'new_price',
+    ])
+    const looksLikeProduct = cols.every(c => {
+      const cleaned = c
+        .replace(/^distinct\s+(on\s*\([^)]*\)\s*)?/i, '')
+        .replace(/^[a-z_]+\./, '')
+        .replace(/::\s*[a-z_]+(\([^)]*\))?/gi, '')
+        .replace(/\s+as\s+([a-z_]+)$/i, ' $1')
+        .trim()
+      const aliasMatch = cleaned.match(/\s+([a-z_]+)$/i)
+      const finalAlias = aliasMatch ? aliasMatch[1] : cleaned
+      return ALLOWED_PRODUCT_COLS.has(finalAlias.toLowerCase())
+    })
+    if (!looksLikeProduct) {
+      return {
+        ok: false,
+        reason: 'Product SELECT must return columns from: product_id, name, slug, image_url, price. Got: ' + selectClause,
+      }
+    }
+    if (/\$[0-9]+/.test(stripped)) {
+      return {
+        ok: false,
+        reason: 'Product SQL must not use placeholders ($1, $2, …). It runs once per sweep with no parameters.',
+      }
     }
   }
 

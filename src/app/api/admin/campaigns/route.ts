@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, query, queryOne } from '@/lib/db'
+import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,6 +64,11 @@ export async function POST(req: NextRequest) {
   if (scenario_kind) {
     const scenarioExists = await queryOne(`SELECT kind FROM scenarios WHERE kind = $1`, [scenario_kind])
     if (!scenarioExists) return NextResponse.json({ error: 'Unknown scenario_kind' }, { status: 400 })
+  }
+
+  const tplCheck = validateCampaignBodyTemplate(body_template, { kind, scenarioKind: scenario_kind })
+  if (!tplCheck.ok) {
+    return NextResponse.json({ error: tplCheck.reason, hint: tplCheck.hint }, { status: 400 })
   }
 
   await query(

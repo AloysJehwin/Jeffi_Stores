@@ -86,6 +86,81 @@ export function cartTaxAmount(items: CartLine[]): number {
   }, 0)
 }
 
+export async function resolveBuyNowItem(input: {
+  productId: string
+  variantId?: string | null
+  subVariantId?: string | null
+  qty: number
+  buyMode?: string
+  buyUnit?: string | null
+}): Promise<
+  | { ok: true; item: { productId: string; variantId: string | null; subVariantId: string | null; qty: number; buyMode: string; buyUnit: string | null; price: number } }
+  | { ok: false; error: string }
+> {
+  if (!input.productId) return { ok: false, error: 'productId required' }
+  const qty = Number(input.qty)
+  if (!Number.isFinite(qty) || qty <= 0 || qty > 10_000) return { ok: false, error: 'Invalid qty' }
+  const buyMode = ['unit', 'weight', 'length'].includes(String(input.buyMode || 'unit')) ? String(input.buyMode || 'unit') : 'unit'
+
+  const product = await queryOne<{
+    id: string
+    is_active: boolean
+    base_price: string | number | null
+    weight_rate: string | number | null
+    length_rate: string | number | null
+  }>(
+    `SELECT id, is_active, base_price, weight_rate, length_rate FROM products WHERE id = $1`,
+    [input.productId]
+  )
+  if (!product || !product.is_active) return { ok: false, error: 'Product not found or inactive' }
+
+  let variant: { id: string; price: string | number | null; weight_rate: string | number | null; length_rate: string | number | null } | null = null
+  if (input.variantId) {
+    variant = await queryOne(
+      `SELECT id, price, weight_rate, length_rate
+         FROM product_variants
+        WHERE id = $1 AND product_id = $2 AND is_active = TRUE`,
+      [input.variantId, input.productId]
+    )
+    if (!variant) return { ok: false, error: 'Variant not found' }
+  }
+
+  let subVariant: { id: string; price: string | number | null } | null = null
+  if (input.subVariantId) {
+    subVariant = await queryOne(
+      `SELECT id, price FROM product_sub_variants
+        WHERE id = $1 AND is_active = TRUE
+          AND ($2::uuid IS NULL OR variant_id = $2::uuid)`,
+      [input.subVariantId, input.variantId || null]
+    )
+    if (!subVariant) return { ok: false, error: 'Sub-variant not found' }
+  }
+
+  let price: number
+  if (buyMode === 'weight') {
+    price = Number(variant?.weight_rate ?? product.weight_rate ?? 0)
+  } else if (buyMode === 'length') {
+    price = Number(variant?.length_rate ?? product.length_rate ?? 0)
+  } else {
+    price = Number(subVariant?.price ?? variant?.price ?? product.base_price ?? 0)
+  }
+  if (!Number.isFinite(price) || price <= 0) return { ok: false, error: 'Could not resolve price for this product' }
+  price = Math.round(price * 100) / 100
+
+  return {
+    ok: true,
+    item: {
+      productId: input.productId,
+      variantId: input.variantId || null,
+      subVariantId: input.subVariantId || null,
+      qty,
+      buyMode,
+      buyUnit: input.buyUnit || null,
+      price,
+    },
+  }
+}
+
 export interface CouponValidation {
   appliedDiscount: number
   ok: boolean
@@ -153,6 +228,43 @@ export async function getMinOrderAmount(): Promise<number> {
     []
   )
   return row ? parseFloat(row.value) || 0 : 0
+}
+
+interface ShippingQuoteItem {
+  productId: string
+  variantId?: string | null
+  quantity: number
+}
+
+export async function quoteShipping(input: {
+  destinationPin: string
+  items: ShippingQuoteItem[]
+  subtotal: number
+  isCod?: boolean
+}): Promise<number> {
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
+  try {
+    const res = await fetch(new URL('/api/shipping/rate', origin).toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        destinationPin: input.destinationPin,
+        cartItems: input.items.map(i => ({
+          productId: i.productId,
+          variantId: i.variantId || null,
+          quantity: i.quantity,
+        })),
+        subtotal: input.subtotal,
+        isCod: !!input.isCod,
+      }),
+    })
+    if (!res.ok) return 0
+    const data = await res.json()
+    const charge = Number(data?.charge)
+    return Number.isFinite(charge) && charge >= 0 ? Math.round(charge * 100) / 100 : 0
+  } catch {
+    return 0
+  }
 }
 
 export async function findExistingUnpaidRazorpayOrder(userId: string) {

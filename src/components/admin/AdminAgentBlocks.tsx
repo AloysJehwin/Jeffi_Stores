@@ -4,6 +4,37 @@ import Link from 'next/link'
 import { Package, ShoppingBag, User, AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+const INR_FORMATTER = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+function parseNumber(input: unknown): number | null {
+  if (input == null) return null
+  if (typeof input === 'number') return isFinite(input) ? input : null
+  const cleaned = String(input).replace(/[₹,\s]/g, '').trim()
+  if (!cleaned) return null
+  const n = Number(cleaned)
+  return isFinite(n) ? n : null
+}
+
+function fmtINR(input: unknown, fallback = '—'): string {
+  const n = parseNumber(input)
+  if (n == null) return fallback
+  return `₹${INR_FORMATTER.format(n)}`
+}
+
+function fmtPriceOrAsk(input: unknown): string {
+  const n = parseNumber(input)
+  if (n == null || n <= 0) return 'Price on request'
+  return fmtINR(n)
+}
+
+function fmtStock(input: unknown): { label: string; tone: 'ok' | 'low' | 'out' | 'unknown' } {
+  const n = parseNumber(input)
+  if (n == null) return { label: 'Stock —', tone: 'unknown' }
+  if (n <= 0) return { label: 'Out of stock', tone: 'out' }
+  if (n < 5) return { label: `Low stock (${n})`, tone: 'low' }
+  return { label: `${n} in stock`, tone: 'ok' }
+}
+
 export interface BaseBlock {
   type: string
   [key: string]: unknown
@@ -103,30 +134,35 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
     case 'product_grid':
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {b.products.map(p => (
-            <Link
-              key={p.id}
-              href={`/admin/products/${p.id}`}
-              className="flex gap-3 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
-            >
-              <div className="w-12 h-12 rounded bg-surface-secondary flex items-center justify-center shrink-0 overflow-hidden">
-                {p.image_url ? <img src={p.image_url} alt="" className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-foreground-muted" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
-                {p.sku && <p className="text-[10px] text-foreground-muted font-mono">{p.sku}</p>}
-                <div className="flex items-center justify-between mt-1">
-                  {p.price !== undefined && <p className="text-xs font-medium text-foreground">₹{p.price}</p>}
-                  {p.stock !== undefined && (
-                    <p className={`text-[10px] ${Number(p.stock) === 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted'}`}>
-                      {Number(p.stock) === 0 ? 'Out of stock' : `${p.stock} in stock`}
-                    </p>
-                  )}
+          {b.products.map(p => {
+            const stockInfo = fmtStock(p.stock)
+            return (
+              <Link
+                key={p.id}
+                href={`/admin/products/${p.id}`}
+                className="flex gap-3 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
+              >
+                <div className="w-12 h-12 rounded bg-surface-secondary flex items-center justify-center shrink-0 overflow-hidden">
+                  {p.image_url ? <img src={p.image_url} alt="" className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-foreground-muted" />}
                 </div>
-                {p.subtitle && <p className="text-[10px] text-foreground-muted mt-0.5">{p.subtitle}</p>}
-              </div>
-            </Link>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
+                  {p.sku && <p className="text-[10px] text-foreground-muted font-mono">{p.sku}</p>}
+                  <div className="flex items-center justify-between mt-1 gap-2">
+                    <p className="text-xs font-medium text-foreground tabular-nums">{fmtPriceOrAsk(p.price)}</p>
+                    <p className={`text-[10px] tabular-nums ${
+                      stockInfo.tone === 'out' ? 'text-red-600 dark:text-red-400'
+                      : stockInfo.tone === 'low' ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-foreground-muted'
+                    }`}>
+                      {stockInfo.label}
+                    </p>
+                  </div>
+                  {p.subtitle && <p className="text-[10px] text-foreground-muted mt-0.5">{p.subtitle}</p>}
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )
     case 'customer_list':
@@ -148,7 +184,7 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
               {c.lifetime_value !== undefined && (
                 <div className="text-right shrink-0">
                   <p className="text-[10px] text-foreground-muted">LTV</p>
-                  <p className="text-xs font-semibold text-foreground">₹{c.lifetime_value}</p>
+                  <p className="text-xs font-semibold text-foreground tabular-nums">{fmtINR(c.lifetime_value)}</p>
                 </div>
               )}
             </Link>
@@ -168,7 +204,7 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
                   {o.created_at ? ` · ${new Date(o.created_at).toLocaleDateString()}` : ''}
                 </p>
               </div>
-              {o.total !== undefined && <p className="text-xs font-semibold text-foreground shrink-0">₹{o.total}</p>}
+              {o.total !== undefined && <p className="text-xs font-semibold text-foreground shrink-0 tabular-nums">{fmtINR(o.total)}</p>}
             </Link>
           ))}
         </div>

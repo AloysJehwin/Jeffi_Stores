@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Bot, X, Send, MessageSquare, Slash, LayoutGrid, CheckCircle, XCircle, Loader2, Maximize2, Minimize2, Plus, History } from 'lucide-react'
+import { Bot, X, Send, MessageSquare, Slash, LayoutGrid, CheckCircle, XCircle, Loader2, Maximize2, Minimize2, Plus, History, Paperclip } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminAgentMessage from './AdminAgentMessage'
 import AdminAgentBlocks, { type UiBlock } from './AdminAgentBlocks'
@@ -91,6 +91,57 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
   const [showHistory, setShowHistory] = useState(false)
   const [conversations, setConversations] = useState<ConversationListItem[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [attachmentId, setAttachmentId] = useState<string | null>(null)
+
+  function clearAttachment() {
+    setPendingFile(null)
+    setAttachmentId(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    if (f.size > 5 * 1024 * 1024) {
+      showToast('File too large (max 5MB)', 'error')
+      e.target.value = ''
+      return
+    }
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+    if (!allowed.includes(f.type)) {
+      showToast('Only JPG, PNG, WEBP, or PDF files are supported', 'error')
+      e.target.value = ''
+      return
+    }
+    setPendingFile(f)
+    setAttachmentId(null)
+  }
+
+  async function uploadPendingFile(): Promise<string | null> {
+    if (!pendingFile) return null
+    if (attachmentId) return attachmentId
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', pendingFile)
+      const res = await fetch('/api/admin/agent/upload', { method: 'POST', credentials: 'include', body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        showToast(data.error || 'Upload failed', 'error')
+        return null
+      }
+      setAttachmentId(data.attachment_id)
+      return data.attachment_id as string
+    } catch (e: any) {
+      showToast(e?.message || 'Upload failed', 'error')
+      return null
+    } finally {
+      setUploading(false)
+    }
+  }
 
   async function loadConversations() {
     setLoadingHistory(true)
@@ -159,17 +210,30 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
 
   async function sendMessage(text: string) {
     const trimmed = text.trim()
-    if (!trimmed || loading) return
-    const userTurn: ChatTurn = { id: crypto.randomUUID(), role: 'user', content: trimmed }
+    const hasFile = !!pendingFile
+    if ((!trimmed && !hasFile) || loading) return
+
+    let attId = attachmentId
+    if (hasFile && !attId) {
+      attId = await uploadPendingFile()
+      if (!attId) return
+    }
+
+    const fileNote = pendingFile ? ` [attachment_id=${attId} filename="${pendingFile.name}" mime=${pendingFile.type}]` : ''
+    const finalUserText = (trimmed || (hasFile ? `Process the attached ${pendingFile?.type.startsWith('image/') ? 'image' : 'PDF'} as a quotation request.` : '')) + fileNote
+
+    const displayContent = trimmed || `📎 ${pendingFile?.name || 'attachment'}`
+    const userTurn: ChatTurn = { id: crypto.randomUUID(), role: 'user', content: displayContent }
     setTurns(t => [...t, userTurn])
     setInput('')
+    clearAttachment()
     setLoading(true)
     try {
       const res = await fetch('/api/admin/agent/chat', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId, message: trimmed }),
+        body: JSON.stringify({ conversationId, message: finalUserText }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -250,10 +314,10 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
         className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all ${
           maximized
             ? 'top-3 w-[calc(100vw-1.5rem)] h-[calc(100vh-1.5rem)]'
-            : 'top-3 sm:top-5 w-[min(1100px,calc(100vw-1.5rem))]'
+            : 'top-3 sm:top-5 w-[min(1100px,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2.5rem)]'
         }`}
       >
-        <div className={`bg-surface-elevated rounded-2xl border border-border-default shadow-2xl overflow-hidden flex flex-col ${maximized ? 'h-full' : ''}`}>
+        <div className={`bg-surface-elevated rounded-2xl border border-border-default shadow-2xl overflow-hidden flex flex-col h-full ${maximized ? '' : 'max-h-[inherit]'}`}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-500 to-secondary-500 flex items-center justify-center">
@@ -317,7 +381,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
           </div>
 
           {tab === 'chat' && (
-            <div className={`flex ${maximized ? 'flex-1' : ''} min-h-0`}>
+            <div className="flex flex-1 min-h-0">
               {showHistory && (
                 <aside className="w-64 border-r border-border-default bg-surface-secondary/50 flex flex-col shrink-0">
                   <div className="px-3 py-2 border-b border-border-default flex items-center justify-between">
@@ -352,7 +416,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                 </aside>
               )}
               <div className="flex-1 flex flex-col min-w-0">
-              <div ref={scrollRef} className={`overflow-y-auto p-4 space-y-3 ${maximized ? 'flex-1' : 'max-h-[min(620px,calc(100vh-12rem))]'}`}>
+              <div ref={scrollRef} className="overflow-y-auto p-4 space-y-3 flex-1 min-h-0">
                 {turns.length === 0 && !loading && (
                   <div className="text-center py-8">
                     <p className="text-sm text-foreground-muted">Ask me anything about the store. I can search products, look up orders, summarise customers, propose actions for your approval.</p>
@@ -467,33 +531,69 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                 )}
               </div>
 
-              <div className="border-t border-border-default p-2 flex items-end gap-2">
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={onKeyDown}
-                  rows={1}
-                  maxLength={2000}
-                  disabled={loading}
-                  placeholder="Ask anything about the store"
-                  className="flex-1 px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none"
-                />
-                <button
-                  onClick={() => sendMessage(input)}
-                  disabled={loading || input.trim().length < 2}
-                  className="p-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50"
-                  aria-label="Send"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+              <div className="border-t border-border-default p-2 flex flex-col gap-2">
+                {pendingFile && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-surface-secondary rounded-lg text-xs">
+                    <Paperclip className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+                    <span className="truncate flex-1 text-foreground">{pendingFile.name}</span>
+                    <span className="text-[10px] text-foreground-muted shrink-0">{(pendingFile.size / 1024).toFixed(0)} KB</span>
+                    {uploading && <Loader2 className="w-3 h-3 animate-spin text-foreground-muted" />}
+                    {attachmentId && <CheckCircle className="w-3 h-3 text-green-600" />}
+                    <button
+                      type="button"
+                      onClick={clearAttachment}
+                      className="p-0.5 text-foreground-muted hover:text-foreground"
+                      aria-label="Remove attachment"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-end gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    onChange={onPickFile}
+                    className="hidden"
+                  />
+                  <textarea
+                    ref={inputRef}
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={onKeyDown}
+                    rows={1}
+                    maxLength={2000}
+                    disabled={loading}
+                    placeholder={pendingFile ? 'Add an instruction (optional) and send' : 'Ask anything about the store'}
+                    className="flex-1 px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted rounded-lg border border-border-secondary focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading || uploading}
+                    className="w-9 h-9 flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-secondary rounded-lg disabled:opacity-50 shrink-0"
+                    aria-label="Attach file"
+                    title="Attach image or PDF (max 5MB)"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => sendMessage(input)}
+                    disabled={loading || uploading || (!pendingFile && input.trim().length < 2)}
+                    className="w-9 h-9 flex items-center justify-center bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 shrink-0"
+                    aria-label="Send"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               </div>
             </div>
           )}
 
           {tab === 'slash' && (
-            <div className={`p-4 space-y-2 overflow-y-auto ${maximized ? 'flex-1' : 'max-h-[min(620px,calc(100vh-12rem))]'}`}>
+            <div className="p-4 space-y-2 overflow-y-auto flex-1 min-h-0">
               <p className="text-xs text-foreground-muted mb-2">Quick commands. Click to send.</p>
               {SLASH_COMMANDS.map(cmd => (
                 <button
@@ -509,7 +609,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
           )}
 
           {tab === 'tools' && (
-            <div className={`p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto ${maximized ? 'flex-1' : 'max-h-[min(620px,calc(100vh-12rem))]'}`}>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto flex-1 min-h-0">
               {TOOL_PALETTE.map(t => (
                 <button
                   key={t.label}
