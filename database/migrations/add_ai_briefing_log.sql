@@ -9,3 +9,4 @@ CREATE TABLE IF NOT EXISTS ai_briefing_log (
 
 CREATE INDEX IF NOT EXISTS idx_ai_briefing_log_date
   ON ai_briefing_log (briefing_date DESC);
+
