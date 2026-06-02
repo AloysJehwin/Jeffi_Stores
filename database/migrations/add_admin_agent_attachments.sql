@@ -13,3 +13,4 @@ CREATE TABLE IF NOT EXISTS admin_agent_attachments (
 CREATE INDEX IF NOT EXISTS idx_admin_agent_attachments_expiry ON admin_agent_attachments(expires_at);
 CREATE INDEX IF NOT EXISTS idx_admin_agent_attachments_admin ON admin_agent_attachments(admin_id, created_at DESC);
 
+
