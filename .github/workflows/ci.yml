@@ -349,15 +349,13 @@ jobs:
               echo "ERROR: DATABASE_URL not found in $ENV_FILE"
               exit 1
             fi
-            # Strip surrounding quotes (single or double) that .env files sometimes add
-            DB_URL="${DB_URL_RAW#[\"\']}"
-            DB_URL="${DB_URL%[\"\']}"
 
-            # Parse DATABASE_URL with Python via base64 to avoid YAML/shell quoting issues.
+            # Pass raw value to Python — the script strips quotes internally so shell
+            # quoting behaviour in the SSH session cannot corrupt the URL.
             # Writes PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD to /tmp/pg_env using
             # shlex.quote so passwords with special characters are always safe to source.
-            export _DB_URL="$DB_URL"
-            echo "aW1wb3J0IG9zLCB1cmxsaWIucGFyc2UsIHNobGV4CnUgPSB1cmxsaWIucGFyc2UudXJscGFyc2Uob3MuZW52aXJvblsiX0RCX1VSTCJdKQpob3N0ID0gdS5ob3N0bmFtZSBvciAiIgpwb3J0ID0gc3RyKHUucG9ydCBvciA1NDMyKQp1c2VyID0gdXJsbGliLnBhcnNlLnVucXVvdGUodS51c2VybmFtZSBvciAiIikKcGFzc3dkID0gdXJsbGliLnBhcnNlLnVucXVvdGUodS5wYXNzd29yZCBvciAiIikKZGJuYW1lID0gKHUucGF0aCBvciAiIikubHN0cmlwKCIvIikuc3BsaXQoIj8iKVswXQp3aXRoIG9wZW4oIi90bXAvcGdfZW52IiwgInciKSBhcyBmOgogICAgZi53cml0ZSgiZXhwb3J0IFBHSE9TVD0iICsgc2hsZXgucXVvdGUoaG9zdCkgKyAiXG4iKQogICAgZi53cml0ZSgiZXhwb3J0IFBHUE9SVD0iICsgcG9ydCArICJcbiIpCiAgICBmLndyaXRlKCJleHBvcnQgUEdVU0VSPSIgKyBzaGxleC5xdW90ZSh1c2VyKSArICJcbiIpCiAgICBmLndyaXRlKCJleHBvcnQgUEdEQVRBQkFTRT0iICsgc2hsZXgucXVvdGUoZGJuYW1lKSArICJcbiIpCiAgICBmLndyaXRlKCJleHBvcnQgUEdQQVNTV09SRD0iICsgc2hsZXgucXVvdGUocGFzc3dkKSArICJcbiIpCg==" | base64 -d | python3
+            export _DB_URL="$DB_URL_RAW"
+            echo "aW1wb3J0IG9zLCB1cmxsaWIucGFyc2UsIHNobGV4CnJhdyA9IG9zLmVudmlyb25bIl9EQl9VUkwiXS5zdHJpcCgpLnN0cmlwKCciXCcnKSAgIyBzdHJpcCBzdXJyb3VuZGluZyBxdW90ZXMKdSA9IHVybGxpYi5wYXJzZS51cmxwYXJzZShyYXcpCmhvc3QgPSB1Lmhvc3RuYW1lIG9yICIiCnBvcnQgPSBzdHIodS5wb3J0IG9yIDU0MzIpCnVzZXIgPSB1cmxsaWIucGFyc2UudW5xdW90ZSh1LnVzZXJuYW1lIG9yICIiKQpwYXNzd2QgPSB1cmxsaWIucGFyc2UudW5xdW90ZSh1LnBhc3N3b3JkIG9yICIiKQpkYm5hbWUgPSAodS5wYXRoIG9yICIiKS5sc3RyaXAoIi8iKS5zcGxpdCgiPyIpWzBdCndpdGggb3BlbigiL3RtcC9wZ19lbnYiLCAidyIpIGFzIGY6CiAgICBmLndyaXRlKCJleHBvcnQgUEdIT1NUPSIgKyBzaGxleC5xdW90ZShob3N0KSArICJcbiIpCiAgICBmLndyaXRlKCJleHBvcnQgUEdQT1JUPSIgKyBwb3J0ICsgIlxuIikKICAgIGYud3JpdGUoImV4cG9ydCBQR1VTRVI9IiArIHNobGV4LnF1b3RlKHVzZXIpICsgIlxuIikKICAgIGYud3JpdGUoImV4cG9ydCBQR0RBVEFCQVNFPSIgKyBzaGxleC5xdW90ZShkYm5hbWUpICsgIlxuIikKICAgIGYud3JpdGUoImV4cG9ydCBQR1BBU1NXT1JEPSIgKyBzaGxleC5xdW90ZShwYXNzd2QpICsgIlxuIikK" | base64 -d | python3
             # shellcheck disable=SC1091
             source /tmp/pg_env
             export PGSSLMODE=require
