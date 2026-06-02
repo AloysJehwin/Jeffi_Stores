@@ -349,9 +349,13 @@ jobs:
               exit 1
             fi
 
-            # Parse DATABASE_URL using Python to handle missing port, query params, special chars
+            # Parse DATABASE_URL with Python via base64 to avoid YAML/shell quoting issues
+            # Decodes and runs a script that writes host/port/user/db to /tmp/pg_env
+            # and writes password to ~/.pgpass (600) so psql never needs PGPASSWORD eval
             export _DB_URL="$DB_URL"
-            eval "$(python3 -c 'import os,urllib.parse; u=urllib.parse.urlparse(os.environ["_DB_URL"]); p=urllib.parse.unquote; print("export PGHOST="+str(u.hostname or "")); print("export PGPORT="+str(u.port or 5432)); print("export PGUSER="+p(u.username or "")); print("export PGDATABASE="+(u.path or "").lstrip("/")); print("export PGPASSWORD="+p(u.password or ""))')"
+            echo "aW1wb3J0IG9zLCB1cmxsaWIucGFyc2UsIHN0YXQKdSA9IHVybGxpYi5wYXJzZS51cmxwYXJzZShvcy5lbnZpcm9uWyJfREJfVVJMIl0pCmhvc3QgPSB1Lmhvc3RuYW1lIG9yICIiCnBvcnQgPSBzdHIodS5wb3J0IG9yIDU0MzIpCnVzZXIgPSB1cmxsaWIucGFyc2UudW5xdW90ZSh1LnVzZXJuYW1lIG9yICIiKQpwYXNzd2QgPSB1cmxsaWIucGFyc2UudW5xdW90ZSh1LnBhc3N3b3JkIG9yICIiKQpkYm5hbWUgPSAodS5wYXRoIG9yICIiKS5sc3RyaXAoIi8iKS5zcGxpdCgiPyIpWzBdCndpdGggb3BlbigiL3RtcC9wZ19lbnYiLCAidyIpIGFzIGY6CiAgICBmLndyaXRlKCJleHBvcnQgUEdIT1NUPSIgKyBob3N0ICsgIgoiKQogICAgZi53cml0ZSgiZXhwb3J0IFBHUE9SVD0iICsgcG9ydCArICIKIikKICAgIGYud3JpdGUoImV4cG9ydCBQR1VTRVI9IiArIHVzZXIgKyAiCiIpCiAgICBmLndyaXRlKCJleHBvcnQgUEdEQVRBQkFTRT0iICsgZGJuYW1lICsgIgoiKQpwZ3Bhc3NfcGF0aCA9IG9zLnBhdGguZXhwYW5kdXNlcigifi8ucGdwYXNzIikKd2l0aCBvcGVuKHBncGFzc19wYXRoLCAidyIpIGFzIGY6CiAgICBmLndyaXRlKGhvc3QgKyAiOiIgKyBwb3J0ICsgIjoiICsgZGJuYW1lICsgIjoiICsgdXNlciArICI6IiArIHBhc3N3ZCArICIKIikKb3MuY2htb2QocGdwYXNzX3BhdGgsIHN0YXQuU19JUlVTUiB8IHN0YXQuU19JV1VTUikK" | base64 -d | python3
+            # shellcheck disable=SC1091
+            source /tmp/pg_env
             export PGSSLMODE=require
 
             echo "Verifying DB connectivity..."
