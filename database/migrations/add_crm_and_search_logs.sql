@@ -32,4 +32,4 @@ CREATE TABLE IF NOT EXISTS search_logs (
 CREATE INDEX IF NOT EXISTS idx_search_logs_created     ON search_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_search_logs_no_results  ON search_logs(query) WHERE results_count = 0;
 CREATE INDEX IF NOT EXISTS idx_search_logs_user        ON search_logs(user_id);
-
+-- migrated

@@ -36,4 +36,4 @@ CREATE INDEX IF NOT EXISTS idx_pae_log_status
   ON product_ai_enrichment_log (status);
 CREATE INDEX IF NOT EXISTS idx_pae_log_proposed_at
   ON product_ai_enrichment_log (proposed_at DESC);
-
+-- migrated

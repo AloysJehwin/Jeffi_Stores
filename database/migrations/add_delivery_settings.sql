@@ -18,4 +18,4 @@ WHERE new.key = 'delivery_free_threshold'
   AND new.value = '5000'
   AND old.value IS NOT NULL
   AND old.value <> '';
-
+-- migrated

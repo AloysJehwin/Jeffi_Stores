@@ -3,4 +3,4 @@ ALTER TABLE brands
   ADD COLUMN IF NOT EXISTS return_window_days      INTEGER NOT NULL DEFAULT 7,
   ADD COLUMN IF NOT EXISTS replacement_allowed     BOOLEAN NOT NULL DEFAULT true,
   ADD COLUMN IF NOT EXISTS replacement_window_days INTEGER NOT NULL DEFAULT 7;
-
+-- migrated

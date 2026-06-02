@@ -43,4 +43,4 @@ CREATE TABLE IF NOT EXISTS customer_health_history (
 
 CREATE INDEX IF NOT EXISTS idx_customer_health_history_user_time
   ON customer_health_history (user_id, snapshot_at DESC);
-
+-- migrated
