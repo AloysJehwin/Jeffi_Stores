@@ -48,3 +48,4 @@ UPDATE campaigns SET
   body_template = '<p style="font-size:16px;color:#333;margin:0 0 12px;">Hi {firstName},</p><h2 style="font-size:22px;color:#1a3a4a;margin:0 0 16px;">Price just dropped</h2><p style="color:#555;line-height:1.6;margin:0 0 12px;"><strong>{productName}</strong> from your wishlist:</p><p style="margin:0 0 20px;"><span style="color:#999;text-decoration:line-through;">₹{oldPrice}</span> &nbsp; <strong style="color:#e07b3f;font-size:20px;">₹{newPrice}</strong></p><p style="margin:20px 0 0;"><a href="{ctaUrl}" style="display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;">View product</a></p>',
   updated_at = NOW()
 WHERE kind = 'price_drop';
+

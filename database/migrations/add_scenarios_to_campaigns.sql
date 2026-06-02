@@ -58,3 +58,4 @@ WHERE scenario_kind IS NULL
   AND kind IN (SELECT kind FROM scenarios);
 
 CREATE INDEX IF NOT EXISTS idx_campaigns_scenario_kind ON campaigns (scenario_kind);
+

@@ -27,3 +27,4 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_aapt_name_active
 
 CREATE INDEX IF NOT EXISTS idx_aapt_status
   ON admin_agent_proposed_tools (status, created_at DESC);
+

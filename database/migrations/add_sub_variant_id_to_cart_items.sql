@@ -13,3 +13,4 @@ BEGIN
       UNIQUE (user_id, product_id, variant_id, sub_variant_id);
   END IF;
 END $$;
+

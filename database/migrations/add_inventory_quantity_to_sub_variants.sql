@@ -10,3 +10,4 @@ BEGIN
 END $$;
 
 UPDATE product_sub_variants SET inventory_quantity = stock_quantity WHERE inventory_quantity = 0 AND stock_quantity > 0;
+

@@ -13,3 +13,4 @@ CREATE TABLE IF NOT EXISTS admin_mfa_recovery_codes (
 
 CREATE INDEX IF NOT EXISTS idx_admin_mfa_recovery_codes_admin_id
   ON admin_mfa_recovery_codes (admin_id) WHERE used_at IS NULL;
+

@@ -12,3 +12,4 @@ UPDATE purchase_orders SET view_token = gen_random_uuid() WHERE view_token IS NU
 CREATE UNIQUE INDEX IF NOT EXISTS quotations_view_token_idx ON quotations(view_token);
 CREATE UNIQUE INDEX IF NOT EXISTS orders_view_token_idx ON orders(view_token);
 CREATE UNIQUE INDEX IF NOT EXISTS purchase_orders_view_token_idx ON purchase_orders(view_token);
+
