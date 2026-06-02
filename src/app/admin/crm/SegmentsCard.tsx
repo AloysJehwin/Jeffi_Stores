@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import CrmCampaignPanel from './CrmCampaignPanel'
 
@@ -76,13 +77,16 @@ function SegmentModal({ segment, onClose }: ModalProps) {
       .finally(() => setLoading(false))
   }
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
       onClick={onClose}
     >
+      <div className="absolute inset-0 bg-black/50" />
       <div
-        className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90vh] flex flex-col"
+        className="relative bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-border-default">
@@ -142,7 +146,8 @@ function SegmentModal({ segment, onClose }: ModalProps) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

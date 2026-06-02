@@ -49,10 +49,30 @@ export async function GET(
             '[]'::json
           )
         ) AS products,
-        COALESCE(b.return_allowed, COALESCE(c.return_allowed, pc.return_allowed, true)) AS return_allowed,
-        COALESCE(b.return_window_days, COALESCE(c.return_window_days, pc.return_window_days, 7)) AS return_window_days,
-        COALESCE(b.replacement_allowed, COALESCE(c.replacement_allowed, pc.replacement_allowed, true)) AS replacement_allowed,
-        COALESCE(b.replacement_window_days, COALESCE(c.replacement_window_days, pc.replacement_window_days, 7)) AS replacement_window_days
+        COALESCE(
+          (CASE WHEN b.return_allowed IS NULL AND c.return_allowed IS NULL AND pc.return_allowed IS NULL THEN true
+                ELSE COALESCE(b.return_allowed, true) AND COALESCE(c.return_allowed, true) AND COALESCE(pc.return_allowed, true)
+           END),
+          true
+        ) AS return_allowed,
+        LEAST(
+          COALESCE(b.return_window_days, 9999),
+          COALESCE(c.return_window_days, 9999),
+          COALESCE(pc.return_window_days, 9999),
+          7
+        ) AS return_window_days,
+        COALESCE(
+          (CASE WHEN b.replacement_allowed IS NULL AND c.replacement_allowed IS NULL AND pc.replacement_allowed IS NULL THEN true
+                ELSE COALESCE(b.replacement_allowed, true) AND COALESCE(c.replacement_allowed, true) AND COALESCE(pc.replacement_allowed, true)
+           END),
+          true
+        ) AS replacement_allowed,
+        LEAST(
+          COALESCE(b.replacement_window_days, 9999),
+          COALESCE(c.replacement_window_days, 9999),
+          COALESCE(pc.replacement_window_days, 9999),
+          7
+        ) AS replacement_window_days
       FROM order_items oi
       LEFT JOIN products p ON oi.product_id = p.id
       LEFT JOIN brands b ON p.brand_id = b.id

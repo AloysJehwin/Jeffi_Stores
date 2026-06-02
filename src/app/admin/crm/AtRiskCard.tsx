@@ -1,5 +1,7 @@
 'use client'
 
+import { createPortal } from 'react-dom'
+
 import { useState } from 'react'
 import Link from 'next/link'
 import CrmCampaignPanel from './CrmCampaignPanel'
@@ -72,7 +74,7 @@ export default function AtRiskCard({ items }: { items: AtRiskEntry[] }) {
         )}
       </div>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => setOpen(false)}
@@ -124,7 +126,7 @@ export default function AtRiskCard({ items }: { items: AtRiskEntry[] }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   )
 }

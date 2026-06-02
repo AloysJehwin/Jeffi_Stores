@@ -1,12 +1,13 @@
 import { Pool } from 'pg'
 import { query, queryMany, queryOne } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
 import { embed } from '@/lib/rag'
 import { SALES_TOOLS } from './tools/sales'
 import { MARKETING_TOOLS } from './tools/marketing'
 import { CATALOG_TOOLS } from './tools/catalog'
 import { CUSTOMER_OPS_TOOLS } from './tools/customer-ops'
 import { OPERATIONS_TOOLS } from './tools/operations'
+import { ok, err } from './tool-envelope'
 
 function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
@@ -94,18 +95,29 @@ export const TOOLS: ToolDef[] = [
         )
         for (const r of vp) if (!productIds.includes(r.product_id)) productIds.push(r.product_id)
       }
-      if (productIds.length === 0) return { products: [], note: 'No matches found.' }
+      if (productIds.length === 0) {
+        return ok({ summary: `No products matched "${String(q).slice(0, 60)}".`, count: 0, data: { products: [] } })
+      }
       const rows = await queryMany(
         `SELECT p.id::text, p.name, p.slug, p.sku,
-                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.inventory_quantity AS stock,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)::float AS price,
+                ${EFFECTIVE_STOCK_SQL}::int AS stock,
                 b.name AS brand, c.name AS category
          FROM products p LEFT JOIN brands b ON b.id = p.brand_id LEFT JOIN categories c ON c.id = p.category_id
          WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
         [productIds.slice(0, lim)]
       )
       const order = new Map(productIds.map((id, i) => [id, i]))
-      return { products: rows.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)) }
+      const sorted = rows.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
+      const top = sorted.slice(0, 3).map((r: any) => r.name).filter(Boolean)
+      return ok({
+        summary: sorted.length === 1
+          ? `Found 1 product: ${top[0] || ''}.`
+          : `Found ${sorted.length} products${top.length > 0 ? ` (top: ${top.join(', ')})` : ''}.`,
+        count: sorted.length,
+        data: { products: sorted },
+        displayHints: { primaryField: 'name', itemNoun: 'product' },
+      })
     },
   },
   {
@@ -733,6 +745,15 @@ export const TOOLS: ToolDef[] = [
       const intr = String(intro || '').trim()
       if (!subj || subj.length > 80) throw new Error('subject required, max 80 chars')
       if (!intr || intr.length > 240) throw new Error('intro required, max 240 chars')
+      if (/!\[[^\]]*\]\([^)]+\)/.test(intr)) {
+        throw new Error('intro must NOT contain markdown image syntax (![alt](url)) — products render automatically below the intro. Pass a one-sentence teaser only.')
+      }
+      if (/\[[^\]]+\]\(https?:[^)]+\)/.test(intr)) {
+        throw new Error('intro must NOT contain markdown links — products auto-link to their PDP. Pass a one-sentence teaser only.')
+      }
+      if (/<img\b|<table\b|<a\s+href=/i.test(intr)) {
+        throw new Error('intro must be plain text. The email template renders the product cards section automatically.')
+      }
       const products = await queryMany<{
         id: string; name: string; slug: string; price: string; short_description: string | null
       }>(

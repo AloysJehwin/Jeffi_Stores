@@ -375,26 +375,36 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   if (!user) return null
 
-  const canReturn = order?.status === 'delivered' && !returnRequest && (() => {
+  const canRefund = order?.status === 'delivered' && !returnRequest && order.items.length > 0 && (() => {
     const deliveryDate = order.deliveredAt || order.updatedAt
     if (!deliveryDate) return false
+    if (order.items.some((item: OrderItem) => !item.returnAllowed)) return false
     const ts = new Date(deliveryDate).getTime()
-    return order.items.some((item: OrderItem) => {
-      if (!item.returnAllowed && !item.replacementAllowed) return false
-      const days = Math.max(item.returnWindowDays, item.replacementWindowDays)
-      return Date.now() <= ts + days * 24 * 60 * 60 * 1000
-    })
+    const minWindow = Math.min(...order.items.map((item: OrderItem) => item.returnWindowDays))
+    return Date.now() <= ts + minWindow * 24 * 60 * 60 * 1000
   })()
+
+  const canReplace = order?.status === 'delivered' && !returnRequest && order.items.length > 0 && (() => {
+    const deliveryDate = order.deliveredAt || order.updatedAt
+    if (!deliveryDate) return false
+    if (order.items.some((item: OrderItem) => !item.replacementAllowed)) return false
+    const ts = new Date(deliveryDate).getTime()
+    const minWindow = Math.min(...order.items.map((item: OrderItem) => item.replacementWindowDays))
+    return Date.now() <= ts + minWindow * 24 * 60 * 60 * 1000
+  })()
+
+  const canReturn = canRefund || canReplace
 
   const returnWindowExpired = order?.status === 'delivered' && !returnRequest && !canReturn && (() => {
     const deliveryDate = order.deliveredAt || order.updatedAt
     if (!deliveryDate) return false
+    const allAllowed = order.items.every((item: OrderItem) => item.returnAllowed || item.replacementAllowed)
+    if (!allAllowed) return false
     const ts = new Date(deliveryDate).getTime()
-    return order.items.some((item: OrderItem) => item.returnAllowed || item.replacementAllowed) &&
-      order.items.every((item: OrderItem) => {
-        const days = Math.max(item.returnWindowDays, item.replacementWindowDays)
-        return Date.now() > ts + days * 24 * 60 * 60 * 1000
-      })
+    return order.items.every((item: OrderItem) => {
+      const days = Math.max(item.returnWindowDays, item.replacementWindowDays)
+      return Date.now() > ts + days * 24 * 60 * 60 * 1000
+    })
   })()
 
   const MobileAccountHeader = () => (
@@ -520,7 +530,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                     {order.status === 'cancel_requested' ? 'Cancellation Requested'
                       : order.status === 'cancel_rejected' ? 'Cancellation Rejected'
                       : order.status === 'out_for_delivery' ? 'Out for Delivery'
@@ -531,29 +541,38 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       : order.status === 'returned' ? 'Returned'
                       : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                   </span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
                     Payment: {order.paymentStatus}
                   </span>
+                  {(CANCELLABLE_STATUSES.includes(order.status) || (canReturn && !showReturnForm) || returnWindowExpired || (order.invoiceNumber && !order.originalOrderId)) && (
+                    <span className="hidden sm:inline-block w-px h-5 bg-border-default mx-1" aria-hidden />
+                  )}
                   {CANCELLABLE_STATUSES.includes(order.status) && (
                     <button
                       type="button"
                       onClick={() => setShowCancelConfirm(true)}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-800 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500 hover:bg-red-600 text-white shadow-sm transition-colors"
                     >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       {order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Cancel Order' : 'Request Cancellation'}
                     </button>
                   )}
                   {canReturn && !showReturnForm && (
                     <button
                       type="button"
-                      onClick={() => setShowReturnForm(true)}
-                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/50 border border-orange-200 dark:border-orange-800 transition-colors"
+                      onClick={() => {
+                        setReturnType(canRefund ? 'refund' : 'replacement')
+                        setShowReturnForm(true)
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-colors"
                     >
-                      Request Return / Replacement
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                      {canRefund && canReplace ? 'Request Return / Replacement' : canRefund ? 'Request Return' : 'Request Replacement'}
                     </button>
                   )}
                   {returnWindowExpired && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 cursor-not-allowed">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 italic">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                       Return window closed
                     </span>
                   )}
@@ -562,7 +581,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       href={`/api/orders/${order.id}/invoice`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-accent-50 text-accent-700 hover:bg-accent-100 border border-accent-200 transition-colors gap-1"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white shadow-sm transition-colors"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -696,31 +715,35 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             {/* Return Request Form */}
             {showReturnForm && (
               <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 sm:p-6">
-                <h3 className="text-lg font-bold text-orange-900 dark:text-orange-300 mb-4">Request Return / Replacement</h3>
+                <h3 className="text-lg font-bold text-orange-900 dark:text-orange-300 mb-4">{canRefund && canReplace ? 'Request Return / Replacement' : canRefund ? 'Request Return' : 'Request Replacement'}</h3>
                 {returnError && (
                   <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
                     {returnError}
                   </div>
                 )}
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium text-foreground-secondary mb-2">What would you like?</p>
-                    <div className="flex gap-3">
-                      {(['refund', 'replacement'] as const).filter(t => !(t === 'replacement' && order.originalOrderId)).map((t) => (
-                        <label key={t} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="returnType"
-                            value={t}
-                            checked={returnType === t}
-                            onChange={() => setReturnType(t)}
-                            className="accent-accent-500"
-                          />
-                          <span className="text-sm text-foreground capitalize">{t}</span>
-                        </label>
-                      ))}
+                  {canRefund && canReplace && (
+                    <div>
+                      <p className="text-sm font-medium text-foreground-secondary mb-2">What would you like?</p>
+                      <div className="flex gap-3">
+                        {(['refund', 'replacement'] as const)
+                          .filter(t => !(t === 'replacement' && order.originalOrderId))
+                          .map((t) => (
+                          <label key={t} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="returnType"
+                              value={t}
+                              checked={returnType === t}
+                              onChange={() => setReturnType(t)}
+                              className="accent-accent-500"
+                            />
+                            <span className="text-sm text-foreground capitalize">{t}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-1">Reason</label>
                     <CustomSelect

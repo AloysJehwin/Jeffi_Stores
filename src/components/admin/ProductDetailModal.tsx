@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useCallback, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Package, Star } from 'lucide-react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
@@ -81,7 +82,9 @@ export default function ProductDetailModal({ product, onClose }: Props) {
   const stock = p.has_variants ? Number(p.variant_inventory_total ?? 0) : Number(p.inventory_quantity ?? 0)
   const isLow = stock > 0 && stock <= (p.low_stock_threshold ?? 5)
 
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center p-4"
       onClick={onClose}
@@ -317,6 +320,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
         {/* Placeholder height while loading so modal isn't tiny */}
         {loading && !detail && <div className="h-64" />}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

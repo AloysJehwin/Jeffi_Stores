@@ -27,10 +27,14 @@ export default function NewScenarioClient() {
   const [step, setStep] = useState<Step>('describe')
   const [aiPrompt, setAiPrompt] = useState('')
   const [sql, setSql] = useState('')
+  const [productSql, setProductSql] = useState('')
+  const [productValidation, setProductValidation] = useState<Validation | null>(null)
   const [explanation, setExplanation] = useState('')
   const [validation, setValidation] = useState<Validation | null>(null)
   const [dryRunCount, setDryRunCount] = useState<number | null>(null)
   const [dryRunSample, setDryRunSample] = useState<string[]>([])
+  const [dryRunProductCount, setDryRunProductCount] = useState<number | null>(null)
+  const [dryRunProductSample, setDryRunProductSample] = useState<Array<{ name: string; price: number | null; image_url: string | null }>>([])
   const [dryRunElapsedMs, setDryRunElapsedMs] = useState<number | null>(null)
   const [name, setName] = useState('')
   const [kind, setKind] = useState('')
@@ -56,8 +60,13 @@ export default function NewScenarioClient() {
         return
       }
       setSql(data.sql || '')
+      setProductSql(data.product_sql || '')
+      setProductValidation(data.productValidation || null)
       setExplanation(data.explanation || '')
       setValidation(data.validation || null)
+      if (data.name && !name.trim()) setName(data.name)
+      if (data.kind && !kind.trim()) setKind(data.kind)
+      if (data.description && !description.trim()) setDescription(data.description)
       setDryRunCount(null)
       setDryRunSample([])
       setStep('review_sql')
@@ -73,7 +82,7 @@ export default function NewScenarioClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ sql }),
+        body: JSON.stringify({ sql, product_sql: productSql || undefined }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -82,6 +91,8 @@ export default function NewScenarioClient() {
       }
       setDryRunCount(data.count)
       setDryRunSample(data.sample || [])
+      setDryRunProductCount(typeof data.productCount === 'number' ? data.productCount : null)
+      setDryRunProductSample(Array.isArray(data.productSample) ? data.productSample : [])
       setDryRunElapsedMs(data.elapsedMs ?? null)
       setStep('save')
     } finally {
@@ -111,6 +122,7 @@ export default function NewScenarioClient() {
           description: description.trim(),
           ai_prompt: aiPrompt.trim(),
           generated_sql: sql,
+          product_sql: productSql || null,
           dry_run_count: dryRunCount,
         }),
       })
@@ -240,6 +252,32 @@ export default function NewScenarioClient() {
             </div>
           )}
 
+          {productSql && (
+            <div className="pt-3 border-t border-border-default">
+              <div className="mb-2 flex items-center justify-between">
+                <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide">Product query (read-only)</label>
+                <span className="text-[10px] text-foreground-muted">Renders as <code className="font-mono">{'{itemsHtml}'}</code> in the email body</span>
+              </div>
+              <textarea
+                value={productSql}
+                readOnly
+                rows={Math.min(12, Math.max(4, productSql.split('\n').length + 2))}
+                className="w-full px-3 py-2 text-xs font-mono border border-border-secondary rounded-lg bg-surface-secondary text-foreground"
+              />
+              {productValidation && (
+                <div className={`mt-2 p-2 rounded text-[11px] ${
+                  productValidation.ok
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
+                    : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+                }`}>
+                  {productValidation.ok
+                    ? <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" /> Product query passed safety check</span>
+                    : <span className="inline-flex items-center gap-1"><X className="w-3 h-3" /> {productValidation.reason}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -271,6 +309,36 @@ export default function NewScenarioClient() {
                       <span key={id} className="px-2 py-0.5 bg-surface rounded border border-border-default text-foreground-secondary">{id}</span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {productSql && dryRunProductCount !== null && (
+                <div className="mt-4 pt-4 border-t border-border-default">
+                  <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-2">Product query</p>
+                  <p className="text-2xl font-bold text-foreground tabular-nums">{dryRunProductCount.toLocaleString('en-IN')} <span className="text-sm font-normal text-foreground-muted">product(s) will appear in the email</span></p>
+                  {dryRunProductSample.length > 0 && (
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {dryRunProductSample.map((p, idx) => (
+                        <div key={idx} className="flex items-center gap-2 px-2 py-1.5 bg-surface rounded border border-border-default">
+                          {p.image_url ? (
+                            <img src={p.image_url} alt="" className="w-10 h-10 object-cover rounded border border-border-default" />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-surface-secondary border border-border-default" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
+                            {p.price != null && <p className="text-[10px] text-foreground-muted">₹{Math.round(p.price).toLocaleString('en-IN')}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!productSql && (
+                <div className="mt-4 pt-4 border-t border-border-default">
+                  <p className="text-[11px] text-foreground-muted italic">No product query — this scenario only targets customers. The email body will not include a product list.</p>
                 </div>
               )}
             </div>

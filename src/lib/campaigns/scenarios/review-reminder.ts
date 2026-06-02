@@ -4,6 +4,7 @@ import {
   fetchUserContext,
   resolveCoupon,
   sendCampaignEmail,
+  renderItemRows,
 } from '@/lib/automation-emails'
 import type { ScenarioModule } from '../types'
 
@@ -59,6 +60,25 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
+    const items = await queryMany<{ name: string; product_id: string; product_slug: string | null; image_url: string | null }>(`
+      SELECT oi.product_name AS name,
+             oi.product_id::text AS product_id,
+             p.slug AS product_slug,
+             (SELECT image_url FROM product_images WHERE product_id = oi.product_id ORDER BY display_order ASC LIMIT 1) AS image_url
+      FROM order_items oi
+      LEFT JOIN products p ON p.id = oi.product_id
+      WHERE oi.order_id = $1::uuid
+      LIMIT 8
+    `, [row.id])
+
+    const itemsHtml = renderItemRows(
+      items.map(i => ({
+        name: i.name,
+        imageUrl: i.image_url,
+        productUrl: i.product_slug ? `${APP_URL}/products/${i.product_slug}?review=1` : null,
+      }))
+    )
+
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
     return sendCampaignEmail({
@@ -68,6 +88,7 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
       vars: {
         firstName: user.first_name || 'there',
         orderNumber: row.order_number,
+        itemsHtml,
         couponCode,
         discountPercent,
         ctaUrl: `${APP_URL}/account/orders/${row.id}`,

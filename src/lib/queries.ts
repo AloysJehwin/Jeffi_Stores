@@ -36,6 +36,15 @@ export const VARIANT_MIN_PRICE_SQL = `
   ) AS combined_prices)
 `
 
+export const EFFECTIVE_STOCK_SQL = `
+  CASE
+    WHEN p.has_variants = true THEN ${VARIANT_INVENTORY_TOTAL_SQL}
+    ELSE COALESCE(p.inventory_quantity, 0)
+  END
+`
+
+export const EFFECTIVE_PRICE_SQL = `COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)`
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
     const [

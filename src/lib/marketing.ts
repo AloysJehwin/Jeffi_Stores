@@ -26,7 +26,24 @@ export interface Campaign {
 
 const FREQUENCY_CAP_HOURS = 72
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+function resolveAppUrl(): string {
+  const isLocalhost = (v: string | undefined) => !!v && /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(v)
+  const isProd = process.env.NODE_ENV === 'production'
+  const pickFirst = (vals: Array<string | undefined>) =>
+    vals.find(v => v && (!isProd || !isLocalhost(v))) || ''
+  const candidate =
+    pickFirst([
+      process.env.NEXT_PUBLIC_APP_URL,
+      process.env.APP_URL,
+      process.env.NEXT_PUBLIC_BASE_URL,
+      process.env.BASE_URL,
+    ]) ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
+    (isProd ? 'https://jeffistores.in' : 'http://localhost:3000')
+  return candidate.replace(/\/$/, '')
+}
+
+const APP_URL = resolveAppUrl()
 
 export async function getCampaign(kind: CampaignKind): Promise<Campaign | null> {
   return queryOne<Campaign>(`SELECT * FROM campaigns WHERE kind = $1`, [kind])

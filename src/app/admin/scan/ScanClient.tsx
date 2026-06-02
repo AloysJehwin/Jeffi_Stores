@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { BrowserQRCodeReader, IScannerControls } from '@zxing/browser'
 
 interface OrderInfo {
@@ -553,7 +554,7 @@ export default function ScanClient() {
         </div>
       )}
 
-      {stage === 'shipping' && order && (
+      {stage === 'shipping' && order && typeof document !== 'undefined' && createPortal(
         <div className="fixed inset-0 z-[300] flex flex-col justify-end bg-black/60">
           <div className="bg-gray-900 rounded-t-3xl p-6 flex flex-col gap-4">
             <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-1" />
@@ -584,7 +585,8 @@ export default function ScanClient() {
               Cancel
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {stage === 'updating' && (

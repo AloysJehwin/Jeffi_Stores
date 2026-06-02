@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 
 interface AnalyticsData {
@@ -79,7 +80,9 @@ function Modal({ title: titleText, subtitle, onClose, children, footer }: {
   children: React.ReactNode
   footer?: React.ReactNode
 }) {
-  return (
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
@@ -108,7 +111,8 @@ function Modal({ title: titleText, subtitle, onClose, children, footer }: {
           <div className="pt-4 shrink-0 border-t border-border-default mt-2">{footer}</div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

@@ -124,7 +124,9 @@ export default function CampaignsListClient() {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
-                <h3 className="font-semibold text-foreground">{c.name}</h3>
+                <Link href={`/admin/campaigns/${c.kind}`} className="font-semibold text-foreground hover:text-accent-500 transition-colors">
+                  {c.name}
+                </Link>
                 <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
                   c.enabled
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
@@ -168,7 +170,7 @@ export default function CampaignsListClient() {
                 href={`/admin/campaigns/${c.kind}`}
                 className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-semibold transition-all"
               >
-                Edit
+                View / Edit
               </Link>
             </div>
           </div>

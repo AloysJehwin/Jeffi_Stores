@@ -25,7 +25,9 @@ function CheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const isBuyNow = searchParams.get('buyNow') === '1'
+  const intentToken = searchParams.get('intent')
+  const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(null)
+  const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
   const couponId = searchParams.get('couponId')
   const couponCode = searchParams.get('couponCode')
   const discountAmount = parseFloat(searchParams.get('discountAmount') || '0')
@@ -72,6 +74,39 @@ function CheckoutPage() {
     }
 
     fetchAddress(addressId)
+
+    if (intentToken) {
+      fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include' })
+        .then(async r => {
+          const d = await r.json()
+          if (!r.ok) { router.push('/'); return }
+          if (d.mode === 'cart') {
+            setIntentMode('cart')
+            return
+          }
+          setIntentMode('buyNow')
+          setBuyNowItem({
+            productId: d.productId,
+            variantId: d.variantId || null,
+            qty: Number(d.qty),
+            buyMode: d.buyMode,
+            buyUnit: d.buyUnit || null,
+            price: Number(d.price),
+            productName: d.productName || '',
+            variantName: d.variantName || null,
+            imageUrl: null,
+          })
+          const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
+          fetch(imageUrl)
+            .then(r => r.json())
+            .then(data => {
+              setBuyNowItem(prev => prev ? { ...prev, imageUrl: data.imageUrl || null } : prev)
+            })
+            .catch(() => {})
+        })
+        .catch(() => router.push('/'))
+      return
+    }
 
     if (isBuyNow) {
       const productId = searchParams.get('productId')
@@ -298,9 +333,10 @@ function CheckoutPage() {
           addressId: searchParams.get('addressId'),
           notes,
           couponId: couponId || null,
-          shippingAmount: shippingCharge ?? 0,
         }
-        if (isBuyNow && buyNowItem) {
+        if (intentToken) {
+          draftBody.intent = intentToken
+        } else if (isBuyNow && buyNowItem) {
           draftBody.item = {
             productId: buyNowItem.productId,
             variantId: buyNowItem.variantId,

@@ -1,5 +1,7 @@
 'use client'
 
+import { createPortal } from 'react-dom'
+
 import { useState } from 'react'
 import Link from 'next/link'
 import CrmCampaignPanel from './CrmCampaignPanel'
@@ -68,7 +70,7 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
         )}
       </div>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => setOpen(false)}
@@ -120,7 +122,7 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   )
 }

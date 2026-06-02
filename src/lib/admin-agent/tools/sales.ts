@@ -1,6 +1,9 @@
-import { queryMany, queryOne } from '@/lib/db'
+import { query, queryMany, queryOne } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
+import { embed } from '@/lib/rag'
 import type { ToolDef } from '../tools'
+import { ok, err } from '../tool-envelope'
+import { ocrImage, ocrPdfPages } from '../vision'
 
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
 function fmtINR(n: number | string | null | undefined): string {
@@ -230,6 +233,243 @@ const get_cash_sale: ToolDef = {
 }
 
 interface QuotationItemInput { productId?: string; variantId?: string; quantity: number; unitPrice?: number }
+
+function vec(arr: number[]): string { return '[' + arr.join(',') + ']' }
+
+const match_quotation_items: ToolDef = {
+  name: 'match_quotation_items',
+  description: 'Take a free-form list of requested items (text per line + qty) and resolve them against the catalog using semantic search. Returns each line as matched | ambiguous | unmatched with up to 3 candidate products per ambiguous line. Use BEFORE propose_create_quotation when the admin gives a free-form request like "50 M27 bolts, 200 washers". DOES NOT create anything — read-only.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      lines: {
+        type: 'string',
+        description: 'JSON array string: [{"requestedText":"M27 structural bolt","qty":50}, {"requestedText":"flat washer 8mm","qty":200}]. Each line.qty must be > 0.',
+      },
+      simThreshold: {
+        type: 'number',
+        description: 'Cosine similarity threshold for "matched" vs "ambiguous". Default 0.62.',
+        default: 0.62,
+      },
+    },
+    required: ['lines'],
+  },
+  mutating: false,
+  handler: async ({ lines, simThreshold }) => {
+    let parsed: { requestedText: string; qty: number }[]
+    try {
+      const raw = typeof lines === 'string' ? JSON.parse(lines) : lines
+      if (!Array.isArray(raw)) throw new Error('not an array')
+      parsed = raw
+    } catch {
+      return err('Invalid lines payload', 'lines must be a JSON array of {requestedText, qty}')
+    }
+    if (parsed.length === 0) return err('No lines provided')
+    if (parsed.length > 30) return err('Too many lines', 'Limit 30 lines per call')
+
+    const threshold = typeof simThreshold === 'number' ? Math.max(0.3, Math.min(0.95, simThreshold)) : 0.62
+
+    const results: Array<{
+      requestedText: string
+      qty: number
+      status: 'matched' | 'ambiguous' | 'unmatched'
+      candidates: Array<{ productId: string; name: string; sku: string | null; price: number; sim: number }>
+    }> = []
+
+    for (const line of parsed) {
+      const text = String(line.requestedText || '').trim()
+      const qty = Number(line.qty)
+      if (!text || !isFinite(qty) || qty <= 0) {
+        results.push({ requestedText: text, qty, status: 'unmatched', candidates: [] })
+        continue
+      }
+      const v = await embed(text)
+      const ids = await queryMany<{ source_table: string; source_id: string; sim: number }>(
+        `SELECT source_table, source_id, 1 - (embedding <=> $1::vector) AS sim
+         FROM embeddings WHERE source_table IN ('products', 'product_variants')
+         ORDER BY embedding <=> $1::vector LIMIT 6`,
+        [vec(v)]
+      ).catch(() => [])
+
+      const productSimMap = new Map<string, number>()
+      for (const r of ids) {
+        if (r.source_table === 'products') {
+          if (!productSimMap.has(r.source_id) || productSimMap.get(r.source_id)! < r.sim) {
+            productSimMap.set(r.source_id, r.sim)
+          }
+        }
+      }
+      const variantSrcIds = ids.filter(r => r.source_table === 'product_variants').map(r => r.source_id)
+      if (variantSrcIds.length) {
+        const vp = await queryMany<{ id: string; product_id: string }>(
+          `SELECT id::text, product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`,
+          [variantSrcIds]
+        )
+        const idToProduct = new Map(vp.map(r => [r.id, r.product_id]))
+        for (const r of ids) {
+          if (r.source_table === 'product_variants') {
+            const pid = idToProduct.get(r.source_id)
+            if (pid) {
+              const cur = productSimMap.get(pid) ?? 0
+              if (r.sim > cur) productSimMap.set(pid, r.sim)
+            }
+          }
+        }
+      }
+
+      const productIds = Array.from(productSimMap.keys()).slice(0, 8)
+      const candidates: Array<{ productId: string; name: string; sku: string | null; price: number; sim: number }> = []
+      if (productIds.length > 0) {
+        const rows = await queryMany<{ id: string; name: string; sku: string | null; price: number }>(
+          `SELECT p.id::text, p.name, p.sku,
+                  COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::float AS price
+           FROM products p
+           WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
+          [productIds]
+        )
+        for (const r of rows) {
+          candidates.push({ productId: r.id, name: r.name, sku: r.sku, price: Number(r.price) || 0, sim: productSimMap.get(r.id) ?? 0 })
+        }
+      }
+      candidates.sort((a, b) => b.sim - a.sim)
+
+      let status: 'matched' | 'ambiguous' | 'unmatched'
+      if (candidates.length === 0 || candidates[0].sim < 0.45) status = 'unmatched'
+      else if (candidates[0].sim >= threshold && (candidates.length === 1 || candidates[0].sim - candidates[1].sim >= 0.05)) status = 'matched'
+      else status = 'ambiguous'
+
+      results.push({
+        requestedText: text,
+        qty,
+        status,
+        candidates: candidates.slice(0, 3),
+      })
+    }
+
+    const counts = {
+      matched: results.filter(r => r.status === 'matched').length,
+      ambiguous: results.filter(r => r.status === 'ambiguous').length,
+      unmatched: results.filter(r => r.status === 'unmatched').length,
+    }
+
+    return ok({
+      summary: `Resolved ${counts.matched}/${results.length} lines exactly` +
+        (counts.ambiguous > 0 ? `, ${counts.ambiguous} ambiguous` : '') +
+        (counts.unmatched > 0 ? `, ${counts.unmatched} unmatched` : '') + '.',
+      count: results.length,
+      data: { lines: results, counts, threshold },
+      displayHints: { primaryField: 'requestedText', itemNoun: 'line' },
+    })
+  },
+}
+
+const extract_quotation_lines_from_attachment: ToolDef = {
+  name: 'extract_quotation_lines_from_attachment',
+  description: 'Read an uploaded file (PDF, image jpg/png/webp, or scanned PDF) and return its raw text so YOU can parse line-items. Use this when the admin attaches a quotation request document. Workflow: call this tool with the attachment_id from the chat, read the returned text, parse it into [{requestedText, qty}], then call match_quotation_items. Falls back from pdf-parse → vision OCR for scanned PDFs. Vision OCR for images runs against the configured Razer model.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      attachment_id: { type: 'string', description: 'UUID returned by /api/admin/agent/upload.' },
+    },
+    required: ['attachment_id'],
+  },
+  mutating: false,
+  handler: async ({ attachment_id }) => {
+    const id = String(attachment_id || '').trim()
+    if (!id) return err('attachment_id is required')
+
+    const row = await queryOne<{
+      id: string
+      mime_type: string
+      filename: string | null
+      byte_size: number
+      data: Buffer
+      extracted_text: string | null
+      expires_at: string
+    }>(
+      `SELECT id::text, mime_type, filename, byte_size, data, extracted_text, expires_at::text
+       FROM admin_agent_attachments
+       WHERE id = $1::uuid AND expires_at > NOW()`,
+      [id]
+    )
+    if (!row) return err('Attachment not found or expired', undefined, 'Ask the admin to re-upload the file.')
+
+    if (row.extracted_text && row.extracted_text.trim()) {
+      return ok({
+        summary: `Re-using cached text from ${row.filename || row.mime_type} (${row.byte_size} bytes).`,
+        data: { text: row.extracted_text, mime_type: row.mime_type, filename: row.filename },
+        meta: { cached: true },
+      })
+    }
+
+    if (row.mime_type === 'application/pdf') {
+      let text = ''
+      try {
+        const pdfParseMod = await import('pdf-parse')
+        const pdfParse = (pdfParseMod as { default?: (b: Buffer) => Promise<{ text: string }>; }).default
+          || (pdfParseMod as unknown as (b: Buffer) => Promise<{ text: string }>)
+        const parsed = await pdfParse(row.data)
+        text = (parsed?.text || '').trim()
+      } catch {
+        text = ''
+      }
+
+      if (!text) {
+        const visionResult = await ocrPdfPages(row.data, { maxPages: 10 })
+        if (!visionResult.ok) {
+          return err(
+            'Could not extract text from PDF',
+            visionResult.reason,
+            visionResult.hint || 'Try a higher-resolution scan, or retype the line-items manually.'
+          )
+        }
+        text = visionResult.text
+        await query(
+          `UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`,
+          [id, text]
+        ).catch(() => {})
+        return ok({
+          summary: `Vision OCR extracted ${text.length} chars from ${visionResult.pages || '?'} page(s) of "${row.filename || 'PDF'}".`,
+          data: { text, mime_type: row.mime_type, filename: row.filename },
+          meta: { cached: false, char_count: text.length, source: 'vision_ocr', pages: visionResult.pages, model: visionResult.model },
+        })
+      }
+
+      await query(
+        `UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`,
+        [id, text]
+      ).catch(() => {})
+      return ok({
+        summary: `Extracted ${text.length} chars from PDF "${row.filename || 'upload'}".`,
+        data: { text, mime_type: row.mime_type, filename: row.filename },
+        meta: { cached: false, char_count: text.length, source: 'pdf_text' },
+      })
+    }
+
+    if (row.mime_type.startsWith('image/')) {
+      const visionResult = await ocrImage(row.data, row.mime_type)
+      if (!visionResult.ok) {
+        return err(
+          'Image OCR failed',
+          visionResult.reason,
+          visionResult.hint || 'Make sure the configured vision model is reachable.'
+        )
+      }
+      const text = visionResult.text
+      await query(
+        `UPDATE admin_agent_attachments SET extracted_text = $2 WHERE id = $1::uuid`,
+        [id, text]
+      ).catch(() => {})
+      return ok({
+        summary: `Vision OCR extracted ${text.length} chars from "${row.filename || 'image'}".`,
+        data: { text, mime_type: row.mime_type, filename: row.filename },
+        meta: { cached: false, char_count: text.length, source: 'vision_ocr', model: visionResult.model },
+      })
+    }
+
+    return err(`Unsupported attachment type: ${row.mime_type}`)
+  },
+}
 
 const propose_create_quotation: ToolDef = {
   name: 'propose_create_quotation',
@@ -553,6 +793,8 @@ export const SALES_TOOLS: ToolDef[] = [
   get_invoice,
   list_cash_sales,
   get_cash_sale,
+  match_quotation_items,
+  extract_quotation_lines_from_attachment,
   propose_create_quotation,
   propose_send_quotation_email,
   propose_mark_invoice_paid,

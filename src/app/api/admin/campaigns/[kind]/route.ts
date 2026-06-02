@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
+import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,20 +87,37 @@ export async function PATCH(req: NextRequest, { params }: { params: { kind: stri
     vals.push(body.subject_template.slice(0, 500))
   }
   if (typeof body.body_template === 'string' && body.body_template.trim()) {
+    const incoming = body.body_template.slice(0, 50000)
+    const cur = await queryOne<{ scenario_kind: string | null }>(
+      `SELECT scenario_kind FROM campaigns WHERE kind = $1`,
+      [params.kind]
+    )
+    const refKind = (typeof body.scenario_kind === 'string' && body.scenario_kind.trim()) || cur?.scenario_kind || params.kind
+    const tplCheck = validateCampaignBodyTemplate(incoming, { kind: params.kind, scenarioKind: refKind })
+    if (!tplCheck.ok) {
+      return NextResponse.json({ error: tplCheck.reason, hint: tplCheck.hint }, { status: 400 })
+    }
     updates.push(`body_template = $${i++}`)
-    vals.push(body.body_template.slice(0, 50000))
+    vals.push(incoming)
   }
   if ('scenario_kind' in body) {
-    const seeded = await queryOne<{ kind: string }>(`SELECT kind FROM scenarios WHERE kind = $1`, [params.kind])
-    if (seeded) {
-      return NextResponse.json({ error: 'Cannot change scenario on a seeded campaign' }, { status: 400 })
+    const current = await queryOne<{ scenario_kind: string | null }>(
+      `SELECT scenario_kind FROM campaigns WHERE kind = $1`,
+      [params.kind]
+    )
+    const nextKind = body.scenario_kind || null
+    if ((current?.scenario_kind || null) !== nextKind) {
+      const seeded = await queryOne<{ kind: string }>(`SELECT kind FROM scenarios WHERE kind = $1`, [params.kind])
+      if (seeded) {
+        return NextResponse.json({ error: 'Cannot change scenario on a seeded campaign' }, { status: 400 })
+      }
+      if (nextKind) {
+        const exists = await queryOne(`SELECT kind FROM scenarios WHERE kind = $1`, [nextKind])
+        if (!exists) return NextResponse.json({ error: 'Unknown scenario_kind' }, { status: 400 })
+      }
+      updates.push(`scenario_kind = $${i++}`)
+      vals.push(nextKind)
     }
-    if (body.scenario_kind) {
-      const exists = await queryOne(`SELECT kind FROM scenarios WHERE kind = $1`, [body.scenario_kind])
-      if (!exists) return NextResponse.json({ error: 'Unknown scenario_kind' }, { status: 400 })
-    }
-    updates.push(`scenario_kind = $${i++}`)
-    vals.push(body.scenario_kind || null)
   }
   if ('parameters' in body && body.parameters && typeof body.parameters === 'object') {
     updates.push(`parameters = $${i++}::jsonb`)

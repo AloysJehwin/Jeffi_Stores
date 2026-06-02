@@ -316,36 +316,51 @@ jobs:
 
       - name: Run migrations
         uses: appleboy/ssh-action@v1
-        env:
-          RDS_MASTER_PASSWORD: ${{ secrets.RDS_MASTER_PASSWORD }}
         with:
           host: ${{ steps.ec2.outputs.host }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 10m
-          envs: RDS_MASTER_PASSWORD
           script: |
             set -euo pipefail
             cd /opt/jeffi-stores
-
-            if [[ -z "${RDS_MASTER_PASSWORD:-}" ]]; then
-              echo "ERROR: RDS_MASTER_PASSWORD is empty — secret not forwarded."
-              exit 1
-            fi
 
             if ! command -v psql >/dev/null 2>&1; then
               echo "Installing postgresql client..."
               sudo dnf install -y postgresql15 || sudo yum install -y postgresql
             fi
 
-            export PGHOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
-            export PGPORT=5432
-            export PGUSER=postgres
-            export PGDATABASE=jeffi_stores
-            export PGPASSWORD="$RDS_MASTER_PASSWORD"
+            # Extract DB credentials from the live .env so CI never goes stale
+            ENV_FILE="/opt/jeffi-stores/.env"
+            if [[ ! -f "$ENV_FILE" ]]; then
+              echo "ERROR: $ENV_FILE not found on server."
+              exit 1
+            fi
+            DB_URL=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+            if [[ -z "$DB_URL" ]]; then
+              echo "ERROR: DATABASE_URL not found in $ENV_FILE"
+              exit 1
+            fi
+
+            # Parse postgresql://user:password@host:port/dbname
+            DB_URL_STRIPPED="${DB_URL#postgresql://}"
+            DB_USER="${DB_URL_STRIPPED%%:*}"
+            DB_REST="${DB_URL_STRIPPED#*:}"
+            DB_PASS="${DB_REST%%@*}"
+            DB_REST2="${DB_REST#*@}"
+            DB_HOST="${DB_REST2%%:*}"
+            DB_REST3="${DB_REST2#*:}"
+            DB_PORT="${DB_REST3%%/*}"
+            DB_NAME="${DB_REST3#*/}"
+
+            export PGHOST="$DB_HOST"
+            export PGPORT="$DB_PORT"
+            export PGUSER="$DB_USER"
+            export PGDATABASE="$DB_NAME"
+            export PGPASSWORD="$DB_PASS"
             export PGSSLMODE=require
 
-            echo "── Verifying DB connectivity ──"
+            echo "Verifying DB connectivity..."
             psql -tAc 'SELECT 1' >/dev/null
 
             echo "── Ensuring schema_migrations table ──"
@@ -383,9 +398,11 @@ jobs:
               rename_products_price_fields.sql
               rename_sale_price_add_ex_gst.sql
               reseed_campaign_templates.sql
+              reseed_campaign_templates_with_images.sql
               add_ai_assistant_log.sql
               add_scenarios_to_campaigns.sql
               add_custom_scenarios.sql
+              add_custom_scenario_product_sql.sql
               add_ai_feedback.sql
               add_recommended_product_ids_to_ai_queries.sql
               add_ai_briefing_log.sql
@@ -393,6 +410,7 @@ jobs:
               add_product_ai_enrichment.sql
               add_admin_agent_proposed_tools.sql
               add_admin_audit_log.sql
+              add_admin_agent_attachments.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')

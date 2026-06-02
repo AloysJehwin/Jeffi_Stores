@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { ADMIN_SCOPES } from '@/lib/scopes'
 import ScopeGrid from '@/components/admin/ScopeGrid'
@@ -256,7 +257,7 @@ export default function AdminUserActions({
         {isSuperAdmin && !isSelf && <span className="text-xs text-foreground-muted">Super Admin</span>}
       </div>
 
-      {editing && (
+      {editing && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={e => { if (e.target === e.currentTarget) setEditing(false) }}
@@ -341,7 +342,8 @@ export default function AdminUserActions({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

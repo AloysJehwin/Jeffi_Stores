@@ -94,6 +94,8 @@ export default function ProductActions({
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
+  const [quantityRaw, setQuantityRaw] = useState('1')
+  useEffect(() => { setQuantityRaw(String(quantity)) }, [quantity])
   const [customQty, setCustomQty] = useState('1')
 
   const pricingTypes = Array.from(new Set(variants.map(v => v.pricing_type || 'unit')))
@@ -290,7 +292,7 @@ export default function ProductActions({
     }
   }
 
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     setIsBuyingNow(true)
     const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
     if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
@@ -303,26 +305,31 @@ export default function ProductActions({
       setIsBuyingNow(false)
       return
     }
-    const price = buyMode === 'weight' && activeWeightRate
-      ? activeWeightRate
-      : buyMode === 'length' && activeLengthRate
-      ? activeLengthRate
-      : effectivePrice
-
-    const params = new URLSearchParams({
-      buyNow: '1',
-      productId,
-      productName,
-      qty: String(finalQty),
-      buyMode,
-      price: String(price),
-    })
-    if (selectedVariantId) params.set('variantId', selectedVariantId)
-    if (selectedVariant) params.set('variantName', selectedVariant.variant_name)
-    if (selectedSubVariantId) params.set('subVariantId', selectedSubVariantId)
-    if (selectedSubVariant) params.set('subVariantName', selectedSubVariant.sub_variant_name)
-    if (currentUnit) params.set('buyUnit', currentUnit)
-    router.push(`/checkout/review?${params.toString()}`)
+    try {
+      const res = await fetch('/api/checkout/intents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          productId,
+          variantId: selectedVariantId || null,
+          subVariantId: selectedSubVariantId || null,
+          qty: finalQty,
+          buyMode,
+          buyUnit: currentUnit || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.intent) {
+        showToast(data?.error || 'Failed to start checkout', 'error')
+        setIsBuyingNow(false)
+        return
+      }
+      router.push(`/checkout/review?intent=${encodeURIComponent(data.intent)}`)
+    } catch {
+      showToast('Could not reach the server. Please try again.', 'error')
+      setIsBuyingNow(false)
+    }
   }
 
   return (
@@ -586,18 +593,22 @@ export default function ProductActions({
               </svg>
             </button>
             <input
-              key={quantity}
               type="number"
               min={1}
               max={effectiveStock}
-              value={quantity}
+              value={quantityRaw}
               onChange={e => {
-                const v = parseInt(e.target.value, 10)
+                const raw = e.target.value
+                setQuantityRaw(raw)
+                if (raw === '' || raw === '0') return
+                const v = parseInt(raw, 10)
                 if (!isNaN(v)) setQuantity(Math.min(effectiveStock, Math.max(1, v)))
               }}
               onBlur={e => {
                 const v = parseInt(e.target.value, 10)
-                setQuantity(isNaN(v) || v < 1 ? 1 : Math.min(effectiveStock, v))
+                const clamped = isNaN(v) || v < 1 ? 1 : Math.min(effectiveStock, v)
+                setQuantity(clamped)
+                setQuantityRaw(String(clamped))
               }}
               className="w-16 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none animate-fade-in [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />

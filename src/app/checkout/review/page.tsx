@@ -34,7 +34,9 @@ function CheckoutReviewPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const isBuyNow = searchParams.get('buyNow') === '1'
+  const intentToken = searchParams.get('intent')
+  const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(null)
+  const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
 
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [addresses, setAddresses] = useState<any[]>([])
@@ -79,6 +81,45 @@ function CheckoutReviewPage() {
       return
     }
 
+    if (intentToken) {
+      fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include' })
+        .then(async r => {
+          const d = await r.json()
+          if (!r.ok) {
+            router.push('/')
+            return
+          }
+          if (d.mode === 'cart') {
+            setIntentMode('cart')
+            if (cartCount === 0 && !cartLoading) router.push('/cart')
+            if (user) fetchAddresses()
+            return
+          }
+          setIntentMode('buyNow')
+          setBuyNowItem({
+            productId: d.productId,
+            variantId: d.variantId || null,
+            qty: Number(d.qty),
+            buyMode: d.buyMode,
+            buyUnit: d.buyUnit || null,
+            price: Number(d.price),
+            productName: d.productName || '',
+            variantName: d.variantName || null,
+            imageUrl: null,
+          })
+          const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
+          fetch(imageUrl)
+            .then(r => r.json())
+            .then(data => {
+              setBuyNowItem(prev => prev ? { ...prev, imageUrl: data.imageUrl || null } : prev)
+            })
+            .catch(() => {})
+          if (user) fetchAddresses()
+        })
+        .catch(() => router.push('/'))
+      return
+    }
+
     if (isBuyNow) {
       const productId = searchParams.get('productId')
       const variantId = searchParams.get('variantId')
@@ -118,7 +159,7 @@ function CheckoutReviewPage() {
     if (user) {
       fetchAddresses()
     }
-  }, [cartCount, user, authLoading, cartLoading, router, isBuyNow])
+  }, [cartCount, user, authLoading, cartLoading, router, isBuyNow, intentToken])
 
   const fetchAddresses = async () => {
     try {
@@ -252,7 +293,9 @@ function CheckoutReviewPage() {
     if (shippingCharge != null) {
       params.set('shippingCharge', String(shippingCharge))
     }
-    if (isBuyNow && buyNowItem) {
+    if (isBuyNow && intentToken) {
+      params.set('intent', intentToken)
+    } else if (isBuyNow && buyNowItem) {
       params.set('buyNow', '1')
       params.set('productId', buyNowItem.productId)
       if (buyNowItem.variantId) params.set('variantId', buyNowItem.variantId)

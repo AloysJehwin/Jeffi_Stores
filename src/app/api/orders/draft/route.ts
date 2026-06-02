@@ -10,8 +10,11 @@ import {
   loadAddress,
   getMinOrderAmount,
   findExistingUnpaidRazorpayOrder,
+  resolveBuyNowItem,
+  quoteShipping,
 } from '@/lib/order-commit'
 import { signDraftToken, hashCartItems } from '@/lib/order-draft'
+import { verifyIntent } from '@/lib/checkout-intent'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,12 +23,19 @@ export async function POST(req: NextRequest) {
   if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
-  const mode = body.mode === 'buyNow' ? 'buyNow' : 'cart'
+  let mode: 'cart' | 'buyNow' = body.mode === 'buyNow' ? 'buyNow' : 'cart'
+  let resolvedIntent: Awaited<ReturnType<typeof verifyIntent>> = null
+  if (typeof body.intent === 'string' && body.intent) {
+    resolvedIntent = await verifyIntent(body.intent)
+    if (!resolvedIntent) return NextResponse.json({ error: 'Invalid or expired intent' }, { status: 400 })
+    mode = resolvedIntent.mode === 'cart' ? 'cart' : 'buyNow'
+    if (resolvedIntent.mode === 'cart' && resolvedIntent.userId !== authUser.userId) {
+      return NextResponse.json({ error: 'Intent does not belong to this user' }, { status: 403 })
+    }
+  }
   const addressId = typeof body.addressId === 'string' ? body.addressId : ''
   const couponId = typeof body.couponId === 'string' && body.couponId ? body.couponId : null
-  const shippingAmount = typeof body.shippingAmount === 'number' && body.shippingAmount > 0
-    ? Math.round(body.shippingAmount * 100) / 100
-    : 0
+  const isCod = false
   const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 1000) : null
 
   if (!addressId) return NextResponse.json({ error: 'addressId is required' }, { status: 400 })
@@ -46,6 +56,7 @@ export async function POST(req: NextRequest) {
   let cartHash: string | null = null
   let cartItemIds: string[] | null = null
   let buyNowItem: any = null
+  let shippingItems: { productId: string; variantId: string | null; quantity: number }[] = []
 
   if (mode === 'cart') {
     const cart = await loadActiveCart(authUser.userId)
@@ -53,26 +64,47 @@ export async function POST(req: NextRequest) {
     subtotal = cartSubtotal(cart)
     cartHash = hashCartItems(cartItemsForHash(cart))
     cartItemIds = cart.map(c => `${c.product_id}:${c.variant_id || ''}:${c.sub_variant_id || ''}:${c.buy_mode}`)
+    shippingItems = cart.map(c => ({ productId: c.product_id, variantId: c.variant_id, quantity: Number(c.quantity) }))
   } else {
-    const item = body.item
-    if (!item || !item.productId || !item.qty || !item.price) {
-      return NextResponse.json({ error: 'Item details are required for buy now' }, { status: 400 })
+    let resolveInput: { productId: string; variantId: string | null; subVariantId: string | null; qty: number; buyMode?: string; buyUnit?: string | null } | null = null
+    if (resolvedIntent && resolvedIntent.mode === 'buyNow') {
+      resolveInput = {
+        productId: resolvedIntent.productId,
+        variantId: resolvedIntent.variantId,
+        subVariantId: resolvedIntent.subVariantId,
+        qty: resolvedIntent.qty,
+        buyMode: resolvedIntent.buyMode,
+        buyUnit: resolvedIntent.buyUnit,
+      }
+    } else {
+      const item = body.item
+      if (!item || !item.productId || !item.qty) {
+        return NextResponse.json({ error: 'Item details are required for buy now' }, { status: 400 })
+      }
+      resolveInput = {
+        productId: String(item.productId),
+        variantId: item.variantId || null,
+        subVariantId: item.subVariantId || null,
+        qty: Number(item.qty),
+        buyMode: item.buyMode,
+        buyUnit: item.buyUnit,
+      }
     }
-    const product = await queryOne<{ id: string }>(
-      `SELECT id FROM products WHERE id = $1`,
-      [item.productId]
-    )
-    if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-    subtotal = Number(item.price) * Number(item.qty)
-    buyNowItem = {
-      productId: String(item.productId),
-      variantId: item.variantId ? String(item.variantId) : null,
-      qty: Number(item.qty),
-      buyMode: typeof item.buyMode === 'string' ? item.buyMode : 'unit',
-      buyUnit: item.buyUnit ? String(item.buyUnit) : null,
-      price: Number(item.price),
-    }
+    const resolved = await resolveBuyNowItem(resolveInput)
+    if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
+    subtotal = Math.round(resolved.item.price * resolved.item.qty * 100) / 100
+    buyNowItem = resolved.item
+    shippingItems = [{ productId: resolved.item.productId, variantId: resolved.item.variantId, quantity: resolved.item.qty }]
   }
+
+  const shippingAmount = address.postal_code
+    ? await quoteShipping({
+        destinationPin: String(address.postal_code),
+        items: shippingItems,
+        subtotal,
+        isCod,
+      })
+    : 0
 
   const minOrder = await getMinOrderAmount()
   if (minOrder > 0 && subtotal < minOrder) {

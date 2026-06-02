@@ -41,6 +41,15 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
 
   let scenarioPayload: any = null
 
+  const UNIVERSAL_DEFAULTS = {
+    sendCooldownDays: 1,
+    maxRecipientsPerSweep: 50,
+  }
+  const UNIVERSAL_SCHEMA = {
+    sendCooldownDays:      { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)', description: 'Skip users sent this campaign within N days' },
+    maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',   description: 'Hard limit per sweep' },
+  }
+
   const builtin = getScenario(params.kind)
   if (builtin) {
     scenarioPayload = {
@@ -50,8 +59,8 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
       trigger: builtin.trigger,
       type: 'builtin',
       enabled: true,
-      default_parameters: builtin.defaultParams,
-      param_schema: builtin.paramSchema,
+      default_parameters: { ...UNIVERSAL_DEFAULTS, ...builtin.defaultParams },
+      param_schema: { ...UNIVERSAL_SCHEMA, ...builtin.paramSchema },
     }
   } else {
     const custom = await queryOne<CustomScenarioRow>(
@@ -69,8 +78,11 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
       enabled: custom.enabled,
       generated_sql: custom.generated_sql,
       dry_run_count: custom.dry_run_count,
-      default_parameters: custom.parameters || {},
-      param_schema: {},
+      default_parameters: {
+        ...UNIVERSAL_DEFAULTS,
+        ...(custom.parameters || {}),
+      },
+      param_schema: UNIVERSAL_SCHEMA,
     }
   }
 

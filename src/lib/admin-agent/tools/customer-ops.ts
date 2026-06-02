@@ -1,5 +1,6 @@
 import { queryMany, queryOne } from '@/lib/db'
 import type { ToolDef } from '../tools'
+import { ok } from '../tool-envelope'
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n))
@@ -171,7 +172,14 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
           ORDER BY ct.created_at DESC LIMIT $2`,
         [slug, lim]
       )
-      return { tag: slug, customers: rows, count: rows.length, truncated: rows.length === lim }
+      return ok({
+        summary: rows.length === 0
+          ? `No customers tagged "${slug}".`
+          : `Found ${rows.length}${rows.length === lim ? '+' : ''} customer${rows.length === 1 ? '' : 's'} tagged "${slug}".`,
+        count: rows.length,
+        data: { tag: slug, customers: rows, truncated: rows.length === lim },
+        displayHints: { primaryField: 'name', itemNoun: 'customer' },
+      })
     },
   },
   {
