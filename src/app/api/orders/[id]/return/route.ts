@@ -4,8 +4,7 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { sendReturnStatusEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
-
-const RETURN_WINDOW_DAYS = 7
+import { checkReturnEligibility } from '@/lib/return-policy'
 
 const REASONS = ['defective', 'wrong_item', 'not_as_described', 'damaged', 'other']
 
@@ -61,10 +60,13 @@ export async function POST(
       return NextResponse.json({ error: 'Only delivered orders can be returned.' }, { status: 400 })
     }
 
-const deliveredAt = new Date(order.delivered_at || order.updated_at)
-    const windowExpiry = new Date(deliveredAt.getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000)
-    if (new Date() > windowExpiry) {
-      return NextResponse.json({ error: `Return window has closed. Returns must be requested within ${RETURN_WINDOW_DAYS} days of delivery.` }, { status: 400 })
+    const eligibility = await checkReturnEligibility(
+      params.id,
+      type as 'refund' | 'replacement',
+      new Date(order.delivered_at || order.updated_at)
+    )
+    if (!eligibility.ok) {
+      return NextResponse.json({ error: eligibility.reason }, { status: 400 })
     }
 
     const existing = await queryOne(

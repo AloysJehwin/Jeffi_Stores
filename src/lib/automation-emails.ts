@@ -15,7 +15,25 @@ import {
 import { baseLayout, ctaButton } from './email-campaigns'
 import { queryOne } from './db'
 
-export const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+function resolveAppUrl(): string {
+  const isLocalhost = (v: string | undefined) => !!v && /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(v)
+  const isProd = process.env.NODE_ENV === 'production'
+  const pickFirst = (vals: Array<string | undefined>) =>
+    vals.find(v => v && (!isProd || !isLocalhost(v))) || ''
+
+  const candidate =
+    pickFirst([
+      process.env.NEXT_PUBLIC_APP_URL,
+      process.env.APP_URL,
+      process.env.NEXT_PUBLIC_BASE_URL,
+      process.env.BASE_URL,
+    ]) ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
+    (isProd ? 'https://jeffistores.in' : 'http://localhost:3000')
+  return candidate.replace(/\/$/, '')
+}
+
+export const APP_URL = resolveAppUrl()
 
 interface UserContext {
   id: string
@@ -84,6 +102,65 @@ export async function fetchProductImageUrl(productId: string): Promise<string> {
     [productId]
   )
   return row?.image_url || ''
+}
+
+const PLACEHOLDER_IMAGE = 'https://placehold.co/120x120/f5f5f5/999999?text=Item'
+
+export interface EmailItem {
+  name: string
+  quantity?: number
+  unitLabel?: string
+  price?: number
+  imageUrl?: string | null
+  productUrl?: string | null
+}
+
+export function renderItemRows(items: EmailItem[]): string {
+  if (!items.length) return ''
+  const rows = items.map(i => {
+    const img = i.imageUrl || PLACEHOLDER_IMAGE
+    const qty = i.quantity != null ? `${i.quantity}${i.unitLabel ? ` ${i.unitLabel}` : ''}` : ''
+    const priceCell = i.price != null
+      ? `<td align="right" valign="top" style="padding:12px 0 12px 12px;color:#1a3a4a;font-weight:600;font-size:14px;white-space:nowrap;">₹${Math.round(i.price).toLocaleString('en-IN')}</td>`
+      : ''
+    const nameCell = i.productUrl
+      ? `<a href="${i.productUrl}" style="color:#1a3a4a;text-decoration:none;font-weight:600;font-size:15px;">${i.name}</a>`
+      : `<span style="color:#1a3a4a;font-weight:600;font-size:15px;">${i.name}</span>`
+    return `<tr>
+      <td valign="top" style="padding:12px 12px 12px 0;width:80px;">
+        <img src="${img}" alt="${i.name.replace(/"/g, '&quot;')}" width="72" height="72" style="display:block;border-radius:6px;border:1px solid #e5e7eb;background:#f5f5f5;object-fit:cover;width:72px;height:72px;" />
+      </td>
+      <td valign="top" style="padding:12px 0;">
+        ${nameCell}
+        ${qty ? `<div style="color:#777;font-size:13px;margin-top:4px;">Qty: ${qty}</div>` : ''}
+      </td>
+      ${priceCell}
+    </tr>`
+  }).join('')
+  return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:16px 0;">${rows}</table>`
+}
+
+export function renderHeroProduct(item: { name: string; imageUrl?: string | null; productUrl?: string | null; oldPrice?: number; newPrice?: number }): string {
+  const img = item.imageUrl || PLACEHOLDER_IMAGE
+  const priceBlock = item.newPrice != null
+    ? `<div style="margin:12px 0 0;">${item.oldPrice != null && item.oldPrice !== item.newPrice ? `<span style="color:#999;text-decoration:line-through;font-size:14px;">₹${Math.round(item.oldPrice).toLocaleString('en-IN')}</span>&nbsp;&nbsp;` : ''}<strong style="color:#e07b3f;font-size:22px;">₹${Math.round(item.newPrice).toLocaleString('en-IN')}</strong></div>`
+    : ''
+  const nameWrap = item.productUrl
+    ? `<a href="${item.productUrl}" style="color:#1a3a4a;text-decoration:none;">${item.name}</a>`
+    : item.name
+  return `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:8px 0 20px;background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;">
+      <tr>
+        <td align="center" style="padding:24px 24px 16px;">
+          <img src="${img}" alt="${item.name.replace(/"/g, '&quot;')}" width="280" style="display:block;max-width:100%;border-radius:6px;background:#fff;" />
+        </td>
+      </tr>
+      <tr>
+        <td align="center" style="padding:0 24px 24px;">
+          <div style="color:#1a3a4a;font-size:18px;font-weight:700;">${nameWrap}</div>
+          ${priceBlock}
+        </td>
+      </tr>
+    </table>`
 }
 
 export async function resolveCoupon(campaign: Campaign, userId: string): Promise<{ couponCode: string; discountPercent: number }> {
@@ -277,16 +354,22 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
   const campaign = await getCampaign(kind)
   if (!campaign) return { ok: false, reason: 'campaign_not_found' }
 
+  const sampleItems = [
+    { name: 'Sample Product A', quantity: 2, price: 500, imageUrl: 'https://placehold.co/120x120/e07b3f/ffffff?text=A', productUrl: '#' },
+    { name: 'Sample Product B', quantity: 1, price: 1200, imageUrl: 'https://placehold.co/120x120/1a3a4a/ffffff?text=B', productUrl: '#' },
+  ]
   const sampleVars: Record<string, string | number> = {
     firstName: 'Sample',
-    itemCount: 3,
-    cartItems: '<ul><li>2 × Widget (₹500)</li><li>1 × Gadget (₹1200)</li></ul>',
+    itemCount: sampleItems.length,
+    cartItems: renderItemRows(sampleItems),
+    itemsHtml: renderItemRows(sampleItems),
+    productCard: renderHeroProduct({ name: 'Sample Product', imageUrl: 'https://placehold.co/280x280/e07b3f/ffffff?text=Product', productUrl: '#', oldPrice: 999, newPrice: 799 }),
     orderNumber: 'TEST-12345',
     total: '2200.00',
     discountPercent: campaign.discount_percent || 10,
     couponCode: 'TEST-CODE',
     productName: 'Sample Product',
-    productImageUrl: '',
+    productImageUrl: 'https://placehold.co/280x280/e07b3f/ffffff?text=Product',
     oldPrice: '999',
     newPrice: '799',
     ctaUrl: `${APP_URL}/products`,

@@ -1,6 +1,7 @@
 import { queryMany, queryOne } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
 import type { ToolDef } from '../tools'
+import { ok } from '../tool-envelope'
 
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
 
@@ -17,6 +18,45 @@ const UPDATABLE_PRODUCT_FIELDS = [
 type UpdatableField = typeof UPDATABLE_PRODUCT_FIELDS[number]
 
 export const CATALOG_TOOLS: ToolDef[] = [
+  {
+    name: 'list_featured_products',
+    description: 'List products currently flagged as is_featured = TRUE. Returns the same shape as search_products (id, name, sku, price, stock with variant rollup, image_url) so you can drop the result straight into a product_grid ui_block. Use this whenever the admin asks "show me featured products" / "what is currently featured" / "list featured items".',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        activeOnly: { type: 'boolean', default: true, description: 'Skip inactive products. Default true.' },
+        limit: { type: 'integer', default: 12, minimum: 1, maximum: 50 },
+      },
+    },
+    mutating: false,
+    handler: async ({ activeOnly, limit }) => {
+      const lim = clamp(typeof limit === 'number' ? limit : 12, 1, 50)
+      const onlyActive = activeOnly !== false
+      const rows = await queryMany<{ id: string; name: string; slug: string | null; sku: string | null; price: number; stock: number; image_url: string | null; brand: string | null; category: string | null }>(
+        `SELECT p.id::text, p.name, p.slug, p.sku,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)::float AS price,
+                ${EFFECTIVE_STOCK_SQL}::int AS stock,
+                (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order ASC LIMIT 1) AS image_url,
+                b.name AS brand, c.name AS category
+           FROM products p
+           LEFT JOIN brands b ON b.id = p.brand_id
+           LEFT JOIN categories c ON c.id = p.category_id
+          WHERE p.is_featured = TRUE ${onlyActive ? 'AND p.is_active = TRUE' : ''}
+          ORDER BY p.created_at DESC
+          LIMIT $1`,
+        [lim]
+      )
+      const inStock = rows.filter(r => Number(r.stock) > 0).length
+      return ok({
+        summary: rows.length === 0
+          ? 'No products are currently featured.'
+          : `${rows.length} featured product${rows.length === 1 ? '' : 's'} (${inStock} in stock${inStock !== rows.length ? `, ${rows.length - inStock} out` : ''}).`,
+        count: rows.length,
+        data: { products: rows },
+        displayHints: { primaryField: 'name', itemNoun: 'product' },
+      })
+    },
+  },
   {
     name: 'list_brands',
     description: 'List brands with their product counts. Use to find a brand id before creating products.',
@@ -171,10 +211,10 @@ export const CATALOG_TOOLS: ToolDef[] = [
       const product = await queryOne<any>(
         `SELECT p.id::text, p.name, p.slug, p.sku, p.short_description, p.description,
                 p.base_price::text, p.mrp::text, p.gst_percentage, p.hsn_code,
-                p.inventory_quantity AS stock, p.is_active, p.is_featured, p.has_variants,
+                ${EFFECTIVE_STOCK_SQL}::int AS stock, p.is_active, p.is_featured, p.has_variants,
                 p.brand_id::text, p.category_id::text,
                 b.name AS brand_name, c.name AS category_name,
-                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS effective_price
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)::float AS effective_price
            FROM products p
            LEFT JOIN brands b ON b.id = p.brand_id
            LEFT JOIN categories c ON c.id = p.category_id

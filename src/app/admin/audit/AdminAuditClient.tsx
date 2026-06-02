@@ -688,7 +688,7 @@ export default function AdminAuditClient() {
                         })}
                       </div>
                     ) : (e.entity_type === 'product_images' || e.entity_type === 'variant_images') && e.metadata?.thumbnail_url ? (
-                      <div className="bg-surface-secondary/60 rounded p-2 flex items-center gap-3">
+                      <div className="bg-surface-secondary/60 rounded p-2 flex items-center gap-3 self-center w-full">
                         <a
                           href={e.metadata.image_url || e.metadata.thumbnail_url}
                           target="_blank"
@@ -728,16 +728,17 @@ export default function AdminAuditClient() {
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-foreground-muted">Per page</span>
-                <select
-                  value={pageSize}
-                  onChange={e => setPageSize(parseInt(e.target.value, 10))}
-                  className="text-xs px-2 py-1 rounded border border-border-default bg-surface text-foreground"
-                >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={200}>200</option>
-                </select>
+                <AdminSelect
+                  sm
+                  value={String(pageSize)}
+                  onChange={v => setPageSize(parseInt(v, 10))}
+                  options={[
+                    { value: '25', label: '25' },
+                    { value: '50', label: '50' },
+                    { value: '100', label: '100' },
+                    { value: '200', label: '200' },
+                  ]}
+                />
               </div>
               <div className="flex items-center gap-1">
                 <button

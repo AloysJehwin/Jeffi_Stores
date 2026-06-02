@@ -4,6 +4,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 
@@ -23,6 +24,32 @@ export default function CartPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
   const [couponLoading, setCouponLoading] = useState(false)
   const [couponError, setCouponError] = useState('')
+  const [proceedingToCheckout, setProceedingToCheckout] = useState(false)
+  const router = useRouter()
+
+  async function proceedToCheckout() {
+    setProceedingToCheckout(true)
+    try {
+      const res = await fetch('/api/checkout/intents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mode: 'cart' }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.intent) {
+        showToast(data?.error || 'Failed to start checkout', 'error')
+        setProceedingToCheckout(false)
+        return
+      }
+      const params = new URLSearchParams({ intent: data.intent })
+      if (appliedCoupon) params.set('couponCode', appliedCoupon.code)
+      router.push(`/checkout/review?${params.toString()}`)
+    } catch {
+      showToast('Could not reach the server. Please try again.', 'error')
+      setProceedingToCheckout(false)
+    }
+  }
 
   const handleQuantityChange = async (cartItemId: string, newQuantity: number) => {
     if (newQuantity < 1) return
@@ -261,11 +288,28 @@ export default function CartPage() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                                 </svg>
                               </button>
-                              <span className="px-4 py-2 border-x border-border-secondary min-w-[60px] text-center flex items-center justify-center">
-                                {isUpdating ? (
+                              {isUpdating ? (
+                                <span className="px-4 py-2 border-x border-border-secondary min-w-[60px] text-center flex items-center justify-center">
                                   <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full"></div>
-                                ) : Math.round(Number(item.quantity))}
-                              </span>
+                                </span>
+                              ) : (
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max={stockQty}
+                                  defaultValue={Math.round(Number(item.quantity))}
+                                  onBlur={(e) => {
+                                    const val = parseInt(e.target.value, 10)
+                                    const safe = !isNaN(val) && val >= 1 ? Math.min(stockQty, val) : 1
+                                    e.target.value = String(safe)
+                                    if (safe !== Math.round(Number(item.quantity))) {
+                                      handleQuantityChange(item.id, safe)
+                                    }
+                                  }}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                                  className="w-16 px-1 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                              )}
                               <button
                                 onClick={() => handleQuantityChange(item.id, Number(item.quantity) + 1)}
                                 disabled={isUpdating || Number(item.quantity) >= stockQty}
@@ -474,15 +518,17 @@ export default function CartPage() {
               </div>
 
               {user ? (
-                <Link
-                  href={`/checkout/review${appliedCoupon ? `?couponCode=${appliedCoupon.code}` : ''}`}
-                  className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
+                <button
+                  type="button"
+                  onClick={proceedToCheckout}
+                  disabled={proceedingToCheckout || cartCount === 0}
+                  className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                 >
-                  Proceed to Checkout
+                  {proceedingToCheckout ? 'Starting…' : 'Proceed to Checkout'}
                   <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                </Link>
+                </button>
               ) : (
                 <div className="space-y-3">
                   <Link

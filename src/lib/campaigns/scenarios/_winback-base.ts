@@ -4,6 +4,7 @@ import {
   fetchUserContext,
   resolveCoupon,
   sendCampaignEmail,
+  renderItemRows,
 } from '@/lib/automation-emails'
 import type { ScenarioModule, ParamSchema } from '../types'
 
@@ -78,6 +79,27 @@ export function buildWinbackScenario(opts: { kind: string; name: string; descrip
         return { ok: false, reason: 'coupon_failed' }
       }
 
+      const items = await queryMany<{ name: string; product_slug: string | null; image_url: string | null }>(`
+        SELECT DISTINCT ON (oi.product_id)
+          oi.product_name AS name,
+          p.slug AS product_slug,
+          (SELECT image_url FROM product_images WHERE product_id = oi.product_id ORDER BY display_order ASC LIMIT 1) AS image_url
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        LEFT JOIN products p ON p.id = oi.product_id
+        WHERE o.user_id = $1::uuid AND o.payment_status = 'paid'
+        ORDER BY oi.product_id, o.created_at DESC
+        LIMIT 3
+      `, [row.id])
+
+      const itemsHtml = renderItemRows(
+        items.map(i => ({
+          name: i.name,
+          imageUrl: i.image_url,
+          productUrl: i.product_slug ? `${APP_URL}/products/${i.product_slug}` : null,
+        }))
+      )
+
       return sendCampaignEmail({
         campaign,
         user,
@@ -86,6 +108,7 @@ export function buildWinbackScenario(opts: { kind: string; name: string; descrip
           firstName: user.first_name || 'there',
           discountPercent,
           couponCode,
+          itemsHtml,
           ctaUrl: `${APP_URL}/products`,
         },
       })

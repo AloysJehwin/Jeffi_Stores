@@ -7,6 +7,15 @@ export type ParamDef =
 
 export type ParamSchema<P> = { [K in keyof P]: ParamDef }
 
+export interface SuppressedRow {
+  user_id: string | null
+  reference_id?: string | null
+  reason: 'cooldown' | 'recent_send' | 'opted_out' | 'inactive' | 'other'
+  reason_detail?: string | null
+  blocked_until?: string | null
+  raw?: Record<string, unknown>
+}
+
 export interface ScenarioModule<P extends Record<string, unknown>, Row> {
   readonly kind: CampaignKind
   readonly name: string
@@ -15,6 +24,7 @@ export interface ScenarioModule<P extends Record<string, unknown>, Row> {
   readonly defaultParams: P
   readonly paramSchema: ParamSchema<P>
   findEligible(ctx: { campaign: Campaign; params: P }): Promise<Row[]>
+  findSuppressed?(ctx: { campaign: Campaign; params: P }): Promise<SuppressedRow[]>
   send(row: Row, ctx: { campaign: Campaign; params: P }): Promise<{ ok: boolean; reason?: string }>
 }
 

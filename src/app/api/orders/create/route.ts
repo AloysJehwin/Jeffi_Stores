@@ -6,6 +6,7 @@ import { isInterState, calculateGST } from '@/lib/gst'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
+import { quoteShipping } from '@/lib/order-commit'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
@@ -25,9 +26,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { shippingAddress, notes, paymentMethod, couponId, shippingAmount: rawShipping } = body
+    const { shippingAddress, notes, paymentMethod, couponId } = body
     const isRazorpayPayment = paymentMethod === 'razorpay'
-    const appliedShipping = typeof rawShipping === 'number' && rawShipping > 0 ? Math.round(rawShipping * 100) / 100 : 0
+    const isCod = false
+    if (paymentMethod !== 'razorpay') {
+      return NextResponse.json({ error: 'Only Razorpay payment is supported' }, { status: 400 })
+    }
 
     const existingUnpaidOrder = await queryOne(
       `SELECT o.id, o.order_number FROM orders o
@@ -144,6 +148,16 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+
+    const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
+    const appliedShipping = destinationPin
+      ? await quoteShipping({
+          destinationPin,
+          items: cartItems.map((c: any) => ({ productId: c.product_id, variantId: c.variant_id, quantity: Number(c.quantity) })),
+          subtotal,
+          isCod,
+        })
+      : 0
 
     const total = subtotal - appliedDiscount + appliedShipping
 

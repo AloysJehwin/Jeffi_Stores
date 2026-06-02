@@ -82,6 +82,15 @@ export async function GET(req: NextRequest) {
     campaignsByScenario.set(c.scenario_kind, arr)
   }
 
+  const UNIVERSAL_DEFAULTS: Record<string, number | boolean | string> = {
+    sendCooldownDays: 1,
+    maxRecipientsPerSweep: 50,
+  }
+  const UNIVERSAL_SCHEMA: Record<string, { type: string; min?: number; max?: number; label: string; description?: string }> = {
+    sendCooldownDays:      { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)', description: 'Skip users sent this campaign within N days' },
+    maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',   description: 'Hard limit per sweep' },
+  }
+
   const scenarios = listScenarios().map(s => {
     const agg = aggMap.get(s.kind)
     return {
@@ -91,8 +100,8 @@ export async function GET(req: NextRequest) {
       trigger: s.trigger,
       type: 'builtin' as const,
       enabled: true,
-      default_parameters: s.defaultParams,
-      param_schema: s.paramSchema,
+      default_parameters: { ...UNIVERSAL_DEFAULTS, ...s.defaultParams },
+      param_schema: { ...UNIVERSAL_SCHEMA, ...s.paramSchema },
       stats: {
         campaigns_count: agg ? parseInt(agg.campaigns_count, 10) : 0,
         total_sent: agg ? parseInt(agg.total_sent, 10) : 0,
@@ -114,6 +123,10 @@ export async function GET(req: NextRequest) {
   for (const c of customRows) {
     if (getScenario(c.kind)) continue
     const agg = aggMap.get(c.kind)
+    const customDefaults: Record<string, number | boolean | string> = {
+      ...UNIVERSAL_DEFAULTS,
+      ...((c.parameters || {}) as Record<string, number | boolean | string>),
+    }
     scenarios.push({
       kind: c.kind,
       name: c.name,
@@ -121,8 +134,8 @@ export async function GET(req: NextRequest) {
       trigger: c.ai_prompt,
       type: 'custom' as const,
       enabled: c.enabled,
-      default_parameters: (c.parameters || {}) as Record<string, number | boolean | string>,
-      param_schema: {},
+      default_parameters: customDefaults,
+      param_schema: UNIVERSAL_SCHEMA,
       stats: {
         campaigns_count: agg ? parseInt(agg.campaigns_count, 10) : 0,
         total_sent: agg ? parseInt(agg.total_sent, 10) : 0,

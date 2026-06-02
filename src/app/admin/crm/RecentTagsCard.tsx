@@ -1,5 +1,7 @@
 'use client'
 
+import { createPortal } from 'react-dom'
+
 import { useState } from 'react'
 import Link from 'next/link'
 
@@ -71,7 +73,7 @@ export default function RecentTagsCard({ items }: { items: TagEntry[] }) {
         )}
       </div>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div
           className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => setOpen(false)}
@@ -100,7 +102,7 @@ export default function RecentTagsCard({ items }: { items: TagEntry[] }) {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </>
   )
 }
