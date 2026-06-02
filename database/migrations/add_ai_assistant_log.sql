@@ -22,4 +22,3 @@ CREATE INDEX IF NOT EXISTS idx_ai_queries_recent
   ON ai_queries (created_at DESC)
   WHERE error IS NULL;
 
-

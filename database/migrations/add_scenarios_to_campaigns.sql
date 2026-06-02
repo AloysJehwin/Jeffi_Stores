@@ -59,4 +59,3 @@ WHERE scenario_kind IS NULL
 
 CREATE INDEX IF NOT EXISTS idx_campaigns_scenario_kind ON campaigns (scenario_kind);
 
-

@@ -20,4 +20,3 @@ CREATE INDEX IF NOT EXISTS idx_ai_feedback_signal
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_feedback_dedupe
   ON ai_feedback (ai_query_id, COALESCE(product_id::text, ''), signal);
 
-

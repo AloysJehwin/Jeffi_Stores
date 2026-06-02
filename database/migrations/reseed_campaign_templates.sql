@@ -49,4 +49,3 @@ UPDATE campaigns SET
   updated_at = NOW()
 WHERE kind = 'price_drop';
 
-

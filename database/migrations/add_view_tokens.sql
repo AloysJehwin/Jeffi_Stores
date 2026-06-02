@@ -13,4 +13,3 @@ CREATE UNIQUE INDEX IF NOT EXISTS quotations_view_token_idx ON quotations(view_t
 CREATE UNIQUE INDEX IF NOT EXISTS orders_view_token_idx ON orders(view_token);
 CREATE UNIQUE INDEX IF NOT EXISTS purchase_orders_view_token_idx ON purchase_orders(view_token);
 
-

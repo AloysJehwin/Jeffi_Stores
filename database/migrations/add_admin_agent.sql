@@ -39,4 +39,3 @@ CREATE INDEX IF NOT EXISTS idx_admin_agent_actions_status
 CREATE INDEX IF NOT EXISTS idx_admin_agent_actions_admin
   ON admin_agent_actions (admin_id, proposed_at DESC);
 
-

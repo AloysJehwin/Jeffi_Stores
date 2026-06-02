@@ -4,4 +4,3 @@ ALTER TABLE cart_items
 
 CREATE INDEX IF NOT EXISTS idx_cart_items_user_saved ON cart_items (user_id, saved_for_later);
 
-

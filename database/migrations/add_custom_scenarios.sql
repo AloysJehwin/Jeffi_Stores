@@ -41,4 +41,3 @@ CREATE INDEX IF NOT EXISTS idx_scenario_audit_kind
 CREATE INDEX IF NOT EXISTS idx_scenario_audit_admin
   ON scenario_audit_log (admin_id, created_at DESC);
 
-

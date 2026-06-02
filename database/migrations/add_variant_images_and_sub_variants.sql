@@ -63,4 +63,3 @@ CREATE INDEX IF NOT EXISTS idx_sub_variants_product_id ON product_sub_variants (
 ALTER TABLE products
     ADD COLUMN IF NOT EXISTS sub_variant_type VARCHAR(100);
 
-

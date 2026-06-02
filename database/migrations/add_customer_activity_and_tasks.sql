@@ -50,4 +50,3 @@ CREATE INDEX IF NOT EXISTS idx_customer_tasks_status_due
   ON customer_tasks (status, due_date)
   WHERE status IN ('pending', 'in_progress');
 
-

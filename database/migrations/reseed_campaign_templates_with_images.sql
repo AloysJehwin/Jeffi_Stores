@@ -50,4 +50,8 @@ UPDATE campaigns SET
 WHERE kind = 'price_drop';
 
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> origin/main
 
