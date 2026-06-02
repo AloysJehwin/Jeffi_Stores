@@ -35,4 +35,4 @@ CREATE INDEX IF NOT EXISTS idx_failed_login_email_time
 CREATE INDEX IF NOT EXISTS idx_failed_login_user_time
   ON failed_login_attempts (user_id, created_at DESC)
   WHERE user_id IS NOT NULL;
-
+-- migrated
