@@ -10,3 +10,4 @@ CREATE TABLE IF NOT EXISTS merchant_sync_log (
 
 CREATE INDEX IF NOT EXISTS idx_merchant_sync_log_started_at ON merchant_sync_log (started_at DESC);
 
+

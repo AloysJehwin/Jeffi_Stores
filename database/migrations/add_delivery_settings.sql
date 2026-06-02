@@ -19,3 +19,4 @@ WHERE new.key = 'delivery_free_threshold'
   AND old.value IS NOT NULL
   AND old.value <> '';
 
+

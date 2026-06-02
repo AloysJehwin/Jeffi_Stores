@@ -57,3 +57,4 @@ FROM products p
 WHERE pv.product_id = p.id
   AND pv.wholeprice_ex_gst IS NOT NULL;
 
+

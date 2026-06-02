@@ -14,3 +14,4 @@ UPDATE categories SET
   replacement_window_days = NULL
 WHERE parent_category_id IS NOT NULL;
 
+

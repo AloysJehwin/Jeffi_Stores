@@ -23,3 +23,4 @@ FROM products p
 WHERE pv.product_id = p.id
   AND pv.price IS NOT NULL;
 
+

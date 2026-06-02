@@ -130,3 +130,4 @@ FROM products p
 WHERE p.id = wi.product_id
   AND wi.snapshot_taken_at IS NULL;
 
+

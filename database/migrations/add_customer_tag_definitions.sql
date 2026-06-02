@@ -22,3 +22,4 @@ INSERT INTO customer_tag_definitions (tag, color, sort_order) VALUES
   ('new-customer',      'teal',    80)
 ON CONFLICT (tag) DO NOTHING;
 
+
