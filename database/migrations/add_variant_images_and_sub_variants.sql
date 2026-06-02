@@ -62,4 +62,4 @@ CREATE INDEX IF NOT EXISTS idx_sub_variants_product_id ON product_sub_variants (
 -- 3. Label for the sub-variant dimension on the product (e.g. "Size", "Grade")
 ALTER TABLE products
     ADD COLUMN IF NOT EXISTS sub_variant_type VARCHAR(100);
-
+-- migrated

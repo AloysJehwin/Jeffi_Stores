@@ -56,4 +56,4 @@ SET wholeprice_ex_gst = ROUND(pv.wholeprice_ex_gst / (1 + COALESCE(p.gst_percent
 FROM products p
 WHERE pv.product_id = p.id
   AND pv.wholeprice_ex_gst IS NOT NULL;
-
+-- migrated

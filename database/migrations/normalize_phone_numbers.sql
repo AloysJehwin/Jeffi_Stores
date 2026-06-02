@@ -21,4 +21,4 @@ UPDATE quotations
 SET consignee_phone = regexp_replace(regexp_replace(consignee_phone, '^\+?91', ''), '[^0-9]', '', 'g')
 WHERE consignee_phone IS NOT NULL
   AND consignee_phone ~ '^\+?91[0-9]';
-
+-- migrated

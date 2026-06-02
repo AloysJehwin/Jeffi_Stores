@@ -21,4 +21,4 @@ INSERT INTO customer_tag_definitions (tag, color, sort_order) VALUES
   ('dormant',           'gray',    70),
   ('new-customer',      'teal',    80)
 ON CONFLICT (tag) DO NOTHING;
-
+-- migrated
