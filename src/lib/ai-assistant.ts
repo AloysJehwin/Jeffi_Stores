@@ -15,6 +15,8 @@ export interface ProductCandidate {
   brand_name: string | null
   category_name: string | null
   short_description: string | null
+  ai_description: string | null
+  ai_use_cases: string[] | null
   inventory_quantity: number
   primary_image_url: string | null
 }
@@ -69,7 +71,7 @@ export async function searchCandidatesViaRag(userQuery: string, limit = 20): Pro
     `SELECT
        p.id::text, p.name, p.slug, p.sku,
        COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS base_price,
-       p.short_description, p.inventory_quantity,
+       p.short_description, p.ai_description, p.ai_use_cases, p.inventory_quantity,
        b.name AS brand_name,
        c.name AS category_name,
        (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.display_order ASC LIMIT 1) AS primary_image_url
@@ -99,7 +101,7 @@ export async function searchCandidates(userQuery: string, limit = 50): Promise<P
       SELECT
         p.id, p.name, p.slug, p.sku,
         COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS base_price,
-        p.short_description, p.inventory_quantity,
+        p.short_description, p.ai_description, p.ai_use_cases, p.inventory_quantity,
         b.name AS brand_name,
         c.name AS category_name,
         (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.display_order ASC LIMIT 1) AS primary_image_url,
@@ -138,7 +140,7 @@ export async function searchCandidates(userQuery: string, limit = 50): Promise<P
     `SELECT
        p.id, p.name, p.slug, p.sku,
        COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS base_price,
-       p.short_description, p.inventory_quantity,
+       p.short_description, p.ai_description, p.ai_use_cases, p.inventory_quantity,
        b.name AS brand_name,
        c.name AS category_name,
        (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.display_order ASC LIMIT 1) AS primary_image_url
@@ -194,7 +196,8 @@ Output ONLY a JSON object: {"summary": "...", "recommendations": [{"product_id":
     brand: c.brand_name,
     category: c.category_name,
     price: c.base_price,
-    description: c.short_description?.slice(0, 200),
+    description: c.ai_description?.slice(0, 200) || c.short_description?.slice(0, 200),
+    use_cases: c.ai_use_cases?.slice(0, 8),
   }))
 
   const r = await aiChat({

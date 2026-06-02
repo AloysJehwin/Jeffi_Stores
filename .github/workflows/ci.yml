@@ -389,6 +389,7 @@ jobs:
               add_ai_briefing_log.sql
               add_admin_agent.sql
               add_product_ai_enrichment.sql
+              add_product_ai_enrichment_v2.sql
               add_admin_agent_proposed_tools.sql
               add_admin_audit_log.sql
               add_admin_agent_attachments.sql

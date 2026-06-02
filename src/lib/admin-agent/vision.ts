@@ -1,6 +1,8 @@
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '')
 const OLLAMA_VISION_MODEL = process.env.OLLAMA_VISION_MODEL || 'llava:13b'
 const VISION_TIMEOUT_MS = 120_000
+const PADDLE_OCR_URL = (process.env.PADDLE_OCR_URL || 'http://localhost:8866').replace(/\/$/, '')
+const PADDLE_TIMEOUT_MS = 60_000
 
 const EXTRACTION_PROMPT = `You are an OCR assistant for a hardware/industrial supply store. The image is a quotation request from a customer (handwritten note, photo of a printed list, or scanned document).
 
@@ -23,7 +25,38 @@ type VisionResult =
   | { ok: true; text: string; model: string; pages?: number }
   | { ok: false; reason: string; hint?: string }
 
+async function ocrPaddle(data: Buffer, mimeType: string): Promise<VisionResult> {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), PADDLE_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${PADDLE_OCR_URL}/ocr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: data.toString('base64'), mime_type: mimeType }),
+      signal: ctrl.signal,
+    })
+    if (!res.ok) {
+      return { ok: false, reason: `PaddleOCR service returned ${res.status}` }
+    }
+    const body = await res.json().catch(() => null) as { ok?: boolean; text?: string; pages?: number; reason?: string } | null
+    if (!body || !body.ok || !body.text) {
+      return { ok: false, reason: body?.reason || 'PaddleOCR returned no text' }
+    }
+    return { ok: true, text: body.text, model: 'PP-OCRv5', pages: body.pages }
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      return { ok: false, reason: `PaddleOCR timed out after ${PADDLE_TIMEOUT_MS / 1000}s` }
+    }
+    return { ok: false, reason: `Cannot reach PaddleOCR service: ${String(e?.message || e)}` }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function ocrImage(image: Buffer, mimeType: string): Promise<VisionResult> {
+  const paddleResult = await ocrPaddle(image, mimeType)
+  if (paddleResult.ok) return paddleResult
+
   const base64 = image.toString('base64')
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), VISION_TIMEOUT_MS)
@@ -74,6 +107,9 @@ export async function ocrImage(image: Buffer, mimeType: string): Promise<VisionR
 }
 
 export async function ocrPdfPages(pdf: Buffer, opts?: { maxPages?: number; perPageTimeoutMs?: number }): Promise<VisionResult> {
+  const paddleResult = await ocrPaddle(pdf, 'application/pdf')
+  if (paddleResult.ok) return paddleResult
+
   const maxPages = Math.max(1, Math.min(20, opts?.maxPages ?? 10))
   let pages = 0
   const collected: string[] = []
@@ -114,7 +150,7 @@ export async function ocrPdfPages(pdf: Buffer, opts?: { maxPages?: number; perPa
 }
 
 export function isVisionConfigured(): boolean {
-  return !!process.env.OLLAMA_BASE_URL || process.env.AI_PROVIDER === 'ollama'
+  return !!process.env.PADDLE_OCR_URL || !!process.env.OLLAMA_BASE_URL || process.env.AI_PROVIDER === 'ollama'
 }
 
 export const VISION_MODEL_NAME = OLLAMA_VISION_MODEL

@@ -505,7 +505,7 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
             </div>
 
             <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/orders/${order.id}" 
+              <a href="${process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'}/admin/orders/${order.id}"
                  style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                 View Order in Admin Panel
               </a>
@@ -1267,7 +1267,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
             </div>
 
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/reviews" class="button" style="color:#ffffff;">
+              <a href="${process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'}/admin/reviews" class="button" style="color:#ffffff;">
                 Approve / Reject Review
               </a>
             </div>
@@ -1369,7 +1369,7 @@ export async function sendPaymentFailedAdminNotification(
             </div>
 
             <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/admin/orders/${order.id}"
+              <a href="${process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'}/admin/orders/${order.id}"
                  style="display: inline-block; background-color: #2563eb; color: #ffffff !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                 View Order in Admin Panel
               </a>
@@ -1570,7 +1570,7 @@ export async function sendReturnStatusEmail(
         <p style="margin:0 0 6px"><strong>Type:</strong> ${extra?.returnType || 'N/A'}</p>
         <p style="margin:0"><strong>Reason:</strong> ${extra?.reason || 'N/A'}</p>
       </div>
-      <a href="${appUrl}/admin/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">Review Request</a>
+      <a href="${process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'}/admin/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">Review Request</a>
     `,
     approved: `
       <p>Your return/replacement request for order <strong>#${orderNumber}</strong> has been <strong style="color:#16a34a;">approved</strong>.</p>
@@ -2027,7 +2027,7 @@ export async function sendOrderAutoCancelledEmail(
 
 export async function sendOrderAutoCancelledAdminNotification(order: any, redirectPath: string) {
   const adminEmail = await getAdminNotificationEmails()
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
+  const baseUrl = process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'
   const total = parseFloat(order.total_amount || 0)
 
   const mailOptions = {
