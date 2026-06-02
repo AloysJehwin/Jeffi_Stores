@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Star } from 'lucide-react'
+import { Star, Sparkles, CheckCircle, XCircle, Loader2, X } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 
 function formatINR(n: number) {
@@ -13,6 +14,213 @@ function formatDate(s: string) {
   if (!s) return '—'
   return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
+
+function TagBadge({ tag, accent }: { tag: string; accent?: boolean }) {
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded ${accent ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : 'bg-surface-secondary text-foreground-secondary'}`}>
+      {tag}
+    </span>
+  )
+}
+
+interface EnrichmentItem {
+  id: string
+  product_id: string
+  source_desc: string | null
+  ai_description: string
+  ai_use_cases: string[]
+  ai_keywords: string[] | null
+  ai_who_uses_it: string | null
+  ai_application: string | null
+  ai_product_type: string | null
+  ai_features: string[] | null
+  ai_search_tags: string[] | null
+  model: string
+  status: string
+  proposed_at: string
+  error: string | null
+}
+
+function AiPanel({ productId, onClose, onApproved }: { productId: string; onClose: () => void; onApproved: () => void }) {
+  const [item, setItem] = useState<EnrichmentItem | null | undefined>(undefined)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/admin/catalog-enrichment/by-product/${productId}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => setItem(d.item ?? null))
+      .catch(() => setItem(null))
+  }, [productId])
+
+  async function decide(action: 'approve' | 'reject') {
+    if (!item) return
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/admin/catalog-enrichment/${item.id}/${action}`, {
+        method: 'POST', credentials: 'include',
+      })
+      if (!res.ok) throw new Error('Failed')
+      if (action === 'approve') onApproved()
+      else setItem(prev => prev ? { ...prev, status: 'rejected' } : prev)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const STATUS_COLOR: Record<string, string> = {
+    proposed: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+    approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
+    rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
+  }
+
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div
+        className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-lg max-h-[85vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-default flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-accent-500" />
+            <span className="font-semibold text-foreground">AI Enrichment</span>
+          </div>
+          <button onClick={onClose} className="p-1 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {item === undefined && (
+            <div className="flex items-center gap-2 text-sm text-foreground-muted py-12 justify-center">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading
+            </div>
+          )}
+
+          {item === null && (
+            <div className="py-12 text-center text-sm text-foreground-muted">
+              No enrichment found for this product.
+            </div>
+          )}
+
+          {item && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[item.status] || ''}`}>
+                  {item.status}
+                </span>
+                <span className="text-[10px] text-foreground-muted">{item.model} · {new Date(item.proposed_at).toLocaleDateString()}</span>
+              </div>
+
+              {item.ai_product_type && (
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Type</p>
+                  <span className="text-xs font-medium text-accent-600 dark:text-accent-400">{item.ai_product_type}</span>
+                </div>
+              )}
+
+              {item.ai_description && (
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">AI Description</p>
+                  <p className="text-xs text-foreground leading-relaxed">{item.ai_description}</p>
+                </div>
+              )}
+
+              {item.source_desc && (
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Original Description</p>
+                  <p className="text-xs text-foreground-muted leading-relaxed">{item.source_desc}</p>
+                </div>
+              )}
+
+              {item.ai_application && (
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Application</p>
+                  <p className="text-xs text-foreground">{item.ai_application}</p>
+                </div>
+              )}
+
+              {item.ai_who_uses_it && (
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Who Uses It</p>
+                  <p className="text-xs text-foreground">{item.ai_who_uses_it}</p>
+                </div>
+              )}
+
+              {item.ai_use_cases?.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Use Cases ({item.ai_use_cases.length})</p>
+                  <div className="flex flex-wrap gap-1">
+                    {item.ai_use_cases.map(t => <TagBadge key={t} tag={t} accent />)}
+                  </div>
+                </div>
+              )}
+
+              {item.ai_keywords && item.ai_keywords.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Keywords ({item.ai_keywords.length})</p>
+                  <div className="flex flex-wrap gap-1">
+                    {item.ai_keywords.map(t => <TagBadge key={t} tag={t} />)}
+                  </div>
+                </div>
+              )}
+
+              {item.ai_features && item.ai_features.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Features ({item.ai_features.length})</p>
+                  <div className="flex flex-wrap gap-1">
+                    {item.ai_features.map(t => <TagBadge key={t} tag={t} />)}
+                  </div>
+                </div>
+              )}
+
+              {item.ai_search_tags && item.ai_search_tags.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Search Tags ({item.ai_search_tags.length})</p>
+                  <div className="flex flex-wrap gap-1">
+                    {item.ai_search_tags.map(t => <TagBadge key={t} tag={t} />)}
+                  </div>
+                </div>
+              )}
+
+              {item.error && (
+                <div>
+                  <p className="text-[10px] text-red-600 uppercase tracking-wide mb-0.5">Embed Error</p>
+                  <p className="text-xs text-red-600">{item.error}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {item?.status === 'proposed' && (
+          <div className="px-5 py-4 border-t border-border-default flex gap-2 flex-shrink-0">
+            <button
+              onClick={() => decide('approve')}
+              disabled={busy}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded text-sm font-semibold disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+              Approve
+            </button>
+            <button
+              onClick={() => decide('reject')}
+              disabled={busy}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-border-default text-foreground hover:bg-surface-secondary rounded text-sm font-semibold disabled:opacity-50"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Reject
+            </button>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 
 function Field({ label, value, mono }: { label: string; value?: any; mono?: boolean }) {
   if (value == null || value === '' || value === false) return null
@@ -46,13 +254,17 @@ export default function ProductDetailClient({ id }: { id: string }) {
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState(0)
   const [shelfStock, setShelfStock] = useState<ShelfRow[]>([])
+  const [aiOpen, setAiOpen] = useState(false)
 
-  useEffect(() => {
+  const loadProduct = useCallback(() => {
+    setLoading(true)
     fetch(`/api/admin/products/${id}`)
       .then(r => r.json())
       .then(p => { setProduct(p); setLoading(false) })
       .catch(() => setLoading(false))
   }, [id])
+
+  useEffect(() => { loadProduct() }, [loadProduct])
 
   useEffect(() => {
     fetch(`/api/admin/shelving/stock?product_id=${id}`)
@@ -135,6 +347,13 @@ export default function ProductDetailClient({ id }: { id: string }) {
           {p.is_featured && (
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
           )}
+          <button
+            onClick={() => setAiOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
+          >
+            <Sparkles className="w-4 h-4 text-accent-500" />
+            AI
+          </button>
           <Link href={`/admin/products/${p.id}/analytics`} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Analytics
           </Link>
@@ -243,6 +462,78 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">Description</p>
               <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{p.description}</p>
+            </div>
+          )}
+
+          {(p.ai_description || p.ai_product_type || p.ai_use_cases?.length || p.ai_keywords?.length || p.ai_features?.length || p.ai_search_tags?.length || p.ai_who_uses_it || p.ai_application) && (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">AI Intelligence</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {p.ai_product_type && (
+                  <div>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-0.5">Type</p>
+                    <span className="text-xs font-medium text-accent-600 dark:text-accent-400">{p.ai_product_type}</span>
+                  </div>
+                )}
+                {p.ai_description && (
+                  <div className="sm:col-span-2">
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">AI Description</p>
+                    <p className="text-xs text-foreground leading-relaxed">{p.ai_description}</p>
+                  </div>
+                )}
+                {p.ai_application && (
+                  <div>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Application</p>
+                    <p className="text-xs text-foreground">{p.ai_application}</p>
+                  </div>
+                )}
+                {p.ai_who_uses_it && (
+                  <div>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Who Uses It</p>
+                    <p className="text-xs text-foreground">{p.ai_who_uses_it}</p>
+                  </div>
+                )}
+                {p.ai_use_cases?.length > 0 && (
+                  <div>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Use Cases ({p.ai_use_cases.length})</p>
+                    <div className="flex flex-wrap gap-1">
+                      {p.ai_use_cases.map((t: string) => (
+                        <span key={t} className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {p.ai_keywords?.length > 0 && (
+                  <div>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Keywords ({p.ai_keywords.length})</p>
+                    <div className="flex flex-wrap gap-1">
+                      {p.ai_keywords.map((t: string) => (
+                        <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {p.ai_features?.length > 0 && (
+                  <div>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Features ({p.ai_features.length})</p>
+                    <div className="flex flex-wrap gap-1">
+                      {p.ai_features.map((t: string) => (
+                        <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {p.ai_search_tags?.length > 0 && (
+                  <div>
+                    <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-1">Search Tags ({p.ai_search_tags.length})</p>
+                    <div className="flex flex-wrap gap-1">
+                      {p.ai_search_tags.map((t: string) => (
+                        <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -397,6 +688,14 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </table>
           </div>
         </div>
+      )}
+
+      {aiOpen && (
+        <AiPanel
+          productId={id}
+          onClose={() => setAiOpen(false)}
+          onApproved={() => { setAiOpen(false); loadProduct() }}
+        />
       )}
     </div>
   )

@@ -248,6 +248,78 @@ export default function ProductDetailModal({ product, onClose }: Props) {
               </div>
             </div>
 
+            {(p.ai_description || p.ai_product_type || p.ai_use_cases?.length || p.ai_keywords?.length || p.ai_features?.length || p.ai_search_tags?.length || p.ai_who_uses_it || p.ai_application) && (
+              <div className="px-5 pb-4 border-t border-border-default pt-4">
+                <p className="text-xs text-foreground-muted uppercase tracking-wide mb-3">AI Intelligence</p>
+                <div className="space-y-3">
+                  {p.ai_product_type && (
+                    <div>
+                      <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Type</p>
+                      <span className="text-xs font-medium text-accent-600 dark:text-accent-400">{p.ai_product_type}</span>
+                    </div>
+                  )}
+                  {p.ai_description && (
+                    <div>
+                      <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">AI Description</p>
+                      <p className="text-xs text-foreground leading-relaxed">{p.ai_description}</p>
+                    </div>
+                  )}
+                  {p.ai_application && (
+                    <div>
+                      <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Application</p>
+                      <p className="text-xs text-foreground">{p.ai_application}</p>
+                    </div>
+                  )}
+                  {p.ai_who_uses_it && (
+                    <div>
+                      <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Who Uses It</p>
+                      <p className="text-xs text-foreground">{p.ai_who_uses_it}</p>
+                    </div>
+                  )}
+                  {p.ai_use_cases?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Use Cases</p>
+                      <div className="flex flex-wrap gap-1">
+                        {p.ai_use_cases.map((t: string) => (
+                          <span key={t} className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded">{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {p.ai_keywords?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Keywords</p>
+                      <div className="flex flex-wrap gap-1">
+                        {p.ai_keywords.map((t: string) => (
+                          <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {p.ai_features?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Features</p>
+                      <div className="flex flex-wrap gap-1">
+                        {p.ai_features.map((t: string) => (
+                          <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {p.ai_search_tags?.length > 0 && (
+                    <div>
+                      <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-1">Search Tags</p>
+                      <div className="flex flex-wrap gap-1">
+                        {p.ai_search_tags.map((t: string) => (
+                          <span key={t} className="text-[10px] px-1.5 py-0.5 bg-surface-secondary text-foreground-secondary rounded">{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <ShelfLocationsSection productId={p.id} />
 
             {/* Variants table */}
