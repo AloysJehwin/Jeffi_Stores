@@ -350,33 +350,15 @@ jobs:
             fi
 
             # Parse DATABASE_URL using Python to handle missing port, query params, special chars
-            eval "$(python3 - "$DB_URL" <<'PYEOF'
-import sys, urllib.parse
-u = urllib.parse.urlparse(sys.argv[1])
-host = u.hostname or ""
-port = u.port or 5432
-user = urllib.parse.unquote(u.username or "")
-passwd = urllib.parse.unquote(u.password or "")
-dbname = (u.path or "").lstrip("/")
-print(f"export PGHOST={urllib.parse.quote(host, safe='.-')}")
-print(f"export PGPORT={port}")
-print(f"export PGUSER={urllib.parse.quote(user, safe='')}")
-print(f"export PGDATABASE={urllib.parse.quote(dbname, safe='_')}")
-print(f"export PGPASSWORD={urllib.parse.quote(passwd, safe='')}")
-PYEOF
-)"
+            export _DB_URL="$DB_URL"
+            eval "$(python3 -c 'import os,urllib.parse; u=urllib.parse.urlparse(os.environ["_DB_URL"]); p=urllib.parse.unquote; print("export PGHOST="+str(u.hostname or "")); print("export PGPORT="+str(u.port or 5432)); print("export PGUSER="+p(u.username or "")); print("export PGDATABASE="+(u.path or "").lstrip("/")); print("export PGPASSWORD="+p(u.password or ""))')"
             export PGSSLMODE=require
 
             echo "Verifying DB connectivity..."
             psql -tAc 'SELECT 1' >/dev/null
 
             echo "── Ensuring schema_migrations table ──"
-            psql -v ON_ERROR_STOP=1 <<'SQL'
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-              filename    TEXT PRIMARY KEY,
-              applied_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-            );
-            SQL
+            psql -v ON_ERROR_STOP=1 -c "CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
 
             MIGRATION_ORDER=(
               add_brand_return_policy.sql
