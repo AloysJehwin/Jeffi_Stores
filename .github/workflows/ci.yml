@@ -331,33 +331,14 @@ jobs:
               sudo dnf install -y postgresql15 || sudo yum install -y postgresql
             fi
 
-            # Extract DB credentials from the live env file so CI never goes stale
-            ENV_FILE=""
-            for candidate in /opt/jeffi-stores/.env.production /opt/jeffi-stores/.env; do
-              if [[ -f "$candidate" ]]; then
-                ENV_FILE="$candidate"
-                break
-              fi
-            done
-            if [[ -z "$ENV_FILE" ]]; then
-              echo "ERROR: No .env.production or .env found under /opt/jeffi-stores"
-              exit 1
-            fi
-            echo "Using env file: $ENV_FILE"
-            DB_URL_RAW=$(grep -E '^DATABASE_URL=' "$ENV_FILE" | head -1 | cut -d= -f2-)
-            if [[ -z "$DB_URL_RAW" ]]; then
-              echo "ERROR: DATABASE_URL not found in $ENV_FILE"
-              exit 1
-            fi
-
-            # Pass raw value to Python — the script strips quotes internally so shell
-            # quoting behaviour in the SSH session cannot corrupt the URL.
-            # Writes PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD to /tmp/pg_env using
-            # shlex.quote so passwords with special characters are always safe to source.
-            export _DB_URL="$DB_URL_RAW"
-            echo "aW1wb3J0IG9zLCB1cmxsaWIucGFyc2UsIHNobGV4CnJhdyA9IG9zLmVudmlyb25bIl9EQl9VUkwiXS5zdHJpcCgpLnN0cmlwKCciXCcnKSAgIyBzdHJpcCBzdXJyb3VuZGluZyBxdW90ZXMKdSA9IHVybGxpYi5wYXJzZS51cmxwYXJzZShyYXcpCmhvc3QgPSB1Lmhvc3RuYW1lIG9yICIiCnBvcnQgPSBzdHIodS5wb3J0IG9yIDU0MzIpCnVzZXIgPSB1cmxsaWIucGFyc2UudW5xdW90ZSh1LnVzZXJuYW1lIG9yICIiKQpwYXNzd2QgPSB1cmxsaWIucGFyc2UudW5xdW90ZSh1LnBhc3N3b3JkIG9yICIiKQpkYm5hbWUgPSAodS5wYXRoIG9yICIiKS5sc3RyaXAoIi8iKS5zcGxpdCgiPyIpWzBdCndpdGggb3BlbigiL3RtcC9wZ19lbnYiLCAidyIpIGFzIGY6CiAgICBmLndyaXRlKCJleHBvcnQgUEdIT1NUPSIgKyBzaGxleC5xdW90ZShob3N0KSArICJcbiIpCiAgICBmLndyaXRlKCJleHBvcnQgUEdQT1JUPSIgKyBwb3J0ICsgIlxuIikKICAgIGYud3JpdGUoImV4cG9ydCBQR1VTRVI9IiArIHNobGV4LnF1b3RlKHVzZXIpICsgIlxuIikKICAgIGYud3JpdGUoImV4cG9ydCBQR0RBVEFCQVNFPSIgKyBzaGxleC5xdW90ZShkYm5hbWUpICsgIlxuIikKICAgIGYud3JpdGUoImV4cG9ydCBQR1BBU1NXT1JEPSIgKyBzaGxleC5xdW90ZShwYXNzd2QpICsgIlxuIikK" | base64 -d | python3
-            # shellcheck disable=SC1091
-            source /tmp/pg_env
+            # RDS uses IAM auth — generate a short-lived token as PGPASSWORD
+            export PGHOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
+            export PGPORT=5432
+            export PGUSER=app_user
+            export PGDATABASE=jeffi_stores
+            export PGPASSWORD=$(aws rds generate-db-auth-token \
+              --hostname "$PGHOST" --port "$PGPORT" \
+              --region us-east-1 --username "$PGUSER")
             export PGSSLMODE=require
 
             echo "Verifying DB connectivity..."
