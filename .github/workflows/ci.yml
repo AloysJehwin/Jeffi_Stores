@@ -336,7 +336,7 @@ jobs:
               sudo dnf install -y postgresql15 || sudo yum install -y postgresql
             fi
 
-            # RDS uses IAM auth with static AWS keys (same as app container)
+            # RDS uses IAM auth with static AWS keys; app_user has rds_superuser for DDL
             export PGHOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
             export PGPORT=5432
             export PGUSER=app_user
