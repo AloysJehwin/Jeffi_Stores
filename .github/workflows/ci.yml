@@ -349,22 +349,22 @@ jobs:
               exit 1
             fi
 
-            # Parse postgresql://user:password@host:port/dbname
-            DB_URL_STRIPPED="${DB_URL#postgresql://}"
-            DB_USER="${DB_URL_STRIPPED%%:*}"
-            DB_REST="${DB_URL_STRIPPED#*:}"
-            DB_PASS="${DB_REST%%@*}"
-            DB_REST2="${DB_REST#*@}"
-            DB_HOST="${DB_REST2%%:*}"
-            DB_REST3="${DB_REST2#*:}"
-            DB_PORT="${DB_REST3%%/*}"
-            DB_NAME="${DB_REST3#*/}"
-
-            export PGHOST="$DB_HOST"
-            export PGPORT="$DB_PORT"
-            export PGUSER="$DB_USER"
-            export PGDATABASE="$DB_NAME"
-            export PGPASSWORD="$DB_PASS"
+            # Parse DATABASE_URL using Python to handle missing port, query params, special chars
+            eval "$(python3 - "$DB_URL" <<'PYEOF'
+import sys, urllib.parse
+u = urllib.parse.urlparse(sys.argv[1])
+host = u.hostname or ""
+port = u.port or 5432
+user = urllib.parse.unquote(u.username or "")
+passwd = urllib.parse.unquote(u.password or "")
+dbname = (u.path or "").lstrip("/")
+print(f"export PGHOST={urllib.parse.quote(host, safe='.-')}")
+print(f"export PGPORT={port}")
+print(f"export PGUSER={urllib.parse.quote(user, safe='')}")
+print(f"export PGDATABASE={urllib.parse.quote(dbname, safe='_')}")
+print(f"export PGPASSWORD={urllib.parse.quote(passwd, safe='')}")
+PYEOF
+)"
             export PGSSLMODE=require
 
             echo "Verifying DB connectivity..."
