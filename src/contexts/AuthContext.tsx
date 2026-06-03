@@ -9,6 +9,7 @@ interface User {
   lastName: string | null
   phone: string | null
   createdAt: string
+  avatarUrl: string | null
 }
 
 interface AuthContextType {
