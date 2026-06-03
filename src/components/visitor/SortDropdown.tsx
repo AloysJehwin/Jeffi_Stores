@@ -36,6 +36,9 @@ export default function SortDropdown() {
     } else if (value === 'base_price') {
       params.set('sort', value)
       params.set('order', 'asc')
+    } else if (value === 'name') {
+      params.set('sort', value)
+      params.set('order', 'asc')
     } else {
       params.set('sort', value)
       params.delete('order')
