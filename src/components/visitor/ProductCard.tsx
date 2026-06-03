@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
@@ -35,7 +35,17 @@ export default function ProductCard({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
 
-  function startLongPress() {
+  useEffect(() => {
+    if (showQuickView) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [showQuickView])
+
+  function startLongPress(e: React.TouchEvent) {
+    e.preventDefault()
     longPressFired.current = false
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true
@@ -100,7 +110,7 @@ export default function ProductCard({
       <Link
         href={`/products/${slug}`}
         className="group"
-        onTouchStart={startLongPress}
+        onTouchStart={(e) => startLongPress(e)}
         onTouchEnd={cancelLongPress}
         onTouchMove={cancelLongPress}
         onClick={(e) => { if (longPressFired.current) e.preventDefault() }}
