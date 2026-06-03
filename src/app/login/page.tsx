@@ -85,7 +85,7 @@ function LoginPage() {
           throw new Error(data.error || 'Please wait before requesting another OTP')
         }
         if (data.userNotFound) {
-          router.push(`/signup?email=${encodeURIComponent(email)}&from=login`)
+          router.push(`/signup?email=${encodeURIComponent(email)}&from=login${redirect !== '/' ? `&redirect=${encodeURIComponent(redirect)}` : ''}`)
           return
         }
         throw new Error(data.error || 'Failed to send OTP')
@@ -273,7 +273,7 @@ function LoginPage() {
 
           <div className="mt-6 text-center text-sm text-foreground-secondary">
             Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
+            <Link href={`/signup${redirect !== '/' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`} className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
               Create one
             </Link>
           </div>

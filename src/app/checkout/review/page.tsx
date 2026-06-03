@@ -83,7 +83,10 @@ function CheckoutReviewPage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/login?redirect=/checkout/review')
+      const currentUrl = intentToken
+        ? `/checkout/review?intent=${encodeURIComponent(intentToken)}`
+        : '/checkout/review'
+      router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`)
       return
     }
 
