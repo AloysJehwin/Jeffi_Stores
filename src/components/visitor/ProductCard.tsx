@@ -36,12 +36,10 @@ export default function ProductCard({
   const longPressFired = useRef(false)
 
   useEffect(() => {
-    if (showQuickView) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => { document.body.style.overflow = '' }
+    if (!showQuickView) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
   }, [showQuickView])
 
   function startLongPress(e: React.TouchEvent) {
@@ -212,6 +210,8 @@ export default function ProductCard({
         <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
           <div
             className="absolute inset-0 bg-black/50"
+            onTouchEnd={(e) => { e.preventDefault(); setShowQuickView(false) }}
+            onTouchMove={(e) => e.preventDefault()}
             onClick={() => setShowQuickView(false)}
           />
           <div className="relative bg-surface-elevated rounded-t-2xl shadow-2xl p-5 pb-8 animate-slide-up">
