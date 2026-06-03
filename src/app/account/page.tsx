@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 
@@ -72,6 +72,13 @@ export default function AccountPage() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [cropScale, setCropScale] = useState(1)
+  const [cropPos, setCropPos] = useState({ x: 0, y: 0 })
+  const cropDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null)
+  const cropPinchRef = useRef<{ dist: number; scale: number } | null>(null)
+  const cropContainerRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     fetch('/api/user/search-history', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { history: [] })
@@ -122,25 +129,113 @@ export default function AccountPage() {
     }
   }
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2 * 1024 * 1024) { setMessage('Photo must be under 2 MB'); return }
+    if (file.size > 10 * 1024 * 1024) { setMessage('Photo must be under 10 MB'); return }
+    const url = URL.createObjectURL(file)
+    setCropSrc(url)
+    setCropScale(1)
+    setCropPos({ x: 0, y: 0 })
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleCropConfirm = useCallback(async () => {
+    if (!cropSrc) return
     setAvatarUploading(true)
     setMessage('')
     try {
+      const SIZE = 512
+      const canvas = document.createElement('canvas')
+      canvas.width = SIZE
+      canvas.height = SIZE
+      const ctx = canvas.getContext('2d')!
+      const img = new Image()
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = reject
+        img.src = cropSrc
+      })
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2, 0, Math.PI * 2)
+      ctx.clip()
+      const displaySize = 256
+      const scaledW = img.naturalWidth * cropScale * (SIZE / displaySize)
+      const scaledH = img.naturalHeight * cropScale * (SIZE / displaySize)
+      const offsetX = (SIZE - scaledW) / 2 + cropPos.x * (SIZE / displaySize)
+      const offsetY = (SIZE - scaledH) / 2 + cropPos.y * (SIZE / displaySize)
+      ctx.drawImage(img, offsetX, offsetY, scaledW, scaledH)
+      ctx.restore()
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas export failed')), 'image/jpeg', 0.9)
+      })
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', blob, 'avatar.jpg')
       const res = await fetch('/api/user/avatar', { method: 'POST', body: fd, credentials: 'include' })
       if (!res.ok) throw new Error((await res.json()).error || 'Upload failed')
       const data = await res.json()
       setAvatarUrl(data.avatarUrl + `?t=${Date.now()}`)
+      setCropSrc(null)
     } catch (err: any) {
       setMessage(err.message || 'Failed to upload photo')
     } finally {
       setAvatarUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }, [cropSrc, cropScale, cropPos])
+
+  const handleCropMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    cropDragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: cropPos.x, startPosY: cropPos.y }
+    const onMove = (ev: MouseEvent) => {
+      if (!cropDragRef.current) return
+      setCropPos({
+        x: cropDragRef.current.startPosX + (ev.clientX - cropDragRef.current.startX),
+        y: cropDragRef.current.startPosY + (ev.clientY - cropDragRef.current.startY),
+      })
+    }
+    const onUp = () => {
+      cropDragRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  const handleCropTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const t = e.touches[0]
+      cropDragRef.current = { startX: t.clientX, startY: t.clientY, startPosX: cropPos.x, startPosY: cropPos.y }
+      cropPinchRef.current = null
+    } else if (e.touches.length === 2) {
+      cropDragRef.current = null
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      cropPinchRef.current = { dist: Math.hypot(dx, dy), scale: cropScale }
+    }
+  }
+
+  const handleCropTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault()
+    if (e.touches.length === 1 && cropDragRef.current) {
+      const t = e.touches[0]
+      setCropPos({
+        x: cropDragRef.current.startPosX + (t.clientX - cropDragRef.current.startX),
+        y: cropDragRef.current.startPosY + (t.clientY - cropDragRef.current.startY),
+      })
+    } else if (e.touches.length === 2 && cropPinchRef.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      const dist = Math.hypot(dx, dy)
+      const next = Math.min(4, Math.max(0.5, cropPinchRef.current.scale * (dist / cropPinchRef.current.dist)))
+      setCropScale(next)
+    }
+  }
+
+  const handleCropWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    setCropScale(s => Math.min(4, Math.max(0.5, s - e.deltaY * 0.001)))
   }
 
   if (isLoading) {
@@ -544,6 +639,76 @@ export default function AccountPage() {
         className="hidden"
         onChange={handleAvatarChange}
       />
+
+      {cropSrc && (
+        <div className="fixed inset-0 z-[200] flex flex-col bg-black">
+          <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
+            <button
+              onClick={() => setCropSrc(null)}
+              className="text-white/70 hover:text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <span className="text-white font-semibold text-sm">Move & Scale</span>
+            <button
+              onClick={handleCropConfirm}
+              disabled={avatarUploading}
+              className="bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-2"
+            >
+              {avatarUploading ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</> : 'Save'}
+            </button>
+          </div>
+
+          <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4">
+            <div
+              ref={cropContainerRef}
+              className="relative overflow-hidden rounded-full flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
+              style={{ width: 256, height: 256, boxShadow: '0 0 0 9999px rgba(0,0,0,0.7)' }}
+              onMouseDown={handleCropMouseDown}
+              onTouchStart={handleCropTouchStart}
+              onTouchMove={handleCropTouchMove}
+              onWheel={handleCropWheel}
+            >
+              <img
+                src={cropSrc}
+                alt="Crop preview"
+                draggable={false}
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  transform: `translate(-50%, -50%) translate(${cropPos.x}px, ${cropPos.y}px) scale(${cropScale})`,
+                  transformOrigin: 'center',
+                  maxWidth: 'none',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                } as React.CSSProperties}
+              />
+            </div>
+
+            <div className="w-full max-w-xs flex flex-col items-center gap-2">
+              <div className="flex items-center gap-3 w-full">
+                <svg className="w-4 h-4 text-white/50 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                </svg>
+                <input
+                  type="range"
+                  min={50}
+                  max={400}
+                  step={1}
+                  value={Math.round(cropScale * 100)}
+                  onChange={e => setCropScale(Number(e.target.value) / 100)}
+                  className="flex-1 accent-accent-500"
+                />
+                <svg className="w-4 h-4 text-white/50 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7m6 0h-6" />
+                </svg>
+              </div>
+              <p className="text-xs text-white/40">Drag to reposition · Scroll or pinch to zoom</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
