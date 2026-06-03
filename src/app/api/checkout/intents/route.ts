@@ -6,13 +6,12 @@ import { signIntent } from '@/lib/checkout-intent'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
-  const auth = await authenticateUser(req)
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const body = await req.json().catch(() => ({}))
   const mode = body.mode === 'cart' ? 'cart' : 'buyNow'
 
   if (mode === 'cart') {
+    const auth = await authenticateUser(req)
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const cart = await loadActiveCart(auth.userId)
     if (cart.length === 0) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
     const token = await signIntent({ mode: 'cart', userId: auth.userId })
