@@ -68,6 +68,10 @@ function CheckoutReviewPage() {
     productName: string
     variantName: string | null
     subVariantName: string | null
+    sku: string | null
+    mrp: number | null
+    gstPercentage: number | null
+    brandName: string | null
     imageUrl: string | null
   } | null>(null)
 
@@ -109,6 +113,10 @@ function CheckoutReviewPage() {
             productName: d.productName || '',
             variantName: d.variantName || null,
             subVariantName: d.subVariantName || null,
+            sku: d.sku || null,
+            mrp: d.mrp != null ? Number(d.mrp) : null,
+            gstPercentage: d.gstPercentage != null ? Number(d.gstPercentage) : null,
+            brandName: d.brandName || null,
             imageUrl: null,
           })
           const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
@@ -147,6 +155,10 @@ function CheckoutReviewPage() {
         productName,
         variantName: variantName || null,
         subVariantName: null,
+        sku: null,
+        mrp: null,
+        gstPercentage: null,
+        brandName: null,
         imageUrl: null,
       })
 
@@ -431,16 +443,39 @@ function CheckoutReviewPage() {
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-foreground">{buyNowItem.productName}</h3>
-                      {buyNowItem.variantName && <p className="text-sm text-foreground-muted">{buyNowItem.variantName}</p>}
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {buyNowItem.brandName && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-secondary text-foreground-secondary border border-border-default">
+                            {buyNowItem.brandName}
+                          </span>
+                        )}
+                        {buyNowItem.sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {buyNowItem.sku}</span>}
+                      </div>
+                      {buyNowItem.variantName && <p className="text-sm text-foreground-muted mt-0.5">{buyNowItem.variantName}</p>}
                       {buyNowItem.subVariantName && <p className="text-xs text-foreground-muted">{buyNowItem.subVariantName}</p>}
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-sm text-foreground-secondary">
                           ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
+                          {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
+                            <>
+                              {' '}<span className="line-through text-foreground-muted">₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                              {' '}<span className="text-accent-600 dark:text-accent-400 font-semibold">{Math.round(((buyNowItem.mrp - buyNowItem.price) / buyNowItem.mrp) * 100)}% off</span>
+                            </>
+                          )}
                         </p>
                         <p className="text-sm font-semibold text-foreground">
                           ₹{(buyNowItem.price * buyNowItem.qty).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
+                      {buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
+                        const lineTotal = buyNowItem.price * buyNowItem.qty
+                        const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
+                        return (
+                          <p className="text-[11px] text-foreground-muted mt-0.5">
+                            incl. ₹{gst.toLocaleString('en-IN', { minimumFractionDigits: 3 })} GST @ {buyNowItem.gstPercentage}%
+                          </p>
+                        )
+                      })()}
                     </div>
                   </div>
                 ) : (
