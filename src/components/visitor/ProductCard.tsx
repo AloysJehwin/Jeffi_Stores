@@ -114,7 +114,11 @@ export default function ProductCard({
         onContextMenu={(e) => e.preventDefault()}
         onClick={(e) => { if (longPressFired.current) e.preventDefault() }}
       >
-        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1 hover:border-accent-300 dark:hover:border-accent-500 h-full flex flex-col">
+        <div
+          className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1 hover:border-accent-300 dark:hover:border-accent-500 h-full flex flex-col"
+          onContextMenu={(e) => e.preventDefault()}
+          style={{ WebkitTouchCallout: 'none', userSelect: 'none' } as React.CSSProperties}
+        >
           {/* Image */}
           <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
             {primaryImage ? (
