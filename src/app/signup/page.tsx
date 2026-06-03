@@ -415,10 +415,6 @@ function SignupPage() {
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Saving...</>
                 ) : 'Save & Continue'}
               </button>
-              <button type="button" onClick={() => router.push(redirectTo)}
-                className="w-full text-center text-sm text-foreground-muted hover:text-foreground mt-1">
-                Skip for now
-              </button>
             </form>
           )}
 
