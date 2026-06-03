@@ -315,7 +315,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'get_low_stock_products',
-    description: 'Products with inventory at or below a threshold. Useful for restock decisions.',
+    description: 'Products with effective stock at or below a threshold, sorted by 30-day sales volume descending. Handles variant products correctly.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -328,12 +328,18 @@ export const TOOLS: ToolDef[] = [
       const lim = clamp(typeof limit === 'number' ? limit : 50, 1, 200)
       const t = clamp(typeof threshold === 'number' ? threshold : 10, 0, 1000)
       const rows = await queryMany(
-        `SELECT p.id::text, p.name, p.sku, p.inventory_quantity AS stock,
+        `SELECT p.id::text, p.name, p.sku,
+                (${EFFECTIVE_STOCK_SQL}) AS stock,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                b.name AS brand
-         FROM products p LEFT JOIN brands b ON b.id = p.brand_id
-         WHERE p.is_active = TRUE AND p.inventory_quantity <= $1
-         ORDER BY p.inventory_quantity ASC, p.name ASC LIMIT $2`,
+                b.name AS brand,
+                COALESCE(SUM(oi.quantity) FILTER (WHERE o.created_at >= NOW() - INTERVAL '30 days' AND o.payment_status = 'paid'), 0)::int AS sold_30d
+         FROM products p
+         LEFT JOIN brands b ON b.id = p.brand_id
+         LEFT JOIN order_items oi ON oi.product_id = p.id
+         LEFT JOIN orders o ON o.id = oi.order_id
+         WHERE p.is_active = TRUE AND (${EFFECTIVE_STOCK_SQL}) <= $1
+         GROUP BY p.id, p.name, p.sku, p.base_price, p.inventory_quantity, p.has_variants, b.name
+         ORDER BY sold_30d DESC, (${EFFECTIVE_STOCK_SQL}) ASC LIMIT $2`,
         [t, lim]
       )
       return { products: rows, threshold: t, count: rows.length, truncated: rows.length === lim }
