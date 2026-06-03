@@ -48,6 +48,13 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
       )
     : null
 
+  const subVariant = resolved.item.subVariantId
+    ? await queryOne<{ sub_variant_name: string }>(
+        `SELECT sub_variant_name FROM product_sub_variants WHERE id = $1`,
+        [resolved.item.subVariantId]
+      )
+    : null
+
   return NextResponse.json({
     mode: 'buyNow',
     productId: resolved.item.productId,
@@ -59,5 +66,6 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
     price: resolved.item.price,
     productName: product?.name || '',
     variantName: variant?.variant_name || null,
+    subVariantName: subVariant?.sub_variant_name || null,
   })
 }
