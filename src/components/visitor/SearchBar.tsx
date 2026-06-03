@@ -49,6 +49,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
+  const [searchHistory, setSearchHistory] = useState<string[]>([])
 
   const overlayRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -66,6 +67,15 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
     setCategories([])
     setActiveIdx(-1)
   }, [onClose])
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/user/search-history', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : { history: [] })
+        .then(data => setSearchHistory(Array.isArray(data.history) ? data.history : []))
+        .catch(() => setSearchHistory([]))
+    }
+  }, [isOpen])
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -127,6 +137,26 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
     return () => clearTimeout(timer)
   }, [query])
 
+  function saveSearchHistory(term: string) {
+    const cleaned = term.trim()
+    if (!cleaned) return
+    fetch('/api/user/search-history', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: cleaned }),
+    }).catch(() => {})
+    setSearchHistory(prev => {
+      const deduped = [cleaned, ...prev.filter(q => q.toLowerCase() !== cleaned.toLowerCase())]
+      return deduped.slice(0, 5)
+    })
+  }
+
+  function clearHistory() {
+    fetch('/api/user/search-history', { method: 'DELETE', credentials: 'include' }).catch(() => {})
+    setSearchHistory([])
+  }
+
   function previewItem(idx: number) {
     skipFetchRef.current = true
     if (idx < 0) {
@@ -175,13 +205,15 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (query.trim()) {
+      saveSearchHistory(query.trim())
       router.push(`/products?search=${encodeURIComponent(query)}`)
       close()
     }
   }
 
   const hasResults = categories.length > 0 || products.length > 0
-  const showResultsPanel = isOpen && (query.trim().length >= 2 || isLoading)
+  const showHistoryPanel = isOpen && query.trim().length === 0 && searchHistory.length > 0
+  const showResultsPanel = isOpen && !showHistoryPanel && (query.trim().length >= 2 || isLoading)
 
   return (
     <>
@@ -260,6 +292,38 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
           </div>
         </form>
 
+        {showHistoryPanel && (
+          <div className="mt-3 w-full bg-surface-elevated rounded-2xl shadow-xl border border-border-default overflow-hidden">
+            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">Recent Searches</p>
+              <button
+                type="button"
+                onClick={clearHistory}
+                className="text-xs text-foreground-muted hover:text-foreground transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="py-1">
+              {searchHistory.map(q => (
+                <Link
+                  key={q}
+                  href={`/products?search=${encodeURIComponent(q)}`}
+                  onClick={close}
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-secondary transition-colors"
+                >
+                  <span className="flex-shrink-0 w-7 h-7 rounded-md bg-surface-secondary flex items-center justify-center">
+                    <svg className="w-3.5 h-3.5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </span>
+                  <span className="text-sm text-foreground">{q}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {showResultsPanel && (
           <div
             role="listbox"
@@ -280,7 +344,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
                         <Link
                           key={cat.id}
                           href={`/products?category=${cat.slug}`}
-                          onClick={close}
+                          onClick={() => { saveSearchHistory(typedQueryRef.current.trim()); close() }}
                           className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIdx === idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                         >
                           <span className="flex-shrink-0 w-7 h-7 rounded-md bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
@@ -310,7 +374,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
                           <Link
                             key={product.id}
                             href={`/products/${product.slug}`}
-                            onClick={close}
+                            onClick={() => { saveSearchHistory(typedQueryRef.current.trim()); close() }}
                             className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIdx === itemIdx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                           >
                             <div className="w-10 h-10 bg-surface-secondary rounded-lg flex-shrink-0 overflow-hidden border border-border-default">
@@ -329,7 +393,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
                                 <Highlight text={product.name} query={query} />
                               </p>
                               <p className="text-xs text-accent-600 dark:text-accent-400 font-semibold mt-0.5">
-                                {product.has_variants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                {product.has_variants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </p>
                             </div>
                             <svg className="w-4 h-4 text-foreground-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -344,7 +408,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
                   <div className="border-t border-border-default p-3">
                     <Link
                       href={`/products?search=${encodeURIComponent(query)}`}
-                      onClick={close}
+                      onClick={() => { saveSearchHistory(query.trim()); close() }}
                       className="flex items-center justify-center gap-1.5 text-sm text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 font-medium"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
