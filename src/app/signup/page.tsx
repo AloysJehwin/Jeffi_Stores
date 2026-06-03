@@ -22,12 +22,13 @@ function SignupPage() {
   const searchParams = useSearchParams()
   const fromLogin = searchParams.get('from') === 'login'
   const prefillEmail = searchParams.get('email') || ''
+  const redirectTo = searchParams.get('redirect') || '/'
 
   const { signup, googleLoginWithAccessToken } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
 
-  const [step, setStep] = useState<'email' | 'otp' | 'details'>('email')
+  const [step, setStep] = useState<'email' | 'otp' | 'details' | 'phone'>('email')
   const [email, setEmail] = useState(prefillEmail)
   const [otp, setOtp] = useState('')
   const [firstName, setFirstName] = useState('')
@@ -63,9 +64,13 @@ function SignupPage() {
       return
     }
     try {
-      await googleLoginWithAccessToken(result.accessToken)
+      const loggedInUser = await googleLoginWithAccessToken(result.accessToken)
       await refreshCart()
-      router.push('/')
+      if (!loggedInUser?.phone) {
+        setStep('phone')
+      } else {
+        router.push(redirectTo)
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -140,7 +145,7 @@ function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (phone && phone.length !== 10) {
+    if (!phone || phone.length !== 10) {
       setError('Enter a valid 10-digit mobile number')
       return
     }
@@ -148,7 +153,7 @@ function SignupPage() {
     try {
       await signup({ email, otp, firstName, lastName, phone })
       await refreshCart()
-      router.push('/')
+      router.push(redirectTo)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -177,6 +182,33 @@ function SignupPage() {
       setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 60)
       showToast('OTP sent successfully!', 'success')
       setTimeout(() => otpInputRef.current?.focus(), 0)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSavePhone = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (!phone || phone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number')
+      return
+    }
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/user/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ phone }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        throw new Error(d.error || 'Failed to save phone number')
+      }
+      router.push(redirectTo)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -329,13 +361,13 @@ function SignupPage() {
               </div>
               <div>
                 <label htmlFor="phone" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Phone Number
+                  Mobile Number *
                 </label>
                 <div className="flex">
                   <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
                     +91
                   </span>
-                  <input id="phone" type="tel" inputMode="numeric" maxLength={10} value={phone}
+                  <input id="phone" type="tel" inputMode="numeric" maxLength={10} value={phone} required
                     onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                     placeholder="98765 43210" />
@@ -349,6 +381,43 @@ function SignupPage() {
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Creating Account...</>
                 ) : 'Complete Signup'}
+              </button>
+            </form>
+          )}
+
+          {step === 'phone' && (
+            <form onSubmit={handleSavePhone} className="space-y-6">
+              <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-2">
+                <p className="text-sm text-blue-800 dark:text-blue-300">
+                  One last step — add your mobile number so we can keep you updated on your orders.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="phone-google" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Mobile Number *
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
+                    +91
+                  </span>
+                  <input id="phone-google" type="tel" inputMode="numeric" maxLength={10} value={phone} required autoFocus
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="98765 43210" />
+                </div>
+                {phone && phone.length > 0 && phone.length !== 10 && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+                )}
+              </div>
+              <button type="submit" disabled={isLoading || phone.length !== 10}
+                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
+                {isLoading ? (
+                  <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Saving...</>
+                ) : 'Save & Continue'}
+              </button>
+              <button type="button" onClick={() => router.push(redirectTo)}
+                className="w-full text-center text-sm text-foreground-muted hover:text-foreground mt-1">
+                Skip for now
               </button>
             </form>
           )}
