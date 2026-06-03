@@ -14,11 +14,19 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { firstName, lastName, phone } = body
 
-    if (!firstName) {
+    const existing = await queryOne('SELECT first_name, last_name, phone FROM users WHERE id = $1', [userId])
+    if (!existing) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const resolvedFirstName = firstName !== undefined ? firstName : existing.first_name
+    const resolvedLastName = lastName !== undefined ? lastName : existing.last_name
+
+    if (!resolvedFirstName) {
       return NextResponse.json({ error: 'First name is required' }, { status: 400 })
     }
 
-    let normalizedPhone = null
+    let normalizedPhone = phone === undefined ? existing.phone : null
     if (phone) {
       const digits = phone.replace(/\D/g, '')
       const cleaned = digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits
@@ -32,7 +40,7 @@ export async function PATCH(request: NextRequest) {
       `UPDATE users SET first_name = $1, last_name = $2, phone = $3, updated_at = NOW()
        WHERE id = $4
        RETURNING *`,
-      [firstName, lastName || null, normalizedPhone, userId]
+      [resolvedFirstName, resolvedLastName || null, normalizedPhone, userId]
     )
 
     if (!updatedUser) {
