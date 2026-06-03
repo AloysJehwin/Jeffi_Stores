@@ -283,7 +283,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
                   className="w-full px-4 py-2 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
-                  placeholder="98765 43210"
+                  placeholder="00000 00000"
                   required
                 />
               </div>

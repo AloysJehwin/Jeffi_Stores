@@ -346,7 +346,7 @@ function LoginPage() {
                     autoFocus
                     onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                    placeholder="98765 43210"
+                    placeholder="00000 00000"
                   />
                 </div>
                 {phone.length > 0 && phone.length !== 10 && (
