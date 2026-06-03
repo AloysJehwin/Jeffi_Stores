@@ -223,6 +223,18 @@ export async function uploadReviewImage(file: File, reviewId: string): Promise<{
   return { url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3ThumbnailKey) }
 }
 
+export async function uploadAvatarImage(buffer: Buffer, userId: string): Promise<{ url: string; s3Key: string }> {
+  const s3Key = `avatars/${userId}.jpg`
+  const resized = await sharp(buffer).rotate().resize(256, 256, { fit: 'cover' }).jpeg({ quality: 85 }).toBuffer()
+  await s3Client.send(new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: `${KEY_PREFIX}${s3Key}`,
+    Body: resized,
+    ContentType: 'image/jpeg',
+  }))
+  return { url: getS3Url(s3Key), s3Key }
+}
+
 export async function deleteGalleryImage(s3Key: string, s3ThumbnailKey: string) {
   await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}` }))
   if (s3ThumbnailKey) {

@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 
@@ -68,6 +68,9 @@ export default function AccountPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [searchHistory, setSearchHistory] = useState<string[]>([])
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/user/search-history', { credentials: 'include' })
@@ -81,6 +84,7 @@ export default function AccountPage() {
       router.push('/login?redirect=/account')
     }
     if (user) {
+      setAvatarUrl(user.avatarUrl)
       setFormData({
         firstName: user.firstName,
         lastName: user.lastName || '',
@@ -115,6 +119,27 @@ export default function AccountPage() {
       setMessage('Failed to update profile')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) { setMessage('Photo must be under 2 MB'); return }
+    setAvatarUploading(true)
+    setMessage('')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/user/avatar', { method: 'POST', body: fd, credentials: 'include' })
+      if (!res.ok) throw new Error((await res.json()).error || 'Upload failed')
+      const data = await res.json()
+      setAvatarUrl(data.avatarUrl + `?t=${Date.now()}`)
+    } catch (err: any) {
+      setMessage(err.message || 'Failed to upload photo')
+    } finally {
+      setAvatarUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -159,9 +184,30 @@ export default function AccountPage() {
       <div className="lg:hidden bg-accent-500 pt-8 pb-16 px-4 relative">
         <h1 className="text-lg font-semibold text-white/80 mb-4">My Account</h1>
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
-            {user.firstName?.[0]?.toUpperCase() || 'U'}
-          </div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={avatarUploading}
+            className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0 group"
+            aria-label="Change profile photo"
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-white/20 flex items-center justify-center text-2xl font-bold text-white">
+                {user.firstName?.[0]?.toUpperCase() || 'U'}
+              </div>
+            )}
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+              {avatarUploading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              )}
+            </div>
+          </button>
           <div>
             <p className="text-xl font-bold text-white">{user.firstName} {user.lastName}</p>
             <p className="text-sm text-white/70 mt-0.5">{user.email}</p>
@@ -280,9 +326,30 @@ export default function AccountPage() {
                 {!isEditing ? (
                   <div className="space-y-2.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-accent-100 dark:bg-accent-900/40 flex items-center justify-center text-lg font-bold text-accent-600 dark:text-accent-400 flex-shrink-0">
-                        {user.firstName?.[0]?.toUpperCase() || 'U'}
-                      </div>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={avatarUploading}
+                        className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 group"
+                        aria-label="Change profile photo"
+                      >
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-accent-100 dark:bg-accent-900/40 flex items-center justify-center text-lg font-bold text-accent-600 dark:text-accent-400">
+                            {user.firstName?.[0]?.toUpperCase() || 'U'}
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                          {avatarUploading ? (
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
                       <div className="min-w-0">
                         <p className="font-semibold text-foreground text-sm">{user.firstName} {user.lastName}</p>
                         <p className="text-xs text-foreground-muted truncate">{user.email}</p>
@@ -469,6 +536,14 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handleAvatarChange}
+      />
     </div>
   )
 }
