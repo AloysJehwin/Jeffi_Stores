@@ -60,12 +60,14 @@ function CheckoutReviewPage() {
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
     variantId: string | null
+    subVariantId: string | null
     qty: number
     buyMode: string
     buyUnit: string | null
     price: number
     productName: string
     variantName: string | null
+    subVariantName: string | null
     imageUrl: string | null
   } | null>(null)
 
@@ -99,12 +101,14 @@ function CheckoutReviewPage() {
           setBuyNowItem({
             productId: d.productId,
             variantId: d.variantId || null,
+            subVariantId: d.subVariantId || null,
             qty: Number(d.qty),
             buyMode: d.buyMode,
             buyUnit: d.buyUnit || null,
             price: Number(d.price),
             productName: d.productName || '',
             variantName: d.variantName || null,
+            subVariantName: d.subVariantName || null,
             imageUrl: null,
           })
           const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
@@ -135,12 +139,14 @@ function CheckoutReviewPage() {
       setBuyNowItem({
         productId,
         variantId: variantId || null,
+        subVariantId: null,
         qty,
         buyMode,
         buyUnit: buyUnit || null,
         price,
         productName,
         variantName: variantName || null,
+        subVariantName: null,
         imageUrl: null,
       })
 
@@ -299,6 +305,7 @@ function CheckoutReviewPage() {
       params.set('buyNow', '1')
       params.set('productId', buyNowItem.productId)
       if (buyNowItem.variantId) params.set('variantId', buyNowItem.variantId)
+      if (buyNowItem.subVariantId) params.set('subVariantId', buyNowItem.subVariantId)
       params.set('qty', String(buyNowItem.qty))
       params.set('buyMode', buyNowItem.buyMode)
       if (buyNowItem.buyUnit) params.set('buyUnit', buyNowItem.buyUnit)
@@ -425,6 +432,7 @@ function CheckoutReviewPage() {
                     <div className="flex-1">
                       <h3 className="font-semibold text-foreground">{buyNowItem.productName}</h3>
                       {buyNowItem.variantName && <p className="text-sm text-foreground-muted">{buyNowItem.variantName}</p>}
+                      {buyNowItem.subVariantName && <p className="text-xs text-foreground-muted">{buyNowItem.subVariantName}</p>}
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-sm text-foreground-secondary">
                           ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
