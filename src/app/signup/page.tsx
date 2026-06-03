@@ -370,7 +370,7 @@ function SignupPage() {
                   <input id="phone" type="tel" inputMode="numeric" maxLength={10} value={phone} required
                     onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                    placeholder="98765 43210" />
+                    placeholder="00000 00000" />
                 </div>
                 {phone && phone.length > 0 && phone.length !== 10 && (
                   <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
@@ -403,7 +403,7 @@ function SignupPage() {
                   <input id="phone-google" type="tel" inputMode="numeric" maxLength={10} value={phone} required autoFocus
                     onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                    placeholder="98765 43210" />
+                    placeholder="00000 00000" />
                 </div>
                 {phone && phone.length > 0 && phone.length !== 10 && (
                   <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
