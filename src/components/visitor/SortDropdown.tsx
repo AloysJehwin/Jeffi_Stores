@@ -19,7 +19,7 @@ export default function SortDropdown() {
   const listRef = useRef<HTMLUListElement>(null)
 
   const currentSort = searchParams.get('sort') || 'created_at'
-  const currentOrder = searchParams.get('order') || 'desc'
+  const currentOrder = searchParams.get('order')
   const currentValue = currentOrder === 'desc' && currentSort === 'base_price'
     ? `${currentSort}&order=${currentOrder}`
     : currentSort
