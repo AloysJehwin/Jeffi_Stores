@@ -21,13 +21,12 @@ interface ProductDisplay {
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
-  const auth = await authenticateUser(req)
-  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const intent = await verifyIntent(params.token)
   if (!intent) return NextResponse.json({ error: 'Invalid or expired intent' }, { status: 400 })
 
   if (intent.mode === 'cart') {
+    const auth = await authenticateUser(req)
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (intent.userId !== auth.userId) {
       return NextResponse.json({ error: 'Intent does not belong to this user' }, { status: 403 })
     }

@@ -4,7 +4,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import Link from 'next/link'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressFormModal from '@/components/visitor/AddressFormModal'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
@@ -38,9 +38,15 @@ function CheckoutReviewPage() {
   const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(null)
   const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
 
+  const authWasLoading = useRef(false)
+  const intentFetched = useRef(false)
+  useEffect(() => {
+    if (authLoading) authWasLoading.current = true
+  }, [authLoading])
+
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [addresses, setAddresses] = useState<any[]>([])
-  const [isLoadingAddresses, setIsLoadingAddresses] = useState(true)
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState(false)
   const [showAddressModal, setShowAddressModal] = useState(false)
 
   const [couponCode, setCouponCode] = useState('')
@@ -81,8 +87,18 @@ function CheckoutReviewPage() {
     }).catch(() => {})
   }, [])
 
+  const addressesFetched = useRef(false)
+
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (user && !addressesFetched.current) {
+      addressesFetched.current = true
+      setIsLoadingAddresses(true)
+      fetchAddresses()
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!authLoading && !user && authWasLoading.current) {
       const currentUrl = intentToken
         ? `/checkout/review?intent=${encodeURIComponent(intentToken)}`
         : '/checkout/review'
@@ -91,6 +107,8 @@ function CheckoutReviewPage() {
     }
 
     if (intentToken) {
+      if (intentFetched.current) return
+      intentFetched.current = true
       fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include' })
         .then(async r => {
           const d = await r.json()
@@ -100,8 +118,7 @@ function CheckoutReviewPage() {
           }
           if (d.mode === 'cart') {
             setIntentMode('cart')
-            if (cartCount === 0 && !cartLoading) router.push('/cart')
-            if (user) fetchAddresses()
+            if (cartCount === 0 && !cartLoading) router.replace('/cart')
             return
           }
           setIntentMode('buyNow')
@@ -129,7 +146,6 @@ function CheckoutReviewPage() {
               setBuyNowItem(prev => prev ? { ...prev, imageUrl: data.imageUrl || null } : prev)
             })
             .catch(() => {})
-          if (user) fetchAddresses()
         })
         .catch(() => router.push('/'))
       return
@@ -174,11 +190,7 @@ function CheckoutReviewPage() {
         })
         .catch(() => {})
     } else if (!intentToken && !cartLoading && cartCount === 0) {
-      router.push('/cart')
-    }
-
-    if (user) {
-      fetchAddresses()
+      router.replace('/cart')
     }
   }, [cartCount, user, authLoading, cartLoading, router, isBuyNow, intentToken])
 
@@ -329,7 +341,7 @@ function CheckoutReviewPage() {
     router.push(`/checkout?${params.toString()}`)
   }
 
-  if (authLoading || cartLoading || isLoadingAddresses) {
+  if (authLoading || cartLoading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full"></div>
@@ -364,7 +376,13 @@ function CheckoutReviewPage() {
                 </button>
               </div>
 
-              {addresses.length === 0 ? (
+              {isLoadingAddresses ? (
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="h-20 bg-surface rounded-lg animate-pulse border border-border-default" />
+                  ))}
+                </div>
+              ) : addresses.length === 0 ? (
                 <div className="text-center py-8">
                   <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -695,10 +713,19 @@ function CheckoutReviewPage() {
                 disabled={!selectedAddress || addresses.length === 0 || belowMinimum || isLoadingShipping || (shippingCharge === null && !shippingError)}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                Proceed to Place Order
-                <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
+                {isLoadingShipping ? (
+                  <>
+                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Calculating delivery…
+                  </>
+                ) : (
+                  <>
+                    Proceed to Place Order
+                    <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </>
+                )}
               </button>
 
               {isBuyNow ? (
