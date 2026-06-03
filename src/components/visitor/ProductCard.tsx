@@ -113,6 +113,7 @@ export default function ProductCard({
         onTouchStart={(e) => startLongPress(e)}
         onTouchEnd={cancelLongPress}
         onTouchMove={cancelLongPress}
+        onContextMenu={(e) => e.preventDefault()}
         onClick={(e) => { if (longPressFired.current) e.preventDefault() }}
       >
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden transition-all duration-300 ease-out hover:shadow-xl hover:-translate-y-1 hover:border-accent-300 dark:hover:border-accent-500 h-full flex flex-col">

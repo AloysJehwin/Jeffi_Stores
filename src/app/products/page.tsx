@@ -60,8 +60,28 @@ async function getProducts(searchParams: any) {
   const allowedSortColumns: Record<string, string> = {
     created_at: 'p.created_at',
     name: 'p.name',
-    base_price: 'p.base_price',
-    price: 'p.base_price',
+    base_price: `CASE WHEN p.has_variants THEN (
+      SELECT MIN(price) FROM (
+        SELECT pv2.price FROM product_variants pv2
+        WHERE pv2.product_id = p.id AND pv2.is_active = true AND pv2.price IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv2 WHERE sv2.variant_id = pv2.id AND sv2.is_active = true)
+        UNION ALL
+        SELECT sv2.price FROM product_sub_variants sv2
+        JOIN product_variants pv2 ON pv2.id = sv2.variant_id
+        WHERE pv2.product_id = p.id AND pv2.is_active = true AND sv2.is_active = true AND sv2.price IS NOT NULL
+      ) AS ep
+    ) ELSE COALESCE(p.price_ex_gst, p.base_price) END`,
+    price: `CASE WHEN p.has_variants THEN (
+      SELECT MIN(price) FROM (
+        SELECT pv2.price FROM product_variants pv2
+        WHERE pv2.product_id = p.id AND pv2.is_active = true AND pv2.price IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv2 WHERE sv2.variant_id = pv2.id AND sv2.is_active = true)
+        UNION ALL
+        SELECT sv2.price FROM product_sub_variants sv2
+        JOIN product_variants pv2 ON pv2.id = sv2.variant_id
+        WHERE pv2.product_id = p.id AND pv2.is_active = true AND sv2.is_active = true AND sv2.price IS NOT NULL
+      ) AS ep
+    ) ELSE COALESCE(p.price_ex_gst, p.base_price) END`,
   }
   const sortColumn = allowedSortColumns[sortBy] || 'p.created_at'
   const hasExplicitSort = !!searchParams.sort
