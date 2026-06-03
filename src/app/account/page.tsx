@@ -641,70 +641,75 @@ export default function AccountPage() {
       />
 
       {cropSrc && (
-        <div className="fixed inset-0 z-[200] flex flex-col bg-black">
-          <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
-            <button
-              onClick={() => setCropSrc(null)}
-              className="text-white/70 hover:text-white text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <span className="text-white font-semibold text-sm">Move & Scale</span>
-            <button
-              onClick={handleCropConfirm}
-              disabled={avatarUploading}
-              className="bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-2"
-            >
-              {avatarUploading ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</> : 'Save'}
-            </button>
-          </div>
-
-          <div className="flex-1 flex flex-col items-center justify-center gap-6 px-4">
-            <div
-              ref={cropContainerRef}
-              className="relative overflow-hidden rounded-full flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
-              style={{ width: 256, height: 256, boxShadow: '0 0 0 9999px rgba(0,0,0,0.7)' }}
-              onMouseDown={handleCropMouseDown}
-              onTouchStart={handleCropTouchStart}
-              onTouchMove={handleCropTouchMove}
-              onWheel={handleCropWheel}
-            >
-              <img
-                src={cropSrc}
-                alt="Crop preview"
-                draggable={false}
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  transform: `translate(-50%, -50%) translate(${cropPos.x}px, ${cropPos.y}px) scale(${cropScale})`,
-                  transformOrigin: 'center',
-                  maxWidth: 'none',
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                } as React.CSSProperties}
-              />
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default w-full max-w-sm flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
+              <button
+                onClick={() => setCropSrc(null)}
+                className="text-foreground-muted hover:text-foreground transition-colors"
+                aria-label="Cancel"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <span className="font-semibold text-foreground text-sm">Adjust Photo</span>
+              <button
+                onClick={handleCropConfirm}
+                disabled={avatarUploading}
+                className="bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                {avatarUploading ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</> : 'Save'}
+              </button>
             </div>
 
-            <div className="w-full max-w-xs flex flex-col items-center gap-2">
-              <div className="flex items-center gap-3 w-full">
-                <svg className="w-4 h-4 text-white/50 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
-                </svg>
-                <input
-                  type="range"
-                  min={50}
-                  max={400}
-                  step={1}
-                  value={Math.round(cropScale * 100)}
-                  onChange={e => setCropScale(Number(e.target.value) / 100)}
-                  className="flex-1 accent-accent-500"
+            <div className="flex flex-col items-center gap-5 p-6 bg-surface">
+              <div
+                ref={cropContainerRef}
+                className="relative overflow-hidden rounded-full flex-shrink-0 cursor-grab active:cursor-grabbing select-none ring-4 ring-accent-500/30"
+                style={{ width: 240, height: 240 }}
+                onMouseDown={handleCropMouseDown}
+                onTouchStart={handleCropTouchStart}
+                onTouchMove={handleCropTouchMove}
+                onWheel={handleCropWheel}
+              >
+                <img
+                  src={cropSrc}
+                  alt="Crop preview"
+                  draggable={false}
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    top: '50%',
+                    transform: `translate(-50%, -50%) translate(${cropPos.x}px, ${cropPos.y}px) scale(${cropScale})`,
+                    transformOrigin: 'center',
+                    maxWidth: 'none',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                  } as React.CSSProperties}
                 />
-                <svg className="w-4 h-4 text-white/50 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7m6 0h-6" />
-                </svg>
               </div>
-              <p className="text-xs text-white/40">Drag to reposition · Scroll or pinch to zoom</p>
+
+              <div className="w-full flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <svg className="w-4 h-4 text-foreground-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                  </svg>
+                  <input
+                    type="range"
+                    min={50}
+                    max={400}
+                    step={1}
+                    value={Math.round(cropScale * 100)}
+                    onChange={e => setCropScale(Number(e.target.value) / 100)}
+                    className="flex-1 accent-accent-500"
+                  />
+                  <svg className="w-5 h-5 text-foreground-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7m6 0h-6" />
+                  </svg>
+                </div>
+                <p className="text-center text-xs text-foreground-muted">Drag to reposition · Scroll or pinch to zoom</p>
+              </div>
             </div>
           </div>
         </div>
