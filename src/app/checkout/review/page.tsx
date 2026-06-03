@@ -170,7 +170,7 @@ function CheckoutReviewPage() {
           }
         })
         .catch(() => {})
-    } else if (!cartLoading && cartCount === 0) {
+    } else if (!intentToken && !cartLoading && cartCount === 0) {
       router.push('/cart')
     }
 
@@ -335,7 +335,7 @@ function CheckoutReviewPage() {
   }
 
   if (!user) return null
-  if (!isBuyNow && cartCount === 0) return null
+  if (!intentToken && !isBuyNow && cartCount === 0) return null
 
   const tax = isBuyNow ? 0 : getCartTax()
 
@@ -698,9 +698,15 @@ function CheckoutReviewPage() {
                 </svg>
               </button>
 
-              <Link href="/cart" className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
-                ← Back to Cart
-              </Link>
+              {isBuyNow ? (
+                <button onClick={() => router.back()} className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
+                  ← Go Back
+                </button>
+              ) : (
+                <Link href="/cart" className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
+                  ← Back to Cart
+                </Link>
+              )}
 
               <div className="mt-6 pt-6 border-t border-border-default">
                 <div className="flex items-center gap-2 text-sm text-foreground-secondary">
