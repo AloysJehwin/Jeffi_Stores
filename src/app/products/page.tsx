@@ -61,6 +61,7 @@ async function getProducts(searchParams: any) {
     created_at: 'p.created_at',
     name: 'p.name',
     base_price: 'p.base_price',
+    price: 'p.base_price',
   }
   const sortColumn = allowedSortColumns[sortBy] || 'p.created_at'
   const hasExplicitSort = !!searchParams.sort
