@@ -22,7 +22,8 @@ function SignupPage() {
   const searchParams = useSearchParams()
   const fromLogin = searchParams.get('from') === 'login'
   const prefillEmail = searchParams.get('email') || ''
-  const redirectTo = searchParams.get('redirect') || '/'
+  const rawRedirectTo = searchParams.get('redirect') || '/'
+  const redirectTo = ['/login', '/signup'].some(p => rawRedirectTo.startsWith(p)) ? '/' : rawRedirectTo
 
   const { signup, googleLoginWithAccessToken } = useAuth()
   const { refreshCart } = useCart()

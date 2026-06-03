@@ -19,7 +19,8 @@ export default function LoginPageWrapper() {
 function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/'
+  const rawRedirect = searchParams.get('redirect') || '/'
+  const redirect = ['/login', '/signup'].some(p => rawRedirect.startsWith(p)) ? '/' : rawRedirect
   const { login, googleLoginWithAccessToken } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
