@@ -74,6 +74,7 @@ export default function AccountPage() {
 
   const [cropSrc, setCropSrc] = useState<string | null>(null)
   const [cropScale, setCropScale] = useState(1)
+  const [cropFitScale, setCropFitScale] = useState(1)
   const [cropPos, setCropPos] = useState({ x: 0, y: 0 })
   const cropDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null)
   const cropPinchRef = useRef<{ dist: number; scale: number } | null>(null)
@@ -137,8 +138,9 @@ export default function AccountPage() {
     const img = new Image()
     img.onload = () => {
       const CIRCLE = 240
-      const scale = Math.max(CIRCLE / img.naturalWidth, CIRCLE / img.naturalHeight)
-      setCropScale(scale)
+      const fitScale = Math.max(CIRCLE / img.naturalWidth, CIRCLE / img.naturalHeight)
+      setCropFitScale(fitScale)
+      setCropScale(fitScale)
       setCropPos({ x: 0, y: 0 })
       setCropSrc(url)
       document.body.style.overflow = 'hidden'
@@ -236,14 +238,14 @@ export default function AccountPage() {
       const dx = e.touches[0].clientX - e.touches[1].clientX
       const dy = e.touches[0].clientY - e.touches[1].clientY
       const dist = Math.hypot(dx, dy)
-      const next = Math.min(4, Math.max(0.5, cropPinchRef.current.scale * (dist / cropPinchRef.current.dist)))
+      const next = Math.min(cropFitScale * 4, Math.max(cropFitScale, cropPinchRef.current.scale * (dist / cropPinchRef.current.dist)))
       setCropScale(next)
     }
   }
 
   const handleCropWheel = (e: React.WheelEvent) => {
     e.preventDefault()
-    setCropScale(s => Math.min(4, Math.max(0.5, s - e.deltaY * 0.001)))
+    setCropScale(s => Math.min(cropFitScale * 4, Math.max(cropFitScale, s - e.deltaY * 0.002 * cropFitScale)))
   }
 
   useEffect(() => {
@@ -709,11 +711,11 @@ export default function AccountPage() {
                   </svg>
                   <input
                     type="range"
-                    min={50}
+                    min={100}
                     max={400}
                     step={1}
-                    value={Math.round(cropScale * 100)}
-                    onChange={e => setCropScale(Number(e.target.value) / 100)}
+                    value={Math.round((cropScale / cropFitScale) * 100)}
+                    onChange={e => setCropScale(cropFitScale * (Number(e.target.value) / 100))}
                     className="flex-1 accent-accent-500"
                   />
                   <svg className="w-5 h-5 text-foreground-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
