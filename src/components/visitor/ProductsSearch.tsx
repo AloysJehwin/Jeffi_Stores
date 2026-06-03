@@ -97,7 +97,19 @@ export default function ProductsSearch({ defaultValue }: { defaultValue?: string
     return () => clearTimeout(timer)
   }, [query])
 
-  function navigate(href: string) {
+  function saveSearchHistory(term: string) {
+    const cleaned = term.trim()
+    if (!cleaned) return
+    fetch('/api/user/search-history', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: cleaned }),
+    }).catch(() => {})
+  }
+
+  function navigate(href: string, saveQuery?: string) {
+    if (saveQuery) saveSearchHistory(saveQuery)
     setOpen(false)
     router.push(href)
   }
@@ -107,7 +119,7 @@ export default function ProductsSearch({ defaultValue }: { defaultValue?: string
     if (!open) {
       if (e.key === 'Enter') {
         e.preventDefault()
-        if (query.trim()) navigate(`/products?search=${encodeURIComponent(query.trim())}`)
+        if (query.trim()) navigate(`/products?search=${encodeURIComponent(query.trim())}`, query.trim())
       }
       return
     }
@@ -121,19 +133,19 @@ export default function ProductsSearch({ defaultValue }: { defaultValue?: string
       e.preventDefault()
       if (activeIdx >= 0) {
         if (activeIdx < categories.length) {
-          navigate(`/products?category=${categories[activeIdx].slug}`)
+          navigate(`/products?category=${categories[activeIdx].slug}`, query.trim())
         } else {
-          navigate(`/products/${products[activeIdx - categories.length].slug}`)
+          navigate(`/products/${products[activeIdx - categories.length].slug}`, query.trim())
         }
       } else if (query.trim()) {
-        navigate(`/products?search=${encodeURIComponent(query.trim())}`)
+        navigate(`/products?search=${encodeURIComponent(query.trim())}`, query.trim())
       }
     }
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (query.trim()) navigate(`/products?search=${encodeURIComponent(query.trim())}`)
+    if (query.trim()) navigate(`/products?search=${encodeURIComponent(query.trim())}`, query.trim())
   }
 
   const hasResults = categories.length > 0 || products.length > 0
@@ -178,7 +190,7 @@ export default function ProductsSearch({ defaultValue }: { defaultValue?: string
                       <Link
                         key={cat.id}
                         href={`/products?category=${cat.slug}`}
-                        onClick={() => setOpen(false)}
+                        onClick={() => navigate(`/products?category=${cat.slug}`, query.trim())}
                         className={`flex items-center gap-2 px-3 py-2 transition-colors text-sm ${activeIdx === idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                       >
                         <span className="flex-shrink-0 w-6 h-6 rounded bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
@@ -206,7 +218,7 @@ export default function ProductsSearch({ defaultValue }: { defaultValue?: string
                         <Link
                           key={product.id}
                           href={`/products/${product.slug}`}
-                          onClick={() => setOpen(false)}
+                          onClick={() => navigate(`/products/${product.slug}`, query.trim())}
                           className={`flex items-center gap-2.5 px-3 py-2 transition-colors ${activeIdx === itemIdx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                         >
                           <div className="w-9 h-9 bg-surface-secondary rounded flex-shrink-0 overflow-hidden border border-border-default">
@@ -225,7 +237,7 @@ export default function ProductsSearch({ defaultValue }: { defaultValue?: string
                               <Highlight text={product.name} query={query} />
                             </p>
                             <p className="text-xs text-accent-600 dark:text-accent-400 font-semibold">
-                              {product.has_variants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              {product.has_variants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </p>
                           </div>
                         </Link>
@@ -237,7 +249,7 @@ export default function ProductsSearch({ defaultValue }: { defaultValue?: string
                 <div className="border-t border-border-default p-2.5">
                   <Link
                     href={`/products?search=${encodeURIComponent(query)}`}
-                    onClick={() => setOpen(false)}
+                    onClick={() => navigate(`/products?search=${encodeURIComponent(query)}`, query.trim())}
                     className="flex items-center justify-center gap-1.5 text-sm text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 font-medium"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

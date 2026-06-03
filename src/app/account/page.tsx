@@ -67,6 +67,14 @@ export default function AccountPage() {
   const [formData, setFormData] = useState({ firstName: '', lastName: '', phone: '' })
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [searchHistory, setSearchHistory] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch('/api/user/search-history', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { history: [] })
+      .then(data => setSearchHistory(Array.isArray(data.history) ? data.history : []))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -216,9 +224,40 @@ export default function AccountPage() {
               </div>
             </div>
 
+            {/* Recent Searches */}
+            {searchHistory.length > 0 && (
+              <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-foreground">Recent Searches</h2>
+                  <button
+                    onClick={() => {
+                      fetch('/api/user/search-history', { method: 'DELETE', credentials: 'include' }).catch(() => {})
+                      setSearchHistory([])
+                    }}
+                    className="text-xs text-foreground-muted hover:text-foreground transition-colors"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {searchHistory.map(q => (
+                    <Link
+                      key={q}
+                      href={`/products?search=${encodeURIComponent(q)}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-border-secondary text-xs text-foreground-secondary hover:text-accent-600 hover:border-accent-300 dark:hover:text-accent-400 dark:hover:border-accent-700 transition-colors"
+                    >
+                      <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      {q}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Profile + Default Address row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Profile card */}
               <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-foreground">Profile</h2>
