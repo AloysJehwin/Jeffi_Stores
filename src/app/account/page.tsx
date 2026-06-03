@@ -134,9 +134,16 @@ export default function AccountPage() {
     if (!file) return
     if (file.size > 10 * 1024 * 1024) { setMessage('Photo must be under 10 MB'); return }
     const url = URL.createObjectURL(file)
-    setCropSrc(url)
-    setCropScale(1)
-    setCropPos({ x: 0, y: 0 })
+    const img = new Image()
+    img.onload = () => {
+      const CIRCLE = 240
+      const scale = Math.max(CIRCLE / img.naturalWidth, CIRCLE / img.naturalHeight)
+      setCropScale(scale)
+      setCropPos({ x: 0, y: 0 })
+      setCropSrc(url)
+      document.body.style.overflow = 'hidden'
+    }
+    img.src = url
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -177,6 +184,7 @@ export default function AccountPage() {
       const data = await res.json()
       setAvatarUrl(data.avatarUrl + `?t=${Date.now()}`)
       setCropSrc(null)
+      document.body.style.overflow = ''
     } catch (err: any) {
       setMessage(err.message || 'Failed to upload photo')
     } finally {
@@ -237,6 +245,10 @@ export default function AccountPage() {
     e.preventDefault()
     setCropScale(s => Math.min(4, Math.max(0.5, s - e.deltaY * 0.001)))
   }
+
+  useEffect(() => {
+    return () => { document.body.style.overflow = '' }
+  }, [])
 
   if (isLoading) {
     return (
@@ -645,7 +657,7 @@ export default function AccountPage() {
           <div className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default w-full max-w-sm flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
               <button
-                onClick={() => setCropSrc(null)}
+                onClick={() => { setCropSrc(null); document.body.style.overflow = '' }}
                 className="text-foreground-muted hover:text-foreground transition-colors"
                 aria-label="Cancel"
               >
