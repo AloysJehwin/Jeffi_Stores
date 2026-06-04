@@ -46,6 +46,7 @@ interface ChatTurn {
   id: string
   role: 'user' | 'assistant'
   content: string
+  model?: string
   toolCalls?: ToolCall[]
   proposedActions?: ProposedAction[]
   pickers?: Picker[]
@@ -246,6 +247,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: data.message,
+        model: data.model || undefined,
         toolCalls: data.toolCalls,
         proposedActions: (data.proposedActions || []).map((a: any) => ({ ...a, status: 'proposed' as const })),
         pickers: data.pickers || [],
@@ -445,6 +447,9 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                                   }}
                                 />
                               </div>
+                            )}
+                            {turn.model && (
+                              <p className="mt-1.5 text-[10px] text-foreground-muted opacity-60">{turn.model}</p>
                             )}
                           </>
                         )}
