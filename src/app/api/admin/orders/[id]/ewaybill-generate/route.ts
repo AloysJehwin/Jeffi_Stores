@@ -84,7 +84,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       cessValue: 0,
       transporterName: body.transporterName || '',
       transporterId: body.transporterId || '',
-      transMode: body.transMode || '1',
+  transMode: (body.transMode || '1') as '1' | '2' | '3' | '4',
       transDistance: body.transDistance || 1,
       vehicleNo: body.vehicleNo || order.awb_number || '',
       vehicleType: 'R',
