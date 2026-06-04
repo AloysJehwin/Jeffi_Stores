@@ -9,25 +9,25 @@ import { parseBody, zNonEmpty, zCurrency, zPositiveInt, zUuid } from '@/lib/vali
 const PostSchema = z.object({
   sub_variant_name: zNonEmpty,
   sku: z.string().optional(),
-  price: zCurrency.optional(),
-  mrp: zCurrency.optional(),
-  price_ex_gst: zCurrency.optional(),
-  mrp_ex_gst: zCurrency.optional(),
-  wholeprice_ex_gst: zCurrency.optional(),
+  price: z.optional(zCurrency),
+  mrp: z.optional(zCurrency),
+  price_ex_gst: z.optional(zCurrency),
+  mrp_ex_gst: z.optional(zCurrency),
+  wholeprice_ex_gst: z.optional(zCurrency),
   stock_quantity: z.number().int().min(0).optional(),
-  attributes: z.record(z.unknown()).optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
 })
 
 const PutSchema = z.object({
   id: zUuid,
   sub_variant_name: z.string().optional(),
-  price: zCurrency.optional(),
-  mrp: zCurrency.optional(),
-  price_ex_gst: zCurrency.optional(),
-  mrp_ex_gst: zCurrency.optional(),
-  wholeprice_ex_gst: zCurrency.optional(),
+  price: z.optional(zCurrency),
+  mrp: z.optional(zCurrency),
+  price_ex_gst: z.optional(zCurrency),
+  mrp_ex_gst: z.optional(zCurrency),
+  wholeprice_ex_gst: z.optional(zCurrency),
   stock_quantity: z.number().int().min(0).optional(),
-  attributes: z.record(z.unknown()).optional(),
+  attributes: z.record(z.string(), z.unknown()).optional(),
   is_active: z.boolean().optional(),
 })
 
@@ -62,11 +62,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   const parsed = parseBody(PostSchema, raw)
   if (!parsed.ok) return parsed.response
-  const { sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, wholeprice_ex_gst, stock_quantity, attributes } = parsed.data
+  const { sub_variant_name, sku: skuInput, price, mrp, price_ex_gst, mrp_ex_gst, wholeprice_ex_gst, stock_quantity, attributes } = parsed.data
 
   const productRow = await queryOne<{ sku: string }>(`SELECT sku FROM products WHERE id = $1`, [params.id])
   const parentSku = variant.sku || productRow?.sku || 'PRD'
-  const sku = body.sku || generateVariantSku(parentSku, sub_variant_name)
+  const sku = skuInput || generateVariantSku(parentSku, sub_variant_name)
 
   const row = await queryOne(
     `INSERT INTO product_sub_variants
