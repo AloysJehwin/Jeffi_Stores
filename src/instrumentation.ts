@@ -11,12 +11,12 @@ export async function register() {
   const THIRTY_MIN = 30 * 60 * 1000
   const ONE_DAY    = 24 * 60 * 60 * 1000
 
-  const recordRun = async (jobId: string, ok: boolean, errorMsg?: string) => {
+  const recordRun = async (jobId: string, ok: boolean, errorMsg?: string, detail?: unknown) => {
     try {
       await fetch(`${APP_URL}/api/internal/cron-record`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${CRON_SECRET}` },
-        body: JSON.stringify({ jobId, ok, errorMsg }),
+        body: JSON.stringify({ jobId, ok, errorMsg, detail }),
       })
     } catch {
     }
@@ -28,7 +28,9 @@ export async function register() {
         method,
         headers: { Authorization: `Bearer ${CRON_SECRET}` },
       })
-      await recordRun(jobId, res.ok, res.ok ? undefined : `HTTP ${res.status}`)
+      let body: unknown
+      try { body = await res.json() } catch { body = undefined }
+      await recordRun(jobId, res.ok, res.ok ? undefined : `HTTP ${res.status}`, body)
     } catch (err: any) {
       await recordRun(jobId, false, err?.message || 'fetch failed')
     }

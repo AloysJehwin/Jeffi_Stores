@@ -85,7 +85,7 @@ interface CronJob {
   lastRun: string | null
   lastStatus: string | null
   lastError: string | null
-  log: Array<{ t: string; ok: boolean; err?: string }>
+  log: Array<{ t: string; ok: boolean; err?: string; detail?: unknown }>
 }
 
 interface ToolLogMessage {
@@ -552,7 +552,7 @@ export default function AdminAuditClient() {
                   </div>
                   </div>
                   {isExpanded && job.log.length > 0 && (
-                    <div className="border-t border-border-default divide-y divide-border-default max-h-60 overflow-y-auto">
+                    <div className="border-t border-border-default divide-y divide-border-default max-h-96 overflow-y-auto">
                       {job.log.map((entry, i) => (
                         <div key={i} className={`px-4 py-2 flex items-start gap-2 text-[11px] ${entry.ok ? '' : 'bg-red-50/50 dark:bg-red-900/10'}`}>
                           {entry.ok
@@ -563,6 +563,11 @@ export default function AdminAuditClient() {
                             <span className="text-foreground-muted">{new Date(entry.t).toLocaleString('en-IN')}</span>
                             {!entry.ok && entry.err && (
                               <span className="ml-2 text-red-600 dark:text-red-400 font-mono">{entry.err}</span>
+                            )}
+                            {entry.detail !== undefined && (
+                              <pre className="mt-1 text-[10px] font-mono bg-surface-secondary rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all text-foreground-muted leading-relaxed">
+                                {typeof entry.detail === 'string' ? entry.detail : JSON.stringify(entry.detail, null, 2)}
+                              </pre>
                             )}
                           </div>
                         </div>
