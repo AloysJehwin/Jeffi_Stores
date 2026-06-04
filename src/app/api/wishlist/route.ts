@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { cookies } from 'next/headers'
 import { getUserIdForSession } from '@/lib/guest-user'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import { logActivity } from '@/lib/activity'
+import { parseBody, zUuid } from '@/lib/validate'
+
+const AddWishlistSchema = z.object({
+  productId: zUuid.optional(),
+  product_id: zUuid.optional(),
+  variantId: zUuid.optional(),
+}).refine(
+  (d) => d.productId !== undefined || d.product_id !== undefined,
+  { message: 'productId is required' }
+)
 
 async function resolveUserId(request: NextRequest): Promise<string> {
   const auth = await authenticateUser(request)
@@ -48,6 +59,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedWishlist = parseBody(AddWishlistSchema, body)
+    if (!parsedWishlist.ok) return parsedWishlist.response
     const productId = body.product_id || body.productId
 
     const userId = await resolveUserId(request)

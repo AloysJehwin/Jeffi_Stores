@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   ShieldCheck, Boxes, Tags, FolderTree, Package, Ticket, MailOpen, ScrollText, Filter,
   ArrowRight, Image as ImageIcon, Truck, Receipt, Wallet, MapPin, Settings,
   Warehouse, TrendingUp, Wand2, ClipboardList, Tag,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  Clock, Wrench, CheckCircle2, XCircle, RefreshCw, Bot, Play,
 } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 
@@ -74,7 +76,33 @@ function relTime(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+interface CronJob {
+  id: string
+  name: string
+  path: string
+  intervalMs: number
+  intervalLabel: string
+  enabled: boolean
+  lastRun: string | null
+  lastStatus: string | null
+  lastError: string | null
+  log: Array<{ t: string; ok: boolean; err?: string; detail?: unknown }>
+}
+
+interface ToolLogMessage {
+  id: string
+  conversation_id: string
+  created_at: string
+  tool_calls: Array<{ tool: string; input: Record<string, unknown>; output: unknown; isError?: boolean }>
+  admin_first_name: string | null
+  admin_last_name: string | null
+  admin_username: string | null
+}
+
+type PageTab = 'audit' | 'cron' | 'tools'
+
 export default function AdminAuditClient() {
+  const searchParams = useSearchParams()
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [entityFilter, setEntityFilter] = useState<string>('all')
@@ -82,6 +110,25 @@ export default function AdminAuditClient() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   const [total, setTotal] = useState(0)
+
+  const initialTab = (): PageTab => {
+    const t = searchParams?.get('tab')
+    if (t === 'cron' || t === 'tools') return t
+    return 'audit'
+  }
+  const [pageTab, setPageTab] = useState<PageTab>(initialTab)
+
+  const [cronJobs, setCronJobs] = useState<CronJob[]>([])
+  const [cronLoading, setCronLoading] = useState(false)
+  const [cronTogglingId, setCronTogglingId] = useState<string | null>(null)
+  const [cronTriggeringId, setCronTriggeringId] = useState<string | null>(null)
+  const [expandedCronId, setExpandedCronId] = useState<string | null>(null)
+
+  const [toolLogs, setToolLogs] = useState<ToolLogMessage[]>([])
+  const [toolLogsLoading, setToolLogsLoading] = useState(false)
+  const [toolLogsPage, setToolLogsPage] = useState(1)
+  const [toolLogsTotal, setToolLogsTotal] = useState(0)
+  const [expandedToolLog, setExpandedToolLog] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -100,8 +147,68 @@ export default function AdminAuditClient() {
     }
   }
 
+  async function loadCronJobs() {
+    setCronLoading(true)
+    try {
+      const res = await fetch('/api/admin/cron/status', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setCronJobs(data.jobs || [])
+      }
+    } finally {
+      setCronLoading(false)
+    }
+  }
+
+  async function toggleCronJob(jobId: string, enabled: boolean) {
+    setCronTogglingId(jobId)
+    try {
+      await fetch('/api/admin/cron/config', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, enabled }),
+      })
+      setCronJobs(prev => prev.map(j => j.id === jobId ? { ...j, enabled } : j))
+    } finally {
+      setCronTogglingId(null)
+    }
+  }
+
+  async function triggerCronJob(jobId: string) {
+    setCronTriggeringId(jobId)
+    try {
+      await fetch('/api/admin/cron/trigger', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId }),
+      })
+      await loadCronJobs()
+    } finally {
+      setCronTriggeringId(null)
+    }
+  }
+
+  async function loadToolLogs() {
+    setToolLogsLoading(true)
+    try {
+      const qs = new URLSearchParams({ page: String(toolLogsPage), pageSize: '50' })
+      const res = await fetch(`/api/admin/agent/tool-logs?${qs.toString()}`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setToolLogs(data.messages || [])
+        setToolLogsTotal(data.total || 0)
+      }
+    } finally {
+      setToolLogsLoading(false)
+    }
+  }
+
   useEffect(() => { setPage(1) }, [entityFilter, actionFilter, pageSize])
   useEffect(() => { load() }, [entityFilter, actionFilter, page, pageSize])
+  useEffect(() => { if (pageTab === 'cron') loadCronJobs() }, [pageTab])
+  useEffect(() => { if (pageTab === 'tools') loadToolLogs() }, [pageTab, toolLogsPage])
 
   const entityOptions = useMemo(() => [
     { value: 'all', label: 'All entities' },
@@ -344,7 +451,255 @@ export default function AdminAuditClient() {
         <h1 className="text-xl font-bold text-foreground">Admin Audit Log</h1>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex items-center gap-1 border-b border-border-default mb-5">
+        {([
+          { id: 'audit', label: 'Audit Events', icon: ScrollText },
+          { id: 'cron', label: 'Cron Jobs', icon: Clock },
+          { id: 'tools', label: 'Agent Tool Logs', icon: Wrench },
+        ] as const).map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setPageTab(id)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors -mb-px ${
+              pageTab === id
+                ? 'text-accent-600 dark:text-accent-400 border-accent-500'
+                : 'text-foreground-muted hover:text-foreground border-transparent'
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {pageTab === 'cron' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-foreground-muted">Background jobs running in the server process. Toggle to enable/disable; last run status reflects current deployment.</p>
+            <button
+              type="button"
+              onClick={loadCronJobs}
+              disabled={cronLoading}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${cronLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+          {cronLoading && cronJobs.length === 0 ? (
+            <div className="space-y-3">
+              {[1,2,3,4,5].map(i => <div key={i} className="h-16 rounded-lg bg-surface-secondary animate-pulse" />)}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {cronJobs.map(job => {
+                  const isExpanded = expandedCronId === job.id
+                  return (
+                <div key={job.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+                  <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-foreground">{job.name}</span>
+                      <span className="text-[10px] font-mono text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">{job.intervalLabel}</span>
+                      {job.lastStatus === 'ok' && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-green-700 dark:text-green-400">
+                          <CheckCircle2 className="w-3 h-3" /> last run ok
+                        </span>
+                      )}
+                      {job.lastStatus === 'error' && (
+                        <span className="flex items-center gap-0.5 text-[10px] text-red-600 dark:text-red-400">
+                          <XCircle className="w-3 h-3" /> last run failed
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-foreground-muted mt-0.5 font-mono">{job.path}</p>
+                    {job.lastRun && (
+                      <p className="text-[11px] text-foreground-muted mt-0.5">
+                        Last run: {new Date(job.lastRun).toLocaleString('en-IN')}
+                        {job.lastError ? ` — ${job.lastError}` : ''}
+                      </p>
+                    )}
+                    {!job.lastRun && <p className="text-[11px] text-foreground-muted mt-0.5 italic">No runs recorded yet</p>}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      disabled={cronTriggeringId === job.id}
+                      onClick={() => triggerCronJob(job.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-accent-100 dark:hover:bg-accent-900/30 hover:text-accent-700 dark:hover:text-accent-300 disabled:opacity-50 transition-colors"
+                    >
+                      {cronTriggeringId === job.id
+                        ? <RefreshCw className="w-3 h-3 animate-spin" />
+                        : <Play className="w-3 h-3" />
+                      }
+                      Trigger now
+                    </button>
+                    {job.log.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedCronId(isExpanded ? null : job.id)}
+                        className="px-3 py-1.5 rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-surface-elevated transition-colors"
+                      >
+                        {isExpanded ? 'Hide' : `Logs (${job.log.length})`}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={cronTogglingId === job.id}
+                      onClick={() => toggleCronJob(job.id, !job.enabled)}
+                      className={`px-4 py-1.5 rounded text-xs font-semibold transition-colors disabled:opacity-50 ${
+                        job.enabled
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-800 dark:hover:text-red-300'
+                          : 'bg-surface-secondary text-foreground-muted hover:bg-green-100 dark:hover:bg-green-900/30 hover:text-green-800 dark:hover:text-green-300'
+                      }`}
+                    >
+                      {cronTogglingId === job.id ? '...' : job.enabled ? 'Enabled' : 'Disabled'}
+                    </button>
+                  </div>
+                  </div>
+                  {isExpanded && job.log.length > 0 && (
+                    <div className="border-t border-border-default divide-y divide-border-default max-h-96 overflow-y-auto">
+                      {job.log.map((entry, i) => (
+                        <div key={i} className={`px-4 py-2 flex items-start gap-2 text-[11px] ${entry.ok ? '' : 'bg-red-50/50 dark:bg-red-900/10'}`}>
+                          {entry.ok
+                            ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0 mt-px" />
+                            : <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0 mt-px" />
+                          }
+                          <div className="flex-1 min-w-0">
+                            <span className="text-foreground-muted">{new Date(entry.t).toLocaleString('en-IN')}</span>
+                            {!entry.ok && entry.err && (
+                              <span className="ml-2 text-red-600 dark:text-red-400 font-mono">{entry.err}</span>
+                            )}
+                            {entry.detail !== undefined && (
+                              <pre className="mt-1 text-[10px] font-mono bg-surface-secondary rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all text-foreground-muted leading-relaxed">
+                                {typeof entry.detail === 'string' ? entry.detail : JSON.stringify(entry.detail, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                  )
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {pageTab === 'tools' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-foreground-muted">Tool calls made by the AI admin assistant. Each row is one assistant response that invoked one or more tools.</p>
+            <button
+              type="button"
+              onClick={loadToolLogs}
+              disabled={toolLogsLoading}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${toolLogsLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+          {toolLogsLoading && toolLogs.length === 0 ? (
+            <div className="space-y-3">
+              {[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-surface-secondary animate-pulse" />)}
+            </div>
+          ) : toolLogs.length === 0 ? (
+            <p className="text-sm text-foreground-muted italic">No tool calls logged yet.</p>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {toolLogs.map(msg => {
+                  const isExpanded = expandedToolLog === msg.id
+                  const adminName = [msg.admin_first_name, msg.admin_last_name].filter(Boolean).join(' ') || msg.admin_username || 'Admin'
+                  const errorCount = msg.tool_calls.filter(tc => tc.isError).length
+                  return (
+                    <div key={msg.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedToolLog(isExpanded ? null : msg.id)}
+                        className="w-full px-4 py-3 flex items-start gap-3 text-left hover:bg-surface-secondary/50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-500 to-secondary-500 flex items-center justify-center shrink-0">
+                          <Bot className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold text-foreground">{msg.tool_calls.length} tool call{msg.tool_calls.length !== 1 ? 's' : ''}</span>
+                            {errorCount > 0 && (
+                              <span className="flex items-center gap-0.5 text-[10px] text-red-600 dark:text-red-400">
+                                <XCircle className="w-3 h-3" /> {errorCount} error{errorCount !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-foreground-muted">{relTime(msg.created_at)}</span>
+                            <span className="text-[10px] text-foreground-muted">by {adminName}</span>
+                          </div>
+                          <p className="text-[11px] text-foreground-muted mt-0.5 font-mono truncate">
+                            {msg.tool_calls.map(tc => tc.tool).join(', ')}
+                          </p>
+                        </div>
+                        <span className="text-[10px] text-foreground-muted shrink-0">{isExpanded ? '▲' : '▼'}</span>
+                      </button>
+                      {isExpanded && (
+                        <div className="border-t border-border-default divide-y divide-border-default">
+                          {msg.tool_calls.map((tc, i) => {
+                            const outputStr = typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output, null, 2)
+                            const inputStr = JSON.stringify(tc.input, null, 2)
+                            return (
+                              <div key={i} className={`px-4 py-3 ${tc.isError ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
+                                <div className="flex items-center gap-2 mb-2">
+                                  {tc.isError
+                                    ? <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                                    : <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                                  }
+                                  <span className="text-xs font-semibold font-mono text-foreground">{tc.tool}</span>
+                                </div>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-[11px]">
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-1">Input</p>
+                                    <pre className="bg-surface-secondary rounded p-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground font-mono leading-relaxed">{inputStr}</pre>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-1">Output</p>
+                                    <pre className={`rounded p-2 overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed ${tc.isError ? 'bg-red-100/50 dark:bg-red-900/20 text-red-800 dark:text-red-300' : 'bg-surface-secondary text-foreground'}`}>{outputStr}</pre>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              {toolLogsTotal > 50 && (
+                <div className="mt-4 flex items-center justify-between border-t border-border-default pt-4">
+                  <p className="text-xs text-foreground-muted">
+                    Showing {(toolLogsPage - 1) * 50 + 1}–{Math.min(toolLogsPage * 50, toolLogsTotal)} of {toolLogsTotal}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => setToolLogsPage(p => Math.max(1, p - 1))} disabled={toolLogsPage === 1} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40">
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs px-2 text-foreground">Page {toolLogsPage}</span>
+                    <button type="button" onClick={() => setToolLogsPage(p => p + 1)} disabled={toolLogsPage * 50 >= toolLogsTotal} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40">
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {pageTab === 'audit' && (
+        <>
+        <div className="flex flex-wrap gap-2 mb-4">
         <div className="min-w-[180px]">
           <AdminSelect sm value={entityFilter} onChange={setEntityFilter} options={entityOptions} />
         </div>
@@ -358,7 +713,7 @@ export default function AdminAuditClient() {
         >
           <Filter className="w-3.5 h-3.5" /> Reset
         </button>
-      </div>
+        </div>
 
       {loading ? (
         <div className="space-y-3">
@@ -785,6 +1140,8 @@ export default function AdminAuditClient() {
           </div>
         )
       })()}
+        </>
+      )}
     </div>
   )
 }

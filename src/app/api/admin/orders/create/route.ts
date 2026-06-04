@@ -5,8 +5,24 @@ import { withTransaction } from '@/lib/db'
 import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
+import { z } from 'zod'
+import { parseBody, zUuid, zPositiveInt, zNonEmpty } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const orderItemSchema = z.object({
+  product_id: zUuid.optional(),
+  variant_id: zUuid.optional(),
+  product_name: zNonEmpty,
+  unit_price: z.number().min(0),
+  quantity: zPositiveInt,
+})
+
+const createOrderSchema = z.object({
+  customerName: zNonEmpty,
+  items: z.array(orderItemSchema).min(1),
+  paymentMode: zNonEmpty.optional(),
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +31,10 @@ export async function POST(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
+
+    const parsed = parseBody(createOrderSchema, body)
+    if (!parsed.ok) return parsed.response
+
     const {
       customerName,
       customerPhone,
@@ -29,10 +49,6 @@ export async function POST(request: NextRequest) {
       items,
       notes,
     } = body
-
-    if (!customerName || !items?.length) {
-      return NextResponse.json({ error: 'customerName and items are required' }, { status: 400 })
-    }
 
     const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
@@ -61,6 +77,7 @@ export async function POST(request: NextRequest) {
         product_name: item.product_name,
         product_sku: item.product_sku || '',
         variant_id: item.variant_id || null,
+        sub_variant_id: item.sub_variant_id || null,
         variant_name: item.variant_name || null,
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
@@ -94,7 +111,18 @@ export async function POST(request: NextRequest) {
       const insufficientItems: string[] = []
       for (const item of processedItems) {
         if (!item.product_id) continue
-        if (item.variant_id) {
+        if (item.sub_variant_id) {
+          const inv = await client.query<{ stock_quantity: string }>(
+            `SELECT stock_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+            [item.sub_variant_id]
+          )
+          const stock = parseFloat(inv.rows[0]?.stock_quantity ?? '0') || 0
+          if (stock < item.quantity) {
+            insufficientItems.push(
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${item.quantity})`
+            )
+          }
+        } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: string }>(
             `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
             [item.variant_id]
@@ -156,13 +184,13 @@ export async function POST(request: NextRequest) {
       for (const item of processedItems) {
         await client.query(
           `INSERT INTO order_items (
-            order_id, product_id, product_name, product_sku, variant_id, variant_name,
+            order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,$11,$12,$13,$14,$15,$16)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14,$15,$16,$17)`,
           [
             orderId, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.variant_name,
+            item.variant_id, item.sub_variant_id, item.variant_name,
             item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
@@ -175,7 +203,12 @@ export async function POST(request: NextRequest) {
       if (!saveAsDraft) {
         for (const item of processedItems) {
           if (!item.product_id) continue
-          if (item.variant_id) {
+          if (item.sub_variant_id) {
+            await client.query(
+              `UPDATE product_sub_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2`,
+              [item.quantity, item.sub_variant_id]
+            )
+          } else if (item.variant_id) {
             await client.query(
               `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
               [item.quantity, item.variant_id]

@@ -19,9 +19,9 @@ export default function SortDropdown() {
   const listRef = useRef<HTMLUListElement>(null)
 
   const currentSort = searchParams.get('sort') || 'created_at'
-  const currentOrder = searchParams.get('order') || 'desc'
-  const currentValue = currentOrder === 'desc' && currentSort === 'base_price'
-    ? `${currentSort}&order=${currentOrder}`
+  const currentOrder = searchParams.get('order')
+  const currentValue = currentSort === 'base_price' && currentOrder === 'desc'
+    ? 'base_price&order=desc'
     : currentSort
 
   const selectedOption = SORT_OPTIONS.find(o => o.value === currentValue) || SORT_OPTIONS[0]
@@ -33,6 +33,12 @@ export default function SortDropdown() {
       const [sort, order] = value.split('&order=')
       params.set('sort', sort)
       params.set('order', order)
+    } else if (value === 'base_price') {
+      params.set('sort', value)
+      params.set('order', 'asc')
+    } else if (value === 'name') {
+      params.set('sort', value)
+      params.set('order', 'asc')
     } else {
       params.set('sort', value)
       params.delete('order')

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
 import {
   getGoogleProductCategory,
@@ -19,7 +19,17 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;')
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const feedSecret = process.env.FEED_SECRET
+  if (feedSecret) {
+    const provided =
+      request.headers.get('x-feed-token') ||
+      new URL(request.url).searchParams.get('token')
+    if (provided !== feedSecret) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+  }
+
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
 
   const products = await queryMany(`

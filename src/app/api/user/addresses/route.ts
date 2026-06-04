@@ -1,7 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { logActivity } from '@/lib/activity'
+import { parseBody, zNonEmpty, zPhone, zIndianPin } from '@/lib/validate'
+
+const CreateAddressSchema = z.object({
+  full_name: zNonEmpty,
+  phone: zPhone,
+  address_line1: zNonEmpty,
+  address_line2: z.string().optional(),
+  landmark: z.string().optional(),
+  city: zNonEmpty,
+  state: zNonEmpty,
+  postal_code: zIndianPin,
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,6 +46,8 @@ export async function POST(request: NextRequest) {
     const userId = user.userId
 
     const body = await request.json()
+    const parsed = parseBody(CreateAddressSchema, body)
+    if (!parsed.ok) return parsed.response
     const {
       address_type,
       full_name,
@@ -45,7 +60,7 @@ export async function POST(request: NextRequest) {
       country,
       phone,
       is_default,
-    } = body
+    } = { ...body, ...parsed.data }
 
     if (!phone) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })

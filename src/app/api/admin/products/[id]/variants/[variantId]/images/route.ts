@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { uploadVariantImage, deleteProductImage, getS3Url } from '@/lib/s3'
+import { parseBody, zUuid } from '@/lib/validate'
+
+const GalleryPostSchema = z.object({ gallery_image_id: zUuid })
+const DeleteSchema = z.object({ imageId: zUuid })
+const PatchSchema = z.object({
+  imageId: zUuid,
+  isPrimary: z.boolean().optional(),
+  displayOrder: z.number().int().min(0).optional(),
+})
 
 const MAX_IMAGES = 5
 
@@ -44,11 +54,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     const isPrimary = existing.length === 0
 
     if (contentType.includes('application/json')) {
-      const body = await request.json()
-      if (!body.gallery_image_id) return NextResponse.json({ error: 'gallery_image_id required' }, { status: 400 })
+      const rawJson = await request.json().catch(() => null)
+      if (!rawJson) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+      const parsedJson = parseBody(GalleryPostSchema, rawJson)
+      if (!parsedJson.ok) return parsedJson.response
+      const { gallery_image_id } = parsedJson.data
       const gimg = await queryOne(
         `SELECT * FROM gallery_images WHERE id = $1`,
-        [body.gallery_image_id]
+        [gallery_image_id]
       )
       if (!gimg) return NextResponse.json({ error: 'Gallery image not found' }, { status: 404 })
       const imageUrl = gimg.image_url || (gimg.s3_key ? getS3Url(gimg.s3_key) : null)
@@ -113,8 +126,11 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const { imageId } = await request.json()
-  if (!imageId) return NextResponse.json({ error: 'imageId required' }, { status: 400 })
+  const rawDel = await request.json().catch(() => null)
+  if (!rawDel) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  const parsedDel = parseBody(DeleteSchema, rawDel)
+  if (!parsedDel.ok) return parsedDel.response
+  const { imageId } = parsedDel.data
 
   const image = await queryOne(
     `SELECT * FROM variant_images WHERE id = $1 AND variant_id = $2`,
@@ -142,8 +158,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const { imageId, isPrimary, displayOrder } = await request.json()
-  if (!imageId) return NextResponse.json({ error: 'imageId required' }, { status: 400 })
+  const rawPatch = await request.json().catch(() => null)
+  if (!rawPatch) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  const parsedPatch = parseBody(PatchSchema, rawPatch)
+  if (!parsedPatch.ok) return parsedPatch.response
+  const { imageId, isPrimary, displayOrder } = parsedPatch.data
 
   if (isPrimary) {
     await query(`UPDATE variant_images SET is_primary = FALSE WHERE variant_id = $1`, [params.variantId])

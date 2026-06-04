@@ -11,6 +11,7 @@ export interface LineItem {
   product_name: string
   product_sku: string
   variant_id: string | null
+  sub_variant_id: string | null
   variant_name: string
   hsn_code: string
   gst_rate: string
@@ -27,6 +28,7 @@ interface Suggestion {
   id: string
   product_id: string
   variant_id: string | null
+  sub_variant_id: string | null
   name: string
   variant_name: string | null
   sku: string
@@ -51,7 +53,7 @@ export function newLineItem(): LineItem {
   return {
     id: Math.random().toString(36).slice(2),
     product_id: null, product_name: '', product_sku: '',
-    variant_id: null, variant_name: '',
+    variant_id: null, sub_variant_id: null, variant_name: '',
     hsn_code: '', gst_rate: '18', quantity: 1, unit: 'PCS', unit_price: 0,
     discount_pct: 0, mrp: 0, inventory_quantity: null,
   }
@@ -66,7 +68,7 @@ function fmt(n: number) {
 }
 
 function decodeLineItemId(encoded: string) {
-  const [product_id, variant_id_raw, base_price_raw, gst_raw, hsn_raw, mrp_raw, inv_raw] = encoded.split('|')
+  const [product_id, variant_id_raw, base_price_raw, gst_raw, hsn_raw, mrp_raw, inv_raw, sub_variant_id_raw] = encoded.split('|')
   const unit_price = parseFloat(base_price_raw) || 0
   const mrp = parseFloat(mrp_raw) || 0
   const discount_pct = mrp > 0 && unit_price < mrp
@@ -75,6 +77,7 @@ function decodeLineItemId(encoded: string) {
   return {
     product_id,
     variant_id: variant_id_raw || null,
+    sub_variant_id: sub_variant_id_raw || null,
     unit_price,
     discount_pct,
     mrp,
@@ -131,7 +134,11 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       if (q.trim()) params.set('q', q.trim())
       const res = await fetch(`/api/admin/labels/products?${params}`, { credentials: 'include' })
       const data = await res.json()
-      setPickerProducts(data.products || [])
+      const raw: any[] = data.products || []
+      setPickerProducts(raw.map(p => ({
+        ...p,
+        sub_variant_id: p.id?.startsWith('subvariant:') ? p.id.slice('subvariant:'.length) : null,
+      })))
     } catch { setPickerProducts([]) }
     finally { setPickerLoading(false) }
   }
@@ -149,6 +156,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       product_name: s.variant_name ? `${s.name} — ${s.variant_name}` : s.name,
       product_sku: s.sku,
       variant_id: s.variant_id,
+      sub_variant_id: s.sub_variant_id,
       variant_name: s.variant_name || '',
       hsn_code: s.hsn_code || '',
       gst_rate: String(Math.round(Number(s.gst_percentage ?? 18))),
@@ -272,6 +280,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                             product_name: s.label,
                             product_sku: s.sublabel?.split(' · ')[0] ?? '',
                             variant_id: d.variant_id,
+                            sub_variant_id: d.sub_variant_id,
                             variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : '',
                             hsn_code: d.hsn_code,
                             gst_rate: d.gst_percentage,
@@ -300,6 +309,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                             product_name: s.label,
                             product_sku: sku,
                             variant_id: d.variant_id,
+                            sub_variant_id: d.sub_variant_id,
                             variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : '',
                             hsn_code: d.hsn_code,
                             gst_rate: d.gst_percentage,

@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
+import { z } from 'zod'
+import { parseBody, zCurrency, zNonEmpty } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const postSchema = z.object({
+  amount: zCurrency.refine((v) => v > 0, { message: 'amount must be greater than 0' }),
+  paymentMethod: zNonEmpty,
+})
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -17,6 +24,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!amount || !payment_date) {
       return NextResponse.json({ error: 'amount and payment_date are required' }, { status: 400 })
     }
+
+    const parsed = parseBody(postSchema, { amount: body.amount, paymentMethod: body.payment_method })
+    if (!parsed.ok) return parsed.response
 
     const expense = await queryOne<{ id: string; total_amount: string; status: string }>(
       'SELECT id, total_amount, status FROM expenses WHERE id = $1',

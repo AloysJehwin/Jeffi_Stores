@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
@@ -9,6 +10,12 @@ import {
   cartItemsForHash,
   validateCouponForUser,
 } from '@/lib/order-commit'
+import { parseBody, zNonEmpty } from '@/lib/validate'
+
+const CreateRazorpayOrderSchema = z.object({
+  draftToken: z.string().optional(),
+  orderId: zNonEmpty.optional(),
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,6 +29,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    const parsed = parseBody(CreateRazorpayOrderSchema, body)
+    if (!parsed.ok) return parsed.response
 
     if (typeof body.draftToken === 'string' && body.draftToken) {
       return await handleDraftToken(body.draftToken, authUser.userId)

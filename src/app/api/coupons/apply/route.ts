@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
+import { parseBody, zNonEmpty, zCurrency } from '@/lib/validate'
+
+const ApplyCouponSchema = z.object({
+  code: zNonEmpty,
+  subtotal: zCurrency,
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,11 +16,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { code, subtotal } = await request.json()
-
-    if (!code || typeof code !== 'string') {
-      return NextResponse.json({ error: 'Coupon code is required' }, { status: 400 })
-    }
+    const body = await request.json()
+    const parsed = parseBody(ApplyCouponSchema, body)
+    if (!parsed.ok) return parsed.response
+    const { code, subtotal } = parsed.data
 
     const coupon = await queryOne<{
       id: string

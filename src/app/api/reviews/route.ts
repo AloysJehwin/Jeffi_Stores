@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendNewReviewNotification } from '@/lib/email'
 import { uploadReviewImage } from '@/lib/s3'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
+import { parseBody, zUuid } from '@/lib/validate'
+
+const CreateReviewSchema = z.object({
+  productId: zUuid,
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().max(2000).optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -100,6 +108,9 @@ export async function POST(request: NextRequest) {
     const title = formData.get('title') as string | null
     const comment = formData.get('comment') as string
     const rating = parseInt(ratingRaw, 10)
+
+    const parsedReview = parseBody(CreateReviewSchema, { productId, rating, comment: comment || undefined })
+    if (!parsedReview.ok) return parsedReview.response
 
     if (!productId || !rating || !comment) {
       return NextResponse.json({ error: 'Product ID, rating, and comment are required' }, { status: 400 })

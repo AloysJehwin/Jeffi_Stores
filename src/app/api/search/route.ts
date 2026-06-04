@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryMany } from '@/lib/db'
 import { cookies } from 'next/headers'
-import { jwtVerify } from 'jose'
+import { authenticateUser } from '@/lib/jwt'
 import { buildProductSearchClause, buildProductSearchRank, buildSearchClause } from '@/lib/search'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 
 export const dynamic = 'force-dynamic'
-
-const JWT_SECRET = process.env.JWT_SECRET ? new TextEncoder().encode(process.env.JWT_SECRET) : null
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,14 +51,8 @@ export async function GET(request: NextRequest) {
       try {
         const cookieStore = await cookies()
         const sessionId = cookieStore.get('session_id')?.value || null
-        let userId: string | null = null
-        const authToken = cookieStore.get('auth_token')?.value
-        if (authToken && JWT_SECRET) {
-          try {
-            const { payload } = await jwtVerify(authToken, JWT_SECRET)
-            userId = (payload.userId as string) || null
-          } catch {}
-        }
+        const authUser = await authenticateUser(request)
+        const userId = authUser?.userId ?? null
         await query(
           `INSERT INTO search_logs (query, results_count, user_id, session_id) VALUES ($1, $2, $3, $4)`,
           [q.slice(0, 200), productsArr.length + categoriesArr.length, userId, sessionId]

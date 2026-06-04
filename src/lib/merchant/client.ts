@@ -1,6 +1,4 @@
 import { createSign } from 'crypto'
-import fs from 'fs'
-import path from 'path'
 
 const MERCHANT_ID = '5762156822'
 const SCOPE = 'https://www.googleapis.com/auth/content'
@@ -19,6 +17,12 @@ interface ServiceAccountCreds {
 let cachedToken: { token: string; expiresAt: number } | null = null
 
 function loadCredentials(): ServiceAccountCreds {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+    return { client_email: creds.client_email, private_key: creds.private_key }
+  }
+  const fs = require('fs')
+  const path = require('path')
   const credPath = path.join(process.cwd(), 'jeffi-stores-76e9ecaecdd6.json')
   const creds = JSON.parse(fs.readFileSync(credPath, 'utf8'))
   return { client_email: creds.client_email, private_key: creds.private_key }

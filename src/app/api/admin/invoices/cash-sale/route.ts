@@ -4,10 +4,23 @@ import { hasScope } from '@/lib/scopes'
 import { withTransaction } from '@/lib/db'
 import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
+import { z } from 'zod'
+import { parseBody, zNonEmpty } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
 const VALID_PAYMENT_MODES = ['cash', 'upi', 'upi_qr']
+
+const cashSaleItemSchema = z.object({
+  product_name: zNonEmpty,
+  unit_price: z.number().min(0),
+  quantity: z.number().min(0),
+})
+
+const cashSaleSchema = z.object({
+  items: z.array(cashSaleItemSchema).min(1),
+  paymentMode: zNonEmpty.optional(),
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,16 +29,14 @@ export async function POST(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
+
+    const parsed = parseBody(cashSaleSchema, body)
+    if (!parsed.ok) return parsed.response
+
     const { paymentMode = 'cash', notes, items } = body
 
     if (!VALID_PAYMENT_MODES.includes(paymentMode)) {
       return NextResponse.json({ error: 'Invalid payment mode for cash sale' }, { status: 400 })
-    }
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'At least one item is required' }, { status: 400 })
-    }
-    if (items.some((it: any) => !it.product_name?.trim() || !it.unit_price)) {
-      return NextResponse.json({ error: 'All items need a name and price' }, { status: 400 })
     }
 
     const orderIsIgst = false
@@ -54,6 +65,7 @@ export async function POST(request: NextRequest) {
         product_name: item.product_name || '',
         product_sku: item.product_sku || '',
         variant_id: item.variant_id || null,
+        sub_variant_id: item.sub_variant_id || null,
         variant_name: item.variant_name || null,
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
@@ -137,7 +149,22 @@ export async function POST(request: NextRequest) {
         if (!item.product_id) continue
         const qty = item.quantity
 
-        if (item.variant_id) {
+        if (item.sub_variant_id) {
+          const inv = await client.query<{ stock_quantity: number }>(
+            `SELECT stock_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+            [item.sub_variant_id]
+          )
+          const stock = parseFloat(inv.rows[0]?.stock_quantity as any) || 0
+          if (stock < qty) {
+            throw new Error(
+              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
+            )
+          }
+          await client.query(
+            `UPDATE product_sub_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2`,
+            [qty, item.sub_variant_id]
+          )
+        } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
             [item.variant_id]

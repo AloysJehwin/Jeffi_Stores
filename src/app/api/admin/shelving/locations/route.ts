@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { listLocations, createLocation } from '@/lib/shelf'
+import { z } from 'zod'
+import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const postSchema = z.object({
+  name: zNonEmpty,
+  warehouseId: zUuid,
+})
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -30,6 +37,9 @@ export async function POST(request: NextRequest) {
     if (!aisle_code?.trim()) return NextResponse.json({ error: 'aisle_code required' }, { status: 400 })
     if (!rack_code?.trim()) return NextResponse.json({ error: 'rack_code required' }, { status: 400 })
     if (!shelf_code?.trim()) return NextResponse.json({ error: 'shelf_code required' }, { status: 400 })
+
+    const parsed = parseBody(postSchema, { name: aisle_code, warehouseId: warehouse_id })
+    if (!parsed.ok) return parsed.response
 
     const location = await createLocation(
       warehouse_id,

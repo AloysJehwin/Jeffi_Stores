@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
+import { z } from 'zod'
+import { parseBody, zNonEmpty } from '@/lib/validate'
+
+const createDraftSchema = z.object({
+  name: zNonEmpty,
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +15,12 @@ export async function POST(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const { name } = await request.json()
+    const rawBody = await request.json()
+
+    const parsed = parseBody(createDraftSchema, rawBody)
+    if (!parsed.ok) return parsed.response
+
+    const { name } = rawBody
     if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })
 
     const trimmed = name.trim()

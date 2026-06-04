@@ -189,7 +189,14 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                         <h3 className="font-medium text-foreground">{item.product_name || item.products?.name || 'Product'}</h3>
                         <p className="text-sm text-foreground-muted mt-1">SKU: {item.product_sku || item.products?.sku}</p>
                         {item.variant_name && (
-                          <p className="text-sm text-foreground-muted">{item.variant_name}</p>
+                          <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                            {item.variant_name}
+                          </span>
+                        )}
+                        {item.sub_variant?.sub_variant_name && (
+                          <span className="inline-flex items-center mt-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                            {item.sub_variant.sub_variant_name}
+                          </span>
                         )}
                         <p className="text-sm text-foreground-secondary mt-1">
                           {item.buy_mode === 'weight' || item.buy_mode === 'length'
@@ -244,7 +251,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             <div className="divide-y divide-border-default">
               {order.order_items && order.order_items.length > 0 ? (
                 order.order_items.map((item: any) => {
-                  const inv = item.variant?.inventory_quantity ?? item.products?.inventory_quantity ?? 0
+                  const inv = item.sub_variant?.inventory_quantity ?? item.variant?.inventory_quantity ?? item.products?.inventory_quantity ?? 0
                   const qty = Math.round(Number(item.quantity))
                   const isOut = inv <= 0
                   const isLow = inv > 0 && inv <= 5
@@ -253,10 +260,18 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
                         <p className="text-xs text-foreground-muted mt-0.5">
-                          SKU: {item.variant?.sku || item.product_sku}
-                          {item.variant_name && ` · ${item.variant_name}`}
-                          {' · '}Ordered: {qty}
+                          SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}{' · '}Ordered: {qty}
                         </p>
+                        {item.variant_name && (
+                          <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                            {item.variant_name}
+                          </span>
+                        )}
+                        {item.sub_variant?.sub_variant_name && (
+                          <span className="inline-flex items-center mt-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                            {item.sub_variant.sub_variant_name}
+                          </span>
+                        )}
                       </div>
                       <div className="text-right shrink-0">
                         <p className={`text-sm font-semibold ${isOut ? 'text-red-500' : isLow ? 'text-yellow-500' : 'text-green-600 dark:text-green-400'}`}>

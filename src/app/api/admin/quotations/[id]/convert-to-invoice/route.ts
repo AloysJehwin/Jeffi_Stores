@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
+import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 
 export const dynamic = 'force-dynamic'
@@ -51,37 +51,50 @@ export async function POST(
       const qty = parseFloat(item.quantity)
       const rate = parseFloat(item.rate)
       const discountFactor = 1 - (parseFloat(item.discount_pct) || 0) / 100
-      const lineTotal = qty * rate * discountFactor
+      const exGstLineTotal = qty * rate * discountFactor
       const gstRate = parseFloat(item.gst_rate || '18')
-      const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
-      subtotal += lineTotal
-      totalTaxable += gst.taxableAmount
-      totalCgst += gst.cgst
-      totalSgst += gst.sgst
-      totalIgst += gst.igst
+      let cgst = 0, sgst = 0, igst = 0
+      if (gstRate > 0) {
+        const lineTax = exGstLineTotal * gstRate / 100
+        if (orderIsIgst) {
+          igst = lineTax
+        } else {
+          cgst = lineTax / 2
+          sgst = lineTax / 2
+        }
+      }
+      const lineTax = cgst + sgst + igst
+      const incGstLineTotal = exGstLineTotal + lineTax
+
+      subtotal += exGstLineTotal
+      totalTaxable += exGstLineTotal
+      totalCgst += cgst
+      totalSgst += sgst
+      totalIgst += igst
 
       return {
         product_id: item.product_id || null,
         product_name: item.description,
         product_sku: '',
         variant_id: item.variant_id || null,
+        sub_variant_id: item.sub_variant_id || null,
         variant_name: null,
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
         unit_price: parseFloat((rate * discountFactor).toFixed(4)),
-        total_price: Math.round(lineTotal * 100) / 100,
-        taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
-        cgst_amount: Math.round(gst.cgst * 100) / 100,
-        sgst_amount: Math.round(gst.sgst * 100) / 100,
-        igst_amount: Math.round(gst.igst * 100) / 100,
-        tax_amount: Math.round((gst.cgst + gst.sgst + gst.igst) * 100) / 100,
+        total_price: Math.round(incGstLineTotal * 100) / 100,
+        taxable_amount: Math.round(exGstLineTotal * 100) / 100,
+        cgst_amount: Math.round(cgst * 100) / 100,
+        sgst_amount: Math.round(sgst * 100) / 100,
+        igst_amount: Math.round(igst * 100) / 100,
+        tax_amount: Math.round(lineTax * 100) / 100,
       }
     })
 
     const taxAmount = Math.round((totalCgst + totalSgst + totalIgst) * 100) / 100
-    const totalAmount = Math.round(subtotal * 100) / 100
+    const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100
     const isPaid = paymentMode !== 'credit'
     const today = new Date().toISOString().slice(0, 10)
 
@@ -156,13 +169,13 @@ export async function POST(
       for (const item of processedItems) {
         await client.query(
           `INSERT INTO order_items (
-            order_id, product_id, product_name, product_sku, variant_id, variant_name,
+            order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, unit_price, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
           [
             newOrder.id, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.variant_name, item.hsn_code, item.gst_rate,
+            item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
             item.quantity, item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
           ]
@@ -173,7 +186,20 @@ export async function POST(
         if (!item.product_id) continue
         const qty = item.quantity
 
-        if (item.variant_id) {
+        if (item.sub_variant_id) {
+          const inv = await client.query<{ stock_quantity: number }>(
+            'SELECT stock_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE',
+            [item.sub_variant_id]
+          )
+          const stock = parseFloat(inv.rows[0]?.stock_quantity as any) || 0
+          if (stock < qty) {
+            throw new Error(`Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`)
+          }
+          await client.query(
+            'UPDATE product_sub_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+            [qty, item.sub_variant_id]
+          )
+        } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE',
             [item.variant_id]

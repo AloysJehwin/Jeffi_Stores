@@ -19,10 +19,17 @@ export default function LoginPageWrapper() {
 function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/'
-  const { login, googleLoginWithAccessToken } = useAuth()
+  const rawRedirect = searchParams.get('redirect') || '/'
+  const redirect = ['/login', '/signup'].some(p => rawRedirect.startsWith(p)) ? '/' : rawRedirect
+  const { user, isLoading: authLoading, login, googleLoginWithAccessToken } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace(redirect)
+    }
+  }, [user, authLoading])
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [email, setEmail] = useState('')
@@ -33,6 +40,10 @@ function LoginPage() {
   const [error, setError] = useState('')
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
+  const [phone, setPhone] = useState('')
+  const [phoneSaving, setPhoneSaving] = useState(false)
+  const [phoneError, setPhoneError] = useState('')
 
   useEffect(() => {
     if (resendCooldown <= 0) return
@@ -57,9 +68,13 @@ function LoginPage() {
       return
     }
     try {
-      await googleLoginWithAccessToken(result.accessToken)
+      const loggedInUser = await googleLoginWithAccessToken(result.accessToken)
       await refreshCart()
-      router.push(redirect)
+      if (!loggedInUser?.phone) {
+        setShowPhoneModal(true)
+      } else {
+        router.push(redirect)
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -85,7 +100,7 @@ function LoginPage() {
           throw new Error(data.error || 'Please wait before requesting another OTP')
         }
         if (data.userNotFound) {
-          router.push(`/signup?email=${encodeURIComponent(email)}&from=login`)
+          router.push(`/signup?email=${encodeURIComponent(email)}&from=login${redirect !== '/' ? `&redirect=${encodeURIComponent(redirect)}` : ''}`)
           return
         }
         throw new Error(data.error || 'Failed to send OTP')
@@ -155,6 +170,33 @@ function LoginPage() {
       setError(err.message)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleSavePhone = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPhoneError('')
+    if (!phone || phone.length !== 10) {
+      setPhoneError('Enter a valid 10-digit mobile number')
+      return
+    }
+    setPhoneSaving(true)
+    try {
+      const res = await fetch('/api/user/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ phone }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        throw new Error(d.error || 'Failed to save phone number')
+      }
+      router.push(redirect)
+    } catch (err: any) {
+      setPhoneError(err.message)
+    } finally {
+      setPhoneSaving(false)
     }
   }
 
@@ -273,12 +315,64 @@ function LoginPage() {
 
           <div className="mt-6 text-center text-sm text-foreground-secondary">
             Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
+            <Link href={`/signup${redirect !== '/' ? `?redirect=${encodeURIComponent(redirect)}` : ''}`} className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
               Create one
             </Link>
           </div>
         </div>
       </div>
+
+      {showPhoneModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-surface-elevated rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 className="text-lg font-semibold text-foreground mb-2">Add Mobile Number</h3>
+            <p className="text-sm text-foreground-secondary mb-6">
+              Add your mobile number so we can keep you updated on your orders.
+            </p>
+            {phoneError && (
+              <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-3 py-2 rounded-lg text-sm">
+                {phoneError}
+              </div>
+            )}
+            <form onSubmit={handleSavePhone} className="space-y-4">
+              <div>
+                <label htmlFor="phone-modal" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Mobile Number *
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
+                    +91
+                  </span>
+                  <input
+                    id="phone-modal"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={phone}
+                    required
+                    autoFocus
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="00000 00000"
+                  />
+                </div>
+                {phone.length > 0 && phone.length !== 10 && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={phoneSaving || phone.length !== 10}
+                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {phoneSaving ? (
+                  <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Saving...</>
+                ) : 'Save & Continue'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

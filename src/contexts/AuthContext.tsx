@@ -9,6 +9,7 @@ interface User {
   lastName: string | null
   phone: string | null
   createdAt: string
+  avatarUrl: string | null
 }
 
 interface AuthContextType {
@@ -16,7 +17,7 @@ interface AuthContextType {
   isLoading: boolean
   login: (email: string, otp: string) => Promise<void>
   googleLogin: (idToken: string) => Promise<void>
-  googleLoginWithAccessToken: (accessToken: string) => Promise<void>
+  googleLoginWithAccessToken: (accessToken: string) => Promise<User>
   signup: (data: SignupData) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -84,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user)
   }
 
-  const googleLoginWithAccessToken = async (accessToken: string) => {
+  const googleLoginWithAccessToken = async (accessToken: string): Promise<User> => {
     const response = await fetch('/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const data = await response.json()
     setUser(data.user)
+    return data.user
   }
 
   const signup = async (signupData: SignupData) => {

@@ -107,8 +107,20 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
           <div className="flex flex-col p-4 gap-1">
             {user ? (
               <>
-                <div className="px-4 py-2 text-sm text-foreground-muted">
-                  Signed in as {user.firstName || user.email}
+                <div className="flex items-center gap-3 px-4 py-2">
+                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.firstName} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-accent-500 text-white flex items-center justify-center font-semibold">
+                        {`${user.firstName.charAt(0)}${user.lastName?.charAt(0) || ''}`.toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{user.firstName} {user.lastName}</p>
+                    <p className="text-xs text-foreground-muted truncate">{user.email}</p>
+                  </div>
                 </div>
                 <Link
                   href="/account"
