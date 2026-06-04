@@ -3,6 +3,7 @@ import { createSign } from 'crypto'
 const MERCHANT_ID = '5762156822'
 const SCOPE = 'https://www.googleapis.com/auth/content'
 const BASE_URL = `https://shoppingcontent.googleapis.com/content/v2.1/${MERCHANT_ID}`
+const BATCH_URL = `https://shoppingcontent.googleapis.com/content/v2.1`
 const CHANNEL = 'online'
 const CONTENT_LANGUAGE = 'en'
 const TARGET_COUNTRY = 'IN'
@@ -110,5 +111,20 @@ export async function listProducts(pageToken?: string): Promise<{ resources?: an
 }
 
 export async function customBatchUpsert(entries: unknown[]): Promise<any> {
-  return gmcRequest('POST', '/products/batch', { entries })
+  const token = await getAccessToken()
+  const res = await fetch(`${BATCH_URL}/products/batch`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ entries }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`GMC POST /products/batch failed (${res.status}): ${err}`)
+  }
+
+  return res.json()
 }
