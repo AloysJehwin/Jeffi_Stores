@@ -62,6 +62,7 @@ export async function PATCH(
         product_name: item.product_name,
         product_sku: item.product_sku || '',
         variant_id: item.variant_id || null,
+        sub_variant_id: item.sub_variant_id || null,
         variant_name: item.variant_name || null,
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
@@ -82,14 +83,14 @@ export async function PATCH(
     const effectiveDate = invoiceDate || new Date().toISOString().slice(0, 10)
 
     const result = await withTransaction(async (client) => {
-      const existingResult = await client.query<{ product_id: string | null; variant_id: string | null; quantity: string }>(
-        `SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1`,
+      const existingResult = await client.query<{ product_id: string | null; variant_id: string | null; sub_variant_id: string | null; quantity: string }>(
+        `SELECT product_id, variant_id, sub_variant_id, quantity FROM order_items WHERE order_id = $1`,
         [params.id]
       )
 
       const existingQtyMap = new Map<string, number>()
       for (const r of existingResult.rows) {
-        const key = `${r.product_id ?? ''}::${r.variant_id ?? ''}`
+        const key = `${r.product_id ?? ''}::${r.variant_id ?? ''}::${r.sub_variant_id ?? ''}`
         existingQtyMap.set(key, (existingQtyMap.get(key) ?? 0) + parseFloat(r.quantity))
       }
 
@@ -97,12 +98,23 @@ export async function PATCH(
 
       for (const item of processedItems) {
         if (!item.product_id) continue
-        const key = `${item.product_id}::${item.variant_id ?? ''}`
+        const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
         const previousQty = existingQtyMap.get(key) ?? 0
         const extraQty = item.quantity - previousQty
         if (extraQty <= 0) continue
 
-        if (item.variant_id) {
+        if (item.sub_variant_id) {
+          const inv = await client.query<{ stock_quantity: string }>(
+            `SELECT stock_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+            [item.sub_variant_id]
+          )
+          const stock = parseFloat(inv.rows[0]?.stock_quantity ?? '0') || 0
+          if (stock < extraQty) {
+            insufficientItems.push(
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, extra needed: ${extraQty})`
+            )
+          }
+        } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: string }>(
             `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
             [item.variant_id]
@@ -170,13 +182,13 @@ export async function PATCH(
       for (const item of processedItems) {
         await client.query(
           `INSERT INTO order_items (
-            order_id, product_id, product_name, product_sku, variant_id, variant_name,
+            order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, unit_price, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
           [
             params.id, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.variant_name, item.hsn_code, item.gst_rate,
+            item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
             item.quantity, item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
           ]
@@ -186,12 +198,17 @@ export async function PATCH(
       if (!moveToDraft) {
         for (const item of processedItems) {
           if (!item.product_id) continue
-          const key = `${item.product_id}::${item.variant_id ?? ''}`
+          const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
           const previousQty = existingQtyMap.get(key) ?? 0
           const extraQty = item.quantity - previousQty
           if (extraQty <= 0) continue
 
-          if (item.variant_id) {
+          if (item.sub_variant_id) {
+            await client.query(
+              `UPDATE product_sub_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2`,
+              [extraQty, item.sub_variant_id]
+            )
+          } else if (item.variant_id) {
             await client.query(
               `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
               [extraQty, item.variant_id]
