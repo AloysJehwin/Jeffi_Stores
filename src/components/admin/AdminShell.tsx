@@ -67,10 +67,10 @@ export default function AdminShell({
       <div className="flex flex-col flex-1 min-w-0 h-full">
 
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0">
+        <div className="relative flex items-center justify-between px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0">
 
-          {/* Left: mobile hamburger OR desktop collapse toggle + brand */}
-          <div className="flex items-center gap-2">
+          {/* Fixed-position brand + toggle — never shifts with sidebar */}
+          <div className="fixed top-0 left-0 h-12 flex items-center gap-2 px-3 z-50 bg-secondary-500 dark:bg-secondary-700">
             {/* Mobile hamburger */}
             <div className="md:hidden flex items-center gap-2">
               <AdminMobileNav
@@ -78,32 +78,33 @@ export default function AdminShell({
                 username={displayName}
                 role={role}
               />
+              <span className="font-bold text-white text-sm">Jeffi Admin</span>
             </div>
 
-            {/* Desktop: collapse/expand toggle */}
-            <button
-              type="button"
-              onClick={toggle}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className="hidden md:flex items-center justify-center w-7 h-7 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-            >
-              {collapsed ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
-                </svg>
-              )}
-            </button>
-
-            {/* Brand — always visible on desktop */}
-            <span className="hidden md:block font-bold text-white text-sm select-none">Jeffi Stores</span>
-
-            {/* Brand — mobile */}
-            <span className="md:hidden font-bold text-white text-sm">Jeffi Admin</span>
+            {/* Desktop: toggle + brand */}
+            <div className="hidden md:flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggle}
+                title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                className="flex items-center justify-center w-7 h-7 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+              >
+                {collapsed ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
+                  </svg>
+                )}
+              </button>
+              <span className="font-bold text-white text-sm select-none">Jeffi Stores</span>
+            </div>
           </div>
+
+          {/* Spacer so right-side items stay pushed right */}
+          <div />
 
           {/* Right side: avatar + name + role + theme + logout */}
           <div className="flex items-center gap-3">
