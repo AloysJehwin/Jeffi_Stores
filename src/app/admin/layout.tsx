@@ -40,13 +40,13 @@ export default async function AdminLayout({
   const headersList = headers()
   const pathname = headersList.get('x-pathname') || ''
 
-  const isLoginPage = pathname === '/admin/login'
+  const session = await getAdminSession()
 
-  if (isLoginPage) {
-    return children
+  // Show bare children (no shell) on login page or when session is absent/expired
+  if (pathname === '/admin/login' || !session) {
+    return <>{children}</>
   }
 
-  const session = await getAdminSession()
   const role = session?.role || ''
   const scopes: string[] = session?.scopes || []
 
