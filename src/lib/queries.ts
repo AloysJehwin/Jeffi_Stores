@@ -916,18 +916,33 @@ export async function getOrder(id: string) {
             'buy_mode', oi.buy_mode, 'buy_unit', oi.buy_unit,
             'created_at', oi.created_at,
             'variant_id', oi.variant_id,
+            'sub_variant_id', oi.sub_variant_id,
             'products', json_build_object(
               'id', pr.id, 'name', pr.name, 'sku', pr.sku,
               'inventory_quantity', pr.inventory_quantity
             ),
             'variant', CASE WHEN oi.variant_id IS NOT NULL THEN
-              json_build_object('id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku, 'inventory_quantity', pv.inventory_quantity)
+              json_build_object(
+                'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
+                'inventory_quantity', CASE
+                  WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+                  THEN COALESCE((SELECT SUM(sv2.inventory_quantity) FROM product_sub_variants sv2 WHERE sv2.variant_id = pv.id AND sv2.is_active = true), 0)
+                  ELSE pv.inventory_quantity
+                END
+              )
+            ELSE NULL END,
+            'sub_variant', CASE WHEN oi.sub_variant_id IS NOT NULL THEN
+              json_build_object(
+                'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
+                'inventory_quantity', psv.stock_quantity
+              )
             ELSE NULL END
           )
         )
         FROM order_items oi
         LEFT JOIN products pr ON oi.product_id = pr.id
         LEFT JOIN product_variants pv ON oi.variant_id = pv.id
+        LEFT JOIN product_sub_variants psv ON oi.sub_variant_id = psv.id
         WHERE oi.order_id = o.id),
         '[]'::json
       ) AS order_items,

@@ -19,6 +19,7 @@ export interface DraftCartItem {
 export interface DraftBuyNowItem {
   productId: string
   variantId: string | null
+  subVariantId: string | null
   qty: number
   buyMode: string
   buyUnit: string | null

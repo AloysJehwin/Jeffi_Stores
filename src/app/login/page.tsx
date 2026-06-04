@@ -21,9 +21,15 @@ function LoginPage() {
   const searchParams = useSearchParams()
   const rawRedirect = searchParams.get('redirect') || '/'
   const redirect = ['/login', '/signup'].some(p => rawRedirect.startsWith(p)) ? '/' : rawRedirect
-  const { login, googleLoginWithAccessToken } = useAuth()
+  const { user, isLoading: authLoading, login, googleLoginWithAccessToken } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace(redirect)
+    }
+  }, [user, authLoading])
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [email, setEmail] = useState('')
