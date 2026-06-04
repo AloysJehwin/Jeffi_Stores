@@ -7,7 +7,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
-const JWT_EXPIRES_IN = '8h'
+const JWT_EXPIRES_IN = '1h'
 
 export interface JWTPayload {
   adminId: string
@@ -23,6 +23,7 @@ export interface JWTPayload {
 export interface UserJWTPayload {
   userId: string
   email: string
+  scopes?: string[]
   [key: string]: any
 }
 
@@ -70,7 +71,7 @@ export async function authenticateUser(request: NextRequest): Promise<UserJWTPay
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     if (!payload.userId || typeof payload.userId !== 'string') return null
-    return { userId: payload.userId as string, email: payload.email as string }
+    return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
   } catch {
     return null
   }
@@ -113,4 +114,16 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
   } catch {
     return null
   }
+}
+
+export async function requireUserScope(
+  request: NextRequest,
+  scope: string
+): Promise<UserJWTPayload | NextResponse> {
+  const user = await authenticateUser(request)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(user.scopes ?? []).includes(scope)) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+  return user
 }
