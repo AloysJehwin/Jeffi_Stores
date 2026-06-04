@@ -1,7 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { logActivity } from '@/lib/activity'
+import { parseBody, zNonEmpty, zPhone } from '@/lib/validate'
+
+const UpdateUserSchema = z
+  .object({
+    firstName: zNonEmpty.optional(),
+    lastName: zNonEmpty.optional(),
+    phone: zPhone.optional(),
+  })
+  .refine(
+    (d) => d.firstName !== undefined || d.lastName !== undefined || d.phone !== undefined,
+    { message: 'At least one field must be provided' }
+  )
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -12,7 +25,9 @@ export async function PATCH(request: NextRequest) {
 
     const userId = authUser.userId
     const body = await request.json()
-    const { firstName, lastName, phone } = body
+    const parsed = parseBody(UpdateUserSchema, body)
+    if (!parsed.ok) return parsed.response
+    const { firstName, lastName, phone } = parsed.data
 
     const existing = await queryOne('SELECT first_name, last_name, phone FROM users WHERE id = $1', [userId])
     if (!existing) {

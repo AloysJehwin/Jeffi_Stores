@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { authenticateUser } from '@/lib/jwt'
 import { getUserIdForSession } from '@/lib/guest-user'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { logActivity } from '@/lib/activity'
+import { parseBody, zUuid, zPositiveInt } from '@/lib/validate'
+
+const AddCartSchema = z
+  .object({
+    productId: zUuid.optional(),
+    variantId: zUuid.optional(),
+    subVariantId: zUuid.optional(),
+    quantity: zPositiveInt.optional(),
+  })
+  .refine(
+    (d) => d.productId !== undefined || d.variantId !== undefined,
+    { message: 'productId or variantId is required' }
+  )
+
+const UpdateCartSchema = z.object({
+  cartItemId: zUuid,
+  quantity: z.number().int().min(0).optional(),
+  savedForLater: z.boolean().optional(),
+})
 
 async function resolveUserId(request: NextRequest) {
   const cookieStore = await cookies()
@@ -76,6 +96,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedCart = parseBody(AddCartSchema, body)
+    if (!parsedCart.ok) return parsedCart.response
     const { productId, quantity = 1, variantId, buyMode = 'unit', buyUnit, subVariantId } = body
 
     const { userId } = await resolveUserId(request)
@@ -179,6 +201,8 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedUpdate = parseBody(UpdateCartSchema, body)
+    if (!parsedUpdate.ok) return parsedUpdate.response
     const { cartItemId, quantity, savedForLater } = body
 
     const { userId, sessionId, authUserId } = await resolveUserId(request)

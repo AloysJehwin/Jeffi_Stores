@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, query } from '@/lib/db'
 import { sendPurchaseOrderEmail } from '@/lib/email'
+import { parseBody } from '@/lib/validate'
+
+const PatchSchema = z.object({
+  status: z.string().optional(),
+  expected_date: z.string().optional(),
+  notes: z.string().optional(),
+}).refine(
+  (d) => d.status !== undefined || d.expected_date !== undefined || d.notes !== undefined,
+  { message: 'At least one field required' }
+)
 
 export const dynamic = 'force-dynamic'
 
@@ -47,8 +58,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const body = await request.json()
-    const { status, expected_date, notes } = body
+    const raw = await request.json().catch(() => null)
+    if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    const parsed = parseBody(PatchSchema, raw)
+    if (!parsed.ok) return parsed.response
+    const { status, expected_date, notes } = parsed.data
 
     const updates: string[] = []
     const values: any[] = []

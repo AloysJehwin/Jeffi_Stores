@@ -41,9 +41,14 @@ export async function GET(request: NextRequest) {
       idx = sc2.nextIdx
 
       const sc3 = buildProductSearchClause(q, 'p.name', 'ps.sku', 'p.search_vector', idx)
-      searchWhereSv = sc3.clause
+      const svBaseClause = sc3.clause
       params.push(...sc3.params)
       idx = sc3.nextIdx
+      const svNameIdx = idx++
+      params.push(`%${q}%`)
+      const svVarIdx = idx++
+      params.push(`%${q}%`)
+      searchWhereSv = `(${svBaseClause} OR ps.sub_variant_name ILIKE $${svNameIdx} OR pv.variant_name ILIKE $${svVarIdx})`
 
       const rk = buildProductSearchRank(q, 'name', 'p.search_vector', idx)
       rank = rk.rank

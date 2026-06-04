@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { z } from 'zod'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
@@ -16,6 +17,15 @@ import {
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
+import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
+
+const VerifySchema = z.object({
+  razorpay_order_id: zNonEmpty,
+  razorpay_payment_id: zNonEmpty,
+  razorpay_signature: zNonEmpty,
+  orderId: zUuid.optional(),
+  draftToken: z.string().optional(),
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,11 +35,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId, draftToken } = body
-
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return NextResponse.json({ error: 'Missing payment details' }, { status: 400 })
-    }
+    const parsed = parseBody(VerifySchema, body)
+    if (!parsed.ok) return parsed.response
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId, draftToken } = parsed.data
 
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
@@ -83,7 +91,7 @@ async function commitDraft(args: {
   let subtotal = 0
   let taxAmount = 0
   let cartItems: Awaited<ReturnType<typeof loadActiveCart>> = []
-  let buyNowSnapshot: { product: any; variant: any | null } | null = null
+  let buyNowSnapshot: { product: any; variant: any | null; subVariant: any | null } | null = null
 
   if (draft.mode === 'cart') {
     cartItems = await loadActiveCart(args.userId)
@@ -105,7 +113,10 @@ async function commitDraft(args: {
     const variant = draft.buyNowItem.variantId
       ? await queryOne<any>(`SELECT id, variant_name, sku FROM product_variants WHERE id = $1`, [draft.buyNowItem.variantId])
       : null
-    buyNowSnapshot = { product, variant }
+    const subVariant = draft.buyNowItem.subVariantId
+      ? await queryOne<any>(`SELECT id, sub_variant_name, sku FROM product_sub_variants WHERE id = $1`, [draft.buyNowItem.subVariantId])
+      : null
+    buyNowSnapshot = { product, variant, subVariant }
     subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
     const gstRate = parseFloat(String(product.gst_percentage || '0'))
     taxAmount = subtotal - subtotal / (1 + gstRate / 100)
@@ -152,6 +163,7 @@ async function commitDraft(args: {
         item: draft.buyNowItem!,
         product: buyNowSnapshot!.product,
         variant: buyNowSnapshot!.variant,
+        subVariant: buyNowSnapshot!.subVariant,
         subtotal,
         taxAmount,
         appliedDiscount,

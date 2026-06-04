@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
 import { aiChat, AiClientError } from '@/lib/ai-client'
 import { CUSTOMER_TOOLS, getCustomerTool, type CustomerToolContext } from '@/lib/customer-agent/tools'
+import { z } from 'zod'
+import { parseBody, zNonEmpty } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const postSchema = z.object({
+  message: zNonEmpty.max(2000),
+})
 
 const MAX_ITERATIONS = 4
 
@@ -65,6 +71,9 @@ export async function POST(req: NextRequest) {
   const userMessage = String(body.message || '').trim()
   if (!userMessage) return NextResponse.json({ error: 'message is required' }, { status: 400 })
   if (userMessage.length > 1000) return NextResponse.json({ error: 'message too long (max 1000)' }, { status: 400 })
+
+  const parsed = parseBody(postSchema, { message: body.message })
+  if (!parsed.ok) return parsed.response
 
   const ctx: CustomerToolContext = { authenticatedUserId: user.userId }
 

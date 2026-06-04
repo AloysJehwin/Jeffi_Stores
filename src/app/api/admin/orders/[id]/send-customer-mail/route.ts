@@ -1,18 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 import { sendAdminContactEmail } from '@/lib/email'
+import { parseBody, zNonEmpty } from '@/lib/validate'
+
+const Schema = z.object({
+  subject: zNonEmpty,
+  body: zNonEmpty,
+})
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const { subject, body } = await request.json()
-  if (!subject?.trim() || !body?.trim()) {
-    return NextResponse.json({ error: 'Subject and body are required' }, { status: 400 })
-  }
+  const raw = await request.json().catch(() => null)
+  if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  const parsed = parseBody(Schema, raw)
+  if (!parsed.ok) return parsed.response
+  const { subject, body } = parsed.data
 
   const order = await queryOne<{ id: string; order_number: string; customer_name: string; customer_email: string; users?: { email: string; first_name: string; last_name: string } }>(
     `SELECT o.id, o.order_number, o.customer_name, o.customer_email,

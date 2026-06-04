@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { getStockLedger, getStockValuation, logStockMovement } from '@/lib/inventory'
 import { getClient, queryOne } from '@/lib/db'
 import { logAdminAudit } from '@/lib/admin-audit'
+import { parseBody, zUuid, zPositiveInt } from '@/lib/validate'
+
+const PatchSchema = z.object({
+  product_id: zUuid,
+  variant_id: zUuid.optional(),
+  sub_variant_id: zUuid.optional(),
+  new_quantity: z.number().int().min(0),
+  notes: z.string().optional(),
+})
 
 export const dynamic = 'force-dynamic'
 
@@ -44,8 +54,11 @@ export async function PATCH(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const { product_id, variant_id, sub_variant_id, new_quantity, notes } = await request.json()
-    if (!product_id || new_quantity == null) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    const raw = await request.json().catch(() => null)
+    if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    const parsed = parseBody(PatchSchema, raw)
+    if (!parsed.ok) return parsed.response
+    const { product_id, variant_id, sub_variant_id, new_quantity, notes } = parsed.data
 
     const client = await getClient()
     try {

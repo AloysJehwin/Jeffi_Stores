@@ -3,8 +3,15 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, query, queryOne } from '@/lib/db'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
+import { z } from 'zod'
+import { parseBody, zNonEmpty } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const createCampaignSchema = z.object({
+  name: zNonEmpty,
+  kind: zNonEmpty,
+})
 
 export async function GET(req: NextRequest) {
   const admin = await authenticateAdmin(req)
@@ -46,6 +53,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
+
+  const parsed = parseBody(createCampaignSchema, body)
+  if (!parsed.ok) return parsed.response
+
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_') : ''
   if (!name || !kind) return NextResponse.json({ error: 'name and kind are required' }, { status: 400 })

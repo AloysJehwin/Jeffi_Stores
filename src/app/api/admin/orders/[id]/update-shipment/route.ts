@@ -1,7 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
+import { parseBody } from '@/lib/validate'
+
+const Schema = z.object({
+  name: z.string().optional(),
+  phone: z.string().optional(),
+  add: z.string().optional(),
+  products_desc: z.string().optional(),
+  gm: z.number().optional(),
+  shipment_height: z.number().optional(),
+  shipment_width: z.number().optional(),
+  shipment_length: z.number().optional(),
+}).refine(
+  (d) => Object.values(d).some((v) => v !== undefined),
+  { message: 'At least one field required' }
+)
 
 const TOKEN = process.env.DELHIVERY_API_KEY
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
@@ -22,8 +38,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.awb_number) return NextResponse.json({ error: 'No AWB number for this order' }, { status: 404 })
 
-    const body = await request.json()
-    const { name, phone, add, products_desc, gm, shipment_height, shipment_width, shipment_length } = body
+    const raw = await request.json().catch(() => null)
+    if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    const parsed = parseBody(Schema, raw)
+    if (!parsed.ok) return parsed.response
+    const { name, phone, add, products_desc, gm, shipment_height, shipment_width, shipment_length } = parsed.data
 
     const payload: Record<string, unknown> = { waybill: order.awb_number }
     if (name) payload.name = name

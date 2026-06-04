@@ -1,8 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { generateVariantSku } from '@/lib/sku'
+import { parseBody, zNonEmpty, zCurrency, zPositiveInt, zUuid } from '@/lib/validate'
+
+const PostSchema = z.object({
+  sub_variant_name: zNonEmpty,
+  sku: z.string().optional(),
+  price: zCurrency.optional(),
+  mrp: zCurrency.optional(),
+  price_ex_gst: zCurrency.optional(),
+  mrp_ex_gst: zCurrency.optional(),
+  wholeprice_ex_gst: zCurrency.optional(),
+  stock_quantity: z.number().int().min(0).optional(),
+  attributes: z.record(z.unknown()).optional(),
+})
+
+const PutSchema = z.object({
+  id: zUuid,
+  sub_variant_name: z.string().optional(),
+  price: zCurrency.optional(),
+  mrp: zCurrency.optional(),
+  price_ex_gst: zCurrency.optional(),
+  mrp_ex_gst: zCurrency.optional(),
+  wholeprice_ex_gst: zCurrency.optional(),
+  stock_quantity: z.number().int().min(0).optional(),
+  attributes: z.record(z.unknown()).optional(),
+  is_active: z.boolean().optional(),
+})
+
+const DeleteSchema = z.object({ id: zUuid })
 
 type Params = { params: { id: string; variantId: string } }
 
@@ -29,9 +58,11 @@ export async function POST(request: NextRequest, { params }: Params) {
   )
   if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
 
-  const body = await request.json()
-  const { sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, wholeprice_ex_gst, stock_quantity, attributes } = body
-  if (!sub_variant_name) return NextResponse.json({ error: 'sub_variant_name required' }, { status: 400 })
+  const raw = await request.json().catch(() => null)
+  if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  const parsed = parseBody(PostSchema, raw)
+  if (!parsed.ok) return parsed.response
+  const { sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, wholeprice_ex_gst, stock_quantity, attributes } = parsed.data
 
   const productRow = await queryOne<{ sku: string }>(`SELECT sku FROM products WHERE id = $1`, [params.id])
   const parentSku = variant.sku || productRow?.sku || 'PRD'
@@ -54,9 +85,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const body = await request.json()
-  const { id, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, wholeprice_ex_gst, stock_quantity, attributes, is_active } = body
-  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+  const rawPut = await request.json().catch(() => null)
+  if (!rawPut) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  const parsedPut = parseBody(PutSchema, rawPut)
+  if (!parsedPut.ok) return parsedPut.response
+  const { id, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, wholeprice_ex_gst, stock_quantity, attributes, is_active } = parsedPut.data
 
   let newSku: string | null = null
   if (sub_variant_name) {
@@ -94,8 +127,11 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const { id } = await request.json()
-  if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+  const rawDel = await request.json().catch(() => null)
+  if (!rawDel) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  const parsedDel = parseBody(DeleteSchema, rawDel)
+  if (!parsedDel.ok) return parsedDel.response
+  const { id } = parsedDel.data
 
   await query(`DELETE FROM product_sub_variants WHERE id = $1 AND variant_id = $2`, [id, params.variantId])
   return NextResponse.json({ success: true })

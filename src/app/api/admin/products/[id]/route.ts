@@ -4,6 +4,19 @@ import { query } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
+import { parseBody, zNonEmpty, zCurrency, zUuid } from '@/lib/validate'
+
+const patchSchema = z
+  .object({
+    name: zNonEmpty.optional(),
+    basePrice: zCurrency.optional(),
+    sku: zNonEmpty.optional(),
+    categoryId: zUuid.optional(),
+  })
+  .refine((d) => Object.values(d).some((v) => v !== undefined), {
+    message: 'At least one field is required',
+  })
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(req)
@@ -24,7 +37,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const body = await req.json()
+  const raw = await req.json()
+  const parsed = parseBody(patchSchema, raw)
+  if (!parsed.ok) return parsed.response
+
+  const body = raw
   const { category_id } = body
   if (!category_id) return NextResponse.json({ error: 'category_id required' }, { status: 400 })
 
