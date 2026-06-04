@@ -1,27 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { jwtVerify } from 'jose'
 import { queryMany, queryCount } from '@/lib/db'
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET not set") })())
+import { authenticateUser } from '@/lib/jwt'
 
 const PAGE_SIZE = 10
 
 export async function GET(request: NextRequest) {
   try {
-    const token = cookies().get('auth_token')?.value
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    let userId: string
-    try {
-      const { payload } = await jwtVerify(token, JWT_SECRET)
-      userId = payload.userId as string
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
+    const auth = await authenticateUser(request)
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const userId = auth.userId
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
