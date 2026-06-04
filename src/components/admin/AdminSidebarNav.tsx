@@ -260,13 +260,10 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle, mounted
 
   return (
     <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto">
-      <div className="flex items-center px-4 h-12 border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-          </svg>
-          <span className="text-base font-bold">Jeffi Stores</span>
-        </div>
+      <div className="flex items-center justify-center h-12 border-b border-white/10 shrink-0">
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+        </svg>
       </div>
       <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
         {ungrouped.map(link => (
