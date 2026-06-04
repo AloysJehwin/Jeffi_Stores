@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin, generateToken } from '@/lib/jwt'
 
+const JWT_MAX_AGE_S = 60 // must match JWT_EXPIRES_IN in jwt.ts
+
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,8 +21,9 @@ export async function POST(request: NextRequest) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60,
+    maxAge: JWT_MAX_AGE_S,
     path: '/',
   })
   return response
 }
+
