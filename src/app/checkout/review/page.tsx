@@ -118,7 +118,6 @@ function CheckoutReviewPage() {
           }
           if (d.mode === 'cart') {
             setIntentMode('cart')
-            if (cartCount === 0 && !cartLoading) router.replace('/cart')
             return
           }
           setIntentMode('buyNow')
@@ -472,8 +471,18 @@ function CheckoutReviewPage() {
                         )}
                         {buyNowItem.sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {buyNowItem.sku}</span>}
                       </div>
-                      {buyNowItem.variantName && <p className="text-sm text-foreground-muted mt-0.5">{buyNowItem.variantName}</p>}
-                      {buyNowItem.subVariantName && <p className="text-xs text-foreground-muted">{buyNowItem.subVariantName}</p>}
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {buyNowItem.variantName && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                            {buyNowItem.variantName}
+                          </span>
+                        )}
+                        {buyNowItem.subVariantName && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                            {buyNowItem.subVariantName}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-sm text-foreground-secondary">
                           ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
@@ -535,8 +544,18 @@ function CheckoutReviewPage() {
                             )}
                             {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
                           </div>
-                          {item.variant && <p className="text-sm text-foreground-muted">{item.variant.variant_name}</p>}
-                          {item.sub_variant && <p className="text-xs text-foreground-muted">{item.sub_variant.sub_variant_name}</p>}
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.variant && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                                {item.variant.variant_name}
+                              </span>
+                            )}
+                            {item.sub_variant && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                                {item.sub_variant.sub_variant_name}
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-sm text-foreground-secondary">
                               ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}

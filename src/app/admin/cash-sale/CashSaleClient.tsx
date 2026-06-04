@@ -189,6 +189,7 @@ export default function CashSaleClient() {
             product_name: it.product_name,
             product_sku: it.product_sku,
             variant_id: it.variant_id,
+            sub_variant_id: it.sub_variant_id,
             variant_name: it.variant_name,
             hsn_code: it.hsn_code,
             gst_rate: it.gst_rate,

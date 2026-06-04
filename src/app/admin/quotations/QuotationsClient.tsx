@@ -234,6 +234,7 @@ export default function QuotationsClient() {
           product_name: i.description || '',
           product_sku: i.sku || '',
           variant_id: i.variant_id || null,
+          sub_variant_id: i.sub_variant_id || null,
           variant_name: '',
           hsn_code: i.hsn_code || '',
           gst_rate: String(gstRate),

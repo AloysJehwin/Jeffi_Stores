@@ -3,7 +3,7 @@
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function CheckoutPage() {
@@ -11,6 +11,11 @@ export default function CheckoutPage() {
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  const authWasLoading = useRef(false)
+  useEffect(() => {
+    if (authLoading) authWasLoading.current = true
+  }, [authLoading])
   
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -19,7 +24,7 @@ export default function CheckoutPage() {
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && authWasLoading.current) {
       router.push('/login?redirect=/checkout')
       return
     }
@@ -50,8 +55,7 @@ export default function CheckoutPage() {
           router.push('/checkout/review')
         }
       }
-    } catch (error) {
-      console.error('Failed to fetch address:', error)
+    } catch {
       router.push('/checkout/review')
     } finally {
       setIsLoadingAddress(false)
