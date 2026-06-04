@@ -399,6 +399,9 @@ jobs:
               add_admin_agent_proposed_tools.sql
               add_admin_audit_log.sql
               add_admin_agent_attachments.sql
+              add_sub_variant_id_to_order_items.sql
+              add_user_avatar.sql
+              add_user_search_history.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')
