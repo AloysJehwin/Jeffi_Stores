@@ -19,9 +19,11 @@ export async function GET(request: NextRequest) {
     const result = await query<any>(
       `SELECT
         m.id, m.conversation_id, m.created_at, m.tool_calls,
-        a.first_name as admin_first_name, a.last_name as admin_last_name, a.username as admin_username
+        a.username as admin_username,
+        u.first_name as admin_first_name, u.last_name as admin_last_name
        FROM admin_agent_messages m
        LEFT JOIN admins a ON a.id = m.admin_id
+       LEFT JOIN users u ON u.id = a.user_id
        WHERE m.role = 'assistant' AND jsonb_array_length(m.tool_calls) > 0
        ORDER BY m.created_at DESC
        LIMIT $1 OFFSET $2`,
