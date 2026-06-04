@@ -219,18 +219,29 @@ jobs:
 
       - name: Rolling deploy (zero downtime)
         uses: appleboy/ssh-action@v1
+        env:
+          GH_DEPLOY_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_ACTOR: ${{ github.actor }}
         with:
           host: ${{ steps.ec2.outputs.host }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 15m
+          envs: GH_DEPLOY_TOKEN,GH_REPOSITORY,GH_ACTOR
           script: |
             set -e
             cd /opt/jeffi-stores
 
+            echo "── Pulling latest code ──"
+            git config credential.helper '!f(){ echo "username=x-token"; echo "password=$GH_DEPLOY_TOKEN"; };f'
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
+
             echo "── Pulling new Docker image ──"
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]'):latest
+            echo "$GH_DEPLOY_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
+            docker pull ghcr.io/$(echo "$GH_REPOSITORY" | tr '[:upper:]' '[:lower:]'):latest
 
             echo "── Rolling restart app (nginx + redis stay up) ──"
             docker compose -f docker-compose.prod.yml stop app 2>/dev/null || true
