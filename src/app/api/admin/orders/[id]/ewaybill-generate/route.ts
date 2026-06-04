@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany } from '@/lib/db'
 import { generateEWayBill, isEWayBillConfigured, EWayBillPayload } from '@/lib/ewaybill'
+import { parseBody } from '@/lib/validate'
+
+const Schema = z.object({
+  transporterName: z.string().optional(),
+  transporterId: z.string().optional(),
+  transMode: z.string().optional(),
+  transDistance: z.number().optional(),
+  vehicleNo: z.string().optional(),
+}).optional()
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +49,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const s: Record<string, string> = {}
     for (const row of settingsRows) s[row.key] = row.value || ''
 
-    const body = await request.json().catch(() => ({}))
+    const rawBody = await request.json().catch(() => ({}))
+    const parsedBody = parseBody(Schema, rawBody)
+    if (!parsedBody.ok) return parsedBody.response
+    const body = parsedBody.data ?? {}
 
     const invoiceDate = new Date(order.invoice_date || order.created_at)
     const dd = String(invoiceDate.getDate()).padStart(2, '0')

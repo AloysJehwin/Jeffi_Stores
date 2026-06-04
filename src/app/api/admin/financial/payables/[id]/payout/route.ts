@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
+import { parseBody, zCurrency } from '@/lib/validate'
+
+const PayoutSchema = z.object({
+  mode: z.enum(['NEFT', 'RTGS', 'IMPS', 'UPI']),
+  amount: zCurrency.refine((v) => v > 0, { message: 'Must be greater than 0' }),
+  notes: z.string().optional(),
+})
 
 export const dynamic = 'force-dynamic'
 
@@ -31,15 +39,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'RazorpayX not configured' }, { status: 500 })
     }
 
-    const body = await request.json()
-    const { mode, amount, notes } = body
-
-    if (!mode || !amount) {
-      return NextResponse.json({ error: 'mode and amount are required' }, { status: 400 })
-    }
-    if (!['NEFT', 'RTGS', 'IMPS', 'UPI'].includes(mode)) {
-      return NextResponse.json({ error: 'Invalid mode' }, { status: 400 })
-    }
+    const raw = await request.json().catch(() => null)
+    if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    const parsedBody = parseBody(PayoutSchema, raw)
+    if (!parsedBody.ok) return parsedBody.response
+    const { mode, amount, notes } = parsedBody.data
 
     const expense = await queryOne<any>(
       `SELECT e.*, s.name AS supplier_name, s.phone AS supplier_phone,
@@ -53,10 +57,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     )
     if (!expense) return NextResponse.json({ error: 'Expense not found' }, { status: 404 })
 
-    const payAmount = parseFloat(amount)
-    if (isNaN(payAmount) || payAmount <= 0) {
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
-    }
+    const payAmount = amount
 
     if (mode === 'UPI' && !expense.upi_id) {
       return NextResponse.json({ error: 'Supplier has no UPI ID on file' }, { status: 400 })

@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { listWarehouses, createWarehouse } from '@/lib/shelf'
+import { z } from 'zod'
+import { parseBody, zNonEmpty } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const postSchema = z.object({
+  name: zNonEmpty,
+  address: z.string().optional(),
+})
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -27,6 +34,9 @@ export async function POST(request: NextRequest) {
     const { name, code, address } = await request.json()
     if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })
     if (!code?.trim()) return NextResponse.json({ error: 'code required' }, { status: 400 })
+
+    const parsed = parseBody(postSchema, { name, address })
+    if (!parsed.ok) return parsed.response
 
     const warehouse = await createWarehouse(name.trim(), code.trim(), address?.trim() || null)
     return NextResponse.json({ warehouse }, { status: 201 })

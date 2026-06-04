@@ -8,6 +8,14 @@ import {
   CARTON_MAX_WEIGHT_GRAMS,
 } from '@/lib/shipping'
 import { getDeliverySettings, applyDeliveryRules } from '@/lib/delivery-settings'
+import { z } from 'zod'
+import { parseBody, zIndianPin, zCurrency } from '@/lib/validate'
+
+const postSchema = z.object({
+  destinationPin: zIndianPin,
+  cartItems: z.array(z.unknown()).min(1, 'cartItems must have at least one item'),
+  subtotal: zCurrency.optional(),
+})
 
 const DELHIVERY_API = 'https://track.delhivery.com/api/kinko/v1/invoice/charges/.json'
 const ORIGIN_PIN = process.env.DELHIVERY_ORIGIN_PINCODE || '492001'
@@ -61,6 +69,9 @@ export async function POST(request: NextRequest) {
     if (!destinationPin || !/^\d{6}$/.test(destinationPin)) {
       return NextResponse.json({ error: 'Invalid destination pincode' }, { status: 400 })
     }
+
+    const parsed = parseBody(postSchema, { destinationPin, cartItems, subtotal })
+    if (!parsed.ok) return parsed.response
 
     const variantIds: string[] = (cartItems || []).filter((i: any) => i.variantId).map((i: any) => i.variantId)
     const productIds: string[] = (cartItems || []).filter((i: any) => !i.variantId).map((i: any) => i.productId)

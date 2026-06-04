@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateUser } from '@/lib/jwt'
 import { resolveBuyNowItem, loadActiveCart } from '@/lib/order-commit'
 import { signIntent } from '@/lib/checkout-intent'
+import { parseBody, zUuid, zPositiveInt } from '@/lib/validate'
+
+const IntentSchema = z.object({
+  mode: z.string().optional(),
+  productId: zUuid.optional(),
+  variantId: zUuid.optional(),
+  subVariantId: zUuid.optional(),
+  qty: zPositiveInt.optional(),
+  buyMode: z.string().optional(),
+  buyUnit: z.string().optional(),
+})
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
+  const parsed = parseBody(IntentSchema, body)
+  if (!parsed.ok) return parsed.response
   const mode = body.mode === 'cart' ? 'cart' : 'buyNow'
 
   if (mode === 'cart') {

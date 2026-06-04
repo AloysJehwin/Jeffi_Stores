@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
 import { recommendProducts, getRemainingQuota } from '@/lib/ai-assistant'
+import { z } from 'zod'
+import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const postSchema = z.object({
+  query: zNonEmpty.max(500),
+  categoryId: zUuid.optional(),
+})
 
 export async function GET(req: NextRequest) {
   const user = await authenticateUser(req)
@@ -23,6 +30,9 @@ export async function POST(req: NextRequest) {
   if (query.length > 500) {
     return NextResponse.json({ error: 'Please keep your message under 500 characters.' }, { status: 400 })
   }
+
+  const parsed = parseBody(postSchema, { query: body.query, categoryId: body.categoryId })
+  if (!parsed.ok) return parsed.response
 
   try {
     const result = await recommendProducts(user.userId, query)

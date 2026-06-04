@@ -21,6 +21,14 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
   const sc2 = buildProductSearchClause(q, 'p.name', 'pv.sku', 'p.search_vector', idx)
   params.push(...sc2.params)
   idx = sc2.nextIdx
+  const sc3 = buildProductSearchClause(q, 'p.name', 'ps.sku', 'p.search_vector', idx)
+  params.push(...sc3.params)
+  idx = sc3.nextIdx
+  const svNameIdx = idx++
+  params.push(`%${q}%`)
+  const svVarIdx = idx++
+  params.push(`%${q}%`)
+  const searchWhereSv = `(${sc3.clause} OR ps.sub_variant_name ILIKE $${svNameIdx} OR pv.variant_name ILIKE $${svVarIdx})`
   const rk = buildProductSearchRank(q, 'name', 'search_vector', idx)
   params.push(...rk.params)
   idx = rk.nextIdx
@@ -28,19 +36,22 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
   params.push(10)
 
   const rows = await queryMany<{
-    product_id: string; variant_id: string | null; name: string; variant_name: string | null
+    product_id: string; variant_id: string | null; sub_variant_id: string | null
+    name: string; variant_name: string | null
     sku: string; base_price: number | null; mrp: number | null; gst_percentage: number; hsn_code: string | null
     inventory_quantity: number | null
   }>(
-    `SELECT product_id, variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code, inventory_quantity FROM (
-       SELECT p.id AS product_id, NULL::uuid AS variant_id, p.name, NULL AS variant_name,
+    `SELECT product_id, variant_id, sub_variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code, inventory_quantity FROM (
+       SELECT p.id AS product_id, NULL::uuid AS variant_id, NULL::uuid AS sub_variant_id,
+              p.name, NULL AS variant_name,
               p.sku, p.base_price, p.mrp, COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
               COALESCE(p.inventory_quantity,0)::numeric AS inventory_quantity,
               p.search_vector
        FROM products p
        WHERE p.is_active = true AND p.has_variants = false AND ${sc.clause}
        UNION ALL
-       SELECT p.id AS product_id, pv.id AS variant_id, p.name, pv.variant_name,
+       SELECT p.id AS product_id, pv.id AS variant_id, NULL::uuid AS sub_variant_id,
+              p.name, pv.variant_name,
               pv.sku, COALESCE(pv.price, p.base_price) AS base_price,
               COALESCE(pv.mrp, p.mrp) AS mrp,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
@@ -49,6 +60,19 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
        WHERE pv.is_active = true AND p.is_active = true AND ${sc2.clause}
+         AND NOT EXISTS (SELECT 1 FROM product_sub_variants WHERE variant_id = pv.id AND is_active = true)
+       UNION ALL
+       SELECT p.id AS product_id, pv.id AS variant_id, ps.id AS sub_variant_id,
+              p.name, ps.sub_variant_name || ' (' || pv.variant_name || ')' AS variant_name,
+              ps.sku, COALESCE(ps.price, 0) AS base_price,
+              COALESCE(ps.mrp, pv.mrp, p.mrp) AS mrp,
+              COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
+              COALESCE(ps.stock_quantity,0)::numeric AS inventory_quantity,
+              p.search_vector
+       FROM product_sub_variants ps
+       JOIN product_variants pv ON pv.id = ps.variant_id
+       JOIN products p ON p.id = pv.product_id
+       WHERE ps.is_active = true AND pv.is_active = true AND p.is_active = true AND ${searchWhereSv}
      ) r
      ORDER BY ${rk.rank}, name ASC, variant_name ASC NULLS FIRST
      LIMIT $${limitIdx}`,
@@ -64,6 +88,7 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
       r.hsn_code ?? '',
       r.mrp != null ? String(r.mrp) : '',
       r.inventory_quantity != null ? String(r.inventory_quantity) : '',
+      r.sub_variant_id ?? '',
     ].join('|')
     const priceStr = r.base_price != null ? ` · ₹${r.base_price}` : ''
     return { id: encoded, label: displayName, sublabel: `${r.sku}${priceStr}` }
@@ -258,6 +283,11 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
   params.push(...sc2.params); idx = sc2.nextIdx
   const sc3 = buildProductSearchClause(q, 'p.name', 'ps.sku', 'p.search_vector', idx)
   params.push(...sc3.params); idx = sc3.nextIdx
+  const svNameIdx = idx++
+  params.push(`%${q}%`)
+  const svVarIdx = idx++
+  params.push(`%${q}%`)
+  const searchWhereSv = `(${sc3.clause} OR ps.sub_variant_name ILIKE $${svNameIdx} OR pv.variant_name ILIKE $${svVarIdx})`
   const rk = buildProductSearchRank(q, 'name', 'search_vector', idx)
   params.push(...rk.params); idx = rk.nextIdx
   params.push(12)
@@ -296,7 +326,7 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
        FROM product_sub_variants ps
        JOIN product_variants pv ON pv.id = ps.variant_id
        JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id
-       WHERE ps.is_active = true AND pv.is_active = true AND p.is_active = true AND ${sc3.clause}
+       WHERE ps.is_active = true AND pv.is_active = true AND p.is_active = true AND ${searchWhereSv}
      ) r
      ORDER BY ${rk.rank}, name ASC, variant_name ASC NULLS FIRST
      LIMIT $${idx}`,

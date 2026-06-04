@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { authenticateUser } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
 import {
@@ -15,6 +16,16 @@ import {
 } from '@/lib/order-commit'
 import { signDraftToken, hashCartItems } from '@/lib/order-draft'
 import { verifyIntent } from '@/lib/checkout-intent'
+import { parseBody, zUuid } from '@/lib/validate'
+
+const DraftSchema = z.object({
+  addressId: zUuid,
+  mode: z.string().optional(),
+  intent: z.string().optional(),
+  item: z.any().optional(),
+  couponId: z.string().optional(),
+  notes: z.string().optional(),
+})
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +34,9 @@ export async function POST(req: NextRequest) {
   if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
-  let mode: 'cart' | 'buyNow' = body.mode === 'buyNow' ? 'buyNow' : 'cart'
+  const parsed = parseBody(DraftSchema, body)
+  if (!parsed.ok) return parsed.response
+  let mode: 'cart' | 'buyNow' = parsed.data.mode === 'buyNow' ? 'buyNow' : 'cart'
   let resolvedIntent: Awaited<ReturnType<typeof verifyIntent>> = null
   if (typeof body.intent === 'string' && body.intent) {
     resolvedIntent = await verifyIntent(body.intent)

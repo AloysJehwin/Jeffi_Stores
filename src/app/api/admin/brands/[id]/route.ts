@@ -3,6 +3,17 @@ import { query, queryOne } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
+import { parseBody, zNonEmpty } from '@/lib/validate'
+
+const patchSchema = z
+  .object({
+    name: zNonEmpty.optional(),
+    slug: zNonEmpty.optional(),
+  })
+  .refine((d) => d.name !== undefined || d.slug !== undefined, {
+    message: 'At least one field is required',
+  })
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(req)
@@ -16,6 +27,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   } = body
 
   if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })
+
+  const parsed = parseBody(patchSchema, { name: body.name, slug: body.slug })
+  if (!parsed.ok) return parsed.response
 
   const computedSlug = slug?.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 

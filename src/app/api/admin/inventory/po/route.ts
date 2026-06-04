@@ -3,8 +3,22 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, query } from '@/lib/db'
 import { buildSearchClause } from '@/lib/search'
+import { z } from 'zod'
+import { parseBody, zUuid, zPositiveInt, zCurrency } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const poItemSchema = z.object({
+  product_id: zUuid,
+  variant_id: zUuid.optional(),
+  quantity: zPositiveInt,
+  unit_cost: zCurrency,
+})
+
+const createPOSchema = z.object({
+  supplier_id: zUuid,
+  items: z.array(poItemSchema).min(1),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,6 +86,10 @@ export async function POST(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
+
+    const parsed = parseBody(createPOSchema, body)
+    if (!parsed.ok) return parsed.response
+
     const { supplier_id, order_date, expected_date, notes, status = 'draft', items } = body
 
     if (!supplier_id) return NextResponse.json({ error: 'supplier_id is required' }, { status: 400 })
