@@ -145,11 +145,25 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     group: 'Settings',
   },
   {
+    key: 'catalog_enrichment',
+    label: 'Catalog Enrichment',
+    description: 'Run AI-powered product enrichment — generate titles, descriptions, and keywords in bulk',
+    routes: ['/admin/catalog-enrichment'],
+    group: 'AI',
+  },
+  {
     key: 'agent',
     label: 'AI Agent',
     description: 'Use the AI admin assistant; can chat, run tools, and propose mutating actions for approval',
-    routes: [],
+    routes: ['/admin/agent'],
     group: 'AI',
+  },
+  {
+    key: 'audit',
+    label: 'Audit Log',
+    description: 'View system audit logs, cron job history, and agent tool call logs',
+    routes: ['/admin/audit'],
+    group: 'Settings',
   },
 ]
 
@@ -193,7 +207,10 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/suggest')) return null
   if (pathname.startsWith('/api/admin/traffic')) return 'dashboard'
   if (pathname.startsWith('/api/admin/agent')) return 'agent'
-  if (pathname.startsWith('/api/admin/catalog-enrichment')) return 'products'
+  if (pathname.startsWith('/api/admin/catalog-enrichment')) return 'catalog_enrichment'
+  if (pathname.startsWith('/api/admin/audit')) return 'audit'
+  if (pathname.startsWith('/api/admin/cron')) return 'audit'
+  if (pathname.startsWith('/api/internal/cron-record')) return null
   if (pathname.startsWith('/api/brands')) return 'brands'
   if (pathname.startsWith('/api/customers')) return 'customers'
 
