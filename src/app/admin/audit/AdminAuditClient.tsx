@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   ShieldCheck, Boxes, Tags, FolderTree, Package, Ticket, MailOpen, ScrollText, Filter,
   ArrowRight, Image as ImageIcon, Truck, Receipt, Wallet, MapPin, Settings,
@@ -101,6 +102,7 @@ interface ToolLogMessage {
 type PageTab = 'audit' | 'cron' | 'tools'
 
 export default function AdminAuditClient() {
+  const searchParams = useSearchParams()
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [entityFilter, setEntityFilter] = useState<string>('all')
@@ -109,7 +111,12 @@ export default function AdminAuditClient() {
   const [pageSize, setPageSize] = useState(50)
   const [total, setTotal] = useState(0)
 
-  const [pageTab, setPageTab] = useState<PageTab>('audit')
+  const initialTab = (): PageTab => {
+    const t = searchParams?.get('tab')
+    if (t === 'cron' || t === 'tools') return t
+    return 'audit'
+  }
+  const [pageTab, setPageTab] = useState<PageTab>(initialTab)
 
   const [cronJobs, setCronJobs] = useState<CronJob[]>([])
   const [cronLoading, setCronLoading] = useState(false)
