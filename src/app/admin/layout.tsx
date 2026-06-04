@@ -4,11 +4,7 @@ import { cookies, headers } from 'next/headers'
 import { logoutAction } from './logout-action'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import AdminMobileNav from '@/components/admin/AdminMobileNav'
-import AdminSidebarNav from '@/components/admin/AdminSidebarNav'
-import AdminAgentTrigger from '@/components/admin/AdminAgentTrigger'
-import ThemeToggle from '@/components/ThemeToggle'
-import SessionGuard from '@/components/admin/SessionGuard'
+import AdminShell from '@/components/admin/AdminShell'
 
 export const metadata = {
   title: 'Admin Panel - Jeffi Stores',
@@ -19,15 +15,10 @@ export const metadata = {
 async function getAdminSession() {
   const cookieStore = cookies()
   const token = cookieStore.get('admin_token')
-
-  if (!token) {
-    return null
-  }
-
+  if (!token) return null
   try {
-    const payload = await verifyToken(token.value)
-    return payload
-  } catch (error) {
+    return await verifyToken(token.value)
+  } catch {
     return null
   }
 }
@@ -96,58 +87,28 @@ export default async function AdminLayout({
     : session?.username || 'Admin'
   const usernameInitial = (session?.first_name || session?.username || 'A')[0].toUpperCase()
 
+  const logoutForm = (
+    <form action={logoutAction}>
+      <button
+        type="submit"
+        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors"
+      >
+        Logout
+      </button>
+    </form>
+  )
+
   return (
-    <div className="h-screen flex flex-row bg-surface-secondary">
-      {/* Left sidebar — desktop only */}
-      <AdminSidebarNav navLinks={desktopNavLinks} />
-
-      {/* Right column: top bar + content */}
-      <div className="flex flex-col flex-1 min-w-0 h-full">
-
-        {/* Top bar — admin profile & actions */}
-        <div className="flex items-center justify-between px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0">
-          {/* Mobile: hamburger + logo */}
-          <div className="flex items-center gap-2 md:hidden">
-            <AdminMobileNav
-              navLinks={filteredNavLinks}
-              username={displayName}
-              role={session?.role || 'user'}
-            />
-            <span className="font-bold text-white text-sm">Jeffi Admin</span>
-          </div>
-          {/* Desktop: spacer */}
-          <div className="hidden md:block" />
-
-          {/* Right side: avatar + name + role + theme + logout */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                {usernameInitial}
-              </div>
-              <div className="hidden sm:block leading-tight">
-                <p className="text-xs font-semibold text-white leading-none">{displayName}</p>
-                <p className="text-[10px] text-white/60 capitalize">{session?.role || 'user'}</p>
-              </div>
-            </div>
-            <ThemeToggle variant="admin" />
-            <AdminAgentTrigger canUse={role === 'super_admin' || scopes.includes('agent')} />
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors"
-              >
-                Logout
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <main className="flex-1 bg-surface-secondary overflow-y-auto relative z-0">
-          {children}
-        </main>
-        <SessionGuard />
-      </div>
-      <div id="dropdown-portal" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }} />
-    </div>
+    <AdminShell
+      desktopNavLinks={desktopNavLinks}
+      allNavLinks={filteredNavLinks}
+      displayName={displayName}
+      usernameInitial={usernameInitial}
+      role={role}
+      canUseAgent={role === 'super_admin' || scopes.includes('agent')}
+      logoutForm={logoutForm}
+    >
+      {children}
+    </AdminShell>
   )
 }
