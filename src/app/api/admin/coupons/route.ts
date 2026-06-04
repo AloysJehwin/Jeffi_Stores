@@ -3,6 +3,16 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryCount } from '@/lib/db'
 import { buildSearchClause } from '@/lib/search'
+import { z } from 'zod'
+import { parseBody, zNonEmpty } from '@/lib/validate'
+
+const createCouponSchema = z.object({
+  code: zNonEmpty,
+  discount_type: z.enum(['percentage', 'flat']),
+  discount_value: z.number().positive(),
+  valid_from: z.string().optional(),
+  valid_until: z.string().optional(),
+})
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -47,6 +57,10 @@ export async function POST(request: NextRequest) {
   if (!hasScope(admin.role, admin.scopes, 'coupons')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
+
+  const parsed = parseBody(createCouponSchema, body)
+  if (!parsed.ok) return parsed.response
+
   const { code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active } = body
 
   if (!code || !discount_type || discount_value == null) {

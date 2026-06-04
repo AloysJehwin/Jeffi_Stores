@@ -4,7 +4,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import Link from 'next/link'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressFormModal from '@/components/visitor/AddressFormModal'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
@@ -38,9 +38,15 @@ function CheckoutReviewPage() {
   const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(null)
   const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
 
+  const authWasLoading = useRef(false)
+  const intentFetched = useRef(false)
+  useEffect(() => {
+    if (authLoading) authWasLoading.current = true
+  }, [authLoading])
+
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [addresses, setAddresses] = useState<any[]>([])
-  const [isLoadingAddresses, setIsLoadingAddresses] = useState(true)
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState(false)
   const [showAddressModal, setShowAddressModal] = useState(false)
 
   const [couponCode, setCouponCode] = useState('')
@@ -60,12 +66,18 @@ function CheckoutReviewPage() {
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
     variantId: string | null
+    subVariantId: string | null
     qty: number
     buyMode: string
     buyUnit: string | null
     price: number
     productName: string
     variantName: string | null
+    subVariantName: string | null
+    sku: string | null
+    mrp: number | null
+    gstPercentage: number | null
+    brandName: string | null
     imageUrl: string | null
   } | null>(null)
 
@@ -75,13 +87,28 @@ function CheckoutReviewPage() {
     }).catch(() => {})
   }, [])
 
+  const addressesFetched = useRef(false)
+
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login?redirect=/checkout/review')
+    if (user && !addressesFetched.current) {
+      addressesFetched.current = true
+      setIsLoadingAddresses(true)
+      fetchAddresses()
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!authLoading && !user && authWasLoading.current) {
+      const currentUrl = intentToken
+        ? `/checkout/review?intent=${encodeURIComponent(intentToken)}`
+        : '/checkout/review'
+      router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`)
       return
     }
 
     if (intentToken) {
+      if (intentFetched.current) return
+      intentFetched.current = true
       fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include' })
         .then(async r => {
           const d = await r.json()
@@ -91,20 +118,24 @@ function CheckoutReviewPage() {
           }
           if (d.mode === 'cart') {
             setIntentMode('cart')
-            if (cartCount === 0 && !cartLoading) router.push('/cart')
-            if (user) fetchAddresses()
             return
           }
           setIntentMode('buyNow')
           setBuyNowItem({
             productId: d.productId,
             variantId: d.variantId || null,
+            subVariantId: d.subVariantId || null,
             qty: Number(d.qty),
             buyMode: d.buyMode,
             buyUnit: d.buyUnit || null,
             price: Number(d.price),
             productName: d.productName || '',
             variantName: d.variantName || null,
+            subVariantName: d.subVariantName || null,
+            sku: d.sku || null,
+            mrp: d.mrp != null ? Number(d.mrp) : null,
+            gstPercentage: d.gstPercentage != null ? Number(d.gstPercentage) : null,
+            brandName: d.brandName || null,
             imageUrl: null,
           })
           const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
@@ -114,7 +145,6 @@ function CheckoutReviewPage() {
               setBuyNowItem(prev => prev ? { ...prev, imageUrl: data.imageUrl || null } : prev)
             })
             .catch(() => {})
-          if (user) fetchAddresses()
         })
         .catch(() => router.push('/'))
       return
@@ -135,12 +165,18 @@ function CheckoutReviewPage() {
       setBuyNowItem({
         productId,
         variantId: variantId || null,
+        subVariantId: null,
         qty,
         buyMode,
         buyUnit: buyUnit || null,
         price,
         productName,
         variantName: variantName || null,
+        subVariantName: null,
+        sku: null,
+        mrp: null,
+        gstPercentage: null,
+        brandName: null,
         imageUrl: null,
       })
 
@@ -152,12 +188,8 @@ function CheckoutReviewPage() {
           }
         })
         .catch(() => {})
-    } else if (!cartLoading && cartCount === 0) {
-      router.push('/cart')
-    }
-
-    if (user) {
-      fetchAddresses()
+    } else if (!intentToken && !cartLoading && cartCount === 0) {
+      router.replace('/cart')
     }
   }, [cartCount, user, authLoading, cartLoading, router, isBuyNow, intentToken])
 
@@ -299,6 +331,7 @@ function CheckoutReviewPage() {
       params.set('buyNow', '1')
       params.set('productId', buyNowItem.productId)
       if (buyNowItem.variantId) params.set('variantId', buyNowItem.variantId)
+      if (buyNowItem.subVariantId) params.set('subVariantId', buyNowItem.subVariantId)
       params.set('qty', String(buyNowItem.qty))
       params.set('buyMode', buyNowItem.buyMode)
       if (buyNowItem.buyUnit) params.set('buyUnit', buyNowItem.buyUnit)
@@ -307,7 +340,7 @@ function CheckoutReviewPage() {
     router.push(`/checkout?${params.toString()}`)
   }
 
-  if (authLoading || cartLoading || isLoadingAddresses) {
+  if (authLoading || cartLoading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full"></div>
@@ -316,7 +349,7 @@ function CheckoutReviewPage() {
   }
 
   if (!user) return null
-  if (!isBuyNow && cartCount === 0) return null
+  if (!intentToken && !isBuyNow && cartCount === 0) return null
 
   const tax = isBuyNow ? 0 : getCartTax()
 
@@ -342,7 +375,13 @@ function CheckoutReviewPage() {
                 </button>
               </div>
 
-              {addresses.length === 0 ? (
+              {isLoadingAddresses ? (
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="h-20 bg-surface rounded-lg animate-pulse border border-border-default" />
+                  ))}
+                </div>
+              ) : addresses.length === 0 ? (
                 <div className="text-center py-8">
                   <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -424,15 +463,49 @@ function CheckoutReviewPage() {
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-foreground">{buyNowItem.productName}</h3>
-                      {buyNowItem.variantName && <p className="text-sm text-foreground-muted">{buyNowItem.variantName}</p>}
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {buyNowItem.brandName && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-secondary text-foreground-secondary border border-border-default">
+                            {buyNowItem.brandName}
+                          </span>
+                        )}
+                        {buyNowItem.sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {buyNowItem.sku}</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {buyNowItem.variantName && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                            {buyNowItem.variantName}
+                          </span>
+                        )}
+                        {buyNowItem.subVariantName && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                            {buyNowItem.subVariantName}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-sm text-foreground-secondary">
                           ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
+                          {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
+                            <>
+                              {' '}<span className="line-through text-foreground-muted">₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                              {' '}<span className="text-accent-600 dark:text-accent-400 font-semibold">{Math.round(((buyNowItem.mrp - buyNowItem.price) / buyNowItem.mrp) * 100)}% off</span>
+                            </>
+                          )}
                         </p>
                         <p className="text-sm font-semibold text-foreground">
                           ₹{(buyNowItem.price * buyNowItem.qty).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                       </div>
+                      {buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
+                        const lineTotal = buyNowItem.price * buyNowItem.qty
+                        const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
+                        return (
+                          <p className="text-[11px] text-foreground-muted mt-0.5">
+                            incl. ₹{gst.toLocaleString('en-IN', { minimumFractionDigits: 3 })} GST @ {buyNowItem.gstPercentage}%
+                          </p>
+                        )
+                      })()}
                     </div>
                   </div>
                 ) : (
@@ -471,8 +544,18 @@ function CheckoutReviewPage() {
                             )}
                             {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
                           </div>
-                          {item.variant && <p className="text-sm text-foreground-muted">{item.variant.variant_name}</p>}
-                          {item.sub_variant && <p className="text-xs text-foreground-muted">{item.sub_variant.sub_variant_name}</p>}
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.variant && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                                {item.variant.variant_name}
+                              </span>
+                            )}
+                            {item.sub_variant && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                                {item.sub_variant.sub_variant_name}
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-sm text-foreground-secondary">
                               ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
@@ -649,15 +732,30 @@ function CheckoutReviewPage() {
                 disabled={!selectedAddress || addresses.length === 0 || belowMinimum || isLoadingShipping || (shippingCharge === null && !shippingError)}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                Proceed to Place Order
-                <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
+                {isLoadingShipping ? (
+                  <>
+                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Calculating delivery…
+                  </>
+                ) : (
+                  <>
+                    Proceed to Place Order
+                    <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </>
+                )}
               </button>
 
-              <Link href="/cart" className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
-                ← Back to Cart
-              </Link>
+              {isBuyNow ? (
+                <button onClick={() => router.back()} className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
+                  ← Go Back
+                </button>
+              ) : (
+                <Link href="/cart" className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
+                  ← Back to Cart
+                </Link>
+              )}
 
               <div className="mt-6 pt-6 border-t border-border-default">
                 <div className="flex items-center gap-2 text-sm text-foreground-secondary">

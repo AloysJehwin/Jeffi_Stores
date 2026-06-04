@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
@@ -7,6 +8,14 @@ import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { quoteShipping } from '@/lib/order-commit'
+import { parseBody, zNonEmpty } from '@/lib/validate'
+
+const CreateOrderSchema = z.object({
+  paymentMethod: zNonEmpty,
+  shippingAddress: z.any().optional(),
+  notes: z.string().optional(),
+  couponId: z.string().optional(),
+})
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
@@ -26,7 +35,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { shippingAddress, notes, paymentMethod, couponId } = body
+    const parsed = parseBody(CreateOrderSchema, body)
+    if (!parsed.ok) return parsed.response
+    const { shippingAddress, notes, paymentMethod, couponId } = parsed.data
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = false
     if (paymentMethod !== 'razorpay') {
@@ -269,9 +280,10 @@ export async function POST(request: NextRequest) {
       for (const { item, unitPrice, gstRate, itemTotal, gst, itemTax } of itemsWithGST) {
         const tax = isGSTEnabled && gst ? gst.totalTax : (itemTax || 0)
         await client.query(
-          `INSERT INTO order_items (order_id, product_id, variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+          `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
           [createdOrder.id, item.product_id, item.variant?.id || null,
+           item.sub_variant?.id || null,
            item.sub_variant
              ? `${item.products.name}${item.variant ? ' - ' + item.variant.variant_name : ''} - ${item.sub_variant.sub_variant_name}`
              : (item.variant ? `${item.products.name} - ${item.variant.variant_name}` : item.products.name),

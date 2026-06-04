@@ -1,23 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { cookies } from 'next/headers'
-import { jwtVerify } from 'jose'
+import { authenticateUser } from '@/lib/jwt'
 import { getUserIdForSession } from '@/lib/guest-user'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { logActivity } from '@/lib/activity'
+import { parseBody, zUuid, zPositiveInt } from '@/lib/validate'
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET not set") })())
+const AddCartSchema = z
+  .object({
+    productId: zUuid.optional(),
+    variantId: zUuid.optional(),
+    subVariantId: zUuid.optional(),
+    quantity: zPositiveInt.optional(),
+  })
+  .refine(
+    (d) => d.productId !== undefined || d.variantId !== undefined,
+    { message: 'productId or variantId is required' }
+  )
 
-async function resolveUserId(cookieStore: Awaited<ReturnType<typeof cookies>>) {
+const UpdateCartSchema = z.object({
+  cartItemId: zUuid,
+  quantity: z.number().int().min(0).optional(),
+  savedForLater: z.boolean().optional(),
+})
+
+async function resolveUserId(request: NextRequest) {
+  const cookieStore = await cookies()
   let sessionId = cookieStore.get('session_id')?.value
-  let authUserId: string | undefined
-  const authToken = cookieStore.get('auth_token')?.value
-  if (authToken) {
-    try {
-      const { payload } = await jwtVerify(authToken, JWT_SECRET)
-      authUserId = payload.userId as string
-    } catch {}
-  }
+  const authResult = await authenticateUser(request)
+  const authUserId = authResult?.userId
   const userId = await getUserIdForSession(sessionId, authUserId)
   if (!sessionId && !authUserId) {
     sessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
@@ -28,8 +41,7 @@ async function resolveUserId(cookieStore: Awaited<ReturnType<typeof cookies>>) {
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const { userId } = await resolveUserId(cookieStore)
+    const { userId } = await resolveUserId(request)
     const url = new URL(request.url)
     const savedOnly = url.searchParams.get('saved') === '1'
     const savedFilter = savedOnly ? 'TRUE' : 'FALSE'
@@ -84,10 +96,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedCart = parseBody(AddCartSchema, body)
+    if (!parsedCart.ok) return parsedCart.response
     const { productId, quantity = 1, variantId, buyMode = 'unit', buyUnit, subVariantId } = body
 
-    const cookieStore = await cookies()
-    const { userId } = await resolveUserId(cookieStore)
+    const { userId } = await resolveUserId(request)
 
     const product = await queryOne(
       'SELECT id, name, base_price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
@@ -145,22 +158,17 @@ export async function POST(request: NextRequest) {
       const newQuantity = Number(existingItem.quantity) + Number(quantity)
       await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [newQuantity, existingItem.id])
       recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
-      const authToken1 = cookieStore.get('auth_token')?.value
-      if (authToken1) {
-        try {
-          const { payload } = await jwtVerify(authToken1, JWT_SECRET)
-          const realUserId = payload.userId as string
-          if (realUserId) {
-            logActivity({
-              userId: realUserId,
-              kind: 'cart_item_added',
-              referenceId: productId,
-              referenceType: 'products',
-              summary: `Added "${product.name}" to cart${quantity > 1 ? ` (×${quantity})` : ''}`,
-              metadata: { productId, quantity, variantId: variantId || null, buyMode },
-            }).catch(() => {})
-          }
-        } catch {}
+      const authResult1 = await authenticateUser(request)
+      const realUserId1 = authResult1?.userId
+      if (realUserId1) {
+        logActivity({
+          userId: realUserId1,
+          kind: 'cart_item_added',
+          referenceId: productId,
+          referenceType: 'products',
+          summary: `Added "${product.name}" to cart${quantity > 1 ? ` (×${quantity})` : ''}`,
+          metadata: { productId, quantity, variantId: variantId || null, buyMode },
+        }).catch(() => {})
       }
       return NextResponse.json({ message: 'Cart updated', quantity: newQuantity })
     }
@@ -171,22 +179,17 @@ export async function POST(request: NextRequest) {
     )
     recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
 
-    const authToken2 = cookieStore.get('auth_token')?.value
-    if (authToken2) {
-      try {
-        const { payload } = await jwtVerify(authToken2, JWT_SECRET)
-        const realUserId = payload.userId as string
-        if (realUserId) {
-          logActivity({
-            userId: realUserId,
-            kind: 'cart_item_added',
-            referenceId: productId,
-            referenceType: 'products',
-            summary: `Added "${product.name}" to cart${quantity > 1 ? ` (×${quantity})` : ''}`,
-            metadata: { productId, quantity, variantId: variantId || null, buyMode },
-          }).catch(() => {})
-        }
-      } catch {}
+    const authResult2 = await authenticateUser(request)
+    const realUserId2 = authResult2?.userId
+    if (realUserId2) {
+      logActivity({
+        userId: realUserId2,
+        kind: 'cart_item_added',
+        referenceId: productId,
+        referenceType: 'products',
+        summary: `Added "${product.name}" to cart${quantity > 1 ? ` (×${quantity})` : ''}`,
+        metadata: { productId, quantity, variantId: variantId || null, buyMode },
+      }).catch(() => {})
     }
 
     return NextResponse.json({ message: 'Item added to cart' })
@@ -198,10 +201,11 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
+    const parsedUpdate = parseBody(UpdateCartSchema, body)
+    if (!parsedUpdate.ok) return parsedUpdate.response
     const { cartItemId, quantity, savedForLater } = body
 
-    const cookieStore = await cookies()
-    const { userId, sessionId, authUserId } = await resolveUserId(cookieStore)
+    const { userId, sessionId, authUserId } = await resolveUserId(request)
     if (!sessionId && !authUserId) return NextResponse.json({ error: 'Session not found' }, { status: 401 })
 
     const cartItem = await queryOne(`
@@ -236,8 +240,7 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const cartItemId = searchParams.get('id')
 
-    const cookieStore = await cookies()
-    const { userId, sessionId, authUserId } = await resolveUserId(cookieStore)
+    const { userId, sessionId, authUserId } = await resolveUserId(request)
     if (!sessionId && !authUserId) return NextResponse.json({ error: 'Session not found' }, { status: 401 })
 
     const cartItem = await queryOne<{ product_id: string; product_name: string }>(

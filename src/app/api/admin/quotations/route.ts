@@ -3,6 +3,8 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { buildVectorSearchClause } from '@/lib/search'
+import { z } from 'zod'
+import { parseBody, zNonEmpty, zEmail } from '@/lib/validate'
 
 function calcTotals(items: any[]) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
@@ -21,6 +23,18 @@ function buildQuoteNumber(now: Date, seq: number): string {
   const mon = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][month]
   return `QT/${fy}/${mon}/${seq}`
 }
+
+const quotationItemSchema = z.object({
+  description: zNonEmpty,
+  quantity: z.number().min(0),
+  rate: z.number().min(0),
+})
+
+const createQuotationSchema = z.object({
+  consignee_name: zNonEmpty,
+  consignee_email: zEmail.optional(),
+  items: z.array(quotationItemSchema).min(1),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,6 +88,10 @@ export async function POST(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
+
+    const parsed = parseBody(createQuotationSchema, body)
+    if (!parsed.ok) return parsed.response
+
     const { items = [], ...fields } = body
 
     if (!Array.isArray(items) || items.length === 0) {

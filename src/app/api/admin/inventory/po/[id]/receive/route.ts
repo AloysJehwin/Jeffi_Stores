@@ -4,8 +4,21 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/db'
 import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
+import { z } from 'zod'
+import { parseBody, zUuid, zPositiveInt } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
+
+const postSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id: zUuid,
+        receivedQty: zPositiveInt,
+      })
+    )
+    .min(1, 'At least one item is required'),
+})
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -19,6 +32,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: 'items array is required' }, { status: 400 })
     }
+
+    const parsed = parseBody(postSchema, body)
+    if (!parsed.ok) return parsed.response
 
     const po = await queryOne<any>(
       `SELECT po.*, s.id AS supplier_id, s.name AS supplier_name, s.contact_name, s.email AS supplier_email

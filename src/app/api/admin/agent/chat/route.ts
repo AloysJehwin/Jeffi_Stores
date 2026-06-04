@@ -75,7 +75,7 @@ Hard rules:
 - search_products is for natural-language semantic search ("hex bolts for steel", "tools for plumbing"). It is NOT for filter queries like "featured products" / "newly added" / "low stock" / "top sellers" — those should ALWAYS use run_sql_readonly with the right WHERE clause (is_featured, created_at DESC, inventory_quantity, sales_count). The single exception is "featured products" — call list_featured_products instead, it pre-applies the canonical price + variant-stock formulas and returns ui-ready rows.
 - list_repo_files + read_repo_file: when you need to understand domain logic — variant pricing, image URL construction, email template structure, campaign kinds, scope semantics — list and read the canonical files. Useful starting points: src/lib/queries.ts (canonical SQL fragments like VARIANT_MIN_PRICE_SQL), src/lib/email.ts (email senders + transporter), src/lib/marketing.ts (campaign kinds), src/lib/scopes.ts (scope keys), src/lib/email-templates.ts if it exists. Files matching password|secret|token are blocked. Do this BEFORE writing complex SQL or rendering email content — the codebase has the answer for things like "how does the storefront resolve a variant's price?"
 - list_admin_api_routes + call_admin_api: when the user asks you to CREATE, UPDATE or DELETE something the dedicated tools don't cover, FIRST call list_admin_api_routes to find the real path, then call_admin_api with the right HTTP method. Do NOT guess endpoints — if list_admin_api_routes doesn't return what you expect, fall back to run_sql_readonly for read-only inspection or tell the user the action isn't possible. POST/PUT/PATCH/DELETE go through the approval queue. GET runs immediately.
-- Stall prevention: NEVER write a sentence like "I'll fetch X now" or "let me check that" without immediately emitting the matching <tool_use> block in the SAME response. The user only sees what you actually call. If you find yourself promising, stop and emit the tool call.
+- Stall prevention: NEVER write ANY sentence before a tool call. No "Step 1:", no "I'll fetch X now", no "Let me retrieve", no "Retrieving data…", no "I need to first". Your FIRST token must be either the <tool_use> block or the final answer. Writing a narration sentence before the tool call wastes a full model round-trip and causes visible delay. If you find yourself writing a sentence, delete it and emit the tool call directly.
 
 Marketing email confirmations (CRITICAL — emails to customers go to real inboxes):
 - For "send a mail about X products" / "announce new products" requests, NEVER jump straight to propose_product_announcement_email.
@@ -237,6 +237,7 @@ export async function POST(req: NextRequest) {
   let finalUiBlocks: any[] = []
   let provider = ''
   let model = ''
+  let consecutiveStalls = 0
 
   try {
     for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
@@ -253,9 +254,10 @@ export async function POST(req: NextRequest) {
       const { calls, remainder } = parseToolCalls(r.content)
 
       if (calls.length === 0) {
-        const stallRe = /\b(let me|i'?ll|i will|now i|first,? i|i'?m going to|let's start|hold on|please hold|fetching|i'?ll fetch|i'?ll check|i'?ll look|i'?ll retrieve|moment)\b/i
-        const isShortPromise = (remainder || r.content).length < 280 && stallRe.test(remainder || r.content)
-        if (isShortPromise && iter < MAX_ITERATIONS - 1) {
+        const stallRe = /\b(let me|i'?ll|i will|now i|first,? i|i'?m going to|let's start|hold on|please hold|fetching|i'?ll fetch|i'?ll check|i'?ll look|i'?ll retrieve|moment|step 1|retrieving|i need to)\b/i
+        const isShortPromise = (remainder || r.content).length < 320 && stallRe.test(remainder || r.content)
+        if (isShortPromise && consecutiveStalls < 1 && iter < MAX_ITERATIONS - 1) {
+          consecutiveStalls++
           messages.push({ role: 'assistant', content: r.content })
           messages.push({
             role: 'user',
@@ -263,11 +265,13 @@ export async function POST(req: NextRequest) {
           })
           continue
         }
+        consecutiveStalls = 0
         const ui = parseUiBlocks(remainder || r.content)
         finalText = ui.remainder
         finalUiBlocks = ui.blocks
         break
       }
+      consecutiveStalls = 0
 
       messages.push({ role: 'assistant', content: r.content })
 

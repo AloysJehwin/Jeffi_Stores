@@ -47,8 +47,14 @@ export default function UserMenu() {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 p-2 hover:bg-surface-secondary rounded-lg transition-colors"
       >
-        <div className="w-10 h-10 bg-accent-500 text-white rounded-full flex items-center justify-center font-semibold">
-          {initials}
+        <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+          {user.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.firstName} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-accent-500 text-white flex items-center justify-center font-semibold">
+              {initials}
+            </div>
+          )}
         </div>
         <div className="hidden lg:block text-left">
           <div className="text-sm font-medium text-foreground">{user.firstName}</div>
@@ -60,9 +66,20 @@ export default function UserMenu() {
 
       {isOpen && (
         <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1rem)] bg-surface-elevated rounded-lg shadow-lg border border-border-default py-2 z-50">
-          <div className="px-4 py-3 border-b border-border-default">
-            <p className="text-sm font-semibold text-foreground">{user.firstName} {user.lastName}</p>
-            <p className="text-xs text-foreground-muted truncate">{user.email}</p>
+          <div className="px-4 py-3 border-b border-border-default flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0">
+              {user.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.firstName} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-accent-500 text-white flex items-center justify-center text-sm font-semibold">
+                  {initials}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-foreground">{user.firstName} {user.lastName}</p>
+              <p className="text-xs text-foreground-muted truncate">{user.email}</p>
+            </div>
           </div>
 
           <Link

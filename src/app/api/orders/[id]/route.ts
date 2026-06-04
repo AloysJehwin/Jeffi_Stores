@@ -41,7 +41,8 @@ export async function GET(
     }
 
     const orderItems = await queryMany(`
-      SELECT oi.id, oi.product_id, oi.product_name, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price, oi.buy_mode, oi.buy_unit,
+      SELECT oi.id, oi.product_id, oi.product_name, oi.product_sku, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price, oi.buy_mode, oi.buy_unit,
+        psv.sub_variant_name, psv.sku AS sub_variant_sku,
         json_build_object('slug', p.slug, 'product_images',
           COALESCE(
             (SELECT json_agg(pi ORDER BY pi.display_order)
@@ -75,6 +76,7 @@ export async function GET(
         ) AS replacement_window_days
       FROM order_items oi
       LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN product_sub_variants psv ON oi.sub_variant_id = psv.id
       LEFT JOIN brands b ON p.brand_id = b.id
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN categories pc ON c.parent_category_id = pc.id
@@ -106,7 +108,10 @@ export async function GET(
         id: item.id,
         productId: item.product_id,
         productName: item.product_name,
+        productSku: item.product_sku || null,
         variantName: item.variant_name || null,
+        subVariantName: item.sub_variant_name || null,
+        subVariantSku: item.sub_variant_sku || null,
         quantity: item.quantity,
         unitPrice: parseFloat(item.unit_price),
         totalPrice: parseFloat(item.total_price),

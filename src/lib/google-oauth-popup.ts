@@ -76,7 +76,10 @@ export function openGoogleOAuthPopup({
 
     const closedInterval = window.setInterval(() => {
       if (popup.closed) {
-        finish({ accessToken: null, error: 'popup_closed' })
+        setTimeout(() => {
+          finish({ accessToken: null, error: 'popup_closed' })
+        }, 300)
+        window.clearInterval(closedInterval)
       }
     }, 500)
 

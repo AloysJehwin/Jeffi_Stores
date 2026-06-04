@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { query, queryOne, withTransaction } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
 import { isInterState, calculateGST } from '@/lib/gst'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { resolveBuyNowItem, quoteShipping, validateCouponForUser, loadAddress } from '@/lib/order-commit'
+import { parseBody, zUuid, zPositiveInt, zNonEmpty } from '@/lib/validate'
+
+const DirectItemSchema = z.object({
+  productId: zUuid,
+  variantId: zUuid.optional(),
+  subVariantId: zUuid.optional(),
+  qty: zPositiveInt,
+  buyMode: z.string().optional(),
+  buyUnit: z.string().optional(),
+})
+
+const CreateDirectOrderSchema = z.object({
+  paymentMethod: zNonEmpty,
+  item: DirectItemSchema,
+  shippingAddress: z.any().optional(),
+  notes: z.string().optional(),
+  couponId: z.string().optional(),
+  addressId: z.string().optional(),
+})
 
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
@@ -24,7 +44,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { shippingAddress, notes, paymentMethod, couponId, item, addressId } = body
+    const parsed = parseBody(CreateDirectOrderSchema, body)
+    if (!parsed.ok) return parsed.response
+    const { shippingAddress, notes, paymentMethod, couponId, item, addressId } = parsed.data
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = false
     if (paymentMethod !== 'razorpay') {

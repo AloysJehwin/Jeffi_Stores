@@ -1,7 +1,5 @@
 import { createSign } from 'crypto'
 import { queryMany } from './db'
-import fs from 'fs'
-import path from 'path'
 import {
   getGoogleProductCategory,
   buildProductType,
@@ -28,6 +26,12 @@ interface ServiceAccountCreds {
 let cachedToken: { token: string; expiresAt: number } | null = null
 
 function loadCredentials(): ServiceAccountCreds {
+  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+    return { client_email: creds.client_email, private_key: creds.private_key }
+  }
+  const fs = require('fs')
+  const path = require('path')
   const credPath = path.join(process.cwd(), 'jeffi-stores-76e9ecaecdd6.json')
   const creds = JSON.parse(fs.readFileSync(credPath, 'utf8'))
   return { client_email: creds.client_email, private_key: creds.private_key }
@@ -207,7 +211,7 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
   return rows
 }
 
-async function fetchAllProducts() {
+async function fetchAllProducts(limit?: number) {
   return queryMany(`
     SELECT p.*,
       json_build_object(
@@ -233,6 +237,7 @@ async function fetchAllProducts() {
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.is_active = true
     ORDER BY p.created_at DESC
+    ${limit ? `LIMIT ${limit}` : ''}
   `)
 }
 
@@ -265,54 +270,87 @@ async function fetchProduct(productId: string) {
   `, [productId])
 }
 
-export async function syncAllProductsToSheet(): Promise<number> {
+export async function syncAllProductsToSheet(testLimit?: number): Promise<{ inserted: number; updated: number; skipped: number }> {
   const token = await getAccessToken()
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
-  const products = await fetchAllProducts()
+  const products = await fetchAllProducts(testLimit)
 
-  const allRows: string[][] = []
-  for (const product of products) {
-    allRows.push(...productToSheetRows(product, baseUrl))
-  }
-
-  await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!AM1:AT1?valueInputOption=RAW`,
-    {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ range: `${SHEET_NAME}!AM1:AT1`, majorDimension: 'ROWS', values: [NEW_HEADERS] }),
-    }
-  )
-
-  await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A2:AT?valueInputOption=RAW`,
-    {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        range: `${SHEET_NAME}!A2:AT`,
-        majorDimension: 'ROWS',
-        values: allRows.length > 0 ? allRows : [['']],
-      }),
-    }
-  )
-
-  const metaRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}?fields=sheets.properties.gridProperties`,
+  const existingRes = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:AT`,
     { headers: { Authorization: `Bearer ${token}` } }
   )
-  const meta = await metaRes.json()
-  const totalRows = meta.sheets?.[0]?.properties?.gridProperties?.rowCount || 1000
-  const dataEndRow = allRows.length + 1
+  const existingData = await existingRes.json()
+  const existingRows: string[][] = existingData.values || []
 
-  if (totalRows > dataEndRow + 1) {
+  const skuToRowIndex = new Map<string, number>()
+  const skuToRowData = new Map<string, string[]>()
+  for (let i = 1; i < existingRows.length; i++) {
+    const sku = existingRows[i]?.[0]
+    if (sku) {
+      skuToRowIndex.set(sku, i + 1)
+      skuToRowData.set(sku, existingRows[i])
+    }
+  }
+
+  const updateBatch: Array<{ range: string; values: string[][] }> = []
+  const toAppend: string[][] = []
+  let skipped = 0
+
+  for (const product of products) {
+    const newRows = productToSheetRows(product, baseUrl)
+    for (const newRow of newRows) {
+      const sku = newRow[0]
+      if (!sku) continue
+
+      if (skuToRowIndex.has(sku)) {
+        const existing = skuToRowData.get(sku)!
+        const changed = newRow.some((cell, idx) => (existing[idx] ?? '') !== cell)
+        if (changed) {
+          const rowNum = skuToRowIndex.get(sku)!
+          updateBatch.push({ range: `${SHEET_NAME}!A${rowNum}:AT${rowNum}`, values: [newRow] })
+        } else {
+          skipped++
+        }
+      } else {
+        toAppend.push(newRow)
+      }
+    }
+  }
+
+  if (updateBatch.length > 0) {
     await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A${dataEndRow + 1}:AT${totalRows}:clear`,
-      { method: 'POST', headers: { Authorization: `Bearer ${token}` } }
+      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values:batchUpdate`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ valueInputOption: 'RAW', data: updateBatch }),
+      }
     )
   }
 
-  return allRows.length
+  if (toAppend.length > 0) {
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:AT:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ majorDimension: 'ROWS', values: toAppend }),
+      }
+    )
+  }
+
+  if (existingRows.length === 0) {
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!AM1:AT1?valueInputOption=RAW`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ range: `${SHEET_NAME}!AM1:AT1`, majorDimension: 'ROWS', values: [NEW_HEADERS] }),
+      }
+    )
+  }
+
+  return { inserted: toAppend.length, updated: updateBatch.length, skipped }
 }
 
 export async function syncProductToSheet(productId: string): Promise<void> {

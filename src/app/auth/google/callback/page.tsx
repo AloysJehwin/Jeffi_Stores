@@ -20,7 +20,7 @@ export default function GoogleCallbackPage() {
         },
         window.location.origin
       )
-      window.close()
+      setTimeout(() => window.close(), 100)
     }
   }, [])
 

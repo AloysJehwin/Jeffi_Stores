@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
 import { queryMany, queryOne } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
+import { z } from 'zod'
+import { parseBody, zNonEmpty } from '@/lib/validate'
+
+const postSchema = z.object({
+  message: zNonEmpty.max(2000),
+})
 
 const CLOSING_PHRASES = [
   'thank you for contacting',
@@ -70,6 +76,9 @@ export async function POST(
     if (!message?.trim()) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
+
+    const parsed = parseBody(postSchema, { message })
+    if (!parsed.ok) return parsed.response
 
     const msg = await queryOne(
       `INSERT INTO support_messages (session_id, sender, message)

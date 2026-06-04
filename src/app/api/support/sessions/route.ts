@@ -3,6 +3,13 @@ import { authenticateUser } from '@/lib/jwt'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { sendSupportEscalationEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
+import { z } from 'zod'
+import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
+
+const postSchema = z.object({
+  message: zNonEmpty.max(2000),
+  productId: zUuid.optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,6 +37,10 @@ export async function POST(request: NextRequest) {
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const raw = await request.json().catch(() => ({}))
+    const parsed = parseBody(postSchema, raw)
+    if (!parsed.ok) return parsed.response
 
     const existing = await queryOne(
       `SELECT id, status, created_at FROM support_sessions WHERE user_id = $1 AND status = 'open' LIMIT 1`,

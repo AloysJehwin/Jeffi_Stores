@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, withTransaction } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { z } from 'zod'
+import { parseBody, zUuid } from '@/lib/validate'
+
+const postSchema = z.object({
+  percentage: z.number().gt(0, 'percentage must be greater than 0'),
+  categoryId: zUuid.optional(),
+})
 
 const VALID_FIELDS = ['base_price', 'mrp', 'price_ex_gst', 'wholeprice_ex_gst', 'weight_rate', 'length_rate']
 const VARIANT_FIELD_MAP: Record<string, string> = { base_price: 'price', mrp: 'mrp', price_ex_gst: 'price_ex_gst', wholeprice_ex_gst: 'wholeprice_ex_gst', weight_rate: 'weight_rate', length_rate: 'length_rate' }
@@ -85,6 +92,9 @@ export async function POST(request: NextRequest) {
 
   if (!category_id || !category_name) return NextResponse.json({ error: 'category_id and category_name required' }, { status: 400 })
   if (!percentage || percentage <= 0) return NextResponse.json({ error: 'percentage must be > 0' }, { status: 400 })
+
+  const parsedPost = parseBody(postSchema, { percentage: body.percentage, categoryId: body.category_id })
+  if (!parsedPost.ok) return parsedPost.response
   const validFields = (fields || []).filter((f: string) => VALID_FIELDS.includes(f))
   if (validFields.length === 0) return NextResponse.json({ error: 'at least one valid field required' }, { status: 400 })
   const filteredProductIds: string[] | null = Array.isArray(product_ids) && product_ids.length > 0 ? product_ids : null

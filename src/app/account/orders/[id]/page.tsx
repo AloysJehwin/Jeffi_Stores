@@ -17,7 +17,10 @@ interface OrderItem {
   id: string
   productId: string
   productName: string
+  productSku: string | null
   variantName: string | null
+  subVariantName: string | null
+  subVariantSku: string | null
   quantity: number
   unitPrice: number
   totalPrice: number
@@ -128,6 +131,11 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [isPayingNow, setIsPayingNow] = useState(false)
+
+  const authWasLoading = useRef(false)
+  useEffect(() => {
+    if (authLoading) authWasLoading.current = true
+  }, [authLoading])
   const [paymentError, setPaymentError] = useState('')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
@@ -150,7 +158,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [returnSuccess, setReturnSuccess] = useState('')
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && authWasLoading.current) {
       router.push('/login?redirect=/account/orders')
       return
     }
@@ -867,7 +875,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                           <p className="font-medium text-foreground">{item.productName}</p>
                         )}
                         {item.variantName && (
-                          <p className="text-sm text-foreground-muted">{item.variantName}</p>
+                          <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                            {item.variantName}
+                          </span>
+                        )}
+                        {item.subVariantName && (
+                          <span className="inline-flex items-center mt-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                            {item.subVariantName}
+                          </span>
                         )}
                         <p className="text-sm text-foreground-secondary mt-1">Quantity: {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))}</p>
                         <p className="text-sm font-semibold text-foreground mt-1">

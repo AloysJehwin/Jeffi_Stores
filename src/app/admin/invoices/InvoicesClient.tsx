@@ -278,6 +278,7 @@ export default function InvoicesClient() {
         product_name: it.product_name || '',
         product_sku: it.product_sku || '',
         variant_id: it.variant_id || null,
+        sub_variant_id: it.sub_variant_id || null,
         variant_name: it.variant_name || '',
         hsn_code: it.hsn_code || '',
         gst_rate: String(it.gst_rate ?? '18'),

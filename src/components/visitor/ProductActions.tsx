@@ -151,7 +151,12 @@ export default function ProductActions({
   const selectedVariant = variants.find(v => v.id === selectedVariantId)
   const displaySku = hasVariants && selectedVariant ? selectedVariant.sku : sku
 
+  const modeInitDone = useRef(false)
   useEffect(() => {
+    if (!modeInitDone.current) {
+      modeInitDone.current = true
+      return
+    }
     const first = variants.filter(v => (v.pricing_type || 'unit') === selectedMode)[0]
     if (first) setSelectedVariantId(first.id)
   }, [selectedMode])
@@ -165,8 +170,11 @@ export default function ProductActions({
     const v = variants.find(x => x.id === selectedVariantId)
     const subs = v?.sub_variants || []
     if (subs.length > 0) {
-      const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
-      setSelectedSubVariantId(firstActive?.id ?? null)
+      const currentStillValid = subs.find(s => s.id === selectedSubVariantId)
+      if (!currentStillValid) {
+        const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
+        setSelectedSubVariantId(firstActive?.id ?? null)
+      }
     } else {
       setSelectedSubVariantId(null)
     }

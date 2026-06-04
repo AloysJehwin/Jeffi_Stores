@@ -300,6 +300,7 @@ export interface BuyNowCommitInput extends CommitInput {
   item: DraftBuyNowItem
   product: { id: string; name: string; sku: string | null; gst_percentage: string | number | null; hsn_code: string | null }
   variant: { id: string; variant_name: string; sku: string } | null
+  subVariant: { id: string; sub_variant_name: string; sku: string | null } | null
   subtotal: number
   taxAmount: number
   appliedDiscount: number
@@ -340,6 +341,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     let itemRows: Array<{
       productId: string
       variantId: string | null
+      subVariantId: string | null
       productName: string
       productSku: string | null
       variantName: string | null
@@ -378,6 +380,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         return {
           productId: item.product_id,
           variantId: item.variant?.id || null,
+          subVariantId: item.sub_variant?.id || null,
           productName,
           productSku: item.sub_variant?.sku || item.variant?.sku || item.products.sku,
           variantName,
@@ -407,9 +410,14 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
       itemRows = [{
         productId: input.product.id,
         variantId: input.variant?.id || null,
-        productName: input.variant ? `${input.product.name} - ${input.variant.variant_name}` : input.product.name,
-        productSku: input.variant?.sku || input.product.sku,
-        variantName: input.variant?.variant_name || null,
+        subVariantId: input.subVariant?.id || null,
+        productName: input.subVariant
+          ? `${input.product.name}${input.variant ? ' - ' + input.variant.variant_name : ''} - ${input.subVariant.sub_variant_name}`
+          : (input.variant ? `${input.product.name} - ${input.variant.variant_name}` : input.product.name),
+        productSku: input.subVariant?.sku || input.variant?.sku || input.product.sku,
+        variantName: input.subVariant
+          ? `${input.variant?.variant_name ? input.variant.variant_name + ' / ' : ''}${input.subVariant.sub_variant_name}`
+          : (input.variant?.variant_name || null),
         qty,
         unitPrice,
         itemTotal,
@@ -469,12 +477,12 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
       const taxAmt = r.gst ? r.gst.totalTax : Math.round((r.itemTotal - r.itemTotal / (1 + r.gstRate / 100)) * 100) / 100
       await client.query(
         `INSERT INTO order_items (
-          order_id, product_id, variant_id, product_name, product_sku, variant_name,
+          order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name,
           quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate,
           taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
         [
-          created.id, r.productId, r.variantId, r.productName, r.productSku, r.variantName,
+          created.id, r.productId, r.variantId, r.subVariantId, r.productName, r.productSku, r.variantName,
           r.qty, r.unitPrice, r.itemTotal, Math.round(taxAmt * 100) / 100,
           r.hsn, isGSTEnabled ? r.gstRate : null,
           r.gst ? r.gst.taxableAmount : 0,

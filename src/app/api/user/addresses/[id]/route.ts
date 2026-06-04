@@ -1,7 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { query, queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
 import { logActivity } from '@/lib/activity'
+import { parseBody, zNonEmpty, zPhone, zIndianPin } from '@/lib/validate'
+
+const UpdateAddressSchema = z.object({
+  full_name: zNonEmpty.optional(),
+  phone: zPhone.optional(),
+  address_line1: zNonEmpty.optional(),
+  address_line2: z.string().optional(),
+  landmark: z.string().optional(),
+  city: zNonEmpty.optional(),
+  state: zNonEmpty.optional(),
+  postal_code: zIndianPin.optional(),
+})
 
 export async function PATCH(
   request: NextRequest,
@@ -16,6 +29,8 @@ export async function PATCH(
     const userId = user.userId
     const addressId = params.id
     const body = await request.json()
+    const parsed = parseBody(UpdateAddressSchema, body)
+    if (!parsed.ok) return parsed.response
     const {
       address_type,
       full_name,
@@ -28,7 +43,7 @@ export async function PATCH(
       country,
       phone,
       is_default,
-    } = body
+    } = { ...body, ...parsed.data }
 
     if (!phone) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })

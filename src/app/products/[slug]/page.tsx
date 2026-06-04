@@ -148,24 +148,125 @@ function buildProductJsonLd(product: any, baseUrl: string) {
   }
 }
 
-async function getRelatedProducts(productId: string, categoryId: string) {
-  return queryMany(`
-    SELECT p.*,
-      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
-      json_build_object('id', b.id, 'name', b.name) AS brands,
-      COALESCE(
-        (SELECT json_agg(pi ORDER BY pi.display_order)
-         FROM product_images pi WHERE pi.product_id = p.id),
-        '[]'::json
-      ) AS product_images,
-      ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
+const DIMENSION_SUFFIX = /[\s\-]+(M\d+(\.\d+)?|[A-Z]?\d+(\.\d+)?[A-Z]*|[A-Z]{1,3}\d+(\.\d+)?)(\s+(M\d+(\.\d+)?|[A-Z]{1,3}\d+(\.\d+)?|[\d.]+[A-Z]*))*\s*$/i
+
+function nameStem(name: string): string {
+  return name.trim().replace(DIMENSION_SUFFIX, '').toLowerCase().trim()
+}
+
+function deduplicateByNameStem(products: any[], excludeStem: string): any[] {
+  const seen = new Set<string>([excludeStem])
+  const result: any[] = []
+  for (const p of products) {
+    const stem = nameStem(p.name)
+    if (!seen.has(stem)) {
+      seen.add(stem)
+      result.push(p)
+    }
+  }
+  return result
+}
+
+async function getRelatedProducts(productId: string, categoryId: string, productName: string) {
+  const cols = `
+    p.*,
+    json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+    json_build_object('id', b.id, 'name', b.name) AS brands,
+    COALESCE(
+      (SELECT json_agg(pi ORDER BY pi.display_order)
+       FROM product_images pi WHERE pi.product_id = p.id),
+      '[]'::json
+    ) AS product_images,
+    ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
+    ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
+  `
+
+  const currentStem = nameStem(productName)
+
+  const parentRow = await queryMany(
+    `SELECT parent_category_id FROM categories WHERE id = $1`,
+    [categoryId]
+  )
+  const parentId = parentRow[0]?.parent_category_id
+
+  if (!parentId) {
+    const sameCatRaw = await queryMany(`
+      SELECT ${cols}
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN brands b ON p.brand_id = b.id
+      WHERE p.category_id = $1 AND p.is_active = true AND p.id != $2
+      LIMIT 20
+    `, [categoryId, productId])
+    return deduplicateByNameStem(sameCatRaw, currentStem).slice(0, 4)
+  }
+
+  const onePer = await queryMany(`
+    SELECT DISTINCT ON (p.category_id) ${cols}
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.category_id = $1 AND p.is_active = true AND p.id != $2
-    LIMIT 4
-  `, [categoryId, productId])
+    WHERE c.parent_category_id = $1
+      AND p.is_active = true
+      AND p.id != $2
+    ORDER BY p.category_id, RANDOM()
+  `, [parentId, productId])
+
+  const currentCatFirst = [
+    ...onePer.filter((p: any) => p.category_id === categoryId),
+    ...onePer.filter((p: any) => p.category_id !== categoryId),
+  ]
+
+  const deduped = deduplicateByNameStem(currentCatFirst, currentStem)
+
+  if (deduped.length >= 4) return deduped.slice(0, 4)
+
+  const seenIds = new Set<string>([productId, ...deduped.map((p: any) => p.id)])
+  const seenStems = new Set<string>([currentStem, ...deduped.map((p: any) => nameStem(p.name))])
+  const needed = 4 - deduped.length
+  const idList = [...seenIds].map((_, i) => `$${i + 2}`).join(', ')
+
+  const fillRaw = await queryMany(`
+    SELECT ${cols}
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE c.parent_category_id = $1
+      AND p.is_active = true
+      AND p.id NOT IN (${idList})
+    ORDER BY RANDOM()
+    LIMIT ${needed * 3}
+  `, [parentId, ...[...seenIds]])
+
+  const fill: any[] = []
+  for (const p of fillRaw) {
+    const stem = nameStem(p.name)
+    if (!seenStems.has(stem)) {
+      seenStems.add(stem)
+      fill.push(p)
+      if (fill.length >= needed) break
+    }
+  }
+
+  if (deduped.length + fill.length >= 4) return [...deduped, ...fill].slice(0, 4)
+
+  const allIds = new Set<string>([productId, ...deduped.map((p: any) => p.id), ...fill.map((p: any) => p.id)])
+  const allIdList = [...allIds].map((_, i) => `$${i + 2}`).join(', ')
+  const stillNeeded = 4 - deduped.length - fill.length
+
+  const extraRaw = await queryMany(`
+    SELECT ${cols}
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE c.parent_category_id = $1
+      AND p.is_active = true
+      AND p.id NOT IN (${allIdList})
+    ORDER BY RANDOM()
+    LIMIT ${stillNeeded}
+  `, [parentId, ...[...allIds]])
+
+  return [...deduped, ...fill, ...extraRaw].slice(0, 4)
 }
 
 export default async function ProductDetailPage({
@@ -181,7 +282,7 @@ export default async function ProductDetailPage({
     notFound()
   }
 
-  const relatedProducts = await getRelatedProducts(product.id, product.category_id)
+  const relatedProducts = await getRelatedProducts(product.id, product.category_id, product.name)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
   const jsonLd = buildProductJsonLd(product, baseUrl)
   const skuParam = typeof searchParams.sku === 'string' ? searchParams.sku : undefined
@@ -207,6 +308,9 @@ export default async function ProductDetailPage({
         name={product.name}
         slug={product.slug}
         price={Number(displayPrice)}
+        mrp={mrp}
+        brand={product.brands?.name || null}
+        inStock={Number(product.variant_stock_total ?? product.stock_quantity ?? 0) > 0}
         image={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
       />
       {/* Breadcrumb */}
@@ -263,11 +367,11 @@ export default async function ProductDetailPage({
         <RecentlyViewed excludeId={product.id} />
 
         {/* Related Products */}
-        {relatedProducts.length > 0 && (
-          <div>
+        {relatedProducts.length >= 4 && (
+          <div className="mt-10">
             <h2 className="text-2xl font-bold text-foreground mb-6">Related Products</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {relatedProducts.map((relatedProduct) => {
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {relatedProducts.map((relatedProduct: any) => {
                 const relatedPrimaryImage = relatedProduct.product_images?.find((img: any) => img.is_primary) || relatedProduct.product_images?.[0]
                 const relatedHasVariants = relatedProduct.has_variants
                 const relatedDisplayPrice = relatedHasVariants && relatedProduct.variant_min_price
@@ -284,21 +388,21 @@ export default async function ProductDetailPage({
                     href={`/products/${relatedProduct.slug}`}
                     className="group"
                   >
-                    <div className="flex flex-col h-full bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow">
-                      <div className="relative aspect-square border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-3 mt-3">
+                    <div className="flex flex-col h-full bg-surface-elevated rounded-xl shadow-sm border border-border-default overflow-hidden hover:shadow-md hover:border-accent-300 transition-all duration-200">
+                      <div className="relative aspect-square bg-surface overflow-hidden">
                         {relatedPrimaryImage ? (
                           <>
                             <img
                               src={relatedPrimaryImage.image_url}
                               alt=""
                               aria-hidden="true"
-                              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
+                              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-40"
                             />
                             <div className="relative w-full h-full">
                               <ImgWithSkeleton
                                 src={relatedPrimaryImage.image_url}
                                 alt={relatedProduct.name}
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-contain p-2"
                               />
                             </div>
                           </>
@@ -310,16 +414,24 @@ export default async function ProductDetailPage({
                           </div>
                         )}
                         {relatedMrpDiscount > 0 && (
-                          <div className="absolute top-2 right-2 bg-accent-500 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                          <div className="absolute top-2 right-2 bg-accent-500 text-white px-2 py-0.5 rounded-full text-xs font-bold shadow">
                             {relatedMrpDiscount}% off
                           </div>
                         )}
                       </div>
-                      <div className="flex flex-col flex-1 p-4">
-                        <h3 className="font-semibold text-sm text-foreground mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 flex-1">
+                      <div className="flex flex-col flex-1 p-3 gap-1">
+                        {relatedProduct.brands?.name && (
+                          <span className="text-xs text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide truncate">
+                            {relatedProduct.brands.name}
+                          </span>
+                        )}
+                        <h3 className="font-semibold text-sm text-foreground group-hover:text-accent-600 transition-colors line-clamp-2 flex-1 leading-snug">
                           {relatedProduct.name}
                         </h3>
-                        <div className="flex items-baseline gap-2">
+                        {relatedProduct.sku && (
+                          <p className="text-xs text-foreground-muted font-mono truncate">SKU: {relatedProduct.sku}</p>
+                        )}
+                        <div className="flex items-baseline gap-2 mt-1">
                           <span className="text-base font-bold text-primary-600 dark:text-primary-400">
                             {relatedHasVariants ? 'From ' : ''}₹{Number(relatedDisplayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>

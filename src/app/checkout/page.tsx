@@ -29,6 +29,11 @@ function CheckoutPage() {
   const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(null)
   const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
   const couponId = searchParams.get('couponId')
+
+  const authWasLoading = useRef(false)
+  useEffect(() => {
+    if (authLoading) authWasLoading.current = true
+  }, [authLoading])
   const couponCode = searchParams.get('couponCode')
   const discountAmount = parseFloat(searchParams.get('discountAmount') || '0')
   const shippingCharge = searchParams.get('shippingCharge') ? parseFloat(searchParams.get('shippingCharge')!) : null
@@ -47,22 +52,28 @@ function CheckoutPage() {
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
     variantId: string | null
+    subVariantId: string | null
     qty: number
     buyMode: string
     buyUnit: string | null
     price: number
     productName: string
     variantName: string | null
+    subVariantName: string | null
+    sku: string | null
+    mrp: number | null
+    gstPercentage: number | null
+    brandName: string | null
     imageUrl: string | null
   } | null>(null)
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && authWasLoading.current) {
       router.push('/login?redirect=/checkout')
       return
     }
 
-    if (!isBuyNow && !cartLoading && cartCount === 0 && !razorpayOpen.current) {
+    if (!intentToken && !isBuyNow && !cartLoading && cartCount === 0 && !razorpayOpen.current) {
       router.push('/cart')
       return
     }
@@ -88,12 +99,18 @@ function CheckoutPage() {
           setBuyNowItem({
             productId: d.productId,
             variantId: d.variantId || null,
+            subVariantId: d.subVariantId || null,
             qty: Number(d.qty),
             buyMode: d.buyMode,
             buyUnit: d.buyUnit || null,
             price: Number(d.price),
             productName: d.productName || '',
             variantName: d.variantName || null,
+            subVariantName: d.subVariantName || null,
+            sku: d.sku || null,
+            mrp: d.mrp != null ? Number(d.mrp) : null,
+            gstPercentage: d.gstPercentage != null ? Number(d.gstPercentage) : null,
+            brandName: d.brandName || null,
             imageUrl: null,
           })
           const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
@@ -123,12 +140,18 @@ function CheckoutPage() {
       setBuyNowItem({
         productId,
         variantId: variantId || null,
+        subVariantId: null,
         qty,
         buyMode,
         buyUnit: buyUnit || null,
         price,
         productName,
         variantName: variantName || null,
+        subVariantName: null,
+        sku: null,
+        mrp: null,
+        gstPercentage: null,
+        brandName: null,
         imageUrl: null,
       })
 
@@ -340,6 +363,7 @@ function CheckoutPage() {
           draftBody.item = {
             productId: buyNowItem.productId,
             variantId: buyNowItem.variantId,
+            subVariantId: buyNowItem.subVariantId,
             qty: buyNowItem.qty,
             buyMode: buyNowItem.buyMode,
             buyUnit: buyNowItem.buyUnit,
@@ -391,6 +415,7 @@ function CheckoutPage() {
         body.item = {
           productId: buyNowItem.productId,
           variantId: buyNowItem.variantId,
+          subVariantId: buyNowItem.subVariantId,
           qty: buyNowItem.qty,
           buyMode: buyNowItem.buyMode,
           buyUnit: buyNowItem.buyUnit,
@@ -500,13 +525,49 @@ function CheckoutPage() {
                       </div>
                       <div className="flex-1">
                         <h3 className="font-semibold text-foreground">{buyNowItem.productName}</h3>
-                        {buyNowItem.variantName && <p className="text-sm text-foreground-muted">{buyNowItem.variantName}</p>}
-                        <p className="text-sm text-foreground-secondary mt-1">
-                          ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
-                        </p>
-                        <p className="text-sm font-semibold text-foreground mt-1">
-                          ₹{(buyNowItem.price * buyNowItem.qty).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </p>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          {buyNowItem.brandName && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-secondary text-foreground-secondary border border-border-default">
+                              {buyNowItem.brandName}
+                            </span>
+                          )}
+                          {buyNowItem.sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {buyNowItem.sku}</span>}
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {buyNowItem.variantName && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                              {buyNowItem.variantName}
+                            </span>
+                          )}
+                          {buyNowItem.subVariantName && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                              {buyNowItem.subVariantName}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <p className="text-sm text-foreground-secondary">
+                            ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
+                            {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
+                              <>
+                                {' '}<span className="line-through text-foreground-muted">₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                {' '}<span className="text-accent-600 dark:text-accent-400 font-semibold">{Math.round(((buyNowItem.mrp - buyNowItem.price) / buyNowItem.mrp) * 100)}% off</span>
+                              </>
+                            )}
+                          </p>
+                          <p className="text-sm font-semibold text-foreground">
+                            ₹{(buyNowItem.price * buyNowItem.qty).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        {buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
+                          const lineTotal = buyNowItem.price * buyNowItem.qty
+                          const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
+                          return (
+                            <p className="text-[11px] text-foreground-muted mt-0.5">
+                              incl. ₹{gst.toLocaleString('en-IN', { minimumFractionDigits: 3 })} GST @ {buyNowItem.gstPercentage}%
+                            </p>
+                          )
+                        })()}
                       </div>
                     </div>
                   ) : (
@@ -542,8 +603,18 @@ function CheckoutPage() {
                               )}
                               {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
                             </div>
-                            {item.variant && <p className="text-sm text-foreground-muted">{item.variant.variant_name}</p>}
-                            {item.sub_variant && <p className="text-xs text-foreground-muted">{item.sub_variant.sub_variant_name}</p>}
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {item.variant && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                                  {item.variant.variant_name}
+                                </span>
+                              )}
+                              {item.sub_variant && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                                  {item.sub_variant.sub_variant_name}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-sm text-foreground-secondary mt-1">
                               ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
                               {showMrp && (

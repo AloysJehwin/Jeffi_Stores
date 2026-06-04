@@ -223,12 +223,18 @@ export default function CartPage() {
                             <span className="text-xs text-foreground-muted font-mono">SKU: {sku}</span>
                           )}
                         </div>
-                        {item.variant && (
-                          <p className="text-sm text-foreground-muted mt-0.5">{item.variant.variant_name}</p>
-                        )}
-                        {item.sub_variant && (
-                          <p className="text-xs text-foreground-muted mt-0.5">{item.sub_variant.sub_variant_name}</p>
-                        )}
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {item.variant && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                              {item.variant.variant_name}
+                            </span>
+                          )}
+                          {item.sub_variant && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                              {item.sub_variant.sub_variant_name}
+                            </span>
+                          )}
+                        </div>
 
                         <div className="mt-2 flex items-center gap-3 flex-wrap">
                           <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
@@ -406,8 +412,18 @@ export default function CartPage() {
                             )}
                             {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
                           </div>
-                          {item.variant && <p className="text-xs text-foreground-muted mt-0.5">{item.variant.variant_name}</p>}
-                          {item.sub_variant && <p className="text-xs text-foreground-muted">{item.sub_variant.sub_variant_name}</p>}
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {item.variant && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                                {item.variant.variant_name}
+                              </span>
+                            )}
+                            {item.sub_variant && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                                {item.sub_variant.sub_variant_name}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">
                             ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
                           </p>

@@ -3,6 +3,7 @@ import { SignJWT } from 'jose'
 import { queryOne, query } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
+import { uploadAvatarImage } from '@/lib/s3'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -102,6 +103,20 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user) return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
+
+    if (payload.picture) {
+      try {
+        const imgRes = await fetch(payload.picture)
+        if (imgRes.ok) {
+          const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
+          const { url, s3Key } = await uploadAvatarImage(imgBuffer, user.id)
+          await query(
+            'UPDATE users SET avatar_url = $1, avatar_s3_key = $2 WHERE id = $3 AND avatar_is_custom = false',
+            [url, s3Key, user.id]
+          )
+        }
+      } catch {}
+    }
 
     const cookieStore = await cookies()
     const guestSessionId = cookieStore.get('session_id')?.value

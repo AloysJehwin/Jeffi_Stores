@@ -23,6 +23,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!phone) {
+      return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 })
+    }
+
     const otpValid = await isOTPVerified(email)
     if (!otpValid) {
       return NextResponse.json(

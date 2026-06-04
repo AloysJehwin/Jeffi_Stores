@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     }
 
     const user = await queryOne(
-      'SELECT id, email, first_name, last_name, phone, created_at FROM users WHERE id = $1',
+      'SELECT id, email, first_name, last_name, phone, created_at, avatar_url FROM users WHERE id = $1',
       [userPayload.userId]
     )
 
@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
         lastName: user.last_name,
         phone: user.phone,
         createdAt: user.created_at,
+        avatarUrl: user.avatar_url || null,
       },
     })
   } catch {

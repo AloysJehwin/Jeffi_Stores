@@ -3,23 +3,28 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
-const CHECK_INTERVAL_MS = 5_000
+const CHECK_INTERVAL_MS = 30_000
 const WARNING_COUNTDOWN_S = 5 * 60
 
 export default function SessionGuard() {
   const router = useRouter()
   const [expired, setExpired] = useState(false)
   const [countdown, setCountdown] = useState(WARNING_COUNTDOWN_S)
+  const expiredRef = useRef(false)
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const checkRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     if (countdownRef.current) clearInterval(countdownRef.current)
     if (checkRef.current) clearInterval(checkRef.current)
+    try {
+      await fetch('/api/admin/logout', { method: 'POST' })
+    } catch {}
     router.push('/admin/login')
   }, [router])
 
   const startCountdown = useCallback(() => {
+    if (countdownRef.current) clearInterval(countdownRef.current)
     setCountdown(WARNING_COUNTDOWN_S)
     countdownRef.current = setInterval(() => {
       setCountdown(prev => {
@@ -34,16 +39,18 @@ export default function SessionGuard() {
   }, [logout])
 
   const checkSession = useCallback(async () => {
+    if (expiredRef.current) return
     try {
       const res = await fetch('/api/admin/check-session', { cache: 'no-store' })
       const data = await res.json()
-      if (!data.authenticated && !expired) {
+      if (!data.authenticated) {
+        expiredRef.current = true
         setExpired(true)
         if (checkRef.current) clearInterval(checkRef.current)
         startCountdown()
       }
     } catch {}
-  }, [expired, startCountdown])
+  }, [startCountdown])
 
   useEffect(() => {
     checkRef.current = setInterval(checkSession, CHECK_INTERVAL_MS)
@@ -58,6 +65,7 @@ export default function SessionGuard() {
     try {
       const res = await fetch('/api/admin/refresh', { method: 'POST' })
       if (res.ok) {
+        expiredRef.current = false
         setExpired(false)
         setCountdown(WARNING_COUNTDOWN_S)
         checkRef.current = setInterval(checkSession, CHECK_INTERVAL_MS)
