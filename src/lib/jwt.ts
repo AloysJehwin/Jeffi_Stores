@@ -7,7 +7,12 @@ if (!process.env.JWT_SECRET) {
 }
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
-const JWT_EXPIRES_IN = '1m'
+
+// Single source of truth for session lifetime.
+// JWT_EXPIRES_IN: jose format string used when signing the token.
+// JWT_MAX_AGE_S:  cookie maxAge in seconds — must match JWT_EXPIRES_IN exactly.
+export const JWT_EXPIRES_IN = '1m'
+export const JWT_MAX_AGE_S = 60
 
 export interface JWTPayload {
   adminId: string

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin, generateToken } from '@/lib/jwt'
-
-const JWT_MAX_AGE_S = 60 // must match JWT_EXPIRES_IN in jwt.ts
+import { authenticateAdmin, generateToken, JWT_MAX_AGE_S } from '@/lib/jwt'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
