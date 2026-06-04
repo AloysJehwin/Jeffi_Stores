@@ -9,39 +9,58 @@ export async function register() {
   const TEN_MIN    = 10 * 60 * 1000
   const ONE_MIN    =      60 * 1000
   const THIRTY_MIN = 30 * 60 * 1000
+  const ONE_DAY    = 24 * 60 * 60 * 1000
 
-  const callCron = async (path: string, method: 'GET' | 'POST') => {
+  const recordRun = async (jobId: string, ok: boolean, errorMsg?: string) => {
     try {
-      await fetch(`${APP_URL}${path}`, {
-        method,
-        headers: { Authorization: `Bearer ${CRON_SECRET}` },
+      await fetch(`${APP_URL}/api/internal/cron-record`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${CRON_SECRET}` },
+        body: JSON.stringify({ jobId, ok, errorMsg }),
       })
     } catch {
     }
   }
 
+  const callCron = async (jobId: string, path: string, method: 'GET' | 'POST') => {
+    try {
+      const res = await fetch(`${APP_URL}${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${CRON_SECRET}` },
+      })
+      await recordRun(jobId, res.ok, res.ok ? undefined : `HTTP ${res.status}`)
+    } catch (err: any) {
+      await recordRun(jobId, false, err?.message || 'fetch failed')
+    }
+  }
+
   setTimeout(() => {
-    callCron('/api/admin/delhivery/sync-statuses', 'POST')
-    setInterval(() => callCron('/api/admin/delhivery/sync-statuses', 'POST'), TEN_MIN)
+    callCron('delhivery_sync', '/api/admin/delhivery/sync-statuses', 'POST')
+    setInterval(() => callCron('delhivery_sync', '/api/admin/delhivery/sync-statuses', 'POST'), TEN_MIN)
   }, 30_000)
 
   setTimeout(() => {
-    callCron('/api/cron/cancel-stale-orders', 'GET')
-    setInterval(() => callCron('/api/cron/cancel-stale-orders', 'GET'), ONE_MIN)
+    callCron('cancel_stale_orders', '/api/cron/cancel-stale-orders', 'GET')
+    setInterval(() => callCron('cancel_stale_orders', '/api/cron/cancel-stale-orders', 'GET'), ONE_MIN)
   }, 45_000)
 
   setTimeout(() => {
-    callCron('/api/cron/sweep-auto-tasks', 'GET')
-    setInterval(() => callCron('/api/cron/sweep-auto-tasks', 'GET'), THIRTY_MIN)
+    callCron('sweep_auto_tasks', '/api/cron/sweep-auto-tasks', 'GET')
+    setInterval(() => callCron('sweep_auto_tasks', '/api/cron/sweep-auto-tasks', 'GET'), THIRTY_MIN)
   }, 90_000)
 
   setTimeout(() => {
-    callCron('/api/cron/run-campaigns', 'GET')
-    setInterval(() => callCron('/api/cron/run-campaigns', 'GET'), THIRTY_MIN)
+    callCron('run_campaigns', '/api/cron/run-campaigns', 'GET')
+    setInterval(() => callCron('run_campaigns', '/api/cron/run-campaigns', 'GET'), THIRTY_MIN)
   }, 120_000)
 
   setTimeout(() => {
-    callCron('/api/cron/compute-health', 'GET')
-    setInterval(() => callCron('/api/cron/compute-health', 'GET'), THIRTY_MIN)
+    callCron('compute_health', '/api/cron/compute-health', 'GET')
+    setInterval(() => callCron('compute_health', '/api/cron/compute-health', 'GET'), THIRTY_MIN)
   }, 150_000)
+
+  setTimeout(() => {
+    callCron('daily_briefing', '/api/cron/daily-briefing', 'GET')
+    setInterval(() => callCron('daily_briefing', '/api/cron/daily-briefing', 'GET'), ONE_DAY)
+  }, 180_000)
 }
