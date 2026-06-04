@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 
 // How often to poll the server for the real expiry time (ms)
 const POLL_INTERVAL_MS = 15_000
@@ -9,7 +9,6 @@ const POLL_INTERVAL_MS = 15_000
 const WARN_BEFORE_S = 20
 
 export default function SessionGuard() {
-  const router = useRouter()
   const pathname = usePathname()
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
   const [showModal, setShowModal] = useState(false)
@@ -33,8 +32,9 @@ export default function SessionGuard() {
     clearTimers()
     setShowModal(false)
     try { await fetch('/api/admin/logout', { method: 'POST' }) } catch {}
-    router.push('/admin/login')
-  }, [router])
+    // Hard reload — forces server layout to re-evaluate with cleared cookie
+    window.location.href = '/admin/login'
+  }, [])
 
   const startTicker = useCallback(() => {
     if (tickRef.current) clearInterval(tickRef.current)
