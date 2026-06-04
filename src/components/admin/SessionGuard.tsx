@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
-const CHECK_INTERVAL_MS = 30_000
-const WARNING_COUNTDOWN_S = 5 * 60
+const CHECK_INTERVAL_MS = 20_000
+const WARNING_COUNTDOWN_S = 20
 
 export default function SessionGuard() {
   const router = useRouter()

@@ -7,7 +7,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
-const JWT_EXPIRES_IN = '1h'
+const JWT_EXPIRES_IN = '1m'
 
 export interface JWTPayload {
   adminId: string
