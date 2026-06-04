@@ -228,11 +228,6 @@ jobs:
             set -e
             cd /opt/jeffi-stores
 
-            echo "── Pulling latest code ──"
-            git fetch origin
-            git checkout main
-            git reset --hard origin/main
-
             echo "── Pulling new Docker image ──"
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]'):latest
