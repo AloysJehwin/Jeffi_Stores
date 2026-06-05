@@ -222,6 +222,7 @@ export async function PATCH(
           await logStockMovement(client, {
             productId: item.product_id!,
             variantId: item.variant_id || null,
+            subVariantId: item.sub_variant_id || null,
             transactionType: 'sale',
             quantityChange: -extraQty,
             referenceType: 'order',

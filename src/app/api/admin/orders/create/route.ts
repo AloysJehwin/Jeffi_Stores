@@ -236,6 +236,7 @@ export async function POST(request: NextRequest) {
           await logStockMovement(client, {
             productId: item.product_id,
             variantId: item.variant_id || null,
+            subVariantId: item.sub_variant_id || null,
             transactionType: 'sale',
             quantityChange: -item.quantity,
             referenceType: 'order',
