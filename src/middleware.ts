@@ -4,17 +4,6 @@ import { verifyToken } from './lib/jwt'
 import { getScopeForPath, hasScope } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 
-// Dev-only request logger — active for 15 min from server start, then silences itself
-const DEV_LOG_START = Date.now()
-const DEV_LOG_WINDOW = 15 * 60 * 1000
-
-function devLog(method: string, pathname: string) {
-  if (process.env.NODE_ENV !== 'development') return
-  if (Date.now() - DEV_LOG_START > DEV_LOG_WINDOW) return
-  if (!pathname.startsWith('/api/')) return
-  process.stdout.write(`[REQ] ${method} ${pathname}\n`)
-}
-
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
@@ -34,8 +23,6 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const pathname = request.nextUrl.pathname
-
-  devLog(request.method, pathname)
 
   const isAdminApiPath = pathname.startsWith('/api/admin')
   const isAdminSubdomain = hostname.startsWith('admin.')
