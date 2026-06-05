@@ -21,7 +21,18 @@ export async function GET(
       [params.id, authUser.userId]
     )
 
-    return NextResponse.json({ returnRequest: returnRequest || null })
+    const monthlyCount = await queryOne(
+      `SELECT COUNT(*) AS cnt
+       FROM return_requests rr
+       JOIN orders o ON o.id = rr.order_id
+       WHERE o.user_id = $1
+         AND rr.status NOT IN ('rejected')
+         AND DATE_TRUNC('month', rr.created_at) = DATE_TRUNC('month', NOW())`,
+      [authUser.userId]
+    )
+    const monthlyLimitReached = parseInt(monthlyCount?.cnt || '0', 10) >= 1
+
+    return NextResponse.json({ returnRequest: returnRequest || null, monthlyLimitReached })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
