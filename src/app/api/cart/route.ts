@@ -6,14 +6,16 @@ import { authenticateUser } from '@/lib/jwt'
 import { getUserIdForSession } from '@/lib/guest-user'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { logActivity } from '@/lib/activity'
-import { parseBody, zUuid, zPositiveInt } from '@/lib/validate'
+import { parseBody, zUuid } from '@/lib/validate'
 
 const AddCartSchema = z
   .object({
     productId: zUuid.optional(),
     variantId: zUuid.optional(),
     subVariantId: zUuid.optional(),
-    quantity: zPositiveInt.optional(),
+    quantity: z.number().positive().optional(),
+    buyMode: z.enum(['unit', 'weight', 'length']).optional(),
+    buyUnit: z.string().optional(),
   })
   .refine(
     (d) => d.productId !== undefined || d.variantId !== undefined,
@@ -98,7 +100,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const parsedCart = parseBody(AddCartSchema, body)
     if (!parsedCart.ok) return parsedCart.response
-    const { productId, quantity = 1, variantId, buyMode = 'unit', buyUnit, subVariantId } = body
+    const { productId, quantity = 1, variantId, buyMode = 'unit', buyUnit, subVariantId } = parsedCart.data
 
     const { userId } = await resolveUserId(request)
 
@@ -106,7 +108,7 @@ export async function POST(request: NextRequest) {
       'SELECT id, name, base_price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
       [productId]
     )
-    if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    if (!productId || !product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
 
     let priceAtAddition: number
 
@@ -203,7 +205,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const parsedUpdate = parseBody(UpdateCartSchema, body)
     if (!parsedUpdate.ok) return parsedUpdate.response
-    const { cartItemId, quantity, savedForLater } = body
+    const { cartItemId, quantity, savedForLater } = parsedUpdate.data
 
     const { userId, sessionId, authUserId } = await resolveUserId(request)
     if (!sessionId && !authUserId) return NextResponse.json({ error: 'Session not found' }, { status: 401 })

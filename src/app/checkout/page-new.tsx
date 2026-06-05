@@ -45,7 +45,7 @@ export default function CheckoutPage() {
 
   const fetchAddress = async (addressId: string) => {
     try {
-      const response = await fetch('/api/user/addresses')
+      const response = await fetch('/api/user/addresses', { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         const selectedAddr = data.addresses.find((a: any) => a.id === addressId)

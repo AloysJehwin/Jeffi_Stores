@@ -20,6 +20,15 @@ const orderItemSchema = z.object({
 
 const createOrderSchema = z.object({
   customerName: zNonEmpty,
+  customerPhone: z.string().optional(),
+  customerEmail: z.string().email().optional().or(z.literal('')),
+  addressLine1: z.string().optional(),
+  addressLine2: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  postalCode: z.string().optional(),
+  buyerGstin: z.string().optional(),
+  notes: z.string().optional(),
   items: z.array(orderItemSchema).min(1),
   paymentMode: zNonEmpty.optional(),
 })
@@ -48,7 +57,7 @@ export async function POST(request: NextRequest) {
       paymentMode,
       items,
       notes,
-    } = body
+    } = parsed.data
 
     const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
