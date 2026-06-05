@@ -67,7 +67,7 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
               ps.sku, COALESCE(ps.price, 0) AS base_price,
               COALESCE(ps.mrp, pv.mrp, p.mrp) AS mrp,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
-              COALESCE(ps.stock_quantity,0)::numeric AS inventory_quantity,
+              COALESCE(ps.inventory_quantity,0)::numeric AS inventory_quantity,
               p.search_vector
        FROM product_sub_variants ps
        JOIN product_variants pv ON pv.id = ps.variant_id
@@ -322,7 +322,7 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
               COALESCE(ps.mrp,0)::numeric AS mrp, ps.price_ex_gst,
               COALESCE(ps.price,0) AS base_price,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
-              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(ps.stock_quantity,0) AS inventory_quantity, p.search_vector
+              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(ps.inventory_quantity,0) AS inventory_quantity, p.search_vector
        FROM product_sub_variants ps
        JOIN product_variants pv ON pv.id = ps.variant_id
        JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id
