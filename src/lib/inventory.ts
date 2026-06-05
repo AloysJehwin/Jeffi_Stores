@@ -10,6 +10,7 @@ export async function logStockMovement(
   params: {
     productId: string
     variantId: string | null
+    subVariantId?: string | null
     transactionType: TransactionType
     quantityChange: number
     referenceType: ReferenceType
@@ -17,21 +18,31 @@ export async function logStockMovement(
     notes?: string
   }
 ) {
-  const { productId, variantId, transactionType, quantityChange, referenceType, referenceId, notes } = params
+  const { productId, variantId, subVariantId, transactionType, quantityChange, referenceType, referenceId, notes } = params
 
-  const currentStock = variantId
-    ? await queryOne<{ inventory_quantity: number }>(
-        'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variantId])
-    : await queryOne<{ inventory_quantity: number }>(
-        'SELECT inventory_quantity FROM products WHERE id = $1', [productId])
+  let currentStockRaw: number
+  if (subVariantId) {
+    const row = await queryOne<{ stock_quantity: number }>(
+      'SELECT stock_quantity FROM product_sub_variants WHERE id = $1', [subVariantId])
+    currentStockRaw = parseFloat(row?.stock_quantity as any) || 0
+  } else if (variantId) {
+    const row = await queryOne<{ inventory_quantity: number }>(
+      'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variantId])
+    currentStockRaw = parseFloat(row?.inventory_quantity as any) || 0
+  } else {
+    const row = await queryOne<{ inventory_quantity: number }>(
+      'SELECT inventory_quantity FROM products WHERE id = $1', [productId])
+    currentStockRaw = parseFloat(row?.inventory_quantity as any) || 0
+  }
 
-  const quantityAfter = (currentStock?.inventory_quantity || 0) + quantityChange
+  const qtyChange = Math.round(quantityChange)
+  const quantityAfter = Math.round(currentStockRaw + quantityChange)
 
   const sql = `INSERT INTO inventory_transactions
     (product_id, variant_id, transaction_type, quantity_change, quantity_after,
      reference_type, reference_id, notes)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`
-  const values = [productId, variantId, transactionType, quantityChange, quantityAfter,
+  const values = [productId, variantId, transactionType, qtyChange, quantityAfter,
     referenceType, referenceId, notes || null]
 
   if (client) {
