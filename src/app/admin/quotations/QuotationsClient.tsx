@@ -243,7 +243,7 @@ export default function QuotationsClient() {
           unit_price: unitPrice,
           discount_pct: discPct,
           mrp,
-          inventory_quantity: null,
+          inventory_quantity: i.inventory_quantity ?? null,
         }
       })
       setItems(loadedItems.length ? loadedItems : [newLineItem()])
