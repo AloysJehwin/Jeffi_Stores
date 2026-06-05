@@ -3,14 +3,14 @@ import { z } from 'zod'
 import { authenticateUser } from '@/lib/jwt'
 import { resolveBuyNowItem, loadActiveCart } from '@/lib/order-commit'
 import { signIntent } from '@/lib/checkout-intent'
-import { parseBody, zUuid, zPositiveInt } from '@/lib/validate'
+import { parseBody, zUuid } from '@/lib/validate'
 
 const IntentSchema = z.object({
   mode: z.string().optional(),
   productId: zUuid.optional(),
   variantId: zUuid.optional(),
   subVariantId: zUuid.optional(),
-  qty: zPositiveInt.optional(),
+  qty: z.number().positive().optional(),
   buyMode: z.string().optional(),
   buyUnit: z.string().optional(),
 })
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const parsed = parseBody(IntentSchema, body)
   if (!parsed.ok) return parsed.response
-  const mode = body.mode === 'cart' ? 'cart' : 'buyNow'
+  const mode = parsed.data.mode === 'cart' ? 'cart' : 'buyNow'
 
   if (mode === 'cart') {
     const auth = await authenticateUser(req)
@@ -32,17 +32,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ intent: token })
   }
 
-  if (!body.productId || !body.qty) {
+  if (!parsed.data.productId || !parsed.data.qty) {
     return NextResponse.json({ error: 'productId and qty required' }, { status: 400 })
   }
 
   const resolved = await resolveBuyNowItem({
-    productId: String(body.productId),
-    variantId: body.variantId || null,
-    subVariantId: body.subVariantId || null,
-    qty: Number(body.qty),
-    buyMode: body.buyMode,
-    buyUnit: body.buyUnit,
+    productId: parsed.data.productId,
+    variantId: parsed.data.variantId || null,
+    subVariantId: parsed.data.subVariantId || null,
+    qty: parsed.data.qty,
+    buyMode: parsed.data.buyMode,
+    buyUnit: parsed.data.buyUnit,
   })
   if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
 

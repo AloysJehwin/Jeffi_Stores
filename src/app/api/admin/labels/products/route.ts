@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get('q')?.trim() || ''
     const categoryId = searchParams.get('category_id')?.trim() || ''
     const productId = searchParams.get('product_id')?.trim() || ''
-    const limit = parseInt(searchParams.get('limit') || '40') || 10000
+    const limit = Math.min(parseInt(searchParams.get('limit') || '40') || 40, 200)
 
     let idx = 1
     const params: unknown[] = []

@@ -13,13 +13,14 @@ const VALID_PAYMENT_MODES = ['cash', 'upi', 'upi_qr']
 
 const cashSaleItemSchema = z.object({
   product_name: zNonEmpty,
-  unit_price: z.number().min(0),
-  quantity: z.number().min(0),
+  unit_price: z.number().positive(),
+  quantity: z.number().positive(),
 })
 
 const cashSaleSchema = z.object({
   items: z.array(cashSaleItemSchema).min(1),
   paymentMode: zNonEmpty.optional(),
+  notes: z.string().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     const parsed = parseBody(cashSaleSchema, body)
     if (!parsed.ok) return parsed.response
 
-    const { paymentMode = 'cash', notes, items } = body
+    const { paymentMode = 'cash', notes, items } = parsed.data
 
     if (!VALID_PAYMENT_MODES.includes(paymentMode)) {
       return NextResponse.json({ error: 'Invalid payment mode for cash sale' }, { status: 400 })

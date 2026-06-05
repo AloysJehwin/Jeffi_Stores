@@ -169,14 +169,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   const fetchOrder = async () => {
     try {
-      const response = await fetch(`/api/orders/${params.id}`)
+      const response = await fetch(`/api/orders/${params.id}`, { credentials: 'include' })
       if (!response.ok) {
         throw new Error('Failed to fetch order details')
       }
       const data = await response.json()
       setOrder(data.order)
 
-      const retRes = await fetch(`/api/orders/${params.id}/return`)
+      const retRes = await fetch(`/api/orders/${params.id}/return`, { credentials: 'include' })
       if (retRes.ok) {
         const retData = await retRes.json()
         setReturnRequest(retData.returnRequest || null)
@@ -196,6 +196,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const response = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           restoreToCart: order?.orderType !== 'direct',
           autoCancelUnpaid: true,
@@ -240,6 +241,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const response = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ restoreToCart: order?.orderType !== 'direct' }),
       })
       const data = await response.json()
@@ -268,6 +270,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const response = await fetch(`/api/orders/${params.id}/return`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ type: returnType, reason: returnReason, description: returnDescription || undefined }),
       })
       const data = await response.json()
