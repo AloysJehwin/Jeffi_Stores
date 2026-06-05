@@ -23,10 +23,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
     const items = await queryMany(`
       SELECT qi.*,
-        COALESCE(pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
+        COALESCE(sv.inventory_quantity, pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
       FROM quotation_items qi
+      LEFT JOIN product_sub_variants sv ON sv.id = qi.sub_variant_id
       LEFT JOIN product_variants pv ON pv.id = qi.variant_id
-      LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL
+      LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL AND qi.sub_variant_id IS NULL
       WHERE qi.quotation_id = $1
       ORDER BY qi.position
     `, [params.id])
@@ -61,14 +62,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       for (let idx = 0; idx < computedItems.length; idx++) {
         const item = computedItems[idx]
         await query(
-          `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, rate, discount_pct, amount, product_id, variant_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
           [
             params.id, idx,
             item.description, item.hsn_code || null, Number(item.gst_rate) || 18,
             Number(item.quantity), item.unit || 'PCS', Number(item.rate),
             Number(item.discount_pct) || 0, item.amount,
-            item.product_id || null, item.variant_id || null,
+            item.product_id || null, item.variant_id || null, item.sub_variant_id || null,
           ]
         )
       }
@@ -103,10 +104,11 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     const savedItems = await queryMany(`
       SELECT qi.*,
-        COALESCE(pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
+        COALESCE(sv.inventory_quantity, pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
       FROM quotation_items qi
+      LEFT JOIN product_sub_variants sv ON sv.id = qi.sub_variant_id
       LEFT JOIN product_variants pv ON pv.id = qi.variant_id
-      LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL
+      LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL AND qi.sub_variant_id IS NULL
       WHERE qi.quotation_id = $1
       ORDER BY qi.position
     `, [params.id])

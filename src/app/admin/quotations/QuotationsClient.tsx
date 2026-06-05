@@ -327,6 +327,7 @@ export default function QuotationsClient() {
             amount: (Number(i.quantity) || 0) * rateExGst,
             product_id: i.product_id || null,
             variant_id: i.variant_id || null,
+            sub_variant_id: i.sub_variant_id || null,
           }
         }),
         ...(newStatus ? { status: newStatus } : {}),
