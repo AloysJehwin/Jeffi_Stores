@@ -21,7 +21,15 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const qt = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [params.id])
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const items = await queryMany(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [params.id])
+    const items = await queryMany(`
+      SELECT qi.*,
+        COALESCE(pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
+      FROM quotation_items qi
+      LEFT JOIN product_variants pv ON pv.id = qi.variant_id
+      LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL
+      WHERE qi.quotation_id = $1
+      ORDER BY qi.position
+    `, [params.id])
     return NextResponse.json({ quotation: qt, items: items || [] })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 })
@@ -93,7 +101,15 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       updateParams
     )
 
-    const savedItems = await queryMany(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [params.id])
+    const savedItems = await queryMany(`
+      SELECT qi.*,
+        COALESCE(pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
+      FROM quotation_items qi
+      LEFT JOIN product_variants pv ON pv.id = qi.variant_id
+      LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL
+      WHERE qi.quotation_id = $1
+      ORDER BY qi.position
+    `, [params.id])
 
     if (fields.status === 'final' && qt?.consignee_email) {
       try {
