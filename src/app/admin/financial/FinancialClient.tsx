@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -19,6 +20,13 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: 'upi', label: 'UPI' },
   { value: 'cash', label: 'Cash' },
   { value: 'cheque', label: 'Cheque' },
+]
+
+const PAYOUT_MODE_OPTIONS = [
+  { value: 'IMPS', label: 'IMPS (instant)' },
+  { value: 'NEFT', label: 'NEFT' },
+  { value: 'RTGS', label: 'RTGS' },
+  { value: 'UPI', label: 'UPI' },
 ]
 
 function formatINR(n: number) {
@@ -54,15 +62,57 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
   )
 }
 
+function Skeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="rounded-xl border border-border-default overflow-hidden">
+      <div className="bg-surface-secondary h-10" />
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="border-t border-border-default px-4 py-3 flex gap-4">
+          <div className="h-4 bg-surface-secondary rounded w-32 animate-pulse" />
+          <div className="h-4 bg-surface-secondary rounded w-24 animate-pulse" />
+          <div className="h-4 bg-surface-secondary rounded flex-1 animate-pulse" />
+          <div className="h-4 bg-surface-secondary rounded w-20 animate-pulse" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const thCls = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary'
 const thRight = 'px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary'
 const thCenter = 'px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary'
 
-function ReceivablesTab() {
+// ── Portal Modal ─────────────────────────────────────────────────────────────
+
+function Modal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', handler)
+      document.body.style.overflow = ''
+    }
+  }, [onClose])
+
+  return createPortal(
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4"
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      {children}
+    </div>,
+    document.body
+  )
+}
+
+// ── Receivables ───────────────────────────────────────────────────────────────
+
+function ReceivablesTab({ initialData }: { initialData: any }) {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [search, setSearch] = useState('')
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
   const [markingPaid, setMarkingPaid] = useState<string | null>(null)
 
@@ -126,13 +176,15 @@ function ReceivablesTab() {
             />
           </div>
           <div className="flex gap-2 pb-0.5">
-            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Load'}</button>
+            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Refresh'}</button>
             {data?.rows?.length > 0 && <button className={btnSecondary} onClick={exportCSV}>Export CSV</button>}
           </div>
         </div>
       </div>
 
-      {data && (
+      {!data ? (
+        <Skeleton />
+      ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <SummaryCard label="Total Outstanding" value={formatINR(data.summary.total)} />
@@ -239,18 +291,13 @@ function ReceivablesTab() {
   )
 }
 
-const PAYOUT_MODE_OPTIONS = [
-  { value: 'IMPS', label: 'IMPS (instant)' },
-  { value: 'NEFT', label: 'NEFT' },
-  { value: 'RTGS', label: 'RTGS' },
-  { value: 'UPI', label: 'UPI' },
-]
+// ── Payables ──────────────────────────────────────────────────────────────────
 
-function PayablesTab() {
+function PayablesTab({ initialData }: { initialData: any }) {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [search, setSearch] = useState('')
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [addForm, setAddForm] = useState({ supplier_name: '', amount: '', tax_amount: '', expense_date: '', due_date: '', description: '', supplier_gstin: '', notes: '' })
@@ -330,6 +377,8 @@ function PayablesTab() {
     setRzpForm({ mode: 'IMPS', amount: remaining.toFixed(2), notes: '' })
   }
 
+  const closePayModal = () => { setPayModal(null); setPayoutResult(null) }
+
   const hasBank = payModal && payModal.supplier_account_number && payModal.supplier_ifsc
   const hasUpi = payModal && payModal.supplier_upi_id
 
@@ -356,7 +405,7 @@ function PayablesTab() {
             />
           </div>
           <div className="flex gap-2 pb-0.5">
-            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Load'}</button>
+            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Refresh'}</button>
             <button className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>+ Add Bill</button>
           </div>
         </div>
@@ -406,7 +455,9 @@ function PayablesTab() {
         </div>
       )}
 
-      {data && data.summary && (
+      {!data ? (
+        <Skeleton />
+      ) : data.summary && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <SummaryCard label="Total Payable" value={formatINR(data.summary.total_payable)} />
@@ -520,7 +571,7 @@ function PayablesTab() {
       )}
 
       {payModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <Modal onClose={closePayModal}>
           <div className="bg-surface-elevated rounded-xl border border-border-default p-6 w-full max-w-md space-y-4">
             <div className="flex items-start justify-between">
               <div>
@@ -529,7 +580,7 @@ function PayablesTab() {
                   Remaining: {formatINR(parseFloat(payModal.total_amount) - parseFloat(payModal.paid_amount))}
                 </p>
               </div>
-              <button className="text-foreground-secondary hover:text-foreground text-lg leading-none" onClick={() => { setPayModal(null); setPayoutResult(null) }}>×</button>
+              <button className="text-foreground-secondary hover:text-foreground text-lg leading-none" onClick={closePayModal}>×</button>
             </div>
 
             {(hasBank || hasUpi) && (
@@ -579,7 +630,7 @@ function PayablesTab() {
                 </div>
                 <div className="flex gap-2 pt-1">
                   <button className={btnPrimary} onClick={submitPayment} disabled={paying}>{paying ? 'Saving…' : 'Record Payment'}</button>
-                  <button className={btnSecondary} onClick={() => { setPayModal(null); setPayoutResult(null) }}>Cancel</button>
+                  <button className={btnSecondary} onClick={closePayModal}>Cancel</button>
                 </div>
               </div>
             )}
@@ -615,25 +666,27 @@ function PayablesTab() {
                   >
                     {paying ? 'Sending…' : payoutResult?.ok ? 'Sent' : 'Send Payout'}
                   </button>
-                  <button className={btnSecondary} onClick={() => { setPayModal(null); setPayoutResult(null) }}>Close</button>
+                  <button className={btnSecondary} onClick={closePayModal}>Close</button>
                 </div>
               </div>
             )}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
 }
 
-function PLTab() {
+// ── P&L ───────────────────────────────────────────────────────────────────────
+
+function PLTab({ initialData }: { initialData: any }) {
   const now = new Date()
   const fyStart = now.getMonth() >= 3 ? `${now.getFullYear()}-04-01` : `${now.getFullYear() - 1}-04-01`
   const fyEnd = now.getMonth() >= 3 ? `${now.getFullYear() + 1}-03-31` : `${now.getFullYear()}-03-31`
 
   const [from, setFrom] = useState(fyStart)
   const [to, setTo] = useState(fyEnd)
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
 
   const load = async () => {
@@ -657,12 +710,14 @@ function PLTab() {
             <DatePicker className="w-36" value={to} onChange={setTo} />
           </div>
           <div className="pb-0.5">
-            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Load'}</button>
+            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Refresh'}</button>
           </div>
         </div>
       </div>
 
-      {data && (
+      {!data ? (
+        <Skeleton rows={6} />
+      ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <SummaryCard label="Revenue" value={formatINR(data.totals.revenue)} sub={`${data.totals.order_count} orders`} />
@@ -758,14 +813,16 @@ function PLTab() {
   )
 }
 
-function CashflowTab() {
+// ── Cashflow ──────────────────────────────────────────────────────────────────
+
+function CashflowTab({ initialData }: { initialData: any }) {
   const now = new Date()
   const fyStart = now.getMonth() >= 3 ? `${now.getFullYear()}-04-01` : `${now.getFullYear() - 1}-04-01`
   const fyEnd = now.getMonth() >= 3 ? `${now.getFullYear() + 1}-03-31` : `${now.getFullYear()}-03-31`
 
   const [from, setFrom] = useState(fyStart)
   const [to, setTo] = useState(fyEnd)
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
 
   const load = async () => {
@@ -789,84 +846,86 @@ function CashflowTab() {
             <DatePicker className="w-36" value={to} onChange={setTo} />
           </div>
           <div className="pb-0.5">
-            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Load'}</button>
+            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Refresh'}</button>
           </div>
         </div>
       </div>
 
-      {data && (
-        data.monthly.length === 0 ? (
-          <p className="text-foreground-secondary text-sm text-center py-10">No transactions in this period</p>
-        ) : (
-          <>
-            <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-secondary">
-                  <tr>
-                    <th className={thCls}>Month</th>
-                    <th className={thRight}>Cash In</th>
-                    <th className={thRight}>Cash Out</th>
-                    <th className={thRight}>Net</th>
-                    <th className={thRight}>Running Balance</th>
+      {!data ? (
+        <Skeleton rows={6} />
+      ) : data.monthly.length === 0 ? (
+        <p className="text-foreground-secondary text-sm text-center py-10">No transactions in this period</p>
+      ) : (
+        <>
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-secondary">
+                <tr>
+                  <th className={thCls}>Month</th>
+                  <th className={thRight}>Cash In</th>
+                  <th className={thRight}>Cash Out</th>
+                  <th className={thRight}>Net</th>
+                  <th className={thRight}>Running Balance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-default">
+                {data.monthly.map((m: any) => (
+                  <tr key={m.month} className="hover:bg-surface-secondary/40 transition-colors">
+                    <td className="px-4 py-3 font-medium text-foreground">
+                      {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400 font-medium">{formatINR(m.cash_in)}</td>
+                    <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</td>
+                    <td className={`px-4 py-3 text-right font-medium ${m.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {m.net >= 0 ? '+' : ''}{formatINR(m.net)}
+                    </td>
+                    <td className={`px-4 py-3 text-right font-semibold ${m.running_balance >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'}`}>
+                      {formatINR(m.running_balance)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {data.monthly.map((m: any) => (
-                    <tr key={m.month} className="hover:bg-surface-secondary/40 transition-colors">
-                      <td className="px-4 py-3 font-medium text-foreground">
-                        {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-                      </td>
-                      <td className="px-4 py-3 text-right text-green-600 dark:text-green-400 font-medium">{formatINR(m.cash_in)}</td>
-                      <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</td>
-                      <td className={`px-4 py-3 text-right font-medium ${m.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {m.net >= 0 ? '+' : ''}{formatINR(m.net)}
-                      </td>
-                      <td className={`px-4 py-3 text-right font-semibold ${m.running_balance >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'}`}>
-                        {formatINR(m.running_balance)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-            <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
-              {data.monthly.map((m: any) => (
-                <div key={m.month} className="p-4 space-y-2">
-                  <p className="font-medium text-foreground text-sm">
-                    {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
-                  </p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-foreground-secondary">Cash In</span>
-                      <span className="font-medium text-green-600 dark:text-green-400">{formatINR(m.cash_in)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground-secondary">Cash Out</span>
-                      <span className="text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground-secondary">Net</span>
-                      <span className={`font-medium ${m.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {m.net >= 0 ? '+' : ''}{formatINR(m.net)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-foreground-secondary">Balance</span>
-                      <span className={`font-semibold ${m.running_balance >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'}`}>
-                        {formatINR(m.running_balance)}
-                      </span>
-                    </div>
+          <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+            {data.monthly.map((m: any) => (
+              <div key={m.month} className="p-4 space-y-2">
+                <p className="font-medium text-foreground text-sm">
+                  {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                </p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-foreground-secondary">Cash In</span>
+                    <span className="font-medium text-green-600 dark:text-green-400">{formatINR(m.cash_in)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-foreground-secondary">Cash Out</span>
+                    <span className="text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-foreground-secondary">Net</span>
+                    <span className={`font-medium ${m.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {m.net >= 0 ? '+' : ''}{formatINR(m.net)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-foreground-secondary">Balance</span>
+                    <span className={`font-semibold ${m.running_balance >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'}`}>
+                      {formatINR(m.running_balance)}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </>
-        )
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
 }
+
+// ── Transactions ──────────────────────────────────────────────────────────────
 
 const TYPE_OPTIONS = [
   { value: 'all', label: 'All' },
@@ -874,12 +933,12 @@ const TYPE_OPTIONS = [
   { value: 'outflow', label: 'Outflow only' },
 ]
 
-function TransactionsTab() {
+function TransactionsTab({ initialData }: { initialData: any }) {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [search, setSearch] = useState('')
   const [type, setType] = useState('all')
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
 
   const load = useCallback(async () => {
@@ -894,10 +953,6 @@ function TransactionsTab() {
     setData(json?.error ? null : json)
     setLoading(false)
   }, [from, to, search, type])
-
-  useEffect(() => {
-    fetch('/api/admin/financial/payables/sync-payouts', { method: 'POST' }).then(() => load())
-  }, [])
 
   const exportCSV = () => {
     if (!data?.rows?.length) return
@@ -933,13 +988,15 @@ function TransactionsTab() {
             <input className={inputCls} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && load()} placeholder="Supplier, customer, ref..." />
           </div>
           <div className="flex gap-2 pb-0.5">
-            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Load'}</button>
+            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Refresh'}</button>
             {data?.rows?.length > 0 && <button className={btnSecondary} onClick={exportCSV}>Export CSV</button>}
           </div>
         </div>
       </div>
 
-      {data && (
+      {!data ? (
+        <Skeleton />
+      ) : (
         <>
           <div className="grid grid-cols-3 gap-3">
             <SummaryCard label="Total Inflow" value={formatINR(data.summary.total_inflow)} sub="payments received" />
@@ -1074,6 +1131,8 @@ function TransactionsTab() {
   )
 }
 
+// ── Root ──────────────────────────────────────────────────────────────────────
+
 const TABS: { key: Tab; label: string }[] = [
   { key: 'receivables', label: 'Receivables' },
   { key: 'payables', label: 'Payables' },
@@ -1088,6 +1147,37 @@ export default function FinancialClient() {
   const tabParam = searchParams.get('tab') as Tab | null
   const validTabs: Tab[] = ['receivables', 'payables', 'transactions', 'pl', 'cashflow']
   const [tab, setTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'receivables')
+
+  const now = new Date()
+  const fyStart = now.getMonth() >= 3 ? `${now.getFullYear()}-04-01` : `${now.getFullYear() - 1}-04-01`
+  const fyEnd = now.getMonth() >= 3 ? `${now.getFullYear() + 1}-03-31` : `${now.getFullYear()}-03-31`
+
+  const [allData, setAllData] = useState<Record<string, any>>({})
+  const loaded = useRef(false)
+
+  useEffect(() => {
+    if (loaded.current) return
+    loaded.current = true
+
+    fetch('/api/admin/financial/payables/sync-payouts', { method: 'POST' }).catch(() => {})
+
+    Promise.allSettled([
+      fetch('/api/admin/financial/receivables').then(r => r.json()),
+      fetch('/api/admin/financial/payables').then(r => r.json()),
+      fetch('/api/admin/financial/transactions').then(r => r.json()),
+      fetch(`/api/admin/financial/pl?from=${fyStart}&to=${fyEnd}`).then(r => r.json()),
+      fetch(`/api/admin/financial/cashflow?from=${fyStart}&to=${fyEnd}`).then(r => r.json()),
+    ]).then(results => {
+      const [rec, pay, txn, pl, cf] = results
+      setAllData({
+        receivables: rec.status === 'fulfilled' && !rec.value?.error ? rec.value : null,
+        payables: pay.status === 'fulfilled' && !pay.value?.error ? pay.value : null,
+        transactions: txn.status === 'fulfilled' && !txn.value?.error ? txn.value : null,
+        pl: pl.status === 'fulfilled' ? pl.value : null,
+        cashflow: cf.status === 'fulfilled' ? cf.value : null,
+      })
+    })
+  }, [])
 
   function handleTabChange(key: Tab) {
     setTab(key)
@@ -1113,11 +1203,11 @@ export default function FinancialClient() {
       </div>
 
       <div>
-        {tab === 'receivables' && <ReceivablesTab />}
-        {tab === 'payables' && <PayablesTab />}
-        {tab === 'transactions' && <TransactionsTab />}
-        {tab === 'pl' && <PLTab />}
-        {tab === 'cashflow' && <CashflowTab />}
+        {tab === 'receivables' && <ReceivablesTab initialData={allData.receivables ?? null} />}
+        {tab === 'payables' && <PayablesTab initialData={allData.payables ?? null} />}
+        {tab === 'transactions' && <TransactionsTab initialData={allData.transactions ?? null} />}
+        {tab === 'pl' && <PLTab initialData={allData.pl ?? null} />}
+        {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
       </div>
     </div>
   )
