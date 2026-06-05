@@ -53,6 +53,40 @@ export async function POST(
     let refundFailed = false
 
     if (action === 'approve') {
+      // Stock is only deducted at payment confirmation — never for pending/unpaid orders.
+      // Only restore inventory if the order was actually paid.
+      const wasStockDeducted = order.payment_status === 'paid'
+
+      async function restoreStock(client: any) {
+        if (!wasStockDeducted) return
+        const itemsResult = await client.query(
+          'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
+          [orderId]
+        )
+        for (const item of itemsResult.rows) {
+          const qty = parseFloat(item.quantity)
+          if (item.variant_id) {
+            await client.query(
+              'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
+              [qty, item.variant_id]
+            )
+          } else {
+            await client.query(
+              'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
+              [qty, item.product_id]
+            )
+          }
+          await logStockMovement(client, {
+            productId: item.product_id,
+            variantId: item.variant_id || null,
+            transactionType: 'adjustment',
+            quantityChange: qty,
+            referenceType: 'order',
+            referenceId: orderId,
+          })
+        }
+      }
+
       let refundSuccess = false
       if (order.payment_status === 'paid' && isRazorpayEnabled()) {
         const paymentRecord = await queryOne(
@@ -79,32 +113,7 @@ export async function POST(
                 `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
                 [JSON.stringify({ ...(typeof paymentRecord.gateway_response === 'string' ? JSON.parse(paymentRecord.gateway_response) : paymentRecord.gateway_response || {}), refund }), paymentRecord.id]
               )
-              const itemsResult = await client.query(
-                'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
-                [orderId]
-              )
-              for (const item of itemsResult.rows) {
-                const qty = parseFloat(item.quantity)
-                if (item.variant_id) {
-                  await client.query(
-                    'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                    [qty, item.variant_id]
-                  )
-                } else {
-                  await client.query(
-                    'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                    [qty, item.product_id]
-                  )
-                }
-                await logStockMovement(client, {
-                  productId: item.product_id,
-                  variantId: item.variant_id || null,
-                  transactionType: 'return',
-                  quantityChange: qty,
-                  referenceType: 'order',
-                  referenceId: orderId,
-                })
-              }
+              await restoreStock(client)
             })
             refundSuccess = true
           } catch {
@@ -114,32 +123,7 @@ export async function POST(
                 `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
                 [orderId]
               )
-              const itemsResult = await client.query(
-                'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
-                [orderId]
-              )
-              for (const item of itemsResult.rows) {
-                const qty = parseFloat(item.quantity)
-                if (item.variant_id) {
-                  await client.query(
-                    'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                    [qty, item.variant_id]
-                  )
-                } else {
-                  await client.query(
-                    'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                    [qty, item.product_id]
-                  )
-                }
-                await logStockMovement(client, {
-                  productId: item.product_id,
-                  variantId: item.variant_id || null,
-                  transactionType: 'return',
-                  quantityChange: qty,
-                  referenceType: 'order',
-                  referenceId: orderId,
-                })
-              }
+              await restoreStock(client)
             })
           }
         } else {
@@ -148,32 +132,7 @@ export async function POST(
               `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
               [orderId]
             )
-            const itemsResult = await client.query(
-              'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
-              [orderId]
-            )
-            for (const item of itemsResult.rows) {
-              const qty = parseFloat(item.quantity)
-              if (item.variant_id) {
-                await client.query(
-                  'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                  [qty, item.variant_id]
-                )
-              } else {
-                await client.query(
-                  'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                  [qty, item.product_id]
-                )
-              }
-              await logStockMovement(client, {
-                productId: item.product_id,
-                variantId: item.variant_id || null,
-                transactionType: 'return',
-                quantityChange: qty,
-                referenceType: 'order',
-                referenceId: orderId,
-              })
-            }
+            await restoreStock(client)
           })
         }
       } else {
@@ -182,32 +141,7 @@ export async function POST(
             `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
             [orderId]
           )
-          const itemsResult = await client.query(
-            'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
-            [orderId]
-          )
-          for (const item of itemsResult.rows) {
-            const qty = parseFloat(item.quantity)
-            if (item.variant_id) {
-              await client.query(
-                'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                [qty, item.variant_id]
-              )
-            } else {
-              await client.query(
-                'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                [qty, item.product_id]
-              )
-            }
-            await logStockMovement(client, {
-              productId: item.product_id,
-              variantId: item.variant_id || null,
-              transactionType: 'return',
-              quantityChange: qty,
-              referenceType: 'order',
-              referenceId: orderId,
-            })
-          }
+          await restoreStock(client)
         })
       }
       newStatus = 'cancelled'
