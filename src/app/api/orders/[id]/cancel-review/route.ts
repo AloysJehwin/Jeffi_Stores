@@ -79,7 +79,7 @@ export async function POST(
           await logStockMovement(client, {
             productId: item.product_id,
             variantId: item.variant_id || null,
-            transactionType: 'adjustment',
+            transactionType: 'return',
             quantityChange: qty,
             referenceType: 'order',
             referenceId: orderId,
