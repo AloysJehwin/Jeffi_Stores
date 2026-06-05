@@ -11,7 +11,7 @@ import { quoteShipping } from '@/lib/order-commit'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 
 const CreateOrderSchema = z.object({
-  paymentMethod: zNonEmpty,
+  paymentMethod: z.enum(['razorpay', 'manual']),
   shippingAddress: z.any().optional(),
   notes: z.string().optional(),
   couponId: z.string().optional(),
@@ -40,9 +40,6 @@ export async function POST(request: NextRequest) {
     const { shippingAddress, notes, paymentMethod, couponId } = parsed.data
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = false
-    if (paymentMethod !== 'razorpay') {
-      return NextResponse.json({ error: 'Only Razorpay payment is supported' }, { status: 400 })
-    }
 
     const existingUnpaidOrder = await queryOne(
       `SELECT o.id, o.order_number FROM orders o

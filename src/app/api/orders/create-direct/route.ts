@@ -18,7 +18,7 @@ const DirectItemSchema = z.object({
 })
 
 const CreateDirectOrderSchema = z.object({
-  paymentMethod: zNonEmpty,
+  paymentMethod: z.enum(['razorpay', 'manual']),
   item: DirectItemSchema,
   shippingAddress: z.any().optional(),
   notes: z.string().optional(),
@@ -49,9 +49,6 @@ export async function POST(request: NextRequest) {
     const { shippingAddress, notes, paymentMethod, couponId, item, addressId } = parsed.data
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = false
-    if (paymentMethod !== 'razorpay') {
-      return NextResponse.json({ error: 'Only Razorpay payment is supported' }, { status: 400 })
-    }
 
     if (!item || !item.productId || !item.qty) {
       return NextResponse.json({ error: 'Item details are required' }, { status: 400 })

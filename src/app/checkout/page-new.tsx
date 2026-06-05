@@ -76,8 +76,10 @@ export default function CheckoutPage() {
     try {
       const response = await fetch('/api/orders/create', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          paymentMethod: 'razorpay',
           shippingAddress: {
             fullName: address.full_name,
             addressLine1: address.address_line1,
