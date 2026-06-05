@@ -53,9 +53,14 @@ export async function POST(
     let refundFailed = false
 
     if (action === 'approve') {
-      // Stock is only deducted at payment confirmation — never for pending/unpaid orders.
-      // Only restore inventory if the order was actually paid.
-      const wasStockDeducted = order.payment_status === 'paid'
+      // Stock is only deducted when an admin moves the order to 'processing'.
+      // A confirmed (paid) order that is cancelled before reaching processing has no stock impact.
+      // Check for an actual sale transaction rather than inferring from payment/status.
+      const saleRecord = await queryOne(
+        `SELECT id FROM inventory_transactions WHERE reference_id = $1 AND transaction_type = 'sale' LIMIT 1`,
+        [orderId]
+      )
+      const wasStockDeducted = !!saleRecord
 
       async function restoreStock(client: any) {
         if (!wasStockDeducted) return
