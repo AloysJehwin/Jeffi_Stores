@@ -11,7 +11,7 @@ const PatchSchema = z.object({
   product_id: zUuid,
   variant_id: zUuid.nullish(),
   sub_variant_id: zUuid.nullish(),
-  new_quantity: z.number().min(0),
+  new_quantity: z.coerce.number().min(0),
   notes: z.string().nullish(),
 })
 
@@ -56,7 +56,7 @@ export async function PATCH(request: NextRequest) {
 
     const raw = await request.json().catch(() => null)
     if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-    const parsed = parseBody(PatchSchema, raw)
+    const parsed = parseBody(PatchSchema, raw, 'PATCH /api/admin/inventory/stock')
     if (!parsed.ok) return parsed.response
     const { product_id, variant_id, sub_variant_id, new_quantity, notes } = parsed.data
 
