@@ -19,7 +19,7 @@ export const zNonEmpty = z
   .trim()
   .min(1, "Must not be empty");
 
-export const zCurrency = z.number().min(0);
+export const zCurrency = z.coerce.number().min(0);
 
 export const zPhone = z
   .string()
