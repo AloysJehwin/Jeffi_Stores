@@ -25,9 +25,15 @@ function buildQuoteNumber(now: Date, seq: number): string {
 }
 
 const quotationItemSchema = z.object({
-  description: zNonEmpty,
-  quantity: z.number().min(0),
-  rate: z.number().min(0),
+  description: z.string().default(''),
+  quantity: z.coerce.number().min(0),
+  rate: z.coerce.number().min(0),
+  hsn_code: z.string().nullish(),
+  gst_rate: z.coerce.number().min(0).default(18),
+  unit: z.string().default('PCS'),
+  discount_pct: z.coerce.number().min(0).default(0),
+  product_id: z.string().uuid().nullish(),
+  variant_id: z.string().uuid().nullish(),
 })
 
 const createQuotationSchema = z.object({
@@ -89,14 +95,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const parsed = parseBody(createQuotationSchema, body)
+    const parsed = parseBody(createQuotationSchema, body, 'POST /api/admin/quotations')
     if (!parsed.ok) return parsed.response
 
-    const { items = [], ...fields } = body
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'At least one item required' }, { status: 400 })
-    }
+    // Use validated items from parsed.data; merge raw body for non-validated fields (addresses, dates, etc.)
+    const { items } = parsed.data
+    const fields = { ...body, items: undefined }
 
     const computedItems = items.map((item: any) => ({
       ...item,
