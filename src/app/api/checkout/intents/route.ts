@@ -8,11 +8,11 @@ import { parseBody, zUuid } from '@/lib/validate'
 const IntentSchema = z.object({
   mode: z.string().optional(),
   productId: zUuid.optional(),
-  variantId: zUuid.optional(),
-  subVariantId: zUuid.optional(),
+  variantId: zUuid.nullish(),
+  subVariantId: zUuid.nullish(),
   qty: z.number().positive().optional(),
-  buyMode: z.string().optional(),
-  buyUnit: z.string().optional(),
+  buyMode: z.string().nullish(),
+  buyUnit: z.string().nullish(),
 })
 
 export const dynamic = 'force-dynamic'
@@ -38,11 +38,11 @@ export async function POST(req: NextRequest) {
 
   const resolved = await resolveBuyNowItem({
     productId: parsed.data.productId,
-    variantId: parsed.data.variantId || null,
-    subVariantId: parsed.data.subVariantId || null,
+    variantId: parsed.data.variantId ?? null,
+    subVariantId: parsed.data.subVariantId ?? null,
     qty: parsed.data.qty,
-    buyMode: parsed.data.buyMode,
-    buyUnit: parsed.data.buyUnit,
+    buyMode: parsed.data.buyMode ?? undefined,
+    buyUnit: parsed.data.buyUnit ?? null,
   })
   if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
 

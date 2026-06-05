@@ -11,11 +11,11 @@ import { parseBody, zUuid } from '@/lib/validate'
 const AddCartSchema = z
   .object({
     productId: zUuid.optional(),
-    variantId: zUuid.optional(),
-    subVariantId: zUuid.optional(),
+    variantId: zUuid.nullish(),
+    subVariantId: zUuid.nullish(),
     quantity: z.number().positive().optional(),
-    buyMode: z.enum(['unit', 'weight', 'length']).optional(),
-    buyUnit: z.string().optional(),
+    buyMode: z.enum(['unit', 'weight', 'length']).nullish(),
+    buyUnit: z.string().nullish(),
   })
   .refine(
     (d) => d.productId !== undefined || d.variantId !== undefined,
