@@ -32,7 +32,7 @@ const quotationItemSchema = z.object({
 
 const createQuotationSchema = z.object({
   consignee_name: zNonEmpty,
-  consignee_email: zEmail.optional(),
+  consignee_email: zEmail.nullish(),
   items: z.array(quotationItemSchema).min(1),
 })
 

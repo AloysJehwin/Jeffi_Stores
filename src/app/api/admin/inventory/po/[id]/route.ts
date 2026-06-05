@@ -7,9 +7,9 @@ import { sendPurchaseOrderEmail } from '@/lib/email'
 import { parseBody } from '@/lib/validate'
 
 const PatchSchema = z.object({
-  status: z.string().optional(),
-  expected_date: z.string().optional(),
-  notes: z.string().optional(),
+  status: z.string().nullish(),
+  expected_date: z.string().nullish(),
+  notes: z.string().nullish(),
 }).refine(
   (d) => d.status !== undefined || d.expected_date !== undefined || d.notes !== undefined,
   { message: 'At least one field required' }

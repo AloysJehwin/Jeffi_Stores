@@ -19,8 +19,8 @@ const cashSaleItemSchema = z.object({
 
 const cashSaleSchema = z.object({
   items: z.array(cashSaleItemSchema).min(1),
-  paymentMode: zNonEmpty.optional(),
-  notes: z.string().optional(),
+  paymentMode: z.string().nullish(),
+  notes: z.string().nullish(),
 })
 
 export async function POST(request: NextRequest) {
@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
     const parsed = parseBody(cashSaleSchema, body)
     if (!parsed.ok) return parsed.response
 
-    const { paymentMode = 'cash', notes, items } = parsed.data
+    const { paymentMode: rawPaymentMode, notes, items } = parsed.data
+    const paymentMode = rawPaymentMode ?? 'cash'
 
     if (!VALID_PAYMENT_MODES.includes(paymentMode)) {
       return NextResponse.json({ error: 'Invalid payment mode for cash sale' }, { status: 400 })

@@ -12,8 +12,8 @@ import { attributeConversion } from '@/lib/marketing'
 import { parseBody } from '@/lib/validate'
 
 const OrderPatchSchema = z.object({
-  status: z.string().optional(),
-  payment_status: z.string().optional(),
+  status: z.string().nullish(),
+  payment_status: z.string().nullish(),
 })
 
 export async function GET(

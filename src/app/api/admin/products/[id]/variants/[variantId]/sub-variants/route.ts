@@ -4,31 +4,31 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { generateVariantSku } from '@/lib/sku'
-import { parseBody, zNonEmpty, zCurrency, zPositiveInt, zUuid } from '@/lib/validate'
+import { parseBody, zNonEmpty, zCurrency, zUuid } from '@/lib/validate'
 
 const PostSchema = z.object({
   sub_variant_name: zNonEmpty,
-  sku: z.string().optional(),
+  sku: z.string().nullish(),
   price: z.optional(zCurrency),
   mrp: z.optional(zCurrency),
   price_ex_gst: z.optional(zCurrency),
   mrp_ex_gst: z.optional(zCurrency),
   wholeprice_ex_gst: z.optional(zCurrency),
-  stock_quantity: z.number().int().min(0).optional(),
+  stock_quantity: z.number().int().min(0).nullish(),
   attributes: z.record(z.string(), z.unknown()).optional(),
 })
 
 const PutSchema = z.object({
   id: zUuid,
-  sub_variant_name: z.string().optional(),
+  sub_variant_name: z.string().nullish(),
   price: z.optional(zCurrency),
   mrp: z.optional(zCurrency),
   price_ex_gst: z.optional(zCurrency),
   mrp_ex_gst: z.optional(zCurrency),
   wholeprice_ex_gst: z.optional(zCurrency),
-  stock_quantity: z.number().int().min(0).optional(),
+  stock_quantity: z.number().int().min(0).nullish(),
   attributes: z.record(z.string(), z.unknown()).optional(),
-  is_active: z.boolean().optional(),
+  is_active: z.boolean().nullish(),
 })
 
 const DeleteSchema = z.object({ id: zUuid })

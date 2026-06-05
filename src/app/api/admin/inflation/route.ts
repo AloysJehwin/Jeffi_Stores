@@ -7,7 +7,7 @@ import { parseBody, zUuid } from '@/lib/validate'
 
 const postSchema = z.object({
   percentage: z.number().gt(0, 'percentage must be greater than 0'),
-  categoryId: zUuid.optional(),
+  categoryId: zUuid.nullish(),
 })
 
 const VALID_FIELDS = ['base_price', 'mrp', 'price_ex_gst', 'wholeprice_ex_gst', 'weight_rate', 'length_rate']

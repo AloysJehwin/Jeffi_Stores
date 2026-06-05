@@ -6,14 +6,14 @@ import { queryOne } from '@/lib/db'
 import { parseBody } from '@/lib/validate'
 
 const Schema = z.object({
-  name: z.string().optional(),
-  phone: z.string().optional(),
-  add: z.string().optional(),
-  products_desc: z.string().optional(),
-  gm: z.number().optional(),
-  shipment_height: z.number().optional(),
-  shipment_width: z.number().optional(),
-  shipment_length: z.number().optional(),
+  name: z.string().nullish(),
+  phone: z.string().nullish(),
+  add: z.string().nullish(),
+  products_desc: z.string().nullish(),
+  gm: z.number().nullish(),
+  shipment_height: z.number().nullish(),
+  shipment_width: z.number().nullish(),
+  shipment_length: z.number().nullish(),
 }).refine(
   (d) => Object.values(d).some((v) => v !== undefined),
   { message: 'At least one field required' }

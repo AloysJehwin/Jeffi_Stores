@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 
 const postSchema = z.object({
   query: zNonEmpty.max(500),
-  categoryId: zUuid.optional(),
+  categoryId: zUuid.nullish(),
 })
 
 export async function GET(req: NextRequest) {
