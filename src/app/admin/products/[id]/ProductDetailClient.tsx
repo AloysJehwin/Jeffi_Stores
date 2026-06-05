@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Star, Sparkles, CheckCircle, XCircle, Loader2, X } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
+import ProductStockMovements from '@/components/admin/ProductStockMovements'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -697,6 +698,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
           onApproved={() => { setAiOpen(false); loadProduct() }}
         />
       )}
+
+      <ProductStockMovements productId={id} />
     </div>
   )
 }
