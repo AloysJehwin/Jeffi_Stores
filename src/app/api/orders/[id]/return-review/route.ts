@@ -19,7 +19,7 @@ export async function POST(
 
     const orderId = params.id
     const body = await request.json()
-    const { action, adminNotes, returnTrackingNumber } = body
+    const { action, adminNotes, returnTrackingNumber, restock } = body
 
     const VALID_ACTIONS = ['approve', 'reject', 'mark_received', 'process']
     if (!action || !VALID_ACTIONS.includes(action)) {
@@ -237,31 +237,33 @@ export async function POST(
                   `UPDATE return_requests SET status = 'completed', resolved_at = NOW(), updated_at = NOW() WHERE id = $1`,
                   [returnRequest.id]
                 )
-                const itemsResult = await client.query(
-                  'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
-                  [orderId]
-                )
-                for (const item of itemsResult.rows) {
-                  const qty = parseFloat(item.quantity)
-                  if (item.variant_id) {
-                    await client.query(
-                      'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                      [qty, item.variant_id]
-                    )
-                  } else {
-                    await client.query(
-                      'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                      [qty, item.product_id]
-                    )
+                if (restock !== false) {
+                  const itemsResult = await client.query(
+                    'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
+                    [orderId]
+                  )
+                  for (const item of itemsResult.rows) {
+                    const qty = parseFloat(item.quantity)
+                    if (item.variant_id) {
+                      await client.query(
+                        'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
+                        [qty, item.variant_id]
+                      )
+                    } else {
+                      await client.query(
+                        'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
+                        [qty, item.product_id]
+                      )
+                    }
+                    await logStockMovement(client, {
+                      productId: item.product_id,
+                      variantId: item.variant_id || null,
+                      transactionType: 'return',
+                      quantityChange: qty,
+                      referenceType: 'order',
+                      referenceId: orderId,
+                    })
                   }
-                  await logStockMovement(client, {
-                    productId: item.product_id,
-                    variantId: item.variant_id || null,
-                    transactionType: 'return',
-                    quantityChange: qty,
-                    referenceType: 'order',
-                    referenceId: orderId,
-                  })
                 }
               })
 
@@ -302,31 +304,33 @@ export async function POST(
             `UPDATE return_requests SET status = 'completed', resolved_at = NOW(), updated_at = NOW() WHERE id = $1`,
             [returnRequest.id]
           )
-          const itemsResult = await client.query(
-            'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
-            [orderId]
-          )
-          for (const item of itemsResult.rows) {
-            const qty = parseFloat(item.quantity)
-            if (item.variant_id) {
-              await client.query(
-                'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                [qty, item.variant_id]
-              )
-            } else {
-              await client.query(
-                'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                [qty, item.product_id]
-              )
+          if (restock !== false) {
+            const itemsResult = await client.query(
+              'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
+              [orderId]
+            )
+            for (const item of itemsResult.rows) {
+              const qty = parseFloat(item.quantity)
+              if (item.variant_id) {
+                await client.query(
+                  'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
+                  [qty, item.variant_id]
+                )
+              } else {
+                await client.query(
+                  'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
+                  [qty, item.product_id]
+                )
+              }
+              await logStockMovement(client, {
+                productId: item.product_id,
+                variantId: item.variant_id || null,
+                transactionType: 'return',
+                quantityChange: qty,
+                referenceType: 'order',
+                referenceId: orderId,
+              })
             }
-            await logStockMovement(client, {
-              productId: item.product_id,
-              variantId: item.variant_id || null,
-              transactionType: 'return',
-              quantityChange: qty,
-              referenceType: 'order',
-              referenceId: orderId,
-            })
           }
         })
 
@@ -439,31 +443,33 @@ export async function POST(
             [orderId]
           )
 
-          const returnedItemsResult = await client.query(
-            'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
-            [orderId]
-          )
-          for (const item of returnedItemsResult.rows) {
-            const qty = parseFloat(item.quantity)
-            if (item.variant_id) {
-              await client.query(
-                'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                [qty, item.variant_id]
-              )
-            } else {
-              await client.query(
-                'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-                [qty, item.product_id]
-              )
+          if (restock !== false) {
+            const returnedItemsResult = await client.query(
+              'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
+              [orderId]
+            )
+            for (const item of returnedItemsResult.rows) {
+              const qty = parseFloat(item.quantity)
+              if (item.variant_id) {
+                await client.query(
+                  'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
+                  [qty, item.variant_id]
+                )
+              } else {
+                await client.query(
+                  'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
+                  [qty, item.product_id]
+                )
+              }
+              await logStockMovement(client, {
+                productId: item.product_id,
+                variantId: item.variant_id || null,
+                transactionType: 'return',
+                quantityChange: qty,
+                referenceType: 'order',
+                referenceId: orderId,
+              })
             }
-            await logStockMovement(client, {
-              productId: item.product_id,
-              variantId: item.variant_id || null,
-              transactionType: 'return',
-              quantityChange: qty,
-              referenceType: 'order',
-              referenceId: orderId,
-            })
           }
         })
 

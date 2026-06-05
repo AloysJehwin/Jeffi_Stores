@@ -34,6 +34,7 @@ const REASON_LABELS: Record<string, string> = {
 export default function ReturnReview({ orderId, returnRequest, replacementOrderNumber }: ReturnReviewProps) {
   const [adminNotes, setAdminNotes] = useState('')
   const [returnTrackingNumber, setReturnTrackingNumber] = useState('')
+  const [restock, setRestock] = useState<boolean>(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -72,7 +73,12 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       const response = await fetch(`/api/orders/${orderId}/return-review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, adminNotes: adminNotes.trim() || undefined, returnTrackingNumber: returnTrackingNumber.trim() || undefined }),
+        body: JSON.stringify({
+          action,
+          adminNotes: adminNotes.trim() || undefined,
+          returnTrackingNumber: returnTrackingNumber.trim() || undefined,
+          ...(action === 'process' ? { restock } : {}),
+        }),
       })
 
       const data = await response.json()
@@ -246,20 +252,59 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       )}
 
       {status === 'received' && (
-        <div className="pt-2 border-t border-border-default">
-          <p className="text-sm text-foreground-secondary mb-3">
-            {type === 'refund'
-              ? 'Issue a full refund via Razorpay and restore stock.'
-              : 'Create a replacement order (confirmed, paid) and restore stock for the returned items.'}
-          </p>
-          <button
-            type="button"
-            onClick={() => submit('process')}
-            disabled={isSubmitting}
-            className="w-full px-4 py-2.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
-          >
-            {isSubmitting ? 'Processing...' : type === 'refund' ? 'Process Refund' : 'Create Replacement Order'}
-          </button>
+        <div className="pt-2 border-t border-border-default space-y-4">
+          <div>
+            <p className="text-sm font-medium text-foreground-secondary mb-2">
+              Add returned item(s) back to inventory?
+            </p>
+            <p className="text-xs text-foreground-muted mb-3">
+              If the item is defective or damaged, do not restock — it will not be added to available inventory.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setRestock(true)}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  restock
+                    ? 'bg-green-600 text-white border-green-600'
+                    : 'bg-surface text-foreground-secondary border-border-secondary hover:border-green-500 hover:text-green-600'
+                }`}
+              >
+                Yes — item is in good condition
+              </button>
+              <button
+                type="button"
+                onClick={() => setRestock(false)}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                  !restock
+                    ? 'bg-red-600 text-white border-red-600'
+                    : 'bg-surface text-foreground-secondary border-border-secondary hover:border-red-500 hover:text-red-600'
+                }`}
+              >
+                No — item is defective / damaged
+              </button>
+            </div>
+            {!restock && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                Stock will NOT be restored. Write off the item manually if needed.
+              </p>
+            )}
+          </div>
+          <div>
+            <p className="text-sm text-foreground-secondary mb-3">
+              {type === 'refund'
+                ? 'Issue a full refund via Razorpay.'
+                : 'Create a replacement order (confirmed, paid).'}
+            </p>
+            <button
+              type="button"
+              onClick={() => submit('process')}
+              disabled={isSubmitting}
+              className="w-full px-4 py-2.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? 'Processing...' : type === 'refund' ? 'Process Refund' : 'Create Replacement Order'}
+            </button>
+          </div>
         </div>
       )}
     </div>
