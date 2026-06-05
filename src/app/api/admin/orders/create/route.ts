@@ -13,9 +13,14 @@ export const dynamic = 'force-dynamic'
 const orderItemSchema = z.object({
   product_id: zUuid.nullish(),
   variant_id: zUuid.nullish(),
-  product_name: zNonEmpty,
-  unit_price: z.number().min(0),
-  quantity: z.number().positive(),
+  sub_variant_id: zUuid.nullish(),
+  product_name: z.string().default(''),
+  product_sku: z.string().nullish(),
+  variant_name: z.string().nullish(),
+  hsn_code: z.string().nullish(),
+  gst_rate: z.coerce.number().min(0).default(18),
+  unit_price: z.coerce.number().min(0),
+  quantity: z.coerce.number().positive(),
 })
 
 const createOrderSchema = z.object({
@@ -41,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const parsed = parseBody(createOrderSchema, body)
+    const parsed = parseBody(createOrderSchema, body, 'POST /api/admin/orders/create')
     if (!parsed.ok) return parsed.response
 
     const {

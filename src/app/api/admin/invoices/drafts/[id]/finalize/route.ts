@@ -38,7 +38,22 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         if (!item.product_id) continue
         const qty = parseFloat(item.quantity)
 
-        if (item.variant_id) {
+        if (item.sub_variant_id) {
+          const inv = await client.query<{ stock_quantity: number }>(
+            `SELECT stock_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+            [item.sub_variant_id]
+          )
+          const stock = parseFloat(inv.rows[0]?.stock_quantity as any) || 0
+          if (stock < qty) {
+            throw new Error(
+              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
+            )
+          }
+          await client.query(
+            `UPDATE product_sub_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2`,
+            [qty, item.sub_variant_id]
+          )
+        } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
             [item.variant_id]
