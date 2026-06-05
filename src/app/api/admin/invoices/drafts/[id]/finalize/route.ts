@@ -54,20 +54,39 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             [qty, item.sub_variant_id]
           )
         } else if (item.variant_id) {
-          const inv = await client.query<{ inventory_quantity: number }>(
-            `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+          const inv = await client.query<{ inventory_quantity: number; has_sub_variants: boolean }>(
+            `SELECT pv.inventory_quantity,
+               EXISTS(SELECT 1 FROM product_sub_variants WHERE variant_id = pv.id AND is_active = true) AS has_sub_variants
+             FROM product_variants pv WHERE pv.id = $1 FOR UPDATE`,
             [item.variant_id]
           )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
+          let stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
+          if (inv.rows[0]?.has_sub_variants) {
+            // variant delegates stock to sub_variants — sum them
+            const svStock = await client.query<{ total: number }>(
+              `SELECT COALESCE(SUM(inventory_quantity), 0) AS total FROM product_sub_variants WHERE variant_id = $1 AND is_active = true`,
+              [item.variant_id]
+            )
+            stock = parseFloat(svStock.rows[0]?.total as any) || 0
+          }
           if (stock < qty) {
             throw new Error(
               `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
             )
           }
-          await client.query(
-            `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-            [qty, item.variant_id]
-          )
+          if (inv.rows[0]?.has_sub_variants) {
+            // deduct from the sub_variant matching by SKU
+            await client.query(
+              `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1
+               WHERE variant_id = $2 AND sku = $3 AND is_active = true`,
+              [qty, item.variant_id, item.product_sku]
+            )
+          } else {
+            await client.query(
+              `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+              [qty, item.variant_id]
+            )
+          }
         } else {
           const inv = await client.query<{ inventory_quantity: number }>(
             `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
