@@ -6,31 +6,31 @@ import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, ge
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { z } from 'zod'
-import { parseBody, zUuid, zPositiveInt, zNonEmpty } from '@/lib/validate'
+import { parseBody, zUuid, zNonEmpty } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
 const orderItemSchema = z.object({
-  product_id: zUuid.optional(),
-  variant_id: zUuid.optional(),
+  product_id: zUuid.nullish(),
+  variant_id: zUuid.nullish(),
   product_name: zNonEmpty,
   unit_price: z.number().min(0),
-  quantity: zPositiveInt,
+  quantity: z.number().positive(),
 })
 
 const createOrderSchema = z.object({
   customerName: zNonEmpty,
-  customerPhone: z.string().optional(),
-  customerEmail: z.string().email().optional().or(z.literal('')),
-  addressLine1: z.string().optional(),
-  addressLine2: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  postalCode: z.string().optional(),
-  buyerGstin: z.string().optional(),
-  notes: z.string().optional(),
+  customerPhone: z.string().nullish(),
+  customerEmail: z.string().email().or(z.literal('')).nullish(),
+  addressLine1: z.string().nullish(),
+  addressLine2: z.string().nullish(),
+  city: z.string().nullish(),
+  state: z.string().nullish(),
+  postalCode: z.string().nullish(),
+  buyerGstin: z.string().nullish(),
+  notes: z.string().nullish(),
   items: z.array(orderItemSchema).min(1),
-  paymentMode: zNonEmpty.optional(),
+  paymentMode: z.string().nullish(),
 })
 
 export async function POST(request: NextRequest) {

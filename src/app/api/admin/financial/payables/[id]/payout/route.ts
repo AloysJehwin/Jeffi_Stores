@@ -8,7 +8,7 @@ import { parseBody, zCurrency } from '@/lib/validate'
 const PayoutSchema = z.object({
   mode: z.enum(['NEFT', 'RTGS', 'IMPS', 'UPI']),
   amount: zCurrency.refine((v) => v > 0, { message: 'Must be greater than 0' }),
-  notes: z.string().optional(),
+  notes: z.string().nullish(),
 })
 
 export const dynamic = 'force-dynamic'

@@ -7,11 +7,11 @@ import { generateEWayBill, isEWayBillConfigured, EWayBillPayload } from '@/lib/e
 import { parseBody } from '@/lib/validate'
 
 const Schema = z.object({
-  transporterName: z.string().optional(),
-  transporterId: z.string().optional(),
-  transMode: z.string().optional(),
-  transDistance: z.number().optional(),
-  vehicleNo: z.string().optional(),
+  transporterName: z.string().nullish(),
+  transporterId: z.string().nullish(),
+  transMode: z.string().nullish(),
+  transDistance: z.number().nullish(),
+  vehicleNo: z.string().nullish(),
 }).optional()
 
 export const dynamic = 'force-dynamic'

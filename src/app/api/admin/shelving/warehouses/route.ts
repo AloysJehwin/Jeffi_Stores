@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 const postSchema = z.object({
   name: zNonEmpty,
-  address: z.string().optional(),
+  address: z.string().nullish(),
 })
 
 export async function GET(request: NextRequest) {

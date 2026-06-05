@@ -6,19 +6,19 @@ import { queryOne, query } from '@/lib/db'
 import { parseBody } from '@/lib/validate'
 
 const PatchSchema = z.object({
-  name: z.string().optional(),
-  gstin: z.string().optional(),
-  contact_name: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-  address: z.string().optional(),
-  payment_terms: z.string().optional(),
-  notes: z.string().optional(),
+  name: z.string().nullish(),
+  gstin: z.string().nullish(),
+  contact_name: z.string().nullish(),
+  phone: z.string().nullish(),
+  email: z.string().email().nullish(),
+  address: z.string().nullish(),
+  payment_terms: z.string().nullish(),
+  notes: z.string().nullish(),
   is_active: z.boolean().optional(),
-  bank_name: z.string().optional(),
-  account_number: z.string().optional(),
-  ifsc: z.string().optional(),
-  upi_id: z.string().optional(),
+  bank_name: z.string().nullish(),
+  account_number: z.string().nullish(),
+  ifsc: z.string().nullish(),
+  upi_id: z.string().nullish(),
 }).refine(
   (d) => Object.values(d).some((v) => v !== undefined),
   { message: 'At least one field required' }
@@ -70,7 +70,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (phone !== undefined) { updates.push(`phone = $${i++}`); values.push(phone || null) }
     if (email !== undefined) { updates.push(`email = $${i++}`); values.push(email || null) }
     if (address !== undefined) { updates.push(`address = $${i++}`); values.push(address || null) }
-    if (payment_terms !== undefined) { updates.push(`payment_terms = $${i++}`); values.push(parseInt(payment_terms) || 30) }
+    if (payment_terms !== undefined) { updates.push(`payment_terms = $${i++}`); values.push(parseInt(payment_terms ?? '') || 30) }
     if (notes !== undefined) { updates.push(`notes = $${i++}`); values.push(notes || null) }
     if (is_active !== undefined) { updates.push(`is_active = $${i++}`); values.push(is_active) }
     if (bank_name !== undefined) { updates.push(`bank_name = $${i++}`); values.push(bank_name || null) }

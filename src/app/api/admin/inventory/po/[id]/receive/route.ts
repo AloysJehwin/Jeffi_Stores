@@ -5,7 +5,7 @@ import { queryOne, queryMany, getClient } from '@/lib/db'
 import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
 import { z } from 'zod'
-import { parseBody, zUuid, zPositiveInt } from '@/lib/validate'
+import { parseBody, zUuid } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +14,7 @@ const postSchema = z.object({
     .array(
       z.object({
         id: zUuid,
-        receivedQty: zPositiveInt,
+        receivedQty: z.number().positive(),
       })
     )
     .min(1, 'At least one item is required'),

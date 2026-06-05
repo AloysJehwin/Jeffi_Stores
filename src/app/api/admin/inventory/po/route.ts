@@ -4,14 +4,14 @@ import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, query } from '@/lib/db'
 import { buildSearchClause } from '@/lib/search'
 import { z } from 'zod'
-import { parseBody, zUuid, zPositiveInt, zCurrency } from '@/lib/validate'
+import { parseBody, zUuid, zCurrency } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
 const poItemSchema = z.object({
   product_id: zUuid,
-  variant_id: zUuid.optional(),
-  quantity: zPositiveInt,
+  variant_id: zUuid.nullish(),
+  quantity: z.number().positive(),
   unit_cost: zCurrency,
 })
 

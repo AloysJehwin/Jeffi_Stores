@@ -13,8 +13,8 @@ import {
 import { parseBody, zNonEmpty } from '@/lib/validate'
 
 const CreateRazorpayOrderSchema = z.object({
-  draftToken: z.string().optional(),
-  orderId: zNonEmpty.optional(),
+  draftToken: z.string().nullish(),
+  orderId: zNonEmpty.nullish(),
 })
 
 export async function POST(request: NextRequest) {

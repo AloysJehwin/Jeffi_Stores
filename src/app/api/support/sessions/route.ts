@@ -8,7 +8,7 @@ import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
 
 const postSchema = z.object({
   message: zNonEmpty.max(2000),
-  productId: zUuid.optional(),
+  productId: zUuid.nullish(),
 })
 
 export async function GET(request: NextRequest) {
