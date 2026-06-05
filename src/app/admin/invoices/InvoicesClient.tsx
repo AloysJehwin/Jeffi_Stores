@@ -287,7 +287,7 @@ export default function InvoicesClient() {
         unit_price: String(it.unit_price ?? ''),
         discount_pct: it.discount_pct ?? 0,
         mrp: it.mrp ?? 0,
-        inventory_quantity: it.inventory_quantity ?? null,
+        inventory_quantity: it.sub_variant?.inventory_quantity ?? it.variant?.inventory_quantity ?? it.inventory_quantity ?? null,
       })) : [newLineItem()])
 
       setFormError('')
