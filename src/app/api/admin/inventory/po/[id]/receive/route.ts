@@ -13,8 +13,11 @@ const postSchema = z.object({
   items: z
     .array(
       z.object({
-        id: zUuid,
-        receivedQty: z.number().positive(),
+        po_item_id: zUuid,
+        product_id: zUuid,
+        variant_id: zUuid.nullish(),
+        quantity_received: z.coerce.number().positive(),
+        unit_cost: z.coerce.number().min(0),
       })
     )
     .min(1, 'At least one item is required'),
@@ -27,14 +30,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
-    const { received_date, notes, items } = body
+    const { received_date, notes } = body
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'items array is required' }, { status: 400 })
-    }
-
-    const parsed = parseBody(postSchema, body)
+    const parsed = parseBody(postSchema, body, 'POST /api/admin/inventory/po/[id]/receive')
     if (!parsed.ok) return parsed.response
+    const { items } = parsed.data
 
     const po = await queryOne<any>(
       `SELECT po.*, s.id AS supplier_id, s.name AS supplier_name, s.contact_name, s.email AS supplier_email
@@ -58,8 +58,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     let receivedAmount = 0
     for (const item of items) {
-      const qty = parseFloat(item.quantity_received) || 0
-      const cost = parseFloat(item.unit_cost) || 0
+      const qty = item.quantity_received
+      const cost = item.unit_cost
       if (qty > 0) receivedAmount += qty * cost
     }
 
@@ -77,10 +77,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const grnId = grnRow.rows[0].id
 
       for (const item of items) {
-        const qtyReceived = parseFloat(item.quantity_received) || 0
+        const qtyReceived = item.quantity_received
         if (qtyReceived <= 0) continue
 
-        const unitCost = parseFloat(item.unit_cost) || 0
+        const unitCost = item.unit_cost
         const poItemId = item.po_item_id
         const productId = item.product_id
         const variantId = item.variant_id || null
