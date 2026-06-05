@@ -5,16 +5,16 @@ import { withTransaction } from '@/lib/db'
 import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 import { z } from 'zod'
-import { parseBody, zNonEmpty } from '@/lib/validate'
+import { parseBody } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
 const VALID_PAYMENT_MODES = ['cash', 'upi', 'upi_qr']
 
 const cashSaleItemSchema = z.object({
-  product_name: zNonEmpty,
-  unit_price: z.number().positive(),
-  quantity: z.number().positive(),
+  product_name: z.string().default(''),
+  unit_price: z.coerce.number().min(0),
+  quantity: z.coerce.number().positive(),
 })
 
 const cashSaleSchema = z.object({
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const parsed = parseBody(cashSaleSchema, body)
+    const parsed = parseBody(cashSaleSchema, body, 'POST /api/admin/invoices/cash-sale')
     if (!parsed.ok) return parsed.response
 
     const { paymentMode: rawPaymentMode, notes, items } = parsed.data
