@@ -13,8 +13,8 @@ import { parseBody, zNonEmpty } from '@/lib/validate'
 const CreateOrderSchema = z.object({
   paymentMethod: z.enum(['razorpay', 'manual']),
   shippingAddress: z.any().optional(),
-  notes: z.string().optional(),
-  couponId: z.string().optional(),
+  notes: z.string().nullish(),
+  couponId: z.string().nullish(),
 })
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
