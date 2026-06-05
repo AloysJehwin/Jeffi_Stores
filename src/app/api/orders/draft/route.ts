@@ -20,11 +20,11 @@ import { parseBody, zUuid } from '@/lib/validate'
 
 const DraftSchema = z.object({
   addressId: zUuid,
-  mode: z.string().optional(),
-  intent: z.string().optional(),
+  mode: z.string().nullish(),
+  intent: z.string().nullish(),
   item: z.any().optional(),
-  couponId: z.string().optional(),
-  notes: z.string().optional(),
+  couponId: z.string().nullish(),
+  notes: z.string().nullish(),
 })
 
 export const dynamic = 'force-dynamic'
@@ -38,18 +38,18 @@ export async function POST(req: NextRequest) {
   if (!parsed.ok) return parsed.response
   let mode: 'cart' | 'buyNow' = parsed.data.mode === 'buyNow' ? 'buyNow' : 'cart'
   let resolvedIntent: Awaited<ReturnType<typeof verifyIntent>> = null
-  if (typeof body.intent === 'string' && body.intent) {
-    resolvedIntent = await verifyIntent(body.intent)
+  if (parsed.data.intent) {
+    resolvedIntent = await verifyIntent(parsed.data.intent)
     if (!resolvedIntent) return NextResponse.json({ error: 'Invalid or expired intent' }, { status: 400 })
     mode = resolvedIntent.mode === 'cart' ? 'cart' : 'buyNow'
     if (resolvedIntent.mode === 'cart' && resolvedIntent.userId !== authUser.userId) {
       return NextResponse.json({ error: 'Intent does not belong to this user' }, { status: 403 })
     }
   }
-  const addressId = typeof body.addressId === 'string' ? body.addressId : ''
-  const couponId = typeof body.couponId === 'string' && body.couponId ? body.couponId : null
+  const addressId = parsed.data.addressId
+  const couponId = parsed.data.couponId ?? null
   const isCod = false
-  const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 1000) : null
+  const notes = parsed.data.notes ? parsed.data.notes.trim().slice(0, 1000) : null
 
   if (!addressId) return NextResponse.json({ error: 'addressId is required' }, { status: 400 })
 
