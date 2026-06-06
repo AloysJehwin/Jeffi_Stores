@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 interface RFQItem {
@@ -37,7 +36,6 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export default function RFQDetailClient({ id }: { id: string }) {
-  const router = useRouter()
   const [rfq, setRfq] = useState<RFQ | null>(null)
   const [items, setItems] = useState<RFQItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,7 +87,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-4xl">
+    <div className="p-4 sm:p-6 max-w-full space-y-5">
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium text-white ${
           toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'
@@ -98,12 +96,18 @@ export default function RFQDetailClient({ id }: { id: string }) {
         </div>
       )}
 
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm text-foreground-secondary">
+        <Link href="/admin/business/rfqs" className="text-accent-500 hover:text-accent-600 transition-colors">
+          Business RFQs
+        </Link>
+        <span>/</span>
+        <span className="text-foreground font-mono">{rfq.rfq_number}</span>
+      </div>
+
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <button onClick={() => router.back()} className="text-sm text-foreground-muted hover:text-foreground mb-2 flex items-center gap-1">
-            ← Back to RFQs
-          </button>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-foreground font-mono">{rfq.rfq_number}</h1>
             <span className={`px-3 py-1 text-sm font-semibold rounded-full ${STATUS_STYLES[rfq.status] || ''}`}>
