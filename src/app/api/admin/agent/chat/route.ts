@@ -23,32 +23,35 @@ interface ToolCallRecord {
   isError?: boolean
 }
 
-function buildSystemPrompt(): string {
-  const toolList = TOOLS.map(t => {
-    const props = Object.entries(t.inputSchema.properties || {}).map(([k, v]: [string, any]) => {
-      const req = (t.inputSchema.required || []).includes(k) ? '*' : ''
-      return `${k}${req}: ${v.type}${v.description ? ` — ${v.description}` : ''}`
+function compactToolList(): string {
+  return TOOLS.map(t => {
+    // Only required args with type — no descriptions (saves ~60% tokens)
+    const requiredArgs = (t.inputSchema.required || []).map(k => {
+      const v = t.inputSchema.properties[k]
+      return `${k}: ${v?.type ?? 'string'}`
     }).join(', ')
-    return `- ${t.name}${t.mutating ? ' [MUTATING]' : ''}: ${t.description}\n  args: { ${props} }`
+    const optionalArgs = Object.entries(t.inputSchema.properties || {})
+      .filter(([k]) => !(t.inputSchema.required || []).includes(k))
+      .map(([k, v]: [string, any]) => `${k}?: ${v.type}`)
+      .join(', ')
+    const args = [requiredArgs, optionalArgs].filter(Boolean).join(', ')
+    // First sentence of description only
+    const desc = t.description.split(/\.\s/)[0].replace(/\.$/, '')
+    return `- ${t.name}${t.mutating ? '!' : ''}: ${desc} {${args}}`
   }).join('\n')
+}
 
-  return buildSystemPromptBody(toolList, '')
+function buildSystemPrompt(): string {
+  return buildSystemPromptBody(compactToolList(), '')
 }
 
 async function buildSystemPromptWithDynamic(): Promise<string> {
-  const builtins = TOOLS.map(t => {
-    const props = Object.entries(t.inputSchema.properties || {}).map(([k, v]: [string, any]) => {
-      const req = (t.inputSchema.required || []).includes(k) ? '*' : ''
-      return `${k}${req}: ${v.type}${v.description ? ` — ${v.description}` : ''}`
-    }).join(', ')
-    return `- ${t.name}${t.mutating ? ' [MUTATING]' : ''}: ${t.description}\n  args: { ${props} }`
-  }).join('\n')
-
-  return buildSystemPromptBody(builtins, '')
+  return buildSystemPromptBody(compactToolList(), '')
 }
 
 function buildSystemPromptBody(toolList: string, dynamicList: string): string {
-  return `You are the Jeffi Stores admin assistant. You help store operators run their business.
+  return `/no_think
+You are the Jeffi Stores admin assistant. You help store operators run their business.
 
 ## TOOL CALLING — MANDATORY PROTOCOL
 
@@ -64,7 +67,7 @@ RULES (non-negotiable):
 - NEVER invent product names, SKUs, prices, stock, order numbers, or customer details.
 - Your first output for any data request must be a <tool_use> block. Not a sentence. Not "I'll fetch". Just the block.
 - Use ONLY values the tools returned. If a tool returns no results, say so — do not fill in from training.
-- For mutating tools ({proposed:true}): tell the user "I've proposed this — review the action card."
+- Tools marked with ! are mutating — when they return {proposed:true}, tell the user "I've proposed this — review the action card."
 - If {needs_choice:true}: write "Multiple matches — pick one above." and stop.
 - Be concise. Numbers and bullet points beat paragraphs. No filler.
 
@@ -207,7 +210,7 @@ export async function POST(req: NextRequest) {
         modelHint: 'agent',
         jsonMode: false,
         temperature: 0.2,
-        maxTokens: 1500,
+        maxTokens: 3000,
         messages,
       })
       provider = r.provider
