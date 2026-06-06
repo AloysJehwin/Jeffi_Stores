@@ -162,7 +162,7 @@ export async function generateCouponForUser(params: {
         code,
         `Auto-generated for ${params.campaignKind}`,
         params.discountPercent,
-        params.minPurchaseAmount ?? null,
+        params.minPurchaseAmount ?? 100,
         params.maxDiscountAmount ?? null,
         validUntil.toISOString(),
         params.userId,
