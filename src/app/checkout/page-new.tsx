@@ -45,7 +45,7 @@ export default function CheckoutPage() {
 
   const fetchAddress = async (addressId: string) => {
     try {
-      const response = await fetch('/api/user/addresses')
+      const response = await fetch('/api/user/addresses', { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         const selectedAddr = data.addresses.find((a: any) => a.id === addressId)
@@ -76,8 +76,10 @@ export default function CheckoutPage() {
     try {
       const response = await fetch('/api/orders/create', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          paymentMethod: 'razorpay',
           shippingAddress: {
             fullName: address.full_name,
             addressLine1: address.address_line1,

@@ -287,7 +287,7 @@ export default function InvoicesClient() {
         unit_price: String(it.unit_price ?? ''),
         discount_pct: it.discount_pct ?? 0,
         mrp: it.mrp ?? 0,
-        inventory_quantity: it.inventory_quantity ?? null,
+        inventory_quantity: it.sub_variant?.inventory_quantity ?? it.variant?.inventory_quantity ?? it.inventory_quantity ?? null,
       })) : [newLineItem()])
 
       setFormError('')
@@ -352,6 +352,7 @@ export default function InvoicesClient() {
           items: items.map(it => ({
             product_id: it.product_id, product_name: it.product_name,
             product_sku: it.product_sku, variant_id: it.variant_id,
+            sub_variant_id: it.sub_variant_id || null,
             variant_name: it.variant_name, hsn_code: it.hsn_code,
             gst_rate: it.gst_rate, quantity: it.quantity, unit_price: it.unit_price,
           })),
@@ -398,6 +399,7 @@ export default function InvoicesClient() {
           items: items.map(it => ({
             product_id: it.product_id, product_name: it.product_name,
             product_sku: it.product_sku, variant_id: it.variant_id,
+            sub_variant_id: it.sub_variant_id || null,
             variant_name: it.variant_name, hsn_code: it.hsn_code,
             gst_rate: it.gst_rate, quantity: it.quantity, unit_price: it.unit_price,
           })),
@@ -443,6 +445,7 @@ export default function InvoicesClient() {
           items: items.map(it => ({
             product_id: it.product_id, product_name: it.product_name,
             product_sku: it.product_sku, variant_id: it.variant_id,
+            sub_variant_id: it.sub_variant_id || null,
             variant_name: it.variant_name, hsn_code: it.hsn_code,
             gst_rate: it.gst_rate, quantity: it.quantity, unit_price: it.unit_price,
           })),

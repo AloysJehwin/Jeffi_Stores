@@ -1,74 +1,114 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 
-const CHECK_INTERVAL_MS = 30_000
-const WARNING_COUNTDOWN_S = 5 * 60
+// How often to poll the server for the real expiry time (ms)
+const POLL_INTERVAL_MS = 15_000
+// Show modal this many seconds before expiry
+const WARN_BEFORE_S = 20
 
 export default function SessionGuard() {
-  const router = useRouter()
-  const [expired, setExpired] = useState(false)
-  const [countdown, setCountdown] = useState(WARNING_COUNTDOWN_S)
-  const expiredRef = useRef(false)
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const checkRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pathname = usePathname()
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null)
+  const [showModal, setShowModal] = useState(false)
+
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const expiresAtRef = useRef<number | null>(null)
+  const loggedOutRef = useRef(false)
+
+  // Don't run on the login page
+  const isLoginPage = pathname === '/admin/login'
+
+  const clearTimers = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
+  }
 
   const logout = useCallback(async () => {
-    if (countdownRef.current) clearInterval(countdownRef.current)
-    if (checkRef.current) clearInterval(checkRef.current)
-    try {
-      await fetch('/api/admin/logout', { method: 'POST' })
-    } catch {}
-    router.push('/admin/login')
-  }, [router])
+    if (loggedOutRef.current) return
+    loggedOutRef.current = true
+    clearTimers()
+    setShowModal(false)
+    try { await fetch('/api/admin/logout', { method: 'POST' }) } catch {}
+    // Hard reload — forces server layout to re-evaluate with cleared cookie
+    window.location.href = '/admin/login'
+  }, [])
 
-  const startCountdown = useCallback(() => {
-    if (countdownRef.current) clearInterval(countdownRef.current)
-    setCountdown(WARNING_COUNTDOWN_S)
-    countdownRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownRef.current!)
-          logout()
-          return 0
-        }
-        return prev - 1
-      })
+  const startTicker = useCallback(() => {
+    if (tickRef.current) clearInterval(tickRef.current)
+    tickRef.current = setInterval(() => {
+      const exp = expiresAtRef.current
+      if (!exp) return
+      const sLeft = Math.floor((exp - Date.now()) / 1000)
+      if (sLeft <= 0) {
+        clearInterval(tickRef.current!)
+        tickRef.current = null
+        setSecondsLeft(0)
+        logout()
+      } else {
+        setSecondsLeft(sLeft)
+      }
     }, 1_000)
   }, [logout])
 
-  const checkSession = useCallback(async () => {
-    if (expiredRef.current) return
+  const pollSession = useCallback(async () => {
+    if (loggedOutRef.current) return
     try {
       const res = await fetch('/api/admin/check-session', { cache: 'no-store' })
       const data = await res.json()
-      if (!data.authenticated) {
-        expiredRef.current = true
-        setExpired(true)
-        if (checkRef.current) clearInterval(checkRef.current)
-        startCountdown()
+
+      if (!data.authenticated || !data.expiresAt) {
+        expiresAtRef.current = null
+        setShowModal(true)
+        setSecondsLeft(0)
+        logout()
+        return
+      }
+
+      expiresAtRef.current = data.expiresAt
+      const sLeft = Math.floor((data.expiresAt - Date.now()) / 1000)
+
+      if (sLeft <= 0) {
+        logout()
+        return
+      }
+
+      if (sLeft <= WARN_BEFORE_S) {
+        setSecondsLeft(sLeft)
+        setShowModal(true)
+        startTicker()
+      } else {
+        // Not near expiry — hide modal if it was showing (e.g. after refresh)
+        setShowModal(false)
+        if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
       }
     } catch {}
-  }, [startCountdown])
+  }, [logout, startTicker])
 
+  // Reset everything when page changes (fixes modal showing on login page)
   useEffect(() => {
-    checkRef.current = setInterval(checkSession, CHECK_INTERVAL_MS)
-    return () => {
-      if (checkRef.current) clearInterval(checkRef.current)
-      if (countdownRef.current) clearInterval(countdownRef.current)
-    }
-  }, [checkSession])
+    loggedOutRef.current = false
+    setShowModal(false)
+    setSecondsLeft(null)
+    clearTimers()
+
+    if (isLoginPage) return
+
+    // Initial poll immediately, then on interval
+    pollSession()
+    pollRef.current = setInterval(pollSession, POLL_INTERVAL_MS)
+
+    return clearTimers
+  }, [pathname, isLoginPage, pollSession])
 
   const handleContinue = async () => {
-    if (countdownRef.current) clearInterval(countdownRef.current)
     try {
       const res = await fetch('/api/admin/refresh', { method: 'POST' })
       if (res.ok) {
-        expiredRef.current = false
-        setExpired(false)
-        setCountdown(WARNING_COUNTDOWN_S)
-        checkRef.current = setInterval(checkSession, CHECK_INTERVAL_MS)
+        // Poll immediately to get new expiresAt
+        await pollSession()
       } else {
         logout()
       }
@@ -77,10 +117,10 @@ export default function SessionGuard() {
     }
   }
 
-  if (!expired) return null
+  if (!showModal || secondsLeft === null) return null
 
-  const mm = String(Math.floor(countdown / 60)).padStart(2, '0')
-  const ss = String(countdown % 60).padStart(2, '0')
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0')
+  const ss = String(secondsLeft % 60).padStart(2, '0')
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-sm bg-black/60">
@@ -91,8 +131,8 @@ export default function SessionGuard() {
           </svg>
         </div>
         <div className="text-center">
-          <h2 className="text-base font-bold text-foreground">Session Expired</h2>
-          <p className="text-sm text-foreground-secondary mt-1">Your session has expired. Continue working or you will be logged out.</p>
+          <h2 className="text-base font-bold text-foreground">Session Expiring</h2>
+          <p className="text-sm text-foreground-secondary mt-1">Your session is about to expire. Continue working or you will be logged out.</p>
         </div>
         <div className="text-3xl font-mono font-bold text-red-500 tabular-nums">{mm}:{ss}</div>
         <div className="flex gap-3 w-full">
@@ -113,3 +153,4 @@ export default function SessionGuard() {
     </div>
   )
 }
+

@@ -168,7 +168,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
       setPinLookupState('loading')
       pinDebounceRef.current = setTimeout(async () => {
         try {
-          const res = await fetch(`/api/pincode/${digits}`)
+          const res = await fetch(`/api/pincode/${digits}`, { credentials: 'include' })
           if (res.ok) {
             const data = await res.json()
             setFormData(prev => ({ ...prev, city: data.district, state: data.state }))
@@ -200,6 +200,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(formData),
       })
 

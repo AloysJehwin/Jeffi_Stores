@@ -10,8 +10,8 @@ const createCouponSchema = z.object({
   code: zNonEmpty,
   discount_type: z.enum(['percentage', 'flat']),
   discount_value: z.number().positive(),
-  valid_from: z.string().optional(),
-  valid_until: z.string().optional(),
+  valid_from: z.string().nullish(),
+  valid_until: z.string().nullish(),
 })
 
 export async function GET(request: NextRequest) {

@@ -6,14 +6,17 @@ import { logActivity } from '@/lib/activity'
 import { parseBody, zNonEmpty, zPhone, zIndianPin } from '@/lib/validate'
 
 const CreateAddressSchema = z.object({
+  address_type: z.string().optional().default('shipping'),
   full_name: zNonEmpty,
   phone: zPhone,
   address_line1: zNonEmpty,
-  address_line2: z.string().optional(),
-  landmark: z.string().optional(),
+  address_line2: z.string().nullish(),
+  landmark: z.string().nullish(),
   city: zNonEmpty,
   state: zNonEmpty,
   postal_code: zIndianPin,
+  country: z.string().optional().default('India'),
+  is_default: z.boolean().optional().default(false),
 })
 
 export async function GET(request: NextRequest) {
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
       country,
       phone,
       is_default,
-    } = { ...body, ...parsed.data }
+    } = parsed.data
 
     if (!phone) {
       return NextResponse.json({ error: 'Phone number is required' }, { status: 400 })

@@ -6,22 +6,36 @@ import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, ge
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { z } from 'zod'
-import { parseBody, zUuid, zPositiveInt, zNonEmpty } from '@/lib/validate'
+import { parseBody, zUuid, zNonEmpty } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
 const orderItemSchema = z.object({
-  product_id: zUuid.optional(),
-  variant_id: zUuid.optional(),
-  product_name: zNonEmpty,
-  unit_price: z.number().min(0),
-  quantity: zPositiveInt,
+  product_id: zUuid.nullish(),
+  variant_id: zUuid.nullish(),
+  sub_variant_id: zUuid.nullish(),
+  product_name: z.string().default(''),
+  product_sku: z.string().nullish(),
+  variant_name: z.string().nullish(),
+  hsn_code: z.string().nullish(),
+  gst_rate: z.coerce.number().min(0).default(18),
+  unit_price: z.coerce.number().min(0),
+  quantity: z.coerce.number().positive(),
 })
 
 const createOrderSchema = z.object({
   customerName: zNonEmpty,
+  customerPhone: z.string().nullish(),
+  customerEmail: z.string().email().or(z.literal('')).nullish(),
+  addressLine1: z.string().nullish(),
+  addressLine2: z.string().nullish(),
+  city: z.string().nullish(),
+  state: z.string().nullish(),
+  postalCode: z.string().nullish(),
+  buyerGstin: z.string().nullish(),
+  notes: z.string().nullish(),
   items: z.array(orderItemSchema).min(1),
-  paymentMode: zNonEmpty.optional(),
+  paymentMode: z.string().nullish(),
 })
 
 export async function POST(request: NextRequest) {
@@ -32,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const parsed = parseBody(createOrderSchema, body)
+    const parsed = parseBody(createOrderSchema, body, 'POST /api/admin/orders/create')
     if (!parsed.ok) return parsed.response
 
     const {
@@ -48,7 +62,7 @@ export async function POST(request: NextRequest) {
       paymentMode,
       items,
       notes,
-    } = body
+    } = parsed.data
 
     const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
@@ -222,6 +236,7 @@ export async function POST(request: NextRequest) {
           await logStockMovement(client, {
             productId: item.product_id,
             variantId: item.variant_id || null,
+            subVariantId: item.sub_variant_id || null,
             transactionType: 'sale',
             quantityChange: -item.quantity,
             referenceType: 'order',

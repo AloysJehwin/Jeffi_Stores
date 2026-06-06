@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin, generateToken } from '@/lib/jwt'
+import { authenticateAdmin, generateToken, JWT_MAX_AGE_S } from '@/lib/jwt'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -19,8 +19,9 @@ export async function POST(request: NextRequest) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60,
+    maxAge: JWT_MAX_AGE_S,
     path: '/',
   })
   return response
 }
+

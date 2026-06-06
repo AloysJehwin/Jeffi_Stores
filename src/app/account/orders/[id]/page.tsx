@@ -149,6 +149,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     replacement_order_id?: string | null; replacement_order_number?: string | null;
     rvp_awb_number?: string | null;
   } | null>(null)
+  const [monthlyLimitReached, setMonthlyLimitReached] = useState(false)
   const [showReturnForm, setShowReturnForm] = useState(false)
   const [returnType, setReturnType] = useState<'refund' | 'replacement'>('refund')
   const [returnReason, setReturnReason] = useState('')
@@ -169,17 +170,18 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   const fetchOrder = async () => {
     try {
-      const response = await fetch(`/api/orders/${params.id}`)
+      const response = await fetch(`/api/orders/${params.id}`, { credentials: 'include' })
       if (!response.ok) {
         throw new Error('Failed to fetch order details')
       }
       const data = await response.json()
       setOrder(data.order)
 
-      const retRes = await fetch(`/api/orders/${params.id}/return`)
+      const retRes = await fetch(`/api/orders/${params.id}/return`, { credentials: 'include' })
       if (retRes.ok) {
         const retData = await retRes.json()
         setReturnRequest(retData.returnRequest || null)
+        setMonthlyLimitReached(!!retData.monthlyLimitReached)
       }
     } catch (err: any) {
       setError(err.message)
@@ -196,6 +198,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const response = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           restoreToCart: order?.orderType !== 'direct',
           autoCancelUnpaid: true,
@@ -240,6 +243,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const response = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ restoreToCart: order?.orderType !== 'direct' }),
       })
       const data = await response.json()
@@ -268,6 +272,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       const response = await fetch(`/api/orders/${params.id}/return`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ type: returnType, reason: returnReason, description: returnDescription || undefined }),
       })
       const data = await response.json()
@@ -401,9 +406,9 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     return Date.now() <= ts + minWindow * 24 * 60 * 60 * 1000
   })()
 
-  const canReturn = canRefund || canReplace
+  const canReturn = !monthlyLimitReached && (canRefund || canReplace)
 
-  const returnWindowExpired = order?.status === 'delivered' && !returnRequest && !canReturn && (() => {
+  const returnWindowExpired = order?.status === 'delivered' && !returnRequest && !monthlyLimitReached && !(canRefund || canReplace) && (() => {
     const deliveryDate = order.deliveredAt || order.updatedAt
     if (!deliveryDate) return false
     const allAllowed = order.items.every((item: OrderItem) => item.returnAllowed || item.replacementAllowed)
@@ -552,7 +557,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}>
                     Payment: {order.paymentStatus}
                   </span>
-                  {(CANCELLABLE_STATUSES.includes(order.status) || (canReturn && !showReturnForm) || returnWindowExpired || (order.invoiceNumber && !order.originalOrderId)) && (
+                  {(CANCELLABLE_STATUSES.includes(order.status) || (canReturn && !showReturnForm) || returnWindowExpired || monthlyLimitReached || (order.invoiceNumber && !order.originalOrderId)) && (
                     <span className="hidden sm:inline-block w-px h-5 bg-border-default mx-1" aria-hidden />
                   )}
                   {CANCELLABLE_STATUSES.includes(order.status) && (
@@ -582,6 +587,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 italic">
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                       Return window closed
+                    </span>
+                  )}
+                  {monthlyLimitReached && (canRefund || canReplace) && !returnRequest && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 italic">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      Monthly return limit reached
                     </span>
                   )}
                   {order.invoiceNumber && !order.originalOrderId && (
@@ -735,7 +746,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       <p className="text-sm font-medium text-foreground-secondary mb-2">What would you like?</p>
                       <div className="flex gap-3">
                         {(['refund', 'replacement'] as const)
-                          .filter(t => !(t === 'replacement' && order.originalOrderId))
                           .map((t) => (
                           <label key={t} className="flex items-center gap-2 cursor-pointer">
                             <input

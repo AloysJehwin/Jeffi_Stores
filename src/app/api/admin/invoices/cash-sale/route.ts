@@ -5,21 +5,22 @@ import { withTransaction } from '@/lib/db'
 import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 import { z } from 'zod'
-import { parseBody, zNonEmpty } from '@/lib/validate'
+import { parseBody } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
 const VALID_PAYMENT_MODES = ['cash', 'upi', 'upi_qr']
 
 const cashSaleItemSchema = z.object({
-  product_name: zNonEmpty,
-  unit_price: z.number().min(0),
-  quantity: z.number().min(0),
+  product_name: z.string().default(''),
+  unit_price: z.coerce.number().min(0),
+  quantity: z.coerce.number().positive(),
 })
 
 const cashSaleSchema = z.object({
   items: z.array(cashSaleItemSchema).min(1),
-  paymentMode: zNonEmpty.optional(),
+  paymentMode: z.string().nullish(),
+  notes: z.string().nullish(),
 })
 
 export async function POST(request: NextRequest) {
@@ -30,10 +31,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const parsed = parseBody(cashSaleSchema, body)
+    const parsed = parseBody(cashSaleSchema, body, 'POST /api/admin/invoices/cash-sale')
     if (!parsed.ok) return parsed.response
 
-    const { paymentMode = 'cash', notes, items } = body
+    const { paymentMode: rawPaymentMode, notes, items } = parsed.data
+    const paymentMode = rawPaymentMode ?? 'cash'
 
     if (!VALID_PAYMENT_MODES.includes(paymentMode)) {
       return NextResponse.json({ error: 'Invalid payment mode for cash sale' }, { status: 400 })
@@ -150,18 +152,18 @@ export async function POST(request: NextRequest) {
         const qty = item.quantity
 
         if (item.sub_variant_id) {
-          const inv = await client.query<{ stock_quantity: number }>(
-            `SELECT stock_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+          const inv = await client.query<{ inventory_quantity: number }>(
+            `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
             [item.sub_variant_id]
           )
-          const stock = parseFloat(inv.rows[0]?.stock_quantity as any) || 0
+          const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
           if (stock < qty) {
             throw new Error(
               `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
             )
           }
           await client.query(
-            `UPDATE product_sub_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2`,
+            `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
             [qty, item.sub_variant_id]
           )
         } else if (item.variant_id) {
@@ -199,6 +201,7 @@ export async function POST(request: NextRequest) {
         await logStockMovement(client, {
           productId: item.product_id,
           variantId: item.variant_id || null,
+          subVariantId: item.sub_variant_id || null,
           transactionType: 'sale',
           quantityChange: -qty,
           referenceType: 'cash_sale',

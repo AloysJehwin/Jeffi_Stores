@@ -23,8 +23,8 @@ const VerifySchema = z.object({
   razorpay_order_id: zNonEmpty,
   razorpay_payment_id: zNonEmpty,
   razorpay_signature: zNonEmpty,
-  orderId: zUuid.optional(),
-  draftToken: z.string().optional(),
+  orderId: zUuid.nullish(),
+  draftToken: z.string().nullish(),
 })
 
 export async function POST(request: NextRequest) {

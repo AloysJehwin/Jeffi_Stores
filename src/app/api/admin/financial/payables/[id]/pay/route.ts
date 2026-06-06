@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'amount and payment_date are required' }, { status: 400 })
     }
 
-    const parsed = parseBody(postSchema, { amount: body.amount, paymentMethod: body.payment_method })
+    const parsed = parseBody(postSchema, { amount: body.amount, paymentMethod: body.paymentMethod ?? body.payment_method }, 'POST /api/admin/financial/payables/[id]/pay')
     if (!parsed.ok) return parsed.response
 
     const expense = await queryOne<{ id: string; total_amount: string; status: string }>(

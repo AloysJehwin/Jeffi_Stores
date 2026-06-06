@@ -44,13 +44,13 @@ export async function GET(
                'id', psv.id,
                'sub_variant_name', psv.sub_variant_name,
                'sku', psv.sku,
-               'inventory_quantity', psv.stock_quantity
+               'inventory_quantity', psv.inventory_quantity
              ) ELSE NULL END AS sub_variant,
              CASE WHEN pv.id IS NOT NULL THEN json_build_object(
                'id', pv.id,
                'variant_name', pv.variant_name,
                'sku', pv.sku,
-               'inventory_quantity', pv.stock_quantity
+               'inventory_quantity', pv.inventory_quantity
              ) ELSE NULL END AS variant
       FROM order_items oi
       LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id

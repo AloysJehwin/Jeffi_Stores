@@ -130,6 +130,7 @@ export default function CartPage() {
       const res = await fetch('/api/coupons/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ code: couponCode.trim(), subtotal: total }),
       })
       const data = await res.json()

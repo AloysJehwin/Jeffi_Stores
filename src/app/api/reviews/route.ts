@@ -11,7 +11,7 @@ import { parseBody, zUuid } from '@/lib/validate'
 const CreateReviewSchema = z.object({
   productId: zUuid,
   rating: z.number().int().min(1).max(5),
-  comment: z.string().max(2000).optional(),
+  comment: z.string().max(2000).nullish(),
 })
 
 export async function GET(request: NextRequest) {

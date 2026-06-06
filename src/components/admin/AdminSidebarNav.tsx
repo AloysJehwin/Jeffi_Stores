@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 
 interface NavLink {
@@ -8,8 +8,6 @@ interface NavLink {
   label: string
   group?: string
 }
-
-const STORAGE_KEY = 'admin_sidebar_collapsed'
 
 const NAV_ICONS: Record<string, JSX.Element> = {
   Dashboard: (
@@ -183,23 +181,15 @@ function NavIcon({ label }: { label: string }) {
   )
 }
 
-export default function AdminSidebarNav({ navLinks }: { navLinks: NavLink[] }) {
+interface Props {
+  navLinks: NavLink[]
+  collapsed: boolean
+  onToggle: () => void
+  mounted: boolean
+}
+
+export default function AdminSidebarNav({ navLinks, collapsed, onToggle, mounted }: Props) {
   const pathname = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === 'true') setCollapsed(true)
-    setMounted(true)
-  }, [])
-
-  function toggle() {
-    setCollapsed(c => {
-      localStorage.setItem(STORAGE_KEY, String(!c))
-      return !c
-    })
-  }
 
   const ungrouped = navLinks.filter(l => !l.group)
   const groups = navLinks.reduce<Record<string, NavLink[]>>((acc, l) => {
@@ -219,24 +209,8 @@ export default function AdminSidebarNav({ navLinks }: { navLinks: NavLink[] }) {
   if (collapsed) {
     return (
       <aside className="hidden md:flex flex-col w-12 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto">
-        <div className="flex items-center justify-center h-12 border-b border-white/10 shrink-0">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-          </svg>
-        </div>
-        <div className="flex justify-center py-2 border-b border-white/10">
-          <button
-            type="button"
-            onClick={toggle}
-            title="Expand sidebar"
-            className="p-1.5 rounded-lg text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-        <nav className="flex flex-col items-center gap-0 p-1.5 flex-1 overflow-y-auto">
+        <div className="h-12 border-b border-white/10 shrink-0" />
+        <nav className="flex flex-col items-center gap-0 p-1.5 flex-1 overflow-y-auto pt-2">
           {ungrouped.map(link => {
             const isActive = pathname === link.href || (link.href !== '/admin/dashboard' && pathname?.startsWith(link.href))
             return (
@@ -282,24 +256,7 @@ export default function AdminSidebarNav({ navLinks }: { navLinks: NavLink[] }) {
 
   return (
     <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto">
-      <div className="flex items-center justify-between px-4 h-12 border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-          </svg>
-          <span className="text-base font-bold">Jeffi Admin</span>
-        </div>
-        <button
-          type="button"
-          onClick={toggle}
-          title="Collapse sidebar"
-          className="p-1 rounded-lg text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
-          </svg>
-        </button>
-      </div>
+      <div className="h-12 border-b border-white/10 shrink-0" />
       <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
         {ungrouped.map(link => (
           <a

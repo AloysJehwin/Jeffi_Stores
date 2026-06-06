@@ -8,17 +8,17 @@ import { parseBody, zNonEmpty } from '@/lib/validate'
 
 const PostSchema = z.object({
   name: zNonEmpty,
-  gstin: z.string().optional(),
-  contact_name: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-  address: z.string().optional(),
-  payment_terms: z.string().optional(),
-  notes: z.string().optional(),
-  bank_name: z.string().optional(),
-  account_number: z.string().optional(),
-  ifsc: z.string().optional(),
-  upi_id: z.string().optional(),
+  gstin: z.string().nullish(),
+  contact_name: z.string().nullish(),
+  phone: z.string().nullish(),
+  email: z.string().email().nullish(),
+  address: z.string().nullish(),
+  payment_terms: z.string().nullish(),
+  notes: z.string().nullish(),
+  bank_name: z.string().nullish(),
+  account_number: z.string().nullish(),
+  ifsc: z.string().nullish(),
+  upi_id: z.string().nullish(),
 })
 
 export const dynamic = 'force-dynamic'
