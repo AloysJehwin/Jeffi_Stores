@@ -83,26 +83,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ needsBusinessProfile: true, email, firstName, lastName })
       }
 
-      // Block if email already registered as a regular customer
-      const existingByEmail = await queryOne<{ id: string; user_type: string }>(
-        `SELECT id, user_type FROM users WHERE email = $1 LIMIT 1`,
-        [email]
-      )
-      if (existingByEmail && existingByEmail.user_type !== 'business') {
-        return NextResponse.json({ error: 'This email is already registered as a regular customer account. Please use a different email for your business account.' }, { status: 409 })
-      }
-
-      // If this google_id already exists on another account (customer), insert without linking google_id
-      const existingByGoogleId = await queryOne<{ id: string }>(
-        `SELECT id FROM users WHERE google_id = $1 AND user_type != 'business' LIMIT 1`,
-        [googleId]
-      )
-
       user = await queryOne<any>(
         `INSERT INTO users (email, first_name, last_name, is_active, auth_provider, google_id, user_type, last_login)
          VALUES ($1, $2, $3, true, 'google', $4, 'business', NOW())
          RETURNING *`,
-        [email, firstName, lastName, existingByGoogleId ? null : googleId]
+        [email, firstName, lastName, googleId]
       )
       if (!user) return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
 

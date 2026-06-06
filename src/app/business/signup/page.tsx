@@ -109,7 +109,7 @@ function BusinessSignUpPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, isSignup: true }),
+        body: JSON.stringify({ email, isSignup: true, userType: 'business' }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -178,7 +178,7 @@ function BusinessSignUpPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, isSignup: true }),
+        body: JSON.stringify({ email, isSignup: true, userType: 'business' }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -455,13 +455,10 @@ function BusinessSignUpPage() {
               <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Locality / Area</label>
                 {localities.length > 0 ? (
-                  <AdminSelect
-                    value={locality}
-                    onChange={setLocality}
-                    placeholder="Select locality…"
-                    options={localities.map(l => ({ value: l, label: l }))}
-                    sm
-                  />
+                  <select value={locality} onChange={e => setLocality(e.target.value)} className={inputCls}>
+                    <option value="">Select locality…</option>
+                    {localities.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
                 ) : (
                   <input type="text" value={locality} onChange={e => setLocality(e.target.value)}
                     className={inputCls} placeholder="Locality / area name" />
