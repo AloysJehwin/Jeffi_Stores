@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany } from '@/lib/db'
+import { query, queryOne, queryMany } from '@/lib/db'
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await authenticateAdmin(request)
@@ -40,6 +40,8 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   const inUse = await queryOne('SELECT id FROM review_forms WHERE coupon_id = $1 LIMIT 1', [params.id])
   if (inUse) return NextResponse.json({ error: 'Coupon is used by a review form — remove it from the form first' }, { status: 409 })
 
+  // Unlink from campaigns before deleting to avoid FK violation
+  await query('UPDATE campaigns SET coupon_id = NULL WHERE coupon_id = $1', [params.id])
   await queryOne('DELETE FROM coupons WHERE id = $1', [params.id])
   return NextResponse.json({ success: true })
 }
