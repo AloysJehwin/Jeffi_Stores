@@ -288,7 +288,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
             key={link.href}
             href={link.href}
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              isNavActive(link.href, pathname)
+              isNavActive(link, pathname)
                 ? 'bg-white/20 text-white'
                 : 'text-gray-300 hover:bg-white/10 hover:text-white'
             }`}
