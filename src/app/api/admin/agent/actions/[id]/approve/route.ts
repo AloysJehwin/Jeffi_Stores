@@ -109,13 +109,13 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
       } else if (audience === 'all_opted_in') {
         recipients = await queryMany(
           `SELECT email, COALESCE(NULLIF(TRIM(first_name || ' ' || COALESCE(last_name,'')), ''), email) AS name
-             FROM users WHERE email IS NOT NULL AND marketing_opt_out IS NOT TRUE`
+             FROM users WHERE is_guest = false AND email IS NOT NULL AND marketing_opt_out IS NOT TRUE`
         ) as any
       } else if (audience === 'recent_buyers') {
         recipients = await queryMany(
           `SELECT DISTINCT u.email, COALESCE(NULLIF(TRIM(u.first_name || ' ' || COALESCE(u.last_name,'')), ''), u.email) AS name
              FROM users u JOIN orders o ON o.user_id = u.id
-            WHERE u.email IS NOT NULL AND u.marketing_opt_out IS NOT TRUE
+            WHERE u.is_guest = false AND u.email IS NOT NULL AND u.marketing_opt_out IS NOT TRUE
               AND o.created_at > NOW() - INTERVAL '90 days'`
         ) as any
       } else {
@@ -327,13 +327,13 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
       } else if (audience === 'all_opted_in') {
         recipients = await queryMany<{ email: string; name: string }>(
           `SELECT email, COALESCE(NULLIF(TRIM(first_name || ' ' || COALESCE(last_name,'')), ''), email) AS name
-             FROM users WHERE email IS NOT NULL AND marketing_opt_out IS NOT TRUE`
+             FROM users WHERE is_guest = false AND email IS NOT NULL AND marketing_opt_out IS NOT TRUE`
         )
       } else if (audience === 'recent_buyers') {
         recipients = await queryMany<{ email: string; name: string }>(
           `SELECT DISTINCT u.email, COALESCE(NULLIF(TRIM(u.first_name || ' ' || COALESCE(u.last_name,'')), ''), u.email) AS name
              FROM users u JOIN orders o ON o.user_id = u.id
-            WHERE u.email IS NOT NULL AND u.marketing_opt_out IS NOT TRUE
+            WHERE u.is_guest = false AND u.email IS NOT NULL AND u.marketing_opt_out IS NOT TRUE
               AND o.created_at > NOW() - INTERVAL '90 days'`
         )
       } else {
