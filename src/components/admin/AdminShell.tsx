@@ -13,6 +13,7 @@ interface NavLink {
   href: string
   label: string
   group?: string
+  exactMatch?: boolean
 }
 
 interface Props {

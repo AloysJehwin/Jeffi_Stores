@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getCustomerById } from '@/lib/queries'
-import CustomerContactForm from '@/components/admin/CustomerContactForm'
 import CustomerActionButton from '@/components/admin/CustomerActionButton'
+import CustomerMailerPanel from '@/components/admin/CustomerMailerPanel'
 import AdminSupportChat from '@/components/admin/AdminSupportChat'
 import CustomerTags from '@/components/admin/CustomerTags'
 import CustomerNotes from '@/components/admin/CustomerNotes'
@@ -193,6 +193,38 @@ export default async function CustomerDetailPage({
         </div>
       )}
 
+      {/* Assigned coupons banner */}
+      {customer.assigned_coupons && customer.assigned_coupons.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 10V5a2 2 0 012-2z" />
+            </svg>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              {customer.assigned_coupons.length} Personal Coupon{customer.assigned_coupons.length > 1 ? 's' : ''} Assigned
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {customer.assigned_coupons.map((c: { id: string; code: string; discount_type: string; discount_value: number; valid_until: string | null; times_used: number; description: string | null }) => (
+              <div key={c.id} className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg text-xs">
+                <span className="font-mono font-bold text-amber-800 dark:text-amber-200">{c.code}</span>
+                <span className="text-amber-600 dark:text-amber-400">
+                  {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
+                </span>
+                {c.times_used > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 font-semibold">Used</span>
+                )}
+                {c.valid_until && (
+                  <span className="text-amber-500 dark:text-amber-500">
+                    until {new Date(c.valid_until).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Main content — 3-col layout on wide screens */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
@@ -227,12 +259,6 @@ export default async function CustomerDetailPage({
           {/* Tasks */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <CustomerTasks customerId={customer.id} />
-          </div>
-
-          {/* Send message */}
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Contact Customer</h2>
-            <CustomerContactForm customerId={customer.id} />
           </div>
 
           {/* Business details */}
@@ -336,6 +362,23 @@ export default async function CustomerDetailPage({
                 <p className="text-foreground-muted text-sm">No orders yet.</p>
               </div>
             )}
+          </div>
+
+          {/* Send Mailer */}
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Send Mailer</h2>
+            <CustomerMailerPanel
+              customerId={customer.id}
+              customerName={fullName}
+              customerEmail={customer.email}
+              segments={customer.segments}
+              healthScore={customer.health?.score ?? null}
+              totalOrders={customer.total_orders}
+              lifetimeValue={customer.lifetime_value}
+              daysSinceLastOrder={customer.days_since_last_order}
+              lastOrderAt={customer.last_order_at}
+              recentOrders={customer.recent_orders ?? []}
+            />
           </div>
         </div>
       </div>

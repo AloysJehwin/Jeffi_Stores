@@ -27,6 +27,8 @@ export default function ProposedToolsPage() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<'proposed' | 'approved' | 'rejected' | 'all'>('proposed')
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   async function load() {
     setLoading(true)
@@ -45,19 +47,22 @@ export default function ProposedToolsPage() {
   useEffect(() => { load() }, [statusFilter])
 
   async function decide(id: string, decision: 'approve' | 'reject') {
-    let body: any = {}
     if (decision === 'reject') {
-      const reason = prompt('Reason for rejecting (optional):')
-      if (reason === null) return
-      body = { reason }
+      setRejectingId(id)
+      setRejectReason('')
+      return
     }
+    await submitDecision(id, 'approve', '')
+  }
+
+  async function submitDecision(id: string, decision: 'approve' | 'reject', reason: string) {
     setBusyId(id)
     try {
       const res = await fetch(`/api/admin/agent/proposed-tools/${id}/${decision}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(decision === 'reject' ? { reason } : {}),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Action failed')
@@ -67,6 +72,8 @@ export default function ProposedToolsPage() {
       showToast(err?.message || 'Action failed', 'error')
     } finally {
       setBusyId(null)
+      setRejectingId(null)
+      setRejectReason('')
     }
   }
 
@@ -160,22 +167,57 @@ export default function ProposedToolsPage() {
             )}
 
             {item.status === 'proposed' && (
-              <div className="flex gap-2">
-                <button
-                  disabled={busyId === item.id}
-                  onClick={() => decide(item.id, 'approve')}
-                  className="flex-1 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
-                >
-                  {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                  Approve and register
-                </button>
-                <button
-                  disabled={busyId === item.id}
-                  onClick={() => decide(item.id, 'reject')}
-                  className="flex-1 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default disabled:opacity-50"
-                >
-                  <XCircle className="w-3.5 h-3.5" /> Reject
-                </button>
+              <div className="flex flex-col gap-2">
+                {rejectingId === item.id ? (
+                  <div className="flex flex-col gap-1.5">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={rejectReason}
+                      onChange={e => setRejectReason(e.target.value)}
+                      placeholder="Reason for rejecting (optional)"
+                      className="w-full px-3 py-1.5 text-xs border border-border-default rounded bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') submitDecision(item.id, 'reject', rejectReason)
+                        if (e.key === 'Escape') { setRejectingId(null); setRejectReason('') }
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        disabled={busyId === item.id}
+                        onClick={() => submitDecision(item.id, 'reject', rejectReason)}
+                        className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
+                      >
+                        {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                        Confirm reject
+                      </button>
+                      <button
+                        onClick={() => { setRejectingId(null); setRejectReason('') }}
+                        className="px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold border border-border-default"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      disabled={busyId === item.id}
+                      onClick={() => decide(item.id, 'approve')}
+                      className="flex-1 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
+                    >
+                      {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                      Approve and register
+                    </button>
+                    <button
+                      disabled={busyId === item.id}
+                      onClick={() => decide(item.id, 'reject')}
+                      className="flex-1 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default disabled:opacity-50"
+                    >
+                      <XCircle className="w-3.5 h-3.5" /> Reject
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

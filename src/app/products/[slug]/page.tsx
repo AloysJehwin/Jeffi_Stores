@@ -3,10 +3,10 @@ import Link from 'next/link'
 import { cache } from 'react'
 import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import ProductDetailClient from '@/components/visitor/ProductDetailClient'
 import ProductReviews from '@/components/visitor/ProductReviews'
-import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import ProductCard from '@/components/visitor/ProductCard'
 import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 
@@ -55,6 +55,7 @@ const getProductBySlug = cache(async (slug: string) => {
         '[]'::json
       ) AS product_variants,
       ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+      ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
@@ -178,7 +179,8 @@ async function getRelatedProducts(productId: string, categoryId: string, product
       '[]'::json
     ) AS product_images,
     ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-    ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
+    ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+    ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
   `
 
   const currentStem = nameStem(productName)
@@ -292,7 +294,9 @@ export default async function ProductDetailPage({
   const displayPrice = hasVariants && product.variant_min_price
     ? product.variant_min_price
     : (product.base_price || 0)
-  const mrp = product.mrp ? Number(product.mrp) : null
+  const mrp = product.mrp
+    ? Number(product.mrp)
+    : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
   const mrpDiscount = mrp && mrp > Number(displayPrice)
     ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
     : 0
@@ -310,7 +314,11 @@ export default async function ProductDetailPage({
         price={Number(displayPrice)}
         mrp={mrp}
         brand={product.brands?.name || null}
-        inStock={Number(product.variant_stock_total ?? product.stock_quantity ?? 0) > 0}
+        inStock={
+          product.has_variants
+            ? Number(product.variant_stock_total ?? 0) > 0
+            : Number(product.stock_quantity ?? 0) > 0
+        }
         image={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
       />
       {/* Breadcrumb */}
@@ -375,75 +383,36 @@ export default async function ProductDetailPage({
                 const relatedPrimaryImage = relatedProduct.product_images?.find((img: any) => img.is_primary) || relatedProduct.product_images?.[0]
                 const relatedHasVariants = relatedProduct.has_variants
                 const relatedDisplayPrice = relatedHasVariants && relatedProduct.variant_min_price
-                  ? relatedProduct.variant_min_price
-                  : (relatedProduct.base_price)
-                const relatedMrp = relatedProduct.mrp ? Number(relatedProduct.mrp) : null
-                const relatedMrpDiscount = relatedMrp && relatedMrp > Number(relatedDisplayPrice)
-                  ? Math.round(((relatedMrp - Number(relatedDisplayPrice)) / relatedMrp) * 100)
+                  ? Number(relatedProduct.variant_min_price)
+                  : Number(relatedProduct.base_price)
+                const relatedMrp = relatedProduct.mrp
+                  ? Number(relatedProduct.mrp)
+                  : (relatedProduct.variant_min_mrp ? Number(relatedProduct.variant_min_mrp) : null)
+                const relatedInclPrice = relatedHasVariants && relatedProduct.variant_min_price
+                  ? Number(relatedProduct.variant_min_price)
+                  : Number(relatedProduct.base_price)
+                const relatedMrpDiscount = relatedMrp && relatedMrp > relatedInclPrice
+                  ? Math.round(((relatedMrp - relatedInclPrice) / relatedMrp) * 100)
                   : 0
+                const relatedStock = relatedHasVariants
+                  ? Number(relatedProduct.variant_stock_total ?? 0)
+                  : Number(relatedProduct.stock_quantity ?? 0)
 
                 return (
-                  <Link
+                  <ProductCard
                     key={relatedProduct.id}
-                    href={`/products/${relatedProduct.slug}`}
-                    className="group"
-                  >
-                    <div className="flex flex-col h-full bg-surface-elevated rounded-xl shadow-sm border border-border-default overflow-hidden hover:shadow-md hover:border-accent-300 transition-all duration-200">
-                      <div className="relative aspect-square bg-surface overflow-hidden">
-                        {relatedPrimaryImage ? (
-                          <>
-                            <img
-                              src={relatedPrimaryImage.image_url}
-                              alt=""
-                              aria-hidden="true"
-                              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-40"
-                            />
-                            <div className="relative w-full h-full">
-                              <ImgWithSkeleton
-                                src={relatedPrimaryImage.image_url}
-                                alt={relatedProduct.name}
-                                className="w-full h-full object-contain p-2"
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-16 h-16 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                        )}
-                        {relatedMrpDiscount > 0 && (
-                          <div className="absolute top-2 right-2 bg-accent-500 text-white px-2 py-0.5 rounded-full text-xs font-bold shadow">
-                            {relatedMrpDiscount}% off
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col flex-1 p-3 gap-1">
-                        {relatedProduct.brands?.name && (
-                          <span className="text-xs text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide truncate">
-                            {relatedProduct.brands.name}
-                          </span>
-                        )}
-                        <h3 className="font-semibold text-sm text-foreground group-hover:text-accent-600 transition-colors line-clamp-2 flex-1 leading-snug">
-                          {relatedProduct.name}
-                        </h3>
-                        {relatedProduct.sku && (
-                          <p className="text-xs text-foreground-muted font-mono truncate">SKU: {relatedProduct.sku}</p>
-                        )}
-                        <div className="flex items-baseline gap-2 mt-1">
-                          <span className="text-base font-bold text-primary-600 dark:text-primary-400">
-                            {relatedHasVariants ? 'From ' : ''}₹{Number(relatedDisplayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </span>
-                          {relatedMrp && relatedMrp > Number(relatedDisplayPrice) && (
-                            <span className="text-xs text-foreground-muted line-through">
-                              ₹{relatedMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
+                    id={relatedProduct.id}
+                    name={relatedProduct.name}
+                    slug={relatedProduct.slug}
+                    hasVariants={relatedHasVariants}
+                    displayPrice={relatedDisplayPrice}
+                    mrp={relatedMrp}
+                    mrpDiscount={relatedMrpDiscount}
+                    effectiveStock={relatedStock}
+                    primaryImage={relatedPrimaryImage || null}
+                    brandName={relatedProduct.brands?.name || null}
+                    categoryName={relatedProduct.categories?.name || null}
+                  />
                 )
               })}
             </div>

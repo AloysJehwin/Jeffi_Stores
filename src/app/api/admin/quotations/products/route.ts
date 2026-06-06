@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')?.trim() || ''
     const categoryId = searchParams.get('category_id')?.trim() || ''
+    const featured = searchParams.get('featured') === 'true'
     const limit = parseInt(searchParams.get('limit') || '40') || 10000
 
     let idx = 1
@@ -20,6 +21,8 @@ export async function GET(request: NextRequest) {
 
     const catClause = categoryId ? `p.category_id = $${idx++}::uuid` : 'TRUE'
     if (categoryId) params.push(categoryId)
+
+    const featuredClause = featured ? 'p.is_featured = true' : 'TRUE'
 
     let searchWhere = 'TRUE'
     let searchWherePv = 'TRUE'
@@ -51,6 +54,7 @@ export async function GET(request: NextRequest) {
            p.id AS product_id,
            NULL::uuid AS variant_id,
            p.name,
+           p.slug,
            NULL AS variant_name,
            p.sku,
            COALESCE(p.mrp, 0)::numeric AS mrp,
@@ -61,7 +65,7 @@ export async function GET(request: NextRequest) {
            p.is_active,
            COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity
          FROM products p
-         WHERE p.has_variants = false AND ${catClause} AND ${searchWhere}
+         WHERE p.has_variants = false AND ${catClause} AND ${featuredClause} AND ${searchWhere}
 
          UNION ALL
 
@@ -70,6 +74,7 @@ export async function GET(request: NextRequest) {
            p.id AS product_id,
            pv.id AS variant_id,
            p.name,
+           p.slug,
            pv.variant_name,
            pv.sku,
            COALESCE(pv.mrp, 0)::numeric AS mrp,
@@ -81,7 +86,7 @@ export async function GET(request: NextRequest) {
            COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
-         WHERE ${catClause} AND ${searchWherePv}
+         WHERE ${catClause} AND ${featuredClause} AND ${searchWherePv}
        ) results
        ORDER BY ${rank}, name ASC, variant_name ASC NULLS FIRST
        LIMIT $${limitIdx}`,

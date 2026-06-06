@@ -3,14 +3,13 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import CrmCampaignPanel from './CrmCampaignPanel'
+import CrmMailerPanel from './CrmMailerPanel'
 
 interface SegmentMeta {
   key: string
   label: string
   count: number
   color: string
-  defaultCampaign: string
 }
 
 interface Customer {
@@ -124,10 +123,10 @@ function SegmentModal({ segment, onClose }: ModalProps) {
             </div>
           </div>
 
-          {/* Right: campaign panel */}
+          {/* Right: mailer panel */}
           <div className="flex flex-col flex-1 min-w-0">
             <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
-              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Campaign</h3>
+              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Send Mailer</h3>
               <Link
                 href={`/admin/customers?segment=${segment.key}`}
                 className="text-xs text-accent-500 hover:text-accent-600 font-medium"
@@ -137,8 +136,9 @@ function SegmentModal({ segment, onClose }: ModalProps) {
               </Link>
             </div>
             <div className="overflow-y-auto flex-1 px-6 pb-6">
-              <CrmCampaignPanel
-                defaultKind={segment.defaultCampaign}
+              <CrmMailerPanel
+                segmentKey={segment.key}
+                segmentLabel={segment.label}
                 recipientCount={segment.count}
                 onClose={onClose}
               />
@@ -150,12 +150,6 @@ function SegmentModal({ segment, onClose }: ModalProps) {
     document.body
   )
 }
-
-const CAMPAIGN_FOR: Record<string, string> = {
-  at_risk: 'winback_90',
-  dormant: 'winback_180',
-}
-const DEFAULT_CAMPAIGN = 'winback_90'
 
 export default function SegmentsCard({ segments }: {
   segments: Record<string, number>
@@ -190,7 +184,6 @@ export default function SegmentsCard({ segments }: {
                   label,
                   count,
                   color,
-                  defaultCampaign: CAMPAIGN_FOR[key] ?? DEFAULT_CAMPAIGN,
                 })}
                 className={`group rounded-xl border px-4 py-3 text-left transition-all hover:shadow-md hover:-translate-y-0.5 ${color}`}
               >

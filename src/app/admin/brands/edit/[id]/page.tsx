@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { query, queryOne } from '@/lib/db'
 import BrandForm from '@/components/admin/BrandForm'
+import { ChevronLeft } from 'lucide-react'
 
 async function getBrand(id: string) {
   const data = await queryOne('SELECT * FROM brands WHERE id = $1', [id])
@@ -51,6 +52,14 @@ export default async function EditBrandPage({ params }: { params: { id: string }
 
   return (
     <div className="p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <a href="/admin/brands" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+          Brands
+        </a>
+        <span className="text-border-default">/</span>
+        <span className="text-foreground font-medium">Edit Brand</span>
+      </div>
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Edit Brand</h1>
         <p className="text-foreground-secondary mt-1">Update brand information</p>

@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       valid_from: string | null
       valid_until: string | null
       is_active: boolean
+      generated_for_user_id: string | null
     }>(
       `SELECT * FROM coupons WHERE code = $1`,
       [code.toUpperCase().trim()]
@@ -42,6 +43,26 @@ export async function POST(request: NextRequest) {
 
     if (!coupon) {
       return NextResponse.json({ error: 'Invalid coupon code' }, { status: 404 })
+    }
+
+    // If coupon has eligible user restrictions, verify this user is on the list
+    const eligibleCount = await queryOne<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM coupon_eligible_users WHERE coupon_id = $1`,
+      [coupon.id]
+    )
+    if (eligibleCount && parseInt(eligibleCount.cnt) > 0) {
+      const isEligible = await queryOne(
+        `SELECT 1 FROM coupon_eligible_users WHERE coupon_id = $1 AND user_id = $2`,
+        [coupon.id, authUser.userId]
+      )
+      if (!isEligible) {
+        return NextResponse.json({ error: 'This coupon is not valid for your account' }, { status: 400 })
+      }
+    }
+
+    // If coupon is targeted at a specific user via generated_for_user_id, enforce it
+    if (coupon.generated_for_user_id && coupon.generated_for_user_id !== authUser.userId) {
+      return NextResponse.json({ error: 'This coupon is not valid for your account' }, { status: 400 })
     }
 
     if (!coupon.is_active) {
