@@ -451,8 +451,9 @@ function BusinessSignUpPage() {
                 )}
               </div>
 
+              {(pinLookupState === 'found' || pinLookupState === 'error') && (
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Locality / Area *</label>
+                <label className="block text-xs font-medium text-foreground-secondary mb-1">Locality / Area</label>
                 {localities.length > 0 ? (
                   <AdminSelect
                     value={locality}
@@ -466,6 +467,7 @@ function BusinessSignUpPage() {
                     className={inputCls} placeholder="Locality / area name" />
                 )}
               </div>
+              )}
 
               <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Landmark <span className="text-foreground-muted">(optional)</span></label>
