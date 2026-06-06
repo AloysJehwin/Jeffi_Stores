@@ -281,7 +281,13 @@ export default function AdminAgentPage() {
         id: m.id || crypto.randomUUID(),
         role: m.role,
         content: m.content,
-        toolCalls: m.tool_calls || undefined,
+        toolCalls: m.tool_calls?.length ? m.tool_calls : undefined,
+        uiBlocks: m.ui_blocks?.length ? m.ui_blocks : undefined,
+        proposedActions: m.proposed_actions?.length
+          ? m.proposed_actions.map((a: any) => ({ ...a, status: a.status ?? 'approved' }))
+          : undefined,
+        pickers: m.pickers?.length ? m.pickers : undefined,
+        pickerResolved: m.pickers?.length ? true : undefined,
       }))
       setTurns(restored)
       setConversationId(id)
