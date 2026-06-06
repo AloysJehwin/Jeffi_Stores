@@ -43,7 +43,7 @@ export default function ShelvingClient() {
     setTabState(next)
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', next)
-    router.replace(`/admin/shelving?${params.toString()}`, { scroll: false })
+    router.push(`/admin/shelving?${params.toString()}`, { scroll: false })
   }
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [locations, setLocations] = useState<ShelfLocation[]>([])

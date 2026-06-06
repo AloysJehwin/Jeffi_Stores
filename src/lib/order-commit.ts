@@ -177,9 +177,30 @@ export async function validateCouponForUser(params: {
     min_purchase_amount: number | null; max_discount_amount: number | null;
     usage_limit: number | null; usage_limit_per_user: number | null;
     times_used: number; valid_from: string | null; valid_until: string | null; is_active: boolean;
+    generated_for_user_id: string | null;
   }>(`SELECT * FROM coupons WHERE id = $1`, [params.couponId])
 
   if (!coupon || !coupon.is_active) return { appliedDiscount: 0, ok: false, reason: 'inactive' }
+
+  // If coupon is restricted to a specific single user (generated_for_user_id)
+  if (coupon.generated_for_user_id && coupon.generated_for_user_id !== params.userId) {
+    return { appliedDiscount: 0, ok: false, reason: 'not_assigned_to_user' }
+  }
+
+  // If coupon has an eligible-users list, only those users may apply it
+  const eligible = await queryOne<{ cnt: string }>(
+    `SELECT COUNT(*) AS cnt FROM coupon_eligible_users WHERE coupon_id = $1`,
+    [coupon.id]
+  )
+  if (eligible && parseInt(eligible.cnt, 10) > 0) {
+    const allowed = await queryOne<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM coupon_eligible_users WHERE coupon_id = $1 AND user_id = $2`,
+      [coupon.id, params.userId]
+    )
+    if (!allowed || parseInt(allowed.cnt, 10) === 0) {
+      return { appliedDiscount: 0, ok: false, reason: 'not_assigned_to_user' }
+    }
+  }
 
   const now = new Date()
   const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -53,14 +54,19 @@ export default function QuotationDetailClient({ id }: { id: string }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 text-sm">
+        <a href="/admin/quotations" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+          Quotations
+        </a>
+        <span className="text-border-default">/</span>
+        <span className="text-foreground font-medium">Quotation #{q.quote_number}</span>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link href="/admin/quotations" className="text-foreground-secondary hover:text-foreground transition-colors">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
           <h1 className="text-xl font-bold text-foreground font-mono">{q.quote_number}</h1>
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[q.status] || 'bg-surface-secondary text-foreground-secondary'}`}>
             {q.status}

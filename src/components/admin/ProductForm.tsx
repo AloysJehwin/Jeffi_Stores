@@ -98,6 +98,65 @@ function getUnitOptions(pricing_type: string) {
   return UNIT_UNITS
 }
 
+// SKU generation
+const BRAND_PREFIX_MAP: Record<string, string> = {
+  'unbrako': 'UNB', 'taparia': 'TAP', 'tvs': 'TVS', 'totem': 'TTM',
+  'gmf': 'GMF', 'jk fenner': 'JKF', 'nesco': 'NES', 'havells': 'HVL',
+  'koleshwari': 'KRE', 'kundan': 'KUN', 'welfast': 'WEL', 'belsona': 'BLS',
+}
+
+// Matches size/spec tokens: M8, M10x50, DIN985, ISO4032, A16-A50, Grade 8.8, 10.9, BSW3/8
+const SKU_SIZE_RE = /\b(M\d+(?:x\d+)?(?:\.\d+)?|DIN\s*\d+[A-Z]?|ISO\s*\d+[A-Z]?|[A-Z]{1,2}\d{2,}(?:-\d+[A-Z]*)?|Grade\s*\d+(?:\.\d+)?[A-Z]?|(?:10|12)\.\d+S?|BSW\s*\d+(?:\/\d+)?|UNC|BSP)\b/gi
+
+const BRAND_STOP = new Set([
+  'UNBRAKO','TAPARIA','TVS','TOTEM','GMF','FENNER','NESCO','HAVELLS',
+  'KOLESHWARI','KUNDAN','WELFAST','BELSONA','FASTENERS','LIMITED','LTD','PVT','INDIA',
+])
+const SKU_STOP = new Set([
+  'THE','AND','FOR','WITH','OF','IN','A','AN','BY','SERIES','TEST',
+  'METRIC','INCH','GRADE','TYPE','STANDARD','CLASS','QUALITY','ALLOY',
+  'CLASSICAL','HEXAGONAL',
+])
+
+function getBrandPrefix(brandName: string): string {
+  const lower = brandName.toLowerCase().trim()
+  for (const [key, val] of Object.entries(BRAND_PREFIX_MAP)) {
+    if (lower.includes(key)) return val
+  }
+  return brandName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4)
+}
+
+function generateSku(name: string, brandName: string): string {
+  let s = name.toUpperCase()
+  // Strip brand words from name
+  for (const bw of brandName.toUpperCase().split(/\s+/).filter(w => w.length > 1))
+    s = s.replace(new RegExp(`(^|\\s)${bw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`, 'g'), ' ')
+
+  // Extract size/spec tokens
+  const sizes = [...new Set(
+    [...s.matchAll(SKU_SIZE_RE)].map(m => m[0].replace(/\s+/g, '').toUpperCase())
+  )].slice(0, 2)
+
+  // Strip sizes, then extract product-type words
+  let rem = s
+  for (const sz of sizes) rem = rem.replace(sz, ' ')
+  const typeTokens = rem
+    .replace(SKU_SIZE_RE, ' ')
+    .split(/[\s/,.()\[\]\-–—]+/)
+    .map(t => t.replace(/[^A-Z0-9]/g, ''))
+    .filter(t => t.length >= 2 && !SKU_STOP.has(t) && !BRAND_STOP.has(t))
+    .slice(0, 3)
+
+  const parts = [
+    getBrandPrefix(brandName),
+    ...(typeTokens.length ? [typeTokens.join('-')] : []),
+    ...sizes,
+  ]
+  if (parts.length <= 1) return parts[0] || ''
+  return parts.join('-').replace(/--+/g, '-').replace(/-+$/, '').toUpperCase()
+}
+
+
 function getPerUnitLabel(unit: string): string {
   const map: Record<string, string> = {
     kg: '/kg', g: '/100g', lb: '/lb', oz: '/oz',
@@ -176,6 +235,10 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [error, setError] = useState<string | null>(null)
   const [productName, setProductName] = useState<string>(product?.name || '')
   const [description, setDescription] = useState<string>(product?.description || '')
+  const [brandId, setBrandId] = useState<string>(product?.brand_id || '')
+  const [categoryId, setCategoryId] = useState<string>(product?.category_id || '')
+  const [sku, setSku] = useState<string>(product?.sku || '')
+  const [skuManuallyEdited, setSkuManuallyEdited] = useState<boolean>(!!product?.sku)
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [existingImagesToKeep, setExistingImagesToKeep] = useState<any[]>([])
   const [galleryImageIds, setGalleryImageIds] = useState<{ id: string; isPrimary: boolean }[]>([])
@@ -357,6 +420,16 @@ export default function ProductForm({ categories, brands, action, product, produ
     const saved = localStorage.getItem(draftKey)
     if (saved) setHasDraft(true)
   }, [draftKey])
+
+  // Auto-regenerate SKU when name/brand/category change (only if not manually edited)
+  useEffect(() => {
+    if (skuManuallyEdited) return
+    const brandName = brands.find(b => b.id === brandId)?.name || ''
+    const categoryName = categories.find(c => c.id === categoryId)?.name || ''
+    if (!productName && !brandName && !categoryName) return
+    const generated = generateSku(productName, brandName)
+    if (generated) setSku(generated)
+  }, [productName, brandId, categoryId, skuManuallyEdited, brands, categories])
 
   useEffect(() => {
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
@@ -816,17 +889,40 @@ export default function ProductForm({ categories, brands, action, product, produ
             />
           </div>
 
-          {product?.sku && (
-            <div>
-              <label className="block text-sm font-medium text-foreground-secondary mb-2">
-                SKU
-              </label>
-              <div className="w-full px-4 py-2 border border-border-default rounded-lg bg-surface text-foreground-secondary font-mono text-sm uppercase">
-                {product.sku.toUpperCase()}
-              </div>
-              <p className="text-xs text-foreground-muted mt-1">Auto-generated, cannot be changed</p>
+          {/* SKU */}
+          <div>
+            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+              SKU
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                name="sku"
+                value={sku}
+                onChange={e => { setSku(e.target.value.toUpperCase()); setSkuManuallyEdited(true) }}
+                className="flex-1 px-4 py-2 border border-border-default rounded-lg bg-surface text-foreground font-mono text-sm uppercase focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="Auto-generated"
+              />
+              <button
+                type="button"
+                title="Regenerate SKU from name, brand and category"
+                onClick={() => {
+                  const brandName = brands.find(b => b.id === brandId)?.name || ''
+                  const categoryName = categories.find(c => c.id === categoryId)?.name || ''
+                  const generated = generateSku(productName, brandName)
+                  if (generated) { setSku(generated); setSkuManuallyEdited(false) }
+                }}
+                className="px-3 py-2 border border-border-default rounded-lg bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-accent-500 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
             </div>
-          )}
+            <p className="text-xs text-foreground-muted mt-1">
+              {skuManuallyEdited ? 'Manually set — click ↺ to regenerate from name, brand & category' : 'Auto-generated from name, brand & category'}
+            </p>
+          </div>
 
           {/* HSN/SAC Code */}
           <div>
@@ -886,7 +982,8 @@ export default function ProductForm({ categories, brands, action, product, produ
             name="category_id"
             label="Category *"
             required
-            defaultValue={product?.category_id}
+            value={categoryId}
+            onChange={setCategoryId}
             placeholder="Select a category"
             options={(() => {
               const opts = leafCategories.map(cat => {
@@ -913,7 +1010,8 @@ export default function ProductForm({ categories, brands, action, product, produ
             id="brand_id"
             name="brand_id"
             label="Brand"
-            defaultValue={product?.brand_id || ''}
+            value={brandId}
+            onChange={setBrandId}
             placeholder="No Brand"
             options={[
               { value: '', label: 'No Brand' },
