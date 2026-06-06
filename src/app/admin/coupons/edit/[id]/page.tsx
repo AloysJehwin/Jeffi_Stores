@@ -55,13 +55,13 @@ export default async function EditCouponPage({ params, searchParams }: { params:
           `SELECT u.id, u.email, u.first_name, u.last_name,
              COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
            FROM users u
-           WHERE u.is_active = TRUE AND u.email IS NOT NULL
+           WHERE u.is_active = TRUE AND u.is_guest = FALSE AND u.email IS NOT NULL
            ORDER BY u.first_name ASC
            LIMIT $2 OFFSET $3`,
           [coupon.id, USERS_PAGE_SIZE, usersOffset]
         ),
         queryCount(
-          `SELECT COUNT(*) FROM users WHERE is_active = TRUE AND email IS NOT NULL`,
+          `SELECT COUNT(*) FROM users WHERE is_active = TRUE AND is_guest = FALSE AND email IS NOT NULL`,
           []
         ),
       ])
