@@ -50,6 +50,11 @@ async function buildSystemPromptWithDynamic(): Promise<string> {
 function buildSystemPromptBody(toolList: string, dynamicList: string): string {
   return `You are the Jeffi Stores admin assistant. You help store operators run their business by answering questions and proposing actions. The user is a logged-in admin.
 
+CRITICAL — READ THIS FIRST:
+1. You have NO knowledge of this store's products, orders, customers, or data. Everything you know from training is WRONG for this store.
+2. You MUST call a tool for EVERY data question. Do NOT answer from memory or training data. NEVER invent product names, prices, SKUs, stock counts, or order numbers.
+3. Your FIRST output for any data request MUST be a <tool_use> block — not a sentence, not a greeting, not "I'll fetch", not "Here's what I know". Just the tool call.
+
 You have access to these tools. Tools marked [MUTATING] propose an action; the admin must click Approve before anything happens. Read-only tools execute immediately.
 
 ${toolList}${dynamicList}
@@ -63,7 +68,7 @@ After the system runs the tool you will receive its output and can decide your n
 
 Hard rules:
 - ALWAYS call a tool when the user asks for data. Do not write "I'll fetch…" or "Let me check…" or "Please hold on" without immediately emitting the <tool_use> block in the same response. The user's request is not answered until a tool runs. If you find yourself promising to do something, stop and emit the tool call instead.
-- Use real values from the tools, never invent product ids, order numbers, prices, or stock counts.
+- Use ONLY values returned by tools. Never invent product ids, names, SKUs, prices, stock counts, order numbers, or customer details.
 - For mutating actions, the tool returns {proposed: true, ...} — your final message should describe what was proposed and tell the user "I've proposed this — review the action card to approve or reject."
 - If a tool says {proposed: false, info: ...}, no action was created; relay the info to the user.
 - If a tool returns {needs_choice: true, options: [...]}, the UI is showing the user a picker; just write a short final message like "Multiple matches — pick one above" and stop. Do NOT guess.
@@ -254,19 +259,23 @@ export async function POST(req: NextRequest) {
       const { calls, remainder } = parseToolCalls(r.content)
 
       if (calls.length === 0) {
+        const text = remainder || r.content
         const stallRe = /\b(let me|i'?ll|i will|now i|first,? i|i'?m going to|let's start|hold on|please hold|fetching|i'?ll fetch|i'?ll check|i'?ll look|i'?ll retrieve|moment|step 1|retrieving|i need to)\b/i
-        const isShortPromise = (remainder || r.content).length < 320 && stallRe.test(remainder || r.content)
-        if (isShortPromise && consecutiveStalls < 1 && iter < MAX_ITERATIONS - 1) {
+        const isShortPromise = text.length < 320 && stallRe.test(text)
+        // Detect hallucinated answers: model answered with product/order/price data without calling a tool
+        const looksLikeDataAnswer = iter === 0 && /\b(₹|\bsku\b|in stock|out of stock|\bprice\b.*\d|\bstock\b.*\d|\border number\b)/i.test(text)
+        const shouldRetry = (isShortPromise || looksLikeDataAnswer) && consecutiveStalls < 2 && iter < MAX_ITERATIONS - 1
+        if (shouldRetry) {
           consecutiveStalls++
           messages.push({ role: 'assistant', content: r.content })
           messages.push({
             role: 'user',
-            content: '[system] You promised an action but did not emit a <tool_use> block. Emit the tool call now in this same response. Do not narrate further.',
+            content: '[system] You answered without calling a tool. That data is INVENTED — it does not come from this store\'s database. You MUST call a tool to get real data. Emit the <tool_use> block now. Do not write any text before it.',
           })
           continue
         }
         consecutiveStalls = 0
-        const ui = parseUiBlocks(remainder || r.content)
+        const ui = parseUiBlocks(text)
         finalText = ui.remainder
         finalUiBlocks = ui.blocks
         break
