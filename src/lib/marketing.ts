@@ -157,12 +157,12 @@ export async function generateCouponForUser(params: {
          (code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount,
           usage_limit, usage_limit_per_user, valid_from, valid_until, is_active,
           auto_generated, generated_for_user_id, generated_for_campaign)
-       VALUES ($1, $2, 'percentage', $3, $4, $5, 1, 1, NOW(), $6, TRUE, TRUE, $7, $8)`,
+       VALUES ($1, $2, 'percentage', $3, $4, $5, NULL, 1, NOW(), $6, TRUE, TRUE, $7, $8)`,
       [
         code,
         `Auto-generated for ${params.campaignKind}`,
         params.discountPercent,
-        params.minPurchaseAmount ?? 0,
+        params.minPurchaseAmount ?? null,
         params.maxDiscountAmount ?? null,
         validUntil.toISOString(),
         params.userId,
