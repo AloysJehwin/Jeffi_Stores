@@ -37,9 +37,11 @@ export default function AdminShell({
   logoutForm,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false)
+  const [ready, setReady] = useState(false)
 
   useLayoutEffect(() => {
     if (localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true)
+    setReady(true)
   }, [])
 
   function toggle() {
@@ -57,6 +59,7 @@ export default function AdminShell({
         navLinks={desktopNavLinks}
         collapsed={collapsed}
         onToggle={toggle}
+        ready={ready}
       />
 
       {/* Right column: top bar + content */}
