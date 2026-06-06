@@ -17,6 +17,7 @@ function shouldShowFooter(pathname: string | null): boolean {
 export default function ConditionalLayout({ children, isFormsSubdomain, isDocumentSubdomain }: { children: React.ReactNode; isFormsSubdomain?: boolean; isDocumentSubdomain?: boolean }) {
   const pathname = usePathname()
   const isAdminPage = pathname?.startsWith('/admin')
+  const isBusinessAuthPage = pathname?.startsWith('/business/signin') || pathname?.startsWith('/business/signup') || pathname?.startsWith('/business/pending')
   const isFormsPage = isFormsSubdomain || pathname?.startsWith('/forms')
   const isDocumentPage = isDocumentSubdomain || pathname?.startsWith('/invoice/') || pathname?.startsWith('/quotation/') || pathname?.startsWith('/purchaseorder/')
 
@@ -28,6 +29,20 @@ export default function ConditionalLayout({ children, isFormsSubdomain, isDocume
             {children}
           </ConfirmProvider>
         </ToastProvider>
+      </ThemeProvider>
+    )
+  }
+
+  if (isBusinessAuthPage) {
+    return (
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <ConfirmProvider>
+              {children}
+            </ConfirmProvider>
+          </ToastProvider>
+        </AuthProvider>
       </ThemeProvider>
     )
   }
