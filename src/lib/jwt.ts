@@ -35,10 +35,22 @@ export interface UserJWTPayload {
 }
 
 export async function authenticateBusiness(request: NextRequest): Promise<UserJWTPayload | null> {
-  const payload = await authenticateUser(request)
-  if (!payload) return null
-  if (!payload.isBusiness) return null
-  return payload
+  const token = getTokenFromRequest(request, 'business_auth_token')
+  if (!token) return null
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+    if (!payload.userId || typeof payload.userId !== 'string') return null
+    if (!payload.isBusiness) return null
+    return {
+      userId: payload.userId as string,
+      email: payload.email as string,
+      isBusiness: true,
+      approvalStatus: payload.approvalStatus as string | undefined,
+      scopes: (payload.scopes as string[] | undefined) ?? [],
+    }
+  } catch {
+    return null
+  }
 }
 
 export interface AdminJWTPayload {
