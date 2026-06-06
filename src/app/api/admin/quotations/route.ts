@@ -25,14 +25,21 @@ function buildQuoteNumber(now: Date, seq: number): string {
 }
 
 const quotationItemSchema = z.object({
-  description: zNonEmpty,
-  quantity: z.number().min(0),
-  rate: z.number().min(0),
+  description: z.string().default(''),
+  quantity: z.coerce.number().min(0),
+  rate: z.coerce.number().min(0),
+  hsn_code: z.string().nullish(),
+  gst_rate: z.coerce.number().min(0).default(18),
+  unit: z.string().default('PCS'),
+  discount_pct: z.coerce.number().min(0).default(0),
+  product_id: z.string().uuid().nullish(),
+  variant_id: z.string().uuid().nullish(),
+  sub_variant_id: z.string().uuid().nullish(),
 })
 
 const createQuotationSchema = z.object({
   consignee_name: zNonEmpty,
-  consignee_email: zEmail.optional(),
+  consignee_email: zEmail.nullish(),
   items: z.array(quotationItemSchema).min(1),
 })
 
@@ -89,14 +96,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const parsed = parseBody(createQuotationSchema, body)
+    const parsed = parseBody(createQuotationSchema, body, 'POST /api/admin/quotations')
     if (!parsed.ok) return parsed.response
 
-    const { items = [], ...fields } = body
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'At least one item required' }, { status: 400 })
-    }
+    // Use validated items from parsed.data; merge raw body for non-validated fields (addresses, dates, etc.)
+    const { items } = parsed.data
+    const fields = { ...body, items: undefined }
 
     const computedItems = items.map((item: any) => ({
       ...item,
@@ -164,14 +169,14 @@ export async function POST(request: NextRequest) {
     for (let idx = 0; idx < computedItems.length; idx++) {
       const item = computedItems[idx]
       await query(
-        `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, rate, discount_pct, amount, product_id, variant_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           qt!.id, idx,
           item.description, item.hsn_code || null, Number(item.gst_rate) || 18,
           Number(item.quantity), item.unit || 'PCS', Number(item.rate),
           Number(item.discount_pct) || 0, item.amount,
-          item.product_id || null, item.variant_id || null,
+          item.product_id || null, item.variant_id || null, item.sub_variant_id || null,
         ]
       )
     }

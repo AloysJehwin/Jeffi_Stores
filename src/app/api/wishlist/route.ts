@@ -9,11 +9,11 @@ import { logActivity } from '@/lib/activity'
 import { parseBody, zUuid } from '@/lib/validate'
 
 const AddWishlistSchema = z.object({
-  productId: zUuid.optional(),
-  product_id: zUuid.optional(),
-  variantId: zUuid.optional(),
+  productId: zUuid.nullish(),
+  product_id: zUuid.nullish(),
+  variantId: zUuid.nullish(),
 }).refine(
-  (d) => d.productId !== undefined || d.product_id !== undefined,
+  (d) => d.productId != null || d.product_id != null,
   { message: 'productId is required' }
 )
 
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const parsedWishlist = parseBody(AddWishlistSchema, body)
     if (!parsedWishlist.ok) return parsedWishlist.response
-    const productId = body.product_id || body.productId
+    const productId = parsedWishlist.data.product_id || parsedWishlist.data.productId
 
     const userId = await resolveUserId(request)
 

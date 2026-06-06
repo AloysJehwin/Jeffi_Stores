@@ -6,24 +6,24 @@ import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/emai
 import { isInterState, calculateGST } from '@/lib/gst'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { resolveBuyNowItem, quoteShipping, validateCouponForUser, loadAddress } from '@/lib/order-commit'
-import { parseBody, zUuid, zPositiveInt, zNonEmpty } from '@/lib/validate'
+import { parseBody, zUuid } from '@/lib/validate'
 
 const DirectItemSchema = z.object({
   productId: zUuid,
-  variantId: zUuid.optional(),
-  subVariantId: zUuid.optional(),
-  qty: zPositiveInt,
-  buyMode: z.string().optional(),
-  buyUnit: z.string().optional(),
+  variantId: zUuid.nullish(),
+  subVariantId: zUuid.nullish(),
+  qty: z.number().positive(),
+  buyMode: z.string().nullish(),
+  buyUnit: z.string().nullish(),
 })
 
 const CreateDirectOrderSchema = z.object({
-  paymentMethod: zNonEmpty,
+  paymentMethod: z.enum(['razorpay', 'manual']),
   item: DirectItemSchema,
   shippingAddress: z.any().optional(),
-  notes: z.string().optional(),
-  couponId: z.string().optional(),
-  addressId: z.string().optional(),
+  notes: z.string().nullish(),
+  couponId: z.string().nullish(),
+  addressId: z.string().nullish(),
 })
 
 
@@ -49,9 +49,6 @@ export async function POST(request: NextRequest) {
     const { shippingAddress, notes, paymentMethod, couponId, item, addressId } = parsed.data
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = false
-    if (paymentMethod !== 'razorpay') {
-      return NextResponse.json({ error: 'Only Razorpay payment is supported' }, { status: 400 })
-    }
 
     if (!item || !item.productId || !item.qty) {
       return NextResponse.json({ error: 'Item details are required' }, { status: 400 })
@@ -75,11 +72,11 @@ export async function POST(request: NextRequest) {
 
     const resolved = await resolveBuyNowItem({
       productId: String(item.productId),
-      variantId: item.variantId || null,
-      subVariantId: item.subVariantId || null,
+      variantId: item.variantId ?? null,
+      subVariantId: item.subVariantId ?? null,
       qty: Number(item.qty),
-      buyMode: item.buyMode,
-      buyUnit: item.buyUnit,
+      buyMode: item.buyMode ?? undefined,
+      buyUnit: item.buyUnit ?? null,
     })
     if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { isInterState, calculateGST } from '@/lib/gst'
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +21,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     )
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
 
-    const items = await queryOne<any>(`SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at ASC`, [params.id])
+    const items = await queryMany<any>(`
+      SELECT oi.*,
+        COALESCE(sv.inventory_quantity, pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
+      FROM order_items oi
+      LEFT JOIN product_sub_variants sv ON sv.id = oi.sub_variant_id
+      LEFT JOIN product_variants pv ON pv.id = oi.variant_id
+      LEFT JOIN products p ON p.id = oi.product_id AND oi.variant_id IS NULL AND oi.sub_variant_id IS NULL
+      WHERE oi.order_id = $1
+      ORDER BY oi.created_at ASC
+    `, [params.id])
 
     return NextResponse.json({ order, items })
   } catch (err: any) {

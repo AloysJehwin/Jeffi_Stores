@@ -90,6 +90,7 @@ function LoginPage() {
       const response = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, isSignup: false }),
       })
       const data = await response.json()
@@ -154,6 +155,7 @@ function LoginPage() {
       const response = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, isSignup: false }),
       })
       const data = await response.json()

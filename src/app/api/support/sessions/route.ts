@@ -4,11 +4,10 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { sendSupportEscalationEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
 import { z } from 'zod'
-import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
+import { parseBody, zUuid } from '@/lib/validate'
 
 const postSchema = z.object({
-  message: zNonEmpty.max(2000),
-  productId: zUuid.optional(),
+  productId: zUuid.nullish(),
 })
 
 export async function GET(request: NextRequest) {
@@ -39,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const raw = await request.json().catch(() => ({}))
-    const parsed = parseBody(postSchema, raw)
+    const parsed = parseBody(postSchema, raw, 'POST /api/support/sessions')
     if (!parsed.ok) return parsed.response
 
     const existing = await queryOne(

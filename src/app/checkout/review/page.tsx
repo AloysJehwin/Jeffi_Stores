@@ -82,7 +82,7 @@ function CheckoutReviewPage() {
   } | null>(null)
 
   useEffect(() => {
-    fetch('/api/store-settings').then(r => r.json()).then(d => {
+    fetch('/api/store-settings', { credentials: 'include' }).then(r => r.json()).then(d => {
       if (typeof d.minOrderAmount === 'number') setMinOrderAmount(d.minOrderAmount)
     }).catch(() => {})
   }, [])
@@ -139,7 +139,7 @@ function CheckoutReviewPage() {
             imageUrl: null,
           })
           const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
-          fetch(imageUrl)
+          fetch(imageUrl, { credentials: 'include' })
             .then(r => r.json())
             .then(data => {
               setBuyNowItem(prev => prev ? { ...prev, imageUrl: data.imageUrl || null } : prev)
@@ -180,7 +180,7 @@ function CheckoutReviewPage() {
         imageUrl: null,
       })
 
-      fetch(`/api/products/${productId}/primary-image`)
+      fetch(`/api/products/${productId}/primary-image`, { credentials: 'include' })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (data?.imageUrl) {
@@ -195,7 +195,7 @@ function CheckoutReviewPage() {
 
   const fetchAddresses = async () => {
     try {
-      const response = await fetch('/api/user/addresses')
+      const response = await fetch('/api/user/addresses', { credentials: 'include' })
       if (response.ok) {
         const data = await response.json()
         setAddresses(data.addresses || [])

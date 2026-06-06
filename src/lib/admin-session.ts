@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { generateToken } from '@/lib/jwt'
+import { generateToken, JWT_MAX_AGE_S } from '@/lib/jwt'
 
 export interface AdminSessionAdmin {
   id: string
@@ -33,7 +33,7 @@ export async function issueAdminSession(
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 8 * 60 * 60,
+    maxAge: JWT_MAX_AGE_S,
     path: '/',
   })
   return response

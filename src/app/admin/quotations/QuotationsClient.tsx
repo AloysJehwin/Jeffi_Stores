@@ -243,7 +243,7 @@ export default function QuotationsClient() {
           unit_price: unitPrice,
           discount_pct: discPct,
           mrp,
-          inventory_quantity: null,
+          inventory_quantity: i.inventory_quantity ?? null,
         }
       })
       setItems(loadedItems.length ? loadedItems : [newLineItem()])
@@ -327,6 +327,7 @@ export default function QuotationsClient() {
             amount: (Number(i.quantity) || 0) * rateExGst,
             product_id: i.product_id || null,
             variant_id: i.variant_id || null,
+            sub_variant_id: i.sub_variant_id || null,
           }
         }),
         ...(newStatus ? { status: newStatus } : {}),

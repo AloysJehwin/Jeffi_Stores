@@ -4,15 +4,19 @@ import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, query } from '@/lib/db'
 import { buildSearchClause } from '@/lib/search'
 import { z } from 'zod'
-import { parseBody, zUuid, zPositiveInt, zCurrency } from '@/lib/validate'
+import { parseBody, zUuid, zCurrency } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
 const poItemSchema = z.object({
   product_id: zUuid,
-  variant_id: zUuid.optional(),
-  quantity: zPositiveInt,
+  variant_id: zUuid.nullish(),
+  sub_variant_id: zUuid.nullish(),
+  quantity: z.coerce.number().positive(),
   unit_cost: zCurrency,
+  tax_rate: z.coerce.number().min(0).default(0),
+  product_name: z.string().nullish(),
+  sku: z.string().nullish(),
 })
 
 const createPOSchema = z.object({
@@ -87,15 +91,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const parsed = parseBody(createPOSchema, body)
+    const parsed = parseBody(createPOSchema, body, 'POST /api/admin/inventory/po')
     if (!parsed.ok) return parsed.response
 
-    const { supplier_id, order_date, expected_date, notes, status = 'draft', items } = body
+    const { supplier_id, items } = parsed.data
+    const { order_date, expected_date, notes, status = 'draft' } = body
 
     if (!supplier_id) return NextResponse.json({ error: 'supplier_id is required' }, { status: 400 })
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: 'items array is required' }, { status: 400 })
-    }
 
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const countRow = await queryOne<{ cnt: number }>(
@@ -108,9 +110,9 @@ export async function POST(request: NextRequest) {
     let subtotal = 0
     let taxAmount = 0
     for (const item of items) {
-      const qty = parseFloat(item.quantity) || 0
-      const cost = parseFloat(item.unit_cost) || 0
-      const tax = parseFloat(item.tax_rate) || 0
+      const qty = item.quantity
+      const cost = item.unit_cost
+      const tax = item.tax_rate ?? 0
       subtotal += qty * cost
       taxAmount += qty * cost * (tax / 100)
     }
@@ -128,9 +130,9 @@ export async function POST(request: NextRequest) {
     )
 
     for (const item of items) {
-      const qty = parseFloat(item.quantity) || 0
-      const cost = parseFloat(item.unit_cost) || 0
-      const tax = parseFloat(item.tax_rate) || 0
+      const qty = item.quantity
+      const cost = item.unit_cost
+      const tax = item.tax_rate ?? 0
       const total = Math.round(qty * cost * (1 + tax / 100) * 100) / 100
       await query(
         `INSERT INTO purchase_order_items (po_id, product_id, variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost)

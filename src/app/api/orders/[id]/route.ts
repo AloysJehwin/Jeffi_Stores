@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
@@ -8,6 +9,12 @@ import { logStockMovement } from '@/lib/inventory'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { attributeConversion } from '@/lib/marketing'
+import { parseBody } from '@/lib/validate'
+
+const OrderPatchSchema = z.object({
+  status: z.string().nullish(),
+  payment_status: z.string().nullish(),
+})
 
 export async function GET(
   request: NextRequest,
@@ -143,7 +150,9 @@ export async function PATCH(
 
     const orderId = params.id
     const body = await request.json()
-    const { status, payment_status } = body
+    const parsed = parseBody(OrderPatchSchema, body)
+    if (!parsed.ok) return parsed.response
+    const { status, payment_status } = parsed.data
 
     const currentOrder = await queryOne(`
       SELECT

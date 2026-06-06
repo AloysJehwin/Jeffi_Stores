@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const certStatus = isAdminSubdomain ? 'valid' : (isLocalhost ? 'development' : 'missing')
 
     if (!token) {
-      const res = NextResponse.json({ authenticated: false })
+      const res = NextResponse.json({ authenticated: false, expiresAt: null })
       res.headers.set('x-cert-status', certStatus)
       return res
     }
@@ -22,15 +22,18 @@ export async function GET(request: NextRequest) {
     const payload = await verifyToken(token.value)
 
     if (!payload) {
-      const res = NextResponse.json({ authenticated: false })
+      const res = NextResponse.json({ authenticated: false, expiresAt: null })
       res.headers.set('x-cert-status', certStatus)
       return res
     }
 
-    const res = NextResponse.json({ authenticated: true, user: payload })
+    // exp is seconds since epoch (JWT standard)
+    const expiresAt = typeof payload.exp === 'number' ? payload.exp * 1000 : null
+    const res = NextResponse.json({ authenticated: true, expiresAt, user: payload })
     res.headers.set('x-cert-status', certStatus)
     return res
   } catch (error) {
-    return NextResponse.json({ authenticated: false })
+    return NextResponse.json({ authenticated: false, expiresAt: null })
   }
 }
+
