@@ -37,10 +37,22 @@ export async function POST(
     const body = await request.json().catch(() => ({}))
     const paymentMode: string = body.paymentMode || 'cash'
 
-    const buyerState = quotation.buyer_same ? quotation.consignee_state : (quotation.buyer_state || quotation.consignee_state)
-    const buyerGstin = quotation.buyer_same ? quotation.consignee_gstin : (quotation.buyer_gstin || quotation.consignee_gstin)
+    const isBuyerSame = quotation.buyer_same !== false
+    const buyerState = isBuyerSame ? quotation.consignee_state : (quotation.buyer_state || quotation.consignee_state)
+    const buyerGstin = isBuyerSame ? quotation.consignee_gstin : (quotation.buyer_gstin || quotation.consignee_gstin)
     const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
     const orderIsIgst = buyerGstin ? isInterState(buyerState || '', sellerStateCode) : false
+
+    // When buyer_same=false the invoice is billed to the buyer, so use buyer contact details
+    const customerName = isBuyerSame
+      ? (quotation.consignee_name || '')
+      : (quotation.buyer_name || quotation.consignee_name || '')
+    const customerPhone = isBuyerSame
+      ? (quotation.consignee_phone || quotation.buyer_phone || null)
+      : (quotation.buyer_phone || quotation.consignee_phone || null)
+    const customerEmail = isBuyerSame
+      ? (quotation.consignee_email || quotation.buyer_email || null)
+      : (quotation.buyer_email || quotation.consignee_email || null)
 
     let subtotal = 0
     let totalTaxable = 0
@@ -166,9 +178,9 @@ export async function POST(
           'OFF-' + Date.now(),
           saveAsDraft ? 'draft' : 'delivered',
           isPaid ? 'paid' : 'unpaid',
-          quotation.consignee_name,
-          quotation.consignee_phone || quotation.buyer_phone || null,
-          quotation.consignee_email || quotation.buyer_email || null,
+          customerName,
+          customerPhone,
+          customerEmail,
           buyerGstin || null,
           orderIsIgst,
           addressId,
@@ -276,12 +288,11 @@ export async function POST(
     })
 
     if (!result.saveAsDraft && result.invoice_number) {
-      const customerEmail = quotation.consignee_email || quotation.buyer_email || null
       if (customerEmail) {
         const invoiceViewUrl = `https://invoice.jeffistores.in/invoice/${result.id}`
         sendInvoiceFinalizedEmail(
           customerEmail,
-          quotation.consignee_name || '',
+          customerName,
           result.invoice_number,
           totalAmount,
           result.order_number,
