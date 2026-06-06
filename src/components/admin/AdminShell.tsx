@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useLayoutEffect } from 'react'
 import AdminSidebarNav from './AdminSidebarNav'
 import AdminMobileNav from './AdminMobileNav'
 import AdminAgentTrigger from './AdminAgentTrigger'
@@ -36,10 +36,11 @@ export default function AdminShell({
   canUseAgent,
   logoutForm,
 }: Props) {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem(STORAGE_KEY) === 'true'
-  })
+  const [collapsed, setCollapsed] = useState(false)
+
+  useLayoutEffect(() => {
+    if (localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true)
+  }, [])
 
   function toggle() {
     setCollapsed(c => {
