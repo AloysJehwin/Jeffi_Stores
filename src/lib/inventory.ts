@@ -16,14 +16,17 @@ export async function logStockMovement(
     referenceType: ReferenceType
     referenceId: string
     notes?: string
+    currentStock?: number
   }
 ) {
   const { productId, variantId, subVariantId, transactionType, quantityChange, referenceType, referenceId, notes } = params
 
   let currentStockRaw: number
-  if (subVariantId) {
+  if (params.currentStock !== undefined) {
+    currentStockRaw = params.currentStock
+  } else if (subVariantId) {
     const row = await queryOne<{ stock_quantity: number }>(
-      'SELECT stock_quantity FROM product_sub_variants WHERE id = $1', [subVariantId])
+      'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1', [subVariantId])
     currentStockRaw = parseFloat(row?.stock_quantity as any) || 0
   } else if (variantId) {
     const row = await queryOne<{ inventory_quantity: number }>(
@@ -39,10 +42,10 @@ export async function logStockMovement(
   const quantityAfter = Math.round(currentStockRaw + quantityChange)
 
   const sql = `INSERT INTO inventory_transactions
-    (product_id, variant_id, transaction_type, quantity_change, quantity_after,
+    (product_id, variant_id, sub_variant_id, transaction_type, quantity_change, quantity_after,
      reference_type, reference_id, notes)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`
-  const values = [productId, variantId, transactionType, qtyChange, quantityAfter,
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`
+  const values = [productId, variantId, subVariantId || null, transactionType, qtyChange, quantityAfter,
     referenceType, referenceId, notes || null]
 
   if (client) {
@@ -145,10 +148,22 @@ export async function getStockLedger(filters: {
       p.cost_price AS product_cost_price,
       pv.id AS variant_id,
       pv.variant_name,
-      pv.cost_price AS variant_cost_price
+      pv.cost_price AS variant_cost_price,
+      sv.id AS sub_variant_id,
+      sv.sub_variant_name,
+      CASE
+        WHEN it.reference_type = 'order'     THEN o.invoice_number
+        WHEN it.reference_type = 'cash_sale' THEN cs.invoice_number
+        WHEN it.reference_type = 'grn'       THEN g.grn_number
+        ELSE NULL
+      END AS reference_label
     FROM inventory_transactions it
     JOIN products p ON p.id = it.product_id
     LEFT JOIN product_variants pv ON pv.id = it.variant_id
+    LEFT JOIN product_sub_variants sv ON sv.id = it.sub_variant_id
+    LEFT JOIN orders o  ON it.reference_type = 'order'     AND o.id  = it.reference_id
+    LEFT JOIN cash_sales cs ON it.reference_type = 'cash_sale' AND cs.id = it.reference_id
+    LEFT JOIN grns g    ON it.reference_type = 'grn'       AND g.id  = it.reference_id
     WHERE ${where}
     ORDER BY it.created_at DESC
     LIMIT $${i} OFFSET $${i + 1}
