@@ -32,7 +32,7 @@ const client = new pg.Client({
   user:     'postgres',
   password: RDS_MASTER_PASSWORD,
   database: 'jeffi_stores',
-  ssl:      false,
+  ssl:      { rejectUnauthorized: false },
 })
 
 const migrationsDir = path.resolve(__dirname, 'migrations')
