@@ -39,6 +39,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
   const usersOffset = (usersPage - 1) * USERS_PAGE_SIZE
 
   const isPersonal = coupon.auto_generated && coupon.generated_for_user_id
+  const isCampaign = coupon.auto_generated && !!coupon.generated_for_campaign && !coupon.generated_for_user_id
 
   const [eligibleUsers, usersTotal] = isPersonal
     ? [
@@ -50,6 +51,23 @@ export default async function EditCouponPage({ params, searchParams }: { params:
         ),
         1,
       ]
+    : isCampaign
+    ? await Promise.all([
+        queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
+          `SELECT u.id, u.email, u.first_name, u.last_name,
+             COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
+           FROM email_campaigns_sent ecs
+           JOIN users u ON u.id = ecs.user_id
+           WHERE ecs.campaign_kind = $2
+           ORDER BY ecs.sent_at DESC
+           LIMIT $3 OFFSET $4`,
+          [coupon.id, coupon.generated_for_campaign, USERS_PAGE_SIZE, usersOffset]
+        ),
+        queryCount(
+          `SELECT COUNT(DISTINCT user_id) FROM email_campaigns_sent WHERE campaign_kind = $1`,
+          [coupon.generated_for_campaign]
+        ),
+      ])
     : await Promise.all([
         queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
           `SELECT u.id, u.email, u.first_name, u.last_name,
@@ -131,6 +149,8 @@ export default async function EditCouponPage({ params, searchParams }: { params:
             <p className="text-xs text-foreground-muted mt-0.5">
               {isPersonal
                 ? 'This coupon is personal — only the user below can redeem it'
+                : isCampaign
+                ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} received this campaign — only they have this code`
                 : `All ${usersTotal} active users can redeem this coupon`}
             </p>
           </div>
@@ -175,7 +195,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
             </tbody>
           </table>
         </div>
-        {!isPersonal && (
+        {!isPersonal && usersTotal > USERS_PAGE_SIZE && (
           <div className="border-t border-border-default px-4 py-2">
             <Pagination
               page={usersPage}
