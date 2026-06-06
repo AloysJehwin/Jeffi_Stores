@@ -77,8 +77,10 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
       throw new AiClientError(`Ollama HTTP ${res.status}: ${body}`, 'ollama')
     }
     const data = await res.json()
-    const content = data?.message?.content
+    let content = data?.message?.content
     if (typeof content !== 'string') throw new AiClientError('Ollama response missing message.content', 'ollama')
+    // Strip <think>...</think> reasoning blocks emitted by Qwen3 and similar models
+    content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trimStart()
     return { content, model }
   } finally {
     clearTimeout(t)
