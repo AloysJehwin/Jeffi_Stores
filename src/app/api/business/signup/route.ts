@@ -29,12 +29,12 @@ export async function POST(request: NextRequest) {
     }
 
     const existingUser = await queryOne<{ id: string }>(
-      'SELECT id FROM users WHERE email = $1',
+      "SELECT id FROM users WHERE email = $1 AND user_type = 'business'",
       [email.toLowerCase()]
     )
     if (existingUser) {
       await deleteOTP(email)
-      return NextResponse.json({ error: 'Email already registered' }, { status: 400 })
+      return NextResponse.json({ error: 'A business account with this email already exists' }, { status: 400 })
     }
 
     const newUser = await queryOne<any>(

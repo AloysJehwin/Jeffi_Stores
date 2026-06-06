@@ -6,7 +6,7 @@ import { queryOne } from '@/lib/db'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, isSignup } = body
+    const { email, isSignup, userType } = body
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
@@ -30,12 +30,14 @@ export async function POST(request: NextRequest) {
 
     if (isSignup) {
       const existingUser = await queryOne(
-        'SELECT id FROM users WHERE email = $1',
+        userType === 'business'
+          ? "SELECT id FROM users WHERE email = $1 AND user_type = 'business'"
+          : 'SELECT id FROM users WHERE email = $1',
         [email.toLowerCase()]
       )
 
       if (existingUser) {
-        return NextResponse.json({ error: 'Email already registered' }, { status: 400 })
+        return NextResponse.json({ error: 'Email already registered', userExists: true }, { status: 400 })
       }
     } else {
       const existingUser = await queryOne(
