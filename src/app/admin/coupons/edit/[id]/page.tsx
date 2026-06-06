@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, queryMany } from '@/lib/db'
 import Link from 'next/link'
 import CouponForm from '../../CouponForm'
 
@@ -19,6 +19,9 @@ interface Coupon {
   valid_from: string | null
   valid_until: string | null
   is_active: boolean
+  auto_generated: boolean
+  generated_for_user_id: string | null
+  generated_for_campaign: string | null
 }
 
 function toDatetimeLocal(val: string | null) {
@@ -29,6 +32,23 @@ function toDatetimeLocal(val: string | null) {
 export default async function EditCouponPage({ params }: { params: { id: string } }) {
   const coupon = await queryOne<Coupon>('SELECT * FROM coupons WHERE id = $1', [params.id])
   if (!coupon) notFound()
+
+  // For auto-generated: fetch the specific user. For manual: fetch all users (eligible = everyone).
+  const eligibleUsers = coupon.auto_generated && coupon.generated_for_user_id
+    ? await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
+        `SELECT u.id, u.email, u.first_name, u.last_name,
+           COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
+         FROM users u WHERE u.id = $2`,
+        [coupon.id, coupon.generated_for_user_id]
+      )
+    : await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
+        `SELECT u.id, u.email, u.first_name, u.last_name,
+           COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
+         FROM users u
+         WHERE u.is_active = TRUE AND u.email IS NOT NULL
+         ORDER BY u.first_name ASC`,
+        [coupon.id]
+      )
 
   async function updateCoupon(formData: FormData) {
     'use server'
@@ -86,6 +106,60 @@ export default async function EditCouponPage({ params }: { params: { id: string 
           is_active: coupon.is_active,
         }}
       />
+
+      {/* Eligible Users */}
+      <div className="mt-8 bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Eligible Users</h2>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              {coupon.auto_generated
+                ? 'This coupon is personal — only the user below can redeem it'
+                : `All ${eligibleUsers.length} active users can redeem this coupon`}
+            </p>
+          </div>
+          {!coupon.auto_generated && (
+            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+              All Users
+            </span>
+          )}
+          {coupon.generated_for_campaign && (
+            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+              {coupon.generated_for_campaign}
+            </span>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-secondary">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">User</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Email</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Redeemed</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-default">
+              {eligibleUsers.map(u => (
+                <tr key={u.id} className="hover:bg-surface-secondary/50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-foreground">
+                    {u.first_name || u.last_name ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-foreground-secondary">{u.email}</td>
+                  <td className="px-4 py-3">
+                    {u.times_used > 0
+                      ? <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">{u.times_used}x used</span>
+                      : <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-surface-secondary text-foreground-muted">Not used</span>
+                    }
+                  </td>
+                </tr>
+              ))}
+              {eligibleUsers.length === 0 && (
+                <tr><td colSpan={3} className="px-4 py-6 text-center text-foreground-muted text-sm">No users found</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
