@@ -1,8 +1,9 @@
 import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, queryMany, queryCount } from '@/lib/db'
 import Link from 'next/link'
 import CouponForm from '../../CouponForm'
+import Pagination from '@/components/admin/Pagination'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,9 @@ interface Coupon {
   valid_from: string | null
   valid_until: string | null
   is_active: boolean
+  auto_generated: boolean
+  generated_for_user_id: string | null
+  generated_for_campaign: string | null
 }
 
 function toDatetimeLocal(val: string | null) {
@@ -26,9 +30,59 @@ function toDatetimeLocal(val: string | null) {
   return new Date(val).toISOString().slice(0, 16)
 }
 
-export default async function EditCouponPage({ params }: { params: { id: string } }) {
+export default async function EditCouponPage({ params, searchParams }: { params: { id: string }; searchParams: { [key: string]: string | undefined } }) {
   const coupon = await queryOne<Coupon>('SELECT * FROM coupons WHERE id = $1', [params.id])
   if (!coupon) notFound()
+
+  const USERS_PAGE_SIZE = 10
+  const usersPage = Math.max(1, parseInt(searchParams.usersPage || '1', 10))
+  const usersOffset = (usersPage - 1) * USERS_PAGE_SIZE
+
+  const isPersonal = coupon.auto_generated && coupon.generated_for_user_id
+  const isCampaign = coupon.auto_generated && !!coupon.generated_for_campaign && !coupon.generated_for_user_id
+
+  const [eligibleUsers, usersTotal] = isPersonal
+    ? [
+        await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
+          `SELECT u.id, u.email, u.first_name, u.last_name,
+             COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
+           FROM users u WHERE u.id = $2`,
+          [coupon.id, coupon.generated_for_user_id]
+        ),
+        1,
+      ]
+    : isCampaign
+    ? await Promise.all([
+        queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
+          `SELECT u.id, u.email, u.first_name, u.last_name,
+             COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
+           FROM email_campaigns_sent ecs
+           JOIN users u ON u.id = ecs.user_id
+           WHERE ecs.campaign_kind = $2
+           ORDER BY ecs.sent_at DESC
+           LIMIT $3 OFFSET $4`,
+          [coupon.id, coupon.generated_for_campaign, USERS_PAGE_SIZE, usersOffset]
+        ),
+        queryCount(
+          `SELECT COUNT(DISTINCT user_id) FROM email_campaigns_sent WHERE campaign_kind = $1`,
+          [coupon.generated_for_campaign]
+        ),
+      ])
+    : await Promise.all([
+        queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
+          `SELECT u.id, u.email, u.first_name, u.last_name,
+             COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
+           FROM users u
+           WHERE u.is_active = TRUE AND u.is_guest = FALSE AND u.email IS NOT NULL
+           ORDER BY u.first_name ASC
+           LIMIT $2 OFFSET $3`,
+          [coupon.id, USERS_PAGE_SIZE, usersOffset]
+        ),
+        queryCount(
+          `SELECT COUNT(*) FROM users WHERE is_active = TRUE AND is_guest = FALSE AND email IS NOT NULL`,
+          []
+        ),
+      ])
 
   async function updateCoupon(formData: FormData) {
     'use server'
@@ -86,6 +140,76 @@ export default async function EditCouponPage({ params }: { params: { id: string 
           is_active: coupon.is_active,
         }}
       />
+
+      {/* Eligible Users */}
+      <div className="mt-8 bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Eligible Users</h2>
+            <p className="text-xs text-foreground-muted mt-0.5">
+              {isPersonal
+                ? 'This coupon is personal — only the user below can redeem it'
+                : isCampaign
+                ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} received this campaign — only they have this code`
+                : `All ${usersTotal} active users can redeem this coupon`}
+            </p>
+          </div>
+          {!coupon.auto_generated && (
+            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+              All Users
+            </span>
+          )}
+          {coupon.generated_for_campaign && (
+            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+              {coupon.generated_for_campaign}
+            </span>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-secondary">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">User</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Email</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Redeemed</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-default">
+              {eligibleUsers.map(u => (
+                <tr key={u.id} className="hover:bg-surface-secondary/50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-foreground">
+                    {u.first_name || u.last_name ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-foreground-secondary">{u.email}</td>
+                  <td className="px-4 py-3">
+                    {u.times_used > 0
+                      ? <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">{u.times_used}x used</span>
+                      : <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-surface-secondary text-foreground-muted">Not used</span>
+                    }
+                  </td>
+                </tr>
+              ))}
+              {eligibleUsers.length === 0 && (
+                <tr><td colSpan={3} className="px-4 py-6 text-center text-foreground-muted text-sm">No users found</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {!isPersonal && usersTotal > USERS_PAGE_SIZE && (
+          <div className="border-t border-border-default px-4 py-2">
+            <Pagination
+              page={usersPage}
+              total={usersTotal}
+              pageSize={USERS_PAGE_SIZE}
+              buildUrl={(p) => {
+                const sp = new URLSearchParams()
+                if (p > 1) sp.set('usersPage', String(p))
+                return `/admin/coupons/edit/${params.id}${sp.toString() ? `?${sp.toString()}` : ''}`
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

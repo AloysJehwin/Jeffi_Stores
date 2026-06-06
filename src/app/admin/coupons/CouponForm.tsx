@@ -5,6 +5,7 @@ import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import Toggle from '@/components/ui/Toggle'
 import DateTimePicker from '@/components/ui/DateTimePicker'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 interface CouponFormProps {
   action: (formData: FormData) => Promise<void>
@@ -36,6 +37,7 @@ export default function CouponForm({ action, submitLabel, defaultValues: d = {} 
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
   const [validFrom, setValidFrom] = useState(d.valid_from ?? '')
   const [validUntil, setValidUntil] = useState(d.valid_until ?? '')
+  const [couponDescription, setCouponDescription] = useState(d.description ?? '')
 
   return (
     <form action={action} className="space-y-5">
@@ -135,13 +137,22 @@ export default function CouponForm({ action, submitLabel, defaultValues: d = {} 
 
           <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-3">
             <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Description</h2>
-            <textarea
-              name="description"
-              rows={3}
-              defaultValue={d.description ?? ''}
-              className={inputClass}
-              placeholder="e.g. 10% off for Google review submission"
-            />
+            <AIEnrichButton
+              fieldLabel="Coupon Description"
+              value={couponDescription}
+              onChange={setCouponDescription}
+              context={`Coupon code: ${d.code ?? 'new coupon'}`}
+              multiline
+            >
+              <textarea
+                name="description"
+                rows={3}
+                value={couponDescription}
+                onChange={e => setCouponDescription(e.target.value)}
+                className={`${inputClass} pr-8`}
+                placeholder="e.g. 10% off for Google review submission"
+              />
+            </AIEnrichButton>
           </div>
         </div>
 

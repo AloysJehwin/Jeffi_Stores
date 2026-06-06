@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     ` : null
 
     const unionQuery = [orderQuery, csQuery].filter(Boolean).join('\nUNION ALL\n')
-    const fullQuery = `SELECT * FROM (${unionQuery}) combined ORDER BY invoice_date DESC NULLS LAST, created_at DESC`
+    const fullQuery = `SELECT * FROM (${unionQuery}) combined ORDER BY invoice_number DESC NULLS LAST`
 
     const [rows, countRow] = await Promise.all([
       queryMany(`${fullQuery} LIMIT $${i} OFFSET $${i + 1}`, [...params, limit, offset]),

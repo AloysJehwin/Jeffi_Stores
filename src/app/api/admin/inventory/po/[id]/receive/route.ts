@@ -16,6 +16,7 @@ const postSchema = z.object({
         po_item_id: zUuid,
         product_id: zUuid,
         variant_id: zUuid.nullish(),
+        sub_variant_id: zUuid.nullish(),
         quantity_received: z.coerce.number().positive(),
         unit_cost: z.coerce.number().min(0),
       })
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         const poItemId = item.po_item_id
         const productId = item.product_id
         const variantId = item.variant_id || null
+        const subVariantId = item.sub_variant_id || null
 
         await client.query(
           `INSERT INTO grn_items (grn_id, po_item_id, product_id, variant_id, quantity_received, unit_cost)
@@ -93,12 +95,33 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
         await updateWeightedAvgCost(client, { productId, variantId, qtyReceived, unitCost })
 
-        if (variantId) {
+        let stockBefore = 0
+        if (subVariantId) {
+          const row = await client.query<{ inventory_quantity: string }>(
+            `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+            [subVariantId]
+          )
+          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+          await client.query(
+            `UPDATE product_sub_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
+            [qtyReceived, subVariantId]
+          )
+        } else if (variantId) {
+          const row = await client.query<{ inventory_quantity: string }>(
+            `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+            [variantId]
+          )
+          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
           await client.query(
             `UPDATE product_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
             [qtyReceived, variantId]
           )
         } else {
+          const row = await client.query<{ inventory_quantity: string }>(
+            `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
+            [productId]
+          )
+          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
           await client.query(
             `UPDATE products SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
             [qtyReceived, productId]
@@ -108,10 +131,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         await logStockMovement(client, {
           productId,
           variantId,
+          subVariantId,
           transactionType: 'purchase',
           quantityChange: qtyReceived,
           referenceType: 'grn',
           referenceId: grnId,
+          currentStock: stockBefore,
         })
 
         await client.query(

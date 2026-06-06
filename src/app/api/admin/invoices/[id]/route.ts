@@ -104,11 +104,11 @@ export async function PATCH(
         if (extraQty <= 0) continue
 
         if (item.sub_variant_id) {
-          const inv = await client.query<{ stock_quantity: string }>(
-            `SELECT stock_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+          const inv = await client.query<{ inventory_quantity: string }>(
+            `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
             [item.sub_variant_id]
           )
-          const stock = parseFloat(inv.rows[0]?.stock_quantity ?? '0') || 0
+          const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
           if (stock < extraQty) {
             insufficientItems.push(
               `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, extra needed: ${extraQty})`
@@ -203,17 +203,33 @@ export async function PATCH(
           const extraQty = item.quantity - previousQty
           if (extraQty <= 0) continue
 
+          let stockBefore = 0
           if (item.sub_variant_id) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+              [item.sub_variant_id]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
-              `UPDATE product_sub_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2`,
+              `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
               [extraQty, item.sub_variant_id]
             )
           } else if (item.variant_id) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+              [item.variant_id]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
               `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
               [extraQty, item.variant_id]
             )
           } else {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
+              [item.product_id]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
               `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
               [extraQty, item.product_id]
@@ -227,6 +243,7 @@ export async function PATCH(
             quantityChange: -extraQty,
             referenceType: 'order',
             referenceId: params.id,
+            currentStock: stockBefore,
           })
         }
       }

@@ -123,52 +123,57 @@ export async function recordSent(params: {
   }
 }
 
-export async function generateCouponForUser(params: {
-  userId: string
+export async function generateCouponForCampaign(params: {
   campaignKind: CampaignKind
   discountPercent: number
   expiresInDays: number
   minPurchaseAmount?: number
   maxDiscountAmount?: number
 }): Promise<string | null> {
-  const existing = await queryOne<{ code: string; valid_until: string | null; is_active: boolean; times_used: number }>(
-    `SELECT code, valid_until, is_active, times_used
-     FROM coupons
+  // Reuse an existing active campaign-level coupon if one exists
+  const existing = await queryOne<{ id: string; code: string }>(
+    `SELECT id, code FROM coupons
      WHERE auto_generated = TRUE
-       AND generated_for_user_id = $1
-       AND generated_for_campaign = $2
+       AND generated_for_campaign = $1
+       AND generated_for_user_id IS NULL
        AND is_active = TRUE
-       AND times_used = 0
        AND (valid_until IS NULL OR valid_until > NOW())
      ORDER BY created_at DESC LIMIT 1`,
-    [params.userId, params.campaignKind]
+    [params.campaignKind]
   )
-  if (existing) return existing.code
+  if (existing) {
+    // Ensure campaigns.coupon_id is set even if it was cleared
+    await query(`UPDATE campaigns SET coupon_id = $1 WHERE kind = $2 AND (coupon_id IS NULL OR coupon_id != $1)`, [existing.id, params.campaignKind])
+    return existing.code
+  }
 
   const prefix = params.campaignKind.startsWith('winback') ? 'BACK' : 'OFFER'
   const random = Math.random().toString(36).slice(2, 8).toUpperCase()
   const code = `${prefix}-${random}`
-
   const validUntil = new Date(Date.now() + params.expiresInDays * 86400000)
 
   try {
-    await query(
+    const result = await query<{ id: string }>(
       `INSERT INTO coupons
          (code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount,
           usage_limit, usage_limit_per_user, valid_from, valid_until, is_active,
           auto_generated, generated_for_user_id, generated_for_campaign)
-       VALUES ($1, $2, 'percentage', $3, $4, $5, 1, 1, NOW(), $6, TRUE, TRUE, $7, $8)`,
+       VALUES ($1, $2, 'percentage', $3, $4, $5, 500, 1, NOW(), $6, TRUE, TRUE, NULL, $7)
+       RETURNING id`,
       [
         code,
         `Auto-generated for ${params.campaignKind}`,
         params.discountPercent,
-        params.minPurchaseAmount ?? 0,
+        params.minPurchaseAmount ?? 100,
         params.maxDiscountAmount ?? null,
         validUntil.toISOString(),
-        params.userId,
         params.campaignKind,
       ]
     )
+    const couponId = result.rows[0]?.id
+    if (couponId) {
+      await query(`UPDATE campaigns SET coupon_id = $1 WHERE kind = $2`, [couponId, params.campaignKind])
+    }
     return code
   } catch {
     return null

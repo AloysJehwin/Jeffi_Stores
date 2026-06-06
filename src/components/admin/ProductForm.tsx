@@ -7,6 +7,7 @@ import { Star, Check, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
 import Toggle from '@/components/ui/Toggle'
+import AIEnrichButton from './AIEnrichButton'
 
 interface Category {
   id: string
@@ -173,6 +174,8 @@ function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: (
 export default function ProductForm({ categories, brands, action, product, productId }: ProductFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [productName, setProductName] = useState<string>(product?.name || '')
+  const [description, setDescription] = useState<string>(product?.description || '')
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [existingImagesToKeep, setExistingImagesToKeep] = useState<any[]>([])
   const [galleryImageIds, setGalleryImageIds] = useState<{ id: string; isPrimary: boolean }[]>([])
@@ -806,7 +809,8 @@ export default function ProductForm({ categories, brands, action, product, produ
               id="name"
               name="name"
               required
-              defaultValue={product?.name}
+              value={productName}
+              onChange={e => setProductName(e.target.value)}
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Enter product name"
             />
@@ -1333,14 +1337,23 @@ export default function ProductForm({ categories, brands, action, product, produ
             <label htmlFor="description" className="block text-sm font-medium text-foreground-secondary mb-2">
               Description
             </label>
-            <textarea
-              id="description"
-              name="description"
-              rows={4}
-              defaultValue={product?.description}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="Enter product description"
-            />
+            <AIEnrichButton
+              fieldLabel="Description"
+              value={description}
+              onChange={setDescription}
+              context={`Product: ${productName}`}
+              multiline
+            >
+              <textarea
+                id="description"
+                name="description"
+                rows={4}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                className="w-full px-4 py-2 pr-8 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="Enter product description"
+              />
+            </AIEnrichButton>
           </div>
 
           {/* Image Upload */}

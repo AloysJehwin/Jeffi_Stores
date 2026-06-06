@@ -44,7 +44,7 @@ export function resolveParams<P extends Record<string, unknown>>(
   if (!override || typeof override !== 'object') return { ...defaults }
   const out: Record<string, unknown> = { ...defaults }
   for (const [k, v] of Object.entries(override as Record<string, unknown>)) {
-    if (v !== undefined && v !== null) out[k] = v
+    if (v !== undefined && v !== null && v !== 0) out[k] = v
   }
   return out as P
 }

@@ -3,6 +3,7 @@ import { getAllCategories, getAllBrands } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { generateProductSku, generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
+import { ChevronLeft } from 'lucide-react'
 
 async function createProduct(formData: FormData) {
   'use server'
@@ -48,11 +49,16 @@ async function createProduct(formData: FormData) {
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
+  const skuFromForm = (formData.get('sku') as string || '').trim().toUpperCase()
   let sku: string
-  try {
-    sku = (await generateProductSku(categoryId || null)).toUpperCase()
-  } catch {
-    sku = `PRD-${Date.now().toString(36).toUpperCase()}`
+  if (skuFromForm) {
+    sku = skuFromForm
+  } else {
+    try {
+      sku = (await generateProductSku(categoryId || null)).toUpperCase()
+    } catch {
+      sku = `PRD-${Date.now().toString(36).toUpperCase()}`
+    }
   }
 
   try {
@@ -214,6 +220,15 @@ export default async function AddProductPage() {
 
   return (
     <div className="p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <a href="/admin/products" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+          Products
+        </a>
+        <span className="text-border-default">/</span>
+        <span className="text-foreground font-medium">Add Product</span>
+      </div>
+
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Add New Product</h1>
         <p className="text-foreground-secondary mt-1">Create a new product in your inventory</p>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 interface EligibleRecipient {
   reference_id: string
@@ -481,12 +482,19 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
             Subject line
           </label>
-          <input
-            type="text"
+          <AIEnrichButton
+            fieldLabel="Subject line"
             value={form.subject_template}
-            onChange={e => setForm({ ...form, subject_template: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-          />
+            onChange={v => setForm({ ...form, subject_template: v })}
+            context={`Campaign: ${campaign.name ?? ''}`}
+          >
+            <input
+              type="text"
+              value={form.subject_template}
+              onChange={e => setForm({ ...form, subject_template: e.target.value })}
+              className="w-full px-3 py-2 pr-8 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            />
+          </AIEnrichButton>
         </div>
 
         <div className="mt-4">
@@ -643,8 +651,14 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                           onChange={e => {
                             const raw = e.target.value
                             const next = { ...form.parameters }
-                            if (raw === '') delete next[key]
-                            else next[key] = def.type === 'integer' ? parseInt(raw, 10) : parseFloat(raw)
+                            if (raw === '') {
+                              delete next[key]
+                            } else {
+                              const parsed = def.type === 'integer' ? parseInt(raw, 10) : parseFloat(raw)
+                              // treat 0 as blank for fields with min >= 1
+                              if (parsed === 0 && (def.min ?? 0) >= 1) delete next[key]
+                              else next[key] = parsed
+                            }
                             setForm({ ...form, parameters: next })
                           }}
                           className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"

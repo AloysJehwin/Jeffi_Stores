@@ -23,9 +23,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const messages = await queryMany<{
-    id: string; role: string; content: string; tool_calls: any; created_at: string
+    id: string; role: string; content: string; tool_calls: any;
+    ui_blocks: any; proposed_actions: any; pickers: any; created_at: string
   }>(
-    `SELECT id::text, role, content, tool_calls, created_at::text
+    `SELECT id::text, role, content, tool_calls, ui_blocks, proposed_actions, pickers, created_at::text
        FROM admin_agent_messages
       WHERE conversation_id = $1::uuid
       ORDER BY created_at ASC`,
