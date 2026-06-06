@@ -28,8 +28,17 @@ export interface JWTPayload {
 export interface UserJWTPayload {
   userId: string
   email: string
+  isBusiness?: boolean
+  approvalStatus?: string
   scopes?: string[]
   [key: string]: any
+}
+
+export async function authenticateBusiness(request: NextRequest): Promise<UserJWTPayload | null> {
+  const payload = await authenticateUser(request)
+  if (!payload) return null
+  if (!payload.isBusiness) return null
+  return payload
 }
 
 export interface AdminJWTPayload {

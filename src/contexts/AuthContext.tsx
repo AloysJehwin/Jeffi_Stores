@@ -10,6 +10,10 @@ interface User {
   phone: string | null
   createdAt: string
   avatarUrl: string | null
+  isBusiness?: boolean
+  approvalStatus?: string
+  companyName?: string
+  businessDiscountMap?: Record<string, number>
 }
 
 interface AuthContextType {
