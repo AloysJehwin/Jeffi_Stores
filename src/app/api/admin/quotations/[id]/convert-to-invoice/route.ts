@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
+import { sendInvoiceFinalizedEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
@@ -96,7 +97,7 @@ export async function POST(
     const taxAmount = Math.round((totalCgst + totalSgst + totalIgst) * 100) / 100
     const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100
     const isPaid = paymentMode !== 'credit'
-    const today = new Date().toISOString().slice(0, 10)
+    const today = new Date().toISOString()
 
     const result = await withTransaction(async (client) => {
       const addrResult = await client.query(
@@ -121,11 +122,11 @@ export async function POST(
         if (!item.product_id) continue
         const qty = item.quantity
         if (item.sub_variant_id) {
-          const inv = await client.query<{ stock_quantity: number }>(
-            'SELECT stock_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE',
+          const inv = await client.query<{ inventory_quantity: number }>(
+            'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE',
             [item.sub_variant_id]
           )
-          const stock = parseFloat(inv.rows[0]?.stock_quantity as any) || 0
+          const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
           if (stock < qty) insufficientItems.push(`${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${qty})`)
         } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
@@ -166,8 +167,8 @@ export async function POST(
           saveAsDraft ? 'draft' : 'delivered',
           isPaid ? 'paid' : 'unpaid',
           quotation.consignee_name,
-          null,
-          null,
+          quotation.consignee_phone || quotation.buyer_phone || null,
+          quotation.consignee_email || quotation.buyer_email || null,
           buyerGstin || null,
           orderIsIgst,
           addressId,
@@ -221,17 +222,33 @@ export async function POST(
         for (const item of processedItems) {
           if (!item.product_id) continue
           const qty = item.quantity
+          let stockBefore = 0
           if (item.sub_variant_id) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE',
+              [item.sub_variant_id]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
-              'UPDATE product_sub_variants SET stock_quantity = stock_quantity - $1 WHERE id = $2',
+              'UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
               [qty, item.sub_variant_id]
             )
           } else if (item.variant_id) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              'SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE',
+              [item.variant_id]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
               'UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
               [qty, item.variant_id]
             )
           } else {
+            const row = await client.query<{ inventory_quantity: string }>(
+              'SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE',
+              [item.product_id]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
               'UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
               [qty, item.product_id]
@@ -245,6 +262,7 @@ export async function POST(
             quantityChange: -qty,
             referenceType: 'order',
             referenceId: newOrder.id,
+            currentStock: stockBefore,
           })
         }
       }
@@ -256,6 +274,21 @@ export async function POST(
 
       return { id: newOrder.id, order_number: newOrder.order_number, invoice_number: invoiceNumber, saveAsDraft, insufficientItems }
     })
+
+    if (!result.saveAsDraft && result.invoice_number) {
+      const customerEmail = quotation.consignee_email || quotation.buyer_email || null
+      if (customerEmail) {
+        const invoiceViewUrl = `https://invoice.jeffistores.in/invoice/${result.id}`
+        sendInvoiceFinalizedEmail(
+          customerEmail,
+          quotation.consignee_name || '',
+          result.invoice_number,
+          totalAmount,
+          result.order_number,
+          invoiceViewUrl
+        ).catch(() => {})
+      }
+    }
 
     return NextResponse.json({
       success: true,

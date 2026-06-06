@@ -673,6 +673,8 @@ type StockTransaction = {
   reference_type: string; reference_id: string; notes: string | null
   product_id: string; product_name: string; product_sku: string | null
   variant_id: string | null; variant_name: string | null
+  sub_variant_id: string | null; sub_variant_name: string | null
+  reference_label: string | null
 }
 
 function StockTab() {
@@ -697,7 +699,15 @@ function StockTab() {
   const [editQty, setEditQty] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editSaving, setEditSaving] = useState(false)
-  const [ledgerSortCol, setLedgerSortCol] = useState<string | undefined>(undefined)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+
+  function toggleGroup(refId: string) {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(refId)) next.delete(refId); else next.add(refId)
+      return next
+    })
+  }
 
   function syncUrl(patch: Record<string, string>) {
     const p = new URLSearchParams(window.location.search)
@@ -706,6 +716,7 @@ function StockTab() {
     }
     router.replace(`/admin/inventory?${p.toString()}`, { scroll: false })
   }
+  const [ledgerSortCol, setLedgerSortCol] = useState<string | undefined>(undefined)
   const [ledgerSortDir, setLedgerSortDir] = useState<SortDir | undefined>(undefined)
   const [valSortCol, setValSortCol] = useState<string | undefined>(undefined)
   const [valSortDir, setValSortDir] = useState<SortDir | undefined>(undefined)
@@ -722,6 +733,14 @@ function StockTab() {
         return ledgerSortDir === 'asc' ? cmp : -cmp
       })
     : transactions
+
+  // Group by reference_id, preserving order of first appearance
+  const ledgerGroups: { refId: string; refType: string; refLabel: string | null; date: string; txs: StockTransaction[] }[] = []
+  for (const tx of sortedTransactions) {
+    const existing = ledgerGroups.find(g => g.refId === tx.reference_id)
+    if (existing) { existing.txs.push(tx) }
+    else { ledgerGroups.push({ refId: tx.reference_id, refType: tx.reference_type, refLabel: tx.reference_label, date: tx.created_at, txs: [tx] }) }
+  }
 
   function handleLedgerSort(col: string, dir: SortDir) { setLedgerSortCol(col); setLedgerSortDir(dir) }
   function handleValSort(col: string, dir: SortDir) { setValSortCol(col); setValSortDir(dir) }
@@ -868,61 +887,143 @@ function StockTab() {
                         {search || from || to ? 'No transactions match your filters' : 'No stock transactions yet'}
                       </td></tr>
                     )}
-                    {sortedTransactions.map(tx => (
-                      <tr key={tx.id} className="hover:bg-surface-secondary/50 transition-colors">
-                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-xs">
-                          {new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </td>
-                        <td className="px-4 py-3 text-foreground">
-                          <HoverCard
-                            trigger={
-                              <Link href={`/admin/products/${tx.product_id}`} className="font-medium hover:text-accent-500 hover:underline underline-offset-2">
-                                {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}</span>}
-                              </Link>
-                            }
-                            align="left"
-                            side="bottom"
-                            width="260px"
-                          >
-                            <div className="p-3 space-y-2">
-                              <p className="text-sm font-semibold text-foreground leading-tight">{tx.product_name}</p>
-                              {tx.variant_name && <p className="text-xs text-foreground-secondary">{tx.variant_name}</p>}
-                              {tx.product_sku && <p className="text-xs font-mono text-foreground-muted">{tx.product_sku}</p>}
-                              <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
-                                <div className="flex justify-between">
-                                  <span className="text-foreground-secondary">Type</span>
-                                  <span className={`px-1.5 py-0.5 rounded-full font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-foreground-secondary">Change</span>
-                                  <span className={`font-mono font-semibold ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                    {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-foreground-secondary">Balance after</span>
-                                  <span className="font-mono font-medium text-foreground">{tx.quantity_after}</span>
-                                </div>
-                                {tx.notes && (
-                                  <div className="pt-1 border-t border-border-default">
-                                    <p className="text-foreground-secondary leading-snug">{tx.notes}</p>
+                    {ledgerGroups.map(group => {
+                      const multi = group.txs.length > 1
+                      const expanded = expandedGroups.has(group.refId)
+                      const totalChange = group.txs.reduce((s, t) => s + t.quantity_change, 0)
+                      const txType = group.txs[0].transaction_type
+
+                      const refLink = group.refType === 'order' ? (
+                        <Link href={`/admin/invoices/${group.refId}`} className="font-mono text-accent-500 hover:underline underline-offset-2">
+                          {group.refLabel || group.refId.slice(0, 8) + '…'}
+                        </Link>
+                      ) : group.refType === 'cash_sale' ? (
+                        <Link href={`/admin/cash-sale/${group.refId}`} className="font-mono text-accent-500 hover:underline underline-offset-2">
+                          {group.refLabel || group.refId.slice(0, 8) + '…'}
+                        </Link>
+                      ) : group.refType === 'grn' ? (
+                        <Link href={`/admin/financial?tab=grn`} className="font-mono text-accent-500 hover:underline underline-offset-2">
+                          {group.refLabel || group.refId.slice(0, 8) + '…'}
+                        </Link>
+                      ) : (
+                        <span className="font-mono text-foreground-secondary">{group.refType}/{group.refId.slice(0, 8)}…</span>
+                      )
+
+                      if (!multi) {
+                        const tx = group.txs[0]
+                        return (
+                          <tr key={tx.id} className="hover:bg-surface-secondary/50 transition-colors">
+                            <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-xs">
+                              {new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td className="px-4 py-3 text-foreground">
+                              <HoverCard
+                                trigger={
+                                  <Link href={`/admin/products/${tx.product_id}`} className="font-medium hover:text-accent-500 hover:underline underline-offset-2">
+                                    {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
+                                  </Link>
+                                }
+                                align="left" side="bottom" width="260px"
+                              >
+                                <div className="p-3 space-y-2">
+                                  <p className="text-sm font-semibold text-foreground leading-tight">{tx.product_name}</p>
+                                  {tx.variant_name && <p className="text-xs text-foreground-secondary">{tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</p>}
+                                  {tx.product_sku && <p className="text-xs font-mono text-foreground-muted">{tx.product_sku}</p>}
+                                  <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
+                                    <div className="flex justify-between">
+                                      <span className="text-foreground-secondary">Type</span>
+                                      <span className={`px-1.5 py-0.5 rounded-full font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-foreground-secondary">Change</span>
+                                      <span className={`font-mono font-semibold ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                        {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-foreground-secondary">Balance after</span>
+                                      <span className="font-mono font-medium text-foreground">{tx.quantity_after}</span>
+                                    </div>
+                                    {tx.notes && <div className="pt-1 border-t border-border-default"><p className="text-foreground-secondary leading-snug">{tx.notes}</p></div>}
                                   </div>
-                                )}
+                                </div>
+                              </HoverCard>
+                              {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
+                            </td>
+                            <td className={`px-4 py-3 text-right font-mono font-semibold ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{tx.quantity_after}</td>
+                            <td className="px-4 py-3 text-xs hidden md:table-cell">{refLink}</td>
+                          </tr>
+                        )
+                      }
+
+                      return (
+                        <>
+                          {/* Group header row */}
+                          <tr
+                            key={`group-${group.refId}`}
+                            className="bg-surface-secondary/60 hover:bg-surface-secondary cursor-pointer transition-colors"
+                            onClick={() => toggleGroup(group.refId)}
+                          >
+                            <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs">
+                              {new Date(group.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-2">
+                                <svg
+                                  className={`w-3.5 h-3.5 text-foreground-secondary shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                <span className="text-sm font-medium text-foreground">
+                                  {group.txs.length} products
+                                </span>
+                                <span className="text-xs text-foreground-muted">
+                                  {expanded ? 'click to collapse' : 'click to expand'}
+                                </span>
                               </div>
-                            </div>
-                          </HoverCard>
-                          {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
-                        </td>
-                        <td className={`px-4 py-3 text-right font-mono font-semibold ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{tx.quantity_after}</td>
-                        <td className="px-4 py-3 text-xs text-foreground-secondary font-mono hidden md:table-cell">{tx.reference_type}/{tx.reference_id.slice(0, 8)}…</td>
-                      </tr>
-                    ))}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[txType] || ''}`}>{txType}</span>
+                            </td>
+                            <td className={`px-4 py-2.5 text-right font-mono font-semibold ${totalChange > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {totalChange > 0 ? '+' : ''}{totalChange}
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-foreground-muted text-xs font-mono">—</td>
+                            <td className="px-4 py-2.5 text-xs hidden md:table-cell">{refLink}</td>
+                          </tr>
+
+                          {/* Expanded product rows */}
+                          {expanded && group.txs.map(tx => (
+                            <tr key={tx.id} className="bg-surface/40 hover:bg-surface-secondary/30 transition-colors border-l-2 border-accent-500/30">
+                              <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8">
+                                {new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td className="px-4 py-2.5 pl-8 text-foreground">
+                                <Link href={`/admin/products/${tx.product_id}`} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2">
+                                  {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
+                                </Link>
+                                {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
+                              </td>
+                              <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
+                              </td>
+                              <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">{tx.quantity_after}</td>
+                              <td className="px-4 py-2.5 text-xs hidden md:table-cell text-foreground-muted font-mono">↳</td>
+                            </tr>
+                          ))}
+                        </>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1174,7 +1275,7 @@ export default function InventoryClient() {
     setTab(key)
     const params = new URLSearchParams()
     params.set('tab', key)
-    router.replace(`/admin/inventory?${params.toString()}`, { scroll: false })
+    router.push(`/admin/inventory?${params.toString()}`, { scroll: false })
   }
 
   return (
