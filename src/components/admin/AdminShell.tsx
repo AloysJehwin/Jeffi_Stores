@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useLayoutEffect } from 'react'
+import { useState } from 'react'
 import AdminSidebarNav from './AdminSidebarNav'
 import AdminMobileNav from './AdminMobileNav'
 import AdminAgentTrigger from './AdminAgentTrigger'
 import ThemeToggle from '@/components/ThemeToggle'
 import SessionGuard from './SessionGuard'
 
-const STORAGE_KEY = 'admin_sidebar_collapsed'
+const COOKIE_NAME = 'sidebar_collapsed'
 
 interface NavLink {
   href: string
@@ -24,6 +24,7 @@ interface Props {
   role: string
   canUseAgent: boolean
   logoutForm: React.ReactNode
+  initialCollapsed: boolean
 }
 
 export default function AdminShell({
@@ -35,19 +36,14 @@ export default function AdminShell({
   role,
   canUseAgent,
   logoutForm,
+  initialCollapsed,
 }: Props) {
-  const [collapsed, setCollapsed] = useState(false)
-  const [ready, setReady] = useState(false)
-
-  useLayoutEffect(() => {
-    if (localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true)
-    setReady(true)
-  }, [])
+  const [collapsed, setCollapsed] = useState(initialCollapsed)
 
   function toggle() {
     setCollapsed(c => {
       const next = !c
-      localStorage.setItem(STORAGE_KEY, String(next))
+      document.cookie = `${COOKIE_NAME}=${next}; path=/; max-age=31536000; SameSite=Lax`
       return next
     })
   }
@@ -59,7 +55,6 @@ export default function AdminShell({
         navLinks={desktopNavLinks}
         collapsed={collapsed}
         onToggle={toggle}
-        ready={ready}
       />
 
       {/* Right column: top bar + content */}
@@ -104,3 +99,4 @@ export default function AdminShell({
     </div>
   )
 }
+

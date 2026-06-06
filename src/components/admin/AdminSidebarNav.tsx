@@ -185,10 +185,9 @@ interface Props {
   navLinks: NavLink[]
   collapsed: boolean
   onToggle: () => void
-  ready: boolean
 }
 
-export default function AdminSidebarNav({ navLinks, collapsed, onToggle, ready }: Props) {
+export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props) {
   const pathname = usePathname()
 
   const ungrouped = navLinks.filter(l => !l.group)
@@ -202,7 +201,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle, ready }
 
   if (collapsed) {
     return (
-      <aside className={`hidden md:flex flex-col w-12 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto${ready ? '' : ' invisible'}`}>
+      <aside className={`hidden md:flex flex-col w-12 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto`}>
         <div className="h-12 flex items-center justify-center border-b border-white/10 shrink-0">
           <button
             type="button"
@@ -260,7 +259,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle, ready }
   }
 
   return (
-    <aside className={`hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto${ready ? '' : ' invisible'}`}>
+    <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto">
       <div className="h-12 flex items-center gap-2 px-3 border-b border-white/10 shrink-0">
         <button
           type="button"
