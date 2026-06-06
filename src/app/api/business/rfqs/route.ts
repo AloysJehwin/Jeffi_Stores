@@ -70,9 +70,9 @@ export async function POST(request: NextRequest) {
   for (let idx = 0; idx < items.length; idx++) {
     const item = items[idx]
     await query(
-      `INSERT INTO business_rfq_items (rfq_id, product_id, variant_id, description, quantity, unit, notes, position)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [rfq!.id, item.productId || null, item.variantId || null, item.description || '', item.quantity || 1, item.unit || 'Nos', item.notes || null, idx]
+      `INSERT INTO business_rfq_items (rfq_id, product_id, variant_id, description, quantity, unit, requested_price, notes, position)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [rfq!.id, item.productId || null, item.variantId || null, item.description || '', item.quantity || 1, item.unit || 'Nos', item.requested_price ?? null, item.notes || null, idx]
     )
   }
 

@@ -21,7 +21,7 @@ function BusinessSignInPage() {
 
   useEffect(() => {
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'approved') {
-      router.replace('/')
+      router.replace('/business')
     }
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'pending') {
       router.replace('/business/pending')
