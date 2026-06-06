@@ -158,7 +158,7 @@ export async function generateCouponForCampaign(params: {
          (code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount,
           usage_limit, usage_limit_per_user, valid_from, valid_until, is_active,
           auto_generated, generated_for_user_id, generated_for_campaign)
-       VALUES ($1, $2, 'percentage', $3, $4, $5, 500, NULL, NOW(), $6, TRUE, TRUE, NULL, $7)
+       VALUES ($1, $2, 'percentage', $3, $4, $5, 500, 1, NOW(), $6, TRUE, TRUE, NULL, $7)
        RETURNING id`,
       [
         code,
