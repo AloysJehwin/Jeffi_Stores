@@ -80,7 +80,7 @@ function BusinessSignUpPage() {
         const data = await res.json()
         setCity(data.district || '')
         setAddrState(data.state || '')
-        const offices: string[] = (data.postOffices || []).map((p: any) => p.Name).filter(Boolean)
+        const offices: string[] = (data.postOffices || []).filter(Boolean)
         setLocalities(offices)
         setLocality(offices[0] || '')
         setPinLookupState('found')
