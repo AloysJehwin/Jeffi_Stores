@@ -130,21 +130,22 @@ export async function generateCouponForCampaign(params: {
   minPurchaseAmount?: number
   maxDiscountAmount?: number
 }): Promise<string | null> {
-  // Reuse the existing active coupon for this campaign if one exists
+  // Reuse an existing active campaign-level coupon if one exists
   const existing = await queryOne<{ id: string; code: string }>(
-    `SELECT c.id, c.code
-     FROM coupons c
-     JOIN campaigns ca ON ca.coupon_id = c.id
-     WHERE ca.kind = $1
-       AND c.auto_generated = TRUE
-       AND c.generated_for_campaign = $1
-       AND c.generated_for_user_id IS NULL
-       AND c.is_active = TRUE
-       AND (c.valid_until IS NULL OR c.valid_until > NOW())
-     ORDER BY c.created_at DESC LIMIT 1`,
+    `SELECT id, code FROM coupons
+     WHERE auto_generated = TRUE
+       AND generated_for_campaign = $1
+       AND generated_for_user_id IS NULL
+       AND is_active = TRUE
+       AND (valid_until IS NULL OR valid_until > NOW())
+     ORDER BY created_at DESC LIMIT 1`,
     [params.campaignKind]
   )
-  if (existing) return existing.code
+  if (existing) {
+    // Ensure campaigns.coupon_id is set even if it was cleared
+    await query(`UPDATE campaigns SET coupon_id = $1 WHERE kind = $2 AND (coupon_id IS NULL OR coupon_id != $1)`, [existing.id, params.campaignKind])
+    return existing.code
+  }
 
   const prefix = params.campaignKind.startsWith('winback') ? 'BACK' : 'OFFER'
   const random = Math.random().toString(36).slice(2, 8).toUpperCase()
