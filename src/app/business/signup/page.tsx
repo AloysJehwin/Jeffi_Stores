@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 export default function BusinessSignUpWrapper() {
   return (
@@ -20,7 +21,6 @@ function BusinessSignUpPage() {
   const [step, setStep] = useState<'email' | 'otp' | 'details'>('email')
   const [email, setEmail] = useState(searchParams.get('email') || '')
   const [otp, setOtp] = useState('')
-  const [otpVerified, setOtpVerified] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
@@ -28,7 +28,6 @@ function BusinessSignUpPage() {
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
 
-  // Google flow — pre-fill email, skip OTP, go straight to details
   const googleAccessToken = searchParams.get('token')
   const isGoogleFlow = searchParams.get('google') === '1' && !!googleAccessToken
 
@@ -42,14 +41,64 @@ function BusinessSignUpPage() {
   const [phone, setPhone] = useState('')
   const [companyName, setCompanyName] = useState('')
   const [gstNumber, setGstNumber] = useState('')
-  const [businessAddress, setBusinessAddress] = useState('')
   const [industry, setIndustry] = useState('')
+
+  // Structured address
+  const [addressLine1, setAddressLine1] = useState('')
+  const [pinCode, setPinCode] = useState('')
+  const [pinLookupState, setPinLookupState] = useState<'idle' | 'loading' | 'found' | 'error'>('idle')
+  const [localities, setLocalities] = useState<string[]>([])
+  const [locality, setLocality] = useState('')
+  const [landmark, setLandmark] = useState('')
+  const [city, setCity] = useState('')
+  const [addrState, setAddrState] = useState('')
+  const pinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (resendCooldown <= 0) return
     const t = setTimeout(() => setResendCooldown(c => c - 1), 1000)
     return () => clearTimeout(t)
   }, [resendCooldown])
+
+  const handlePinChange = (val: string) => {
+    const digits = val.replace(/\D/g, '').slice(0, 6)
+    setPinCode(digits)
+    if (digits.length < 6) {
+      setPinLookupState('idle')
+      setLocalities([])
+      setLocality('')
+      setCity('')
+      setAddrState('')
+      return
+    }
+    if (pinDebounceRef.current) clearTimeout(pinDebounceRef.current)
+    pinDebounceRef.current = setTimeout(async () => {
+      setPinLookupState('loading')
+      try {
+        const res = await fetch(`/api/pincode/${digits}`)
+        if (!res.ok) throw new Error()
+        const data = await res.json()
+        setCity(data.district || '')
+        setAddrState(data.state || '')
+        const offices: string[] = (data.postOffices || []).map((p: any) => p.Name).filter(Boolean)
+        setLocalities(offices)
+        setLocality(offices[0] || '')
+        setPinLookupState('found')
+      } catch {
+        setPinLookupState('error')
+        setCity('')
+        setAddrState('')
+        setLocalities([])
+        setLocality('')
+      }
+    }, 400)
+  }
+
+  const buildBusinessAddress = () =>
+    [addressLine1, locality, landmark, city, addrState, pinCode]
+      .map(s => s.trim())
+      .filter(Boolean)
+      .join(', ')
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -98,7 +147,6 @@ function BusinessSignUpPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Invalid OTP')
-      setOtpVerified(true)
       setStep('details')
     } catch (err: any) {
       setError(err.message)
@@ -157,14 +205,16 @@ function BusinessSignUpPage() {
       setGoogleLoading(false)
       return
     }
-    // In Google flow, store the token and go to details
     router.push(`/business/signup?google=1&token=${result.accessToken}`)
   }
 
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!firstName.trim() || !companyName.trim() || !gstNumber.trim() || !businessAddress.trim() || !industry.trim()) {
+    if (!addressLine1.trim()) { setError('Enter a street / building address'); return }
+    if (pinCode.length !== 6) { setError('Enter a valid 6-digit PIN code'); return }
+    if (!city.trim() || !addrState.trim()) { setError('PIN code lookup failed — enter city and state manually'); return }
+    if (!firstName.trim() || !companyName.trim() || !gstNumber.trim() || !industry.trim()) {
       setError('All business details are required')
       return
     }
@@ -172,6 +222,7 @@ function BusinessSignUpPage() {
       setError('Enter a valid 10-digit mobile number')
       return
     }
+    const businessAddress = buildBusinessAddress()
     setIsLoading(true)
     try {
       let res: Response
@@ -180,30 +231,14 @@ function BusinessSignUpPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({
-            accessToken: googleAccessToken,
-            companyName,
-            gstNumber,
-            businessAddress,
-            industry,
-          }),
+          body: JSON.stringify({ accessToken: googleAccessToken, companyName, gstNumber, businessAddress, industry }),
         })
       } else {
         res = await fetch('/api/business/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({
-            email,
-            otp,
-            firstName,
-            lastName,
-            phone,
-            companyName,
-            gstNumber,
-            businessAddress,
-            industry,
-          }),
+          body: JSON.stringify({ email, otp, firstName, lastName, phone, companyName, gstNumber, businessAddress, industry }),
         })
       }
       const data = await res.json()
@@ -221,6 +256,8 @@ function BusinessSignUpPage() {
     'Electronics & Electrical', 'Retail & Distribution', 'Engineering & Fabrication',
     'Agriculture', 'Education', 'Government', 'Healthcare', 'IT & Technology', 'Other',
   ]
+
+  const inputCls = 'w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500'
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
@@ -347,14 +384,12 @@ function BusinessSignUpPage() {
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">First Name *</label>
                       <input type="text" required value={firstName} onChange={e => setFirstName(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                        placeholder="First" />
+                        className={inputCls} placeholder="First" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Last Name</label>
                       <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                        placeholder="Last" />
+                        className={inputCls} placeholder="Last" />
                     </div>
                   </div>
                   <div>
@@ -372,33 +407,107 @@ function BusinessSignUpPage() {
               <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Company Name *</label>
                 <input type="text" required value={companyName} onChange={e => setCompanyName(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                  placeholder="Your Company Pvt. Ltd." />
+                  className={inputCls} placeholder="Your Company Pvt. Ltd." />
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1">GST Number *</label>
                 <input type="text" required value={gstNumber} onChange={e => setGstNumber(e.target.value.toUpperCase())}
                   maxLength={15}
-                  className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm font-mono tracking-wider focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                  className={`${inputCls} font-mono tracking-wider`}
                   placeholder="22AAAAA0000A1Z5" />
               </div>
 
+              {/* Structured address */}
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Business Address *</label>
-                <textarea required value={businessAddress} onChange={e => setBusinessAddress(e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500 resize-none"
-                  placeholder="Street, City, State, PIN" />
+                <label className="block text-xs font-medium text-foreground-secondary mb-1">Flat / Building / Street *</label>
+                <input type="text" required value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
+                  className={inputCls} placeholder="e.g. 12, MG Road" />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Industry *</label>
-                <select required value={industry} onChange={e => setIndustry(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500">
-                  <option value="">Select industry…</option>
-                  {industries.map(i => <option key={i} value={i}>{i}</option>)}
-                </select>
+                <label className="block text-xs font-medium text-foreground-secondary mb-1">PIN Code *</label>
+                <div className="relative">
+                  <input
+                    type="text" inputMode="numeric" maxLength={6}
+                    value={pinCode} onChange={e => handlePinChange(e.target.value)}
+                    className={`${inputCls} pr-8`}
+                    placeholder="6-digit PIN"
+                  />
+                  {pinLookupState === 'loading' && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      <div className="w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                  {pinLookupState === 'found' && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-green-500">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                  {pinLookupState === 'error' && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-400">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                {pinLookupState === 'error' && (
+                  <p className="mt-1 text-xs text-red-500">PIN code not found — enter city and state below manually.</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground-secondary mb-1">Locality / Area *</label>
+                {localities.length > 0 ? (
+                  <AdminSelect
+                    value={locality}
+                    onChange={setLocality}
+                    placeholder="Select locality…"
+                    options={localities.map(l => ({ value: l, label: l }))}
+                    sm
+                  />
+                ) : (
+                  <input type="text" value={locality} onChange={e => setLocality(e.target.value)}
+                    className={inputCls} placeholder="Locality / area name" />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground-secondary mb-1">Landmark <span className="text-foreground-muted">(optional)</span></label>
+                <input type="text" value={landmark} onChange={e => setLandmark(e.target.value)}
+                  className={inputCls} placeholder="Near post office, opposite temple…" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-foreground-secondary mb-1">City *</label>
+                  <input type="text" required value={city} onChange={e => setCity(e.target.value)}
+                    readOnly={pinLookupState === 'found'}
+                    className={`${inputCls} ${pinLookupState === 'found' ? 'bg-surface-secondary text-foreground-secondary' : ''}`}
+                    placeholder="City" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-secondary mb-1">State *</label>
+                  <input type="text" required value={addrState} onChange={e => setAddrState(e.target.value)}
+                    readOnly={pinLookupState === 'found'}
+                    className={`${inputCls} ${pinLookupState === 'found' ? 'bg-surface-secondary text-foreground-secondary' : ''}`}
+                    placeholder="State" />
+                </div>
+              </div>
+
+              <div>
+                <AdminSelect
+                  label="Industry *"
+                  required
+                  value={industry}
+                  onChange={setIndustry}
+                  placeholder="Select industry…"
+                  options={industries.map(i => ({ value: i, label: i }))}
+                  sm
+                />
               </div>
 
               <button type="submit" disabled={isLoading}
