@@ -23,6 +23,7 @@ interface WishlistItem {
     is_in_stock: boolean
     variant_stock_total: number
     variant_min_price: number | null
+    variant_min_mrp: number | null
     product_images: Array<{
       thumbnail_url: string
       is_primary: boolean
@@ -202,9 +203,12 @@ export default function WishlistPage() {
               : (item.products.price_ex_gst || item.products.base_price)
             const effectiveStock = hasVariants ? Number(item.products.variant_stock_total) : item.products.stock_quantity
             const isInStock = effectiveStock > 0
-            const mrp = item.products.mrp ? Number(item.products.mrp) : null
-            const mrpDiscount = mrp && mrp > Number(price)
-              ? Math.round(((mrp - Number(price)) / mrp) * 100)
+            const mrp = item.products.mrp ? Number(item.products.mrp) : (item.products.variant_min_mrp ? Number(item.products.variant_min_mrp) : null)
+            const inclPrice = hasVariants && item.products.variant_min_price
+              ? Number(item.products.variant_min_price)
+              : Number(item.products.base_price)
+            const mrpDiscount = mrp && mrp > inclPrice
+              ? Math.round(((mrp - inclPrice) / mrp) * 100)
               : 0
             const isAddingToCart = addingToCart.has(item.product_id)
 

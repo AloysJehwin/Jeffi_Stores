@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/visitor/ProductCard'
@@ -42,7 +42,8 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[],
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
+      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+      ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -152,9 +153,12 @@ export default async function CategoryDetailPage({
                   ? product.variant_min_price
                   : (product.price_ex_gst || product.base_price)
                 const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
-                const mrp = product.mrp ? Number(product.mrp) : null
-                const mrpDiscount = mrp && mrp > Number(displayPrice)
-                  ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
+                const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                const inclPrice = hasVariants && product.variant_min_price
+                  ? Number(product.variant_min_price)
+                  : Number(product.base_price)
+                const mrpDiscount = mrp && mrp > inclPrice
+                  ? Math.round(((mrp - inclPrice) / mrp) * 100)
                   : 0
 
                 return (
