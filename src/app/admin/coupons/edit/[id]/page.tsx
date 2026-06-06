@@ -1,8 +1,9 @@
 import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { query, queryOne, queryMany, queryCount } from '@/lib/db'
 import Link from 'next/link'
 import CouponForm from '../../CouponForm'
+import Pagination from '@/components/admin/Pagination'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,26 +30,41 @@ function toDatetimeLocal(val: string | null) {
   return new Date(val).toISOString().slice(0, 16)
 }
 
-export default async function EditCouponPage({ params }: { params: { id: string } }) {
+export default async function EditCouponPage({ params, searchParams }: { params: { id: string }; searchParams: { [key: string]: string | undefined } }) {
   const coupon = await queryOne<Coupon>('SELECT * FROM coupons WHERE id = $1', [params.id])
   if (!coupon) notFound()
 
-  // For auto-generated: fetch the specific user. For manual: fetch all users (eligible = everyone).
-  const eligibleUsers = coupon.auto_generated && coupon.generated_for_user_id
-    ? await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
-        `SELECT u.id, u.email, u.first_name, u.last_name,
-           COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
-         FROM users u WHERE u.id = $2`,
-        [coupon.id, coupon.generated_for_user_id]
-      )
-    : await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
-        `SELECT u.id, u.email, u.first_name, u.last_name,
-           COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
-         FROM users u
-         WHERE u.is_active = TRUE AND u.email IS NOT NULL
-         ORDER BY u.first_name ASC`,
-        [coupon.id]
-      )
+  const USERS_PAGE_SIZE = 10
+  const usersPage = Math.max(1, parseInt(searchParams.usersPage || '1', 10))
+  const usersOffset = (usersPage - 1) * USERS_PAGE_SIZE
+
+  const isPersonal = coupon.auto_generated && coupon.generated_for_user_id
+
+  const [eligibleUsers, usersTotal] = isPersonal
+    ? [
+        await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
+          `SELECT u.id, u.email, u.first_name, u.last_name,
+             COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
+           FROM users u WHERE u.id = $2`,
+          [coupon.id, coupon.generated_for_user_id]
+        ),
+        1,
+      ]
+    : await Promise.all([
+        queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
+          `SELECT u.id, u.email, u.first_name, u.last_name,
+             COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
+           FROM users u
+           WHERE u.is_active = TRUE AND u.email IS NOT NULL
+           ORDER BY u.first_name ASC
+           LIMIT $2 OFFSET $3`,
+          [coupon.id, USERS_PAGE_SIZE, usersOffset]
+        ),
+        queryCount(
+          `SELECT COUNT(*) FROM users WHERE is_active = TRUE AND email IS NOT NULL`,
+          []
+        ),
+      ])
 
   async function updateCoupon(formData: FormData) {
     'use server'
@@ -113,9 +129,9 @@ export default async function EditCouponPage({ params }: { params: { id: string 
           <div>
             <h2 className="text-base font-semibold text-foreground">Eligible Users</h2>
             <p className="text-xs text-foreground-muted mt-0.5">
-              {coupon.auto_generated
+              {isPersonal
                 ? 'This coupon is personal — only the user below can redeem it'
-                : `All ${eligibleUsers.length} active users can redeem this coupon`}
+                : `All ${usersTotal} active users can redeem this coupon`}
             </p>
           </div>
           {!coupon.auto_generated && (
@@ -159,6 +175,20 @@ export default async function EditCouponPage({ params }: { params: { id: string 
             </tbody>
           </table>
         </div>
+        {!isPersonal && (
+          <div className="border-t border-border-default">
+            <Pagination
+              page={usersPage}
+              total={usersTotal}
+              pageSize={USERS_PAGE_SIZE}
+              buildUrl={(p) => {
+                const sp = new URLSearchParams()
+                if (p > 1) sp.set('usersPage', String(p))
+                return `/admin/coupons/edit/${params.id}${sp.toString() ? `?${sp.toString()}` : ''}`
+              }}
+            />
+          </div>
+        )}
       </div>
     </div>
   )
