@@ -36,14 +36,10 @@ export default function AdminShell({
   canUseAgent,
   logoutForm,
 }: Props) {
-  const [collapsed, setCollapsed] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === 'true') setCollapsed(true)
-    setMounted(true)
-  }, [])
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(STORAGE_KEY) === 'true'
+  })
 
   function toggle() {
     setCollapsed(c => {
@@ -60,7 +56,6 @@ export default function AdminShell({
         navLinks={desktopNavLinks}
         collapsed={collapsed}
         onToggle={toggle}
-        mounted={mounted}
       />
 
       {/* Right column: top bar + content */}
