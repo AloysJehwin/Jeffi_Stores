@@ -4,7 +4,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 const OLLAMA_URL = () =>
   (process.env.OLLAMA_BASE_URL || 'http://100.110.153.68:11434').replace(/\/$/, '')
 const OLLAMA_MODEL = () =>
-  process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
+  process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_AGENT_MODEL || process.env.OLLAMA_MODEL || 'qwen3-coder:30b'
 
 const SYSTEM_PROMPT = `You are a copywriting assistant for an Indian B2B/B2C hardware and tools store (jeffistores.com).
 Enrich the given field value to be clearer, more professional, and more useful to buyers and staff.
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!res.ok) {
-      return NextResponse.json({ error: 'AI service unavailable' }, { status: 503 })
+      return NextResponse.json({ error: `AI service error (${res.status})` }, { status: 503 })
     }
 
     const data = await res.json() as { message?: { content?: string } }
