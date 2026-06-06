@@ -211,16 +211,14 @@ function BusinessSignUpPage() {
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!addressLine1.trim()) { setError('Enter a street / building address'); return }
     if (pinCode.length !== 6) { setError('Enter a valid 6-digit PIN code'); return }
     if (!city.trim() || !addrState.trim()) { setError('PIN code lookup failed — enter city and state manually'); return }
-    if (!firstName.trim() || !companyName.trim() || !gstNumber.trim() || !industry.trim()) {
-      setError('All business details are required')
-      return
-    }
-    if (!isGoogleFlow && phone.length !== 10) {
-      setError('Enter a valid 10-digit mobile number')
-      return
+    if (!companyName.trim()) { setError('Company name is required'); return }
+    if (!gstNumber.trim()) { setError('GST number is required'); return }
+    if (!industry.trim()) { setError('Please select an industry'); return }
+    if (!isGoogleFlow) {
+      if (!firstName.trim()) { setError('First name is required'); return }
+      if (phone.length !== 10) { setError('Enter a valid 10-digit mobile number'); return }
     }
     const businessAddress = buildBusinessAddress()
     setIsLoading(true)
@@ -420,8 +418,8 @@ function BusinessSignUpPage() {
 
               {/* Structured address */}
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Flat / Building / Street *</label>
-                <input type="text" required value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
+                <label className="block text-xs font-medium text-foreground-secondary mb-1">Flat / Building / Street</label>
+                <input type="text" value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
                   className={inputCls} placeholder="e.g. 12, MG Road" />
               </div>
 
