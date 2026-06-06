@@ -176,7 +176,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
           </table>
         </div>
         {!isPersonal && (
-          <div className="border-t border-border-default">
+          <div className="border-t border-border-default px-4 py-2">
             <Pagination
               page={usersPage}
               total={usersTotal}
