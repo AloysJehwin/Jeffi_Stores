@@ -34,7 +34,7 @@ const OLLAMA_SQL_MODEL = process.env.OLLAMA_SQL_MODEL || OLLAMA_AGENT_MODEL
 const OLLAMA_COPY_MODEL = process.env.OLLAMA_COPY_MODEL || OLLAMA_AGENT_MODEL
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 const OLLAMA_HEALTH_TIMEOUT_MS = 2000
-const OLLAMA_REQUEST_TIMEOUT_MS = 60_000
+const OLLAMA_REQUEST_TIMEOUT_MS = 120_000
 
 async function isOllamaReachable(): Promise<boolean> {
   try {
@@ -69,6 +69,7 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
         options: {
           temperature: req.temperature ?? 0.2,
           num_predict: req.maxTokens ?? 2000,
+          num_ctx: 8192,
         },
       }),
     })
