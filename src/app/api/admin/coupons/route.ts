@@ -8,7 +8,7 @@ import { parseBody, zNonEmpty } from '@/lib/validate'
 
 const createCouponSchema = z.object({
   code: zNonEmpty,
-  discount_type: z.enum(['percentage', 'flat']),
+  discount_type: z.enum(['percentage', 'fixed']),
   discount_value: z.number().positive(),
   valid_from: z.string().nullish(),
   valid_until: z.string().nullish(),
