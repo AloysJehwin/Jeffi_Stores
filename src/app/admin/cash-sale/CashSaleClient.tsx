@@ -89,6 +89,8 @@ export default function CashSaleClient() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [selectedSale, setSelectedSale] = useState<CashSale | null>(null)
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
   const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
   const [toDate, setToDate] = useState(searchParams.get('to') || '')
@@ -168,10 +170,40 @@ export default function CashSaleClient() {
     setFormError('')
   }
 
+  async function cancelSale(id: string) {
+    setCancellingId(id)
+    try {
+      const res = await fetch(`/api/admin/cash-sale/${id}/detail`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      })
+      const data = await res.json()
+      if (!res.ok) { showToast(data.error || 'Failed to cancel', 'error'); return }
+      showToast('Cash sale cancelled and stock restored', 'success')
+      fetchSales(page)
+    } catch {
+      showToast('Failed to cancel sale', 'error')
+    } finally {
+      setCancellingId(null)
+      setConfirmCancelId(null)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
       setFormError('All items need a name and price')
+      return
+    }
+    if (items.some(it => !it.product_id)) {
+      setFormError('All items must be selected from inventory — free-typed names are not allowed')
+      return
+    }
+    const overstock = items.find(it => it.inventory_quantity !== null && Number(it.quantity) > it.inventory_quantity)
+    if (overstock) {
+      setFormError(`Insufficient stock for "${overstock.product_name}" — available: ${overstock.inventory_quantity}, required: ${overstock.quantity}`)
       return
     }
     setFormError('')
@@ -623,14 +655,43 @@ export default function CashSaleClient() {
                             </svg>
                           </a>
                           <a
-                            href={`/admin/orders/${sale.id}`}
-                            title="View Order"
+                            href={`/admin/cash-sale/${sale.id}`}
+                            title="View Detail"
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           </a>
+                          {sale.status !== 'cancelled' && (
+                            confirmCancelId === sale.id ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => cancelSale(sale.id)}
+                                  disabled={cancellingId === sale.id}
+                                  className="px-2 py-1 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 transition-colors"
+                                >
+                                  {cancellingId === sale.id ? '…' : 'Yes'}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmCancelId(null)}
+                                  className="px-2 py-1 text-xs font-semibold border border-border-default text-foreground-secondary hover:bg-surface-secondary rounded-lg transition-colors"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmCancelId(sale.id)}
+                                title="Cancel Sale"
+                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -650,7 +711,7 @@ export default function CashSaleClient() {
                     <div onClick={e => e.stopPropagation()}>
                       {sale.invoice_number ? (
                         <a
-                          href={`/admin/invoices/${sale.id}`}
+                          href={`/admin/cash-sale/${sale.id}`}
                           className="font-mono font-semibold text-sm text-accent-500 hover:underline"
                         >
                           {sale.invoice_number}
@@ -688,11 +749,38 @@ export default function CashSaleClient() {
                       PDF
                     </a>
                     <a
-                      href={`/admin/orders/${sale.id}`}
+                      href={`/admin/cash-sale/${sale.id}`}
                       className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                     >
-                      View Order
+                      View Detail
                     </a>
+                    {sale.status !== 'cancelled' && (
+                      confirmCancelId === sale.id ? (
+                        <div className="flex items-center gap-2 ml-auto">
+                          <span className="text-xs text-foreground-muted">Restock?</span>
+                          <button
+                            onClick={() => cancelSale(sale.id)}
+                            disabled={cancellingId === sale.id}
+                            className="text-xs font-semibold text-white bg-red-600 hover:bg-red-700 px-2 py-0.5 rounded disabled:opacity-50 transition-colors"
+                          >
+                            {cancellingId === sale.id ? '…' : 'Yes'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmCancelId(null)}
+                            className="text-xs font-medium text-foreground-secondary hover:text-foreground"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmCancelId(sale.id)}
+                          className="ml-auto text-xs font-medium text-red-600 dark:text-red-400 hover:underline"
+                        >
+                          Cancel
+                        </button>
+                      )
+                    )}
                   </div>
                 </div>
               ))}
@@ -721,12 +809,44 @@ export default function CashSaleClient() {
         </div>
       )}
 
-      {selectedSale && <SaleDetailModal sale={selectedSale} onClose={() => setSelectedSale(null)} />}
+      {selectedSale && (
+        <SaleDetailModal
+          sale={selectedSale}
+          onClose={() => setSelectedSale(null)}
+          onCancelled={() => { setSelectedSale(null); fetchSales(page) }}
+        />
+      )}
     </div>
   )
 }
 
-function SaleDetailModal({ sale, onClose }: { sale: CashSale; onClose: () => void }) {
+function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClose: () => void; onCancelled: () => void }) {
+  const { showToast } = useToast()
+  const [cancelling, setCancelling] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+
+  async function handleCancel() {
+    setCancelling(true)
+    try {
+      const res = await fetch(`/api/admin/cash-sale/${sale.id}/detail`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      })
+      const data = await res.json()
+      if (!res.ok) { showToast(data.error || 'Failed to cancel', 'error'); return }
+      showToast('Cash sale cancelled and stock restored', 'success')
+      onCancelled()
+    } catch {
+      showToast('Failed to cancel sale', 'error')
+    } finally {
+      setCancelling(false)
+      setConfirmCancel(false)
+    }
+  }
+
+  const isCancelled = sale.status === 'cancelled'
   if (typeof document === 'undefined') return null
   return createPortal(
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
@@ -831,6 +951,38 @@ function SaleDetailModal({ sale, onClose }: { sale: CashSale; onClose: () => voi
               </svg>
               View Order
             </a>
+            {!isCancelled && (
+              <div className="ml-auto">
+                {!confirmCancel ? (
+                  <button
+                    onClick={() => setConfirmCancel(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Cancel Sale
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-foreground-secondary">Restock inventory?</span>
+                    <button
+                      onClick={handleCancel}
+                      disabled={cancelling}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 transition-colors"
+                    >
+                      {cancelling ? 'Cancelling…' : 'Confirm'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmCancel(false)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
+                    >
+                      No
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

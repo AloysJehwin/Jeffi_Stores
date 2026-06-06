@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -60,6 +61,15 @@ export default function PayableDetailClient({ id }: { id: string }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <a href="/admin/financial" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+          Financial
+        </a>
+        <span className="text-border-default">/</span>
+        <span className="text-foreground font-medium">Payable Detail</span>
+      </div>
+
       <div className="flex items-center gap-2">
         <Link href="/admin/financial" className="text-foreground-secondary hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

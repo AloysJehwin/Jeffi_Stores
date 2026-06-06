@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { ChevronLeft } from 'lucide-react'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -74,6 +75,15 @@ export default function SupplierDetailClient({ id }: { id: string }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <a href="/admin/inventory?tab=suppliers" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+          Suppliers
+        </a>
+        <span className="text-border-default">/</span>
+        <span className="text-foreground font-medium">{s.name || 'Supplier Detail'}</span>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">

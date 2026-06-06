@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 
 interface CampaignForm {
   delay_hours: number
@@ -44,6 +45,7 @@ interface Props {
 
 export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose }: Props) {
   const router = useRouter()
+  const { showToast, showConfirm } = useToast()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [selectedKind, setSelectedKind] = useState(defaultKind)
   const [form, setForm] = useState<CampaignForm | null>(null)
@@ -82,7 +84,13 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
 
   async function saveAndRun() {
     if (!form) return
-    if (!confirm(`Save settings and send campaign to ${recipientCount} customers?`)) return
+    const ok = await showConfirm({
+      title: 'Save & Send Campaign',
+      message: `Save settings and send campaign to ${recipientCount} customers?`,
+      confirmText: 'Send',
+      type: 'info',
+    })
+    if (!ok) return
     setSaving(true)
     try {
       const patchRes = await fetch(`/api/admin/campaigns/${selectedKind}`, {
@@ -91,7 +99,7 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
         credentials: 'include',
         body: JSON.stringify(form),
       })
-      if (!patchRes.ok) { alert('Failed to save campaign settings.'); return }
+      if (!patchRes.ok) { showToast('Failed to save campaign settings.', 'error'); return }
     } finally {
       setSaving(false)
     }
@@ -102,11 +110,11 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
         credentials: 'include',
       })
       if (runRes.ok) {
-        alert('Campaign triggered successfully.')
+        showToast('Campaign triggered successfully.', 'success')
         onClose()
         router.push(`/admin/campaigns/${selectedKind}`)
       } else {
-        alert('Failed to run campaign. Check Campaigns page.')
+        showToast('Failed to run campaign. Check Campaigns page.', 'error')
       }
     } finally {
       setRunning(false)
@@ -128,9 +136,9 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
           c.kind === selectedKind ? { ...c, ...form } : c
         )
         setCampaigns(updated)
-        alert('Campaign settings saved.')
+        showToast('Campaign settings saved.', 'success')
       } else {
-        alert('Failed to save campaign settings.')
+        showToast('Failed to save campaign settings.', 'error')
       }
     } finally {
       setSaving(false)

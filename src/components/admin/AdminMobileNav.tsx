@@ -8,6 +8,14 @@ interface NavLink {
   label: string
   mobileOnly?: boolean
   group?: string
+  exactMatch?: boolean
+}
+
+function isMobileNavActive(link: NavLink, currentPath: string | null): boolean {
+  if (!currentPath) return false
+  if (currentPath === link.href) return true
+  if (link.exactMatch || link.href === '/admin/dashboard') return false
+  return currentPath.startsWith(link.href + '/')
 }
 
 interface AdminMobileNavProps {
@@ -105,7 +113,7 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
                 key={link.href}
                 href={link.href}
                 className={`px-4 py-3 rounded-lg font-medium transition-colors ${
-                  pathname === link.href || (link.href !== '/admin/dashboard' && pathname?.startsWith(link.href))
+                  isMobileNavActive(link, pathname)
                     ? 'bg-primary-500/20 text-primary-400'
                     : 'text-gray-300 hover:bg-white/10 hover:text-white'
                 }`}
@@ -124,7 +132,7 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
 }
 
 function MobileNavGroup({ groupName, links, pathname }: { groupName: string; links: NavLink[]; pathname: string | null }) {
-  const isAnyActive = links.some(l => pathname === l.href || pathname?.startsWith(l.href))
+  const isAnyActive = links.some(l => isMobileNavActive(l, pathname))
   const [isOpen, setIsOpen] = useState(isAnyActive)
 
   return (
@@ -152,7 +160,7 @@ function MobileNavGroup({ groupName, links, pathname }: { groupName: string; lin
               key={link.href}
               href={link.href}
               className={`px-4 py-2.5 rounded-lg font-medium transition-colors ${
-                pathname === link.href || pathname?.startsWith(link.href)
+                isMobileNavActive(link, pathname)
                   ? 'bg-primary-500/20 text-primary-400'
                   : 'text-gray-400 hover:bg-white/10 hover:text-white'
               }`}

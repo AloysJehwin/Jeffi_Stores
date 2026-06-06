@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   ShieldCheck, Boxes, Tags, FolderTree, Package, Ticket, MailOpen, ScrollText, Filter,
   ArrowRight, Image as ImageIcon, Truck, Receipt, Wallet, MapPin, Settings,
   Warehouse, TrendingUp, Wand2, ClipboardList, Tag,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  Clock, Wrench, CheckCircle2, XCircle, RefreshCw, Bot, Play,
+  Clock, CheckCircle2, XCircle, RefreshCw, Play, Mail, ChevronDown, ChevronUp, Users, User,
 } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 
@@ -89,20 +89,11 @@ interface CronJob {
   log: Array<{ t: string; ok: boolean; err?: string; detail?: unknown }>
 }
 
-interface ToolLogMessage {
-  id: string
-  conversation_id: string
-  created_at: string
-  tool_calls: Array<{ tool: string; input: Record<string, unknown>; output: unknown; isError?: boolean }>
-  admin_first_name: string | null
-  admin_last_name: string | null
-  admin_username: string | null
-}
-
-type PageTab = 'audit' | 'cron' | 'tools'
+type PageTab = 'audit' | 'mail_log' | 'cron'
 
 export default function AdminAuditClient() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [entityFilter, setEntityFilter] = useState<string>('all')
@@ -113,10 +104,16 @@ export default function AdminAuditClient() {
 
   const initialTab = (): PageTab => {
     const t = searchParams?.get('tab')
-    if (t === 'cron' || t === 'tools') return t
+    if (t === 'cron') return t
+    if (t === 'mail_log') return t
     return 'audit'
   }
-  const [pageTab, setPageTab] = useState<PageTab>(initialTab)
+  const [pageTab, setPageTabState] = useState<PageTab>(initialTab)
+
+  function setPageTab(next: PageTab) {
+    setPageTabState(next)
+    router.push(`/admin/audit?tab=${next}`, { scroll: false })
+  }
 
   const [cronJobs, setCronJobs] = useState<CronJob[]>([])
   const [cronLoading, setCronLoading] = useState(false)
@@ -124,11 +121,70 @@ export default function AdminAuditClient() {
   const [cronTriggeringId, setCronTriggeringId] = useState<string | null>(null)
   const [expandedCronId, setExpandedCronId] = useState<string | null>(null)
 
-  const [toolLogs, setToolLogs] = useState<ToolLogMessage[]>([])
-  const [toolLogsLoading, setToolLogsLoading] = useState(false)
-  const [toolLogsPage, setToolLogsPage] = useState(1)
-  const [toolLogsTotal, setToolLogsTotal] = useState(0)
-  const [expandedToolLog, setExpandedToolLog] = useState<string | null>(null)
+  // ── Mail Log state ──────────────────────────────────────────────────────────
+  interface MailLog {
+    email: string
+    status: 'sent' | 'failed'
+    error: string | null
+    sent_at: string
+  }
+  interface MailCampaign {
+    id: string
+    title: string
+    template_key: string
+    subject: string
+    audience_type: string
+    recipient_count: number | null
+    status: string
+    sent_at: string | null
+    created_at: string
+    logs?: MailLog[]
+    logsLoading?: boolean
+  }
+  const [mailCampaigns, setMailCampaigns] = useState<MailCampaign[]>([])
+  const [mailLoading, setMailLoading] = useState(false)
+  const [mailPage, setMailPage] = useState(1)
+  const [mailTotal, setMailTotal] = useState(0)
+  const mailPageSize = 20
+  const [expandedMailId, setExpandedMailId] = useState<string | null>(null)
+
+  async function loadMailLog() {
+    setMailLoading(true)
+    try {
+      const res = await fetch(`/api/admin/mailer?page=${mailPage}`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setMailCampaigns((data.campaigns || []).map((c: MailCampaign) => ({ ...c, logs: undefined, logsLoading: false })))
+        setMailTotal(data.total || 0)
+      }
+    } finally {
+      setMailLoading(false)
+    }
+  }
+
+  async function loadCampaignLogs(campaignId: string) {
+    setMailCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, logsLoading: true } : c))
+    try {
+      const res = await fetch(`/api/admin/mailer/${campaignId}?logPage=1`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setMailCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, logs: data.logs || [], logsLoading: false } : c))
+      }
+    } catch {
+      setMailCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, logsLoading: false } : c))
+    }
+  }
+
+  function toggleMailExpand(id: string, campaign: MailCampaign) {
+    if (expandedMailId === id) {
+      setExpandedMailId(null)
+    } else {
+      setExpandedMailId(id)
+      if (!campaign.logs && !campaign.logsLoading) {
+        loadCampaignLogs(id)
+      }
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -190,25 +246,10 @@ export default function AdminAuditClient() {
     }
   }
 
-  async function loadToolLogs() {
-    setToolLogsLoading(true)
-    try {
-      const qs = new URLSearchParams({ page: String(toolLogsPage), pageSize: '50' })
-      const res = await fetch(`/api/admin/agent/tool-logs?${qs.toString()}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setToolLogs(data.messages || [])
-        setToolLogsTotal(data.total || 0)
-      }
-    } finally {
-      setToolLogsLoading(false)
-    }
-  }
-
   useEffect(() => { setPage(1) }, [entityFilter, actionFilter, pageSize])
   useEffect(() => { load() }, [entityFilter, actionFilter, page, pageSize])
   useEffect(() => { if (pageTab === 'cron') loadCronJobs() }, [pageTab])
-  useEffect(() => { if (pageTab === 'tools') loadToolLogs() }, [pageTab, toolLogsPage])
+  useEffect(() => { if (pageTab === 'mail_log') loadMailLog() }, [pageTab, mailPage])
 
   const entityOptions = useMemo(() => [
     { value: 'all', label: 'All entities' },
@@ -454,8 +495,8 @@ export default function AdminAuditClient() {
       <div className="flex items-center gap-1 border-b border-border-default mb-5">
         {([
           { id: 'audit', label: 'Audit Events', icon: ScrollText },
+          { id: 'mail_log', label: 'Mail Log', icon: Mail },
           { id: 'cron', label: 'Cron Jobs', icon: Clock },
-          { id: 'tools', label: 'Agent Tool Logs', icon: Wrench },
         ] as const).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -472,6 +513,158 @@ export default function AdminAuditClient() {
           </button>
         ))}
       </div>
+
+      {pageTab === 'mail_log' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-foreground-muted">All outbound email campaigns. Click a row to expand individual recipient logs.</p>
+            <button
+              type="button"
+              onClick={loadMailLog}
+              disabled={mailLoading}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${mailLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+
+          {mailLoading && mailCampaigns.length === 0 ? (
+            <div className="space-y-3">
+              {[1,2,3,4,5].map(i => <div key={i} className="h-14 rounded-lg bg-surface-secondary animate-pulse" />)}
+            </div>
+          ) : mailCampaigns.length === 0 ? (
+            <p className="text-sm text-foreground-muted italic">No mail campaigns found.</p>
+          ) : (
+            <div className="space-y-2">
+              {mailCampaigns.map(campaign => {
+                const isExpanded = expandedMailId === campaign.id
+                const isSingle = campaign.audience_type === 'specific_user'
+                const sentCount = campaign.logs ? campaign.logs.filter(l => l.status === 'sent').length : null
+                const failedCount = campaign.logs ? campaign.logs.filter(l => l.status === 'failed').length : null
+
+                return (
+                  <div key={campaign.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => toggleMailExpand(campaign.id, campaign)}
+                      className="w-full text-left p-4 flex items-center gap-4 hover:bg-surface-secondary/40 transition-colors"
+                    >
+                      {/* Icon */}
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${isSingle ? 'bg-blue-500' : 'bg-emerald-500'}`}>
+                        {isSingle ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                      </div>
+
+                      {/* Main info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-foreground truncate">{campaign.title}</span>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            campaign.status === 'sent' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                            campaign.status === 'sending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                            campaign.status === 'draft' ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' :
+                            'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                          }`}>{campaign.status}</span>
+                        </div>
+                        <p className="text-xs text-foreground-muted mt-0.5 truncate">
+                          {campaign.subject}
+                        </p>
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          <span className="text-[11px] text-foreground-muted">
+                            {campaign.sent_at
+                              ? `Sent ${new Date(campaign.sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                              : `Created ${new Date(campaign.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                          </span>
+                          {campaign.recipient_count !== null && (
+                            <span className="text-[11px] text-foreground-muted">{campaign.recipient_count} recipient{campaign.recipient_count !== 1 ? 's' : ''}</span>
+                          )}
+                          <span className="text-[10px] font-mono text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
+                            {campaign.template_key} · {campaign.audience_type.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Stats + chevron */}
+                      <div className="flex items-center gap-3 shrink-0">
+                        {sentCount !== null && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> {sentCount}
+                            </span>
+                            {failedCount! > 0 && (
+                              <span className="flex items-center gap-1 text-red-500">
+                                <XCircle className="w-3.5 h-3.5" /> {failedCount}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {isExpanded
+                          ? <ChevronUp className="w-4 h-4 text-foreground-muted" />
+                          : <ChevronDown className="w-4 h-4 text-foreground-muted" />
+                        }
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="border-t border-border-default">
+                        {campaign.logsLoading ? (
+                          <div className="flex items-center justify-center py-6">
+                            <RefreshCw className="w-4 h-4 animate-spin text-foreground-muted" />
+                          </div>
+                        ) : !campaign.logs || campaign.logs.length === 0 ? (
+                          <p className="px-4 py-4 text-xs text-foreground-muted italic">No recipient logs found.</p>
+                        ) : (
+                          <div className="divide-y divide-border-default max-h-80 overflow-y-auto">
+                            {/* Header */}
+                            <div className="grid grid-cols-[1fr_80px_140px] px-4 py-2 bg-surface-secondary text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
+                              <span>Recipient</span>
+                              <span>Status</span>
+                              <span>Sent at</span>
+                            </div>
+                            {campaign.logs.map((log, idx) => (
+                              <div key={`${log.email}-${idx}`} className="grid grid-cols-[1fr_80px_140px] px-4 py-2.5 items-center hover:bg-surface-secondary/40 transition-colors">
+                                <span className="text-xs text-foreground truncate pr-2">{log.email}</span>
+                                <span>
+                                  {log.status === 'sent'
+                                    ? <span className="flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400"><CheckCircle2 className="w-3 h-3" /> Sent</span>
+                                    : <span className="flex items-center gap-1 text-[11px] text-red-500"><XCircle className="w-3 h-3" /> Failed</span>
+                                  }
+                                </span>
+                                <span className="text-[11px] text-foreground-muted">
+                                  {log.sent_at ? new Date(log.sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                                </span>
+                                {log.error && (
+                                  <span className="col-span-3 text-[10px] text-red-500 font-mono mt-0.5 truncate">{log.error}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!mailLoading && mailTotal > mailPageSize && (() => {
+            const totalPages = Math.ceil(mailTotal / mailPageSize)
+            return (
+              <div className="mt-6 flex items-center justify-between border-t border-border-default pt-4">
+                <p className="text-xs text-foreground-muted">
+                  Page <span className="font-medium text-foreground">{mailPage}</span> of <span className="font-medium text-foreground">{totalPages}</span> · {mailTotal} campaigns
+                </p>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setMailPage(p => Math.max(1, p - 1))} disabled={mailPage === 1} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => setMailPage(p => Math.min(totalPages, p + 1))} disabled={mailPage >= totalPages} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"><ChevronRight className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      )}
 
       {pageTab === 'cron' && (
         <div>
@@ -589,113 +782,6 @@ export default function AdminAuditClient() {
         </div>
       )}
 
-      {pageTab === 'tools' && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-foreground-muted">Tool calls made by the AI admin assistant. Each row is one assistant response that invoked one or more tools.</p>
-            <button
-              type="button"
-              onClick={loadToolLogs}
-              disabled={toolLogsLoading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${toolLogsLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
-          {toolLogsLoading && toolLogs.length === 0 ? (
-            <div className="space-y-3">
-              {[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-surface-secondary animate-pulse" />)}
-            </div>
-          ) : toolLogs.length === 0 ? (
-            <p className="text-sm text-foreground-muted italic">No tool calls logged yet.</p>
-          ) : (
-            <>
-              <div className="space-y-2">
-                {toolLogs.map(msg => {
-                  const isExpanded = expandedToolLog === msg.id
-                  const adminName = [msg.admin_first_name, msg.admin_last_name].filter(Boolean).join(' ') || msg.admin_username || 'Admin'
-                  const errorCount = msg.tool_calls.filter(tc => tc.isError).length
-                  return (
-                    <div key={msg.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedToolLog(isExpanded ? null : msg.id)}
-                        className="w-full px-4 py-3 flex items-start gap-3 text-left hover:bg-surface-secondary/50 transition-colors"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-500 to-secondary-500 flex items-center justify-center shrink-0">
-                          <Bot className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-semibold text-foreground">{msg.tool_calls.length} tool call{msg.tool_calls.length !== 1 ? 's' : ''}</span>
-                            {errorCount > 0 && (
-                              <span className="flex items-center gap-0.5 text-[10px] text-red-600 dark:text-red-400">
-                                <XCircle className="w-3 h-3" /> {errorCount} error{errorCount !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                            <span className="text-[10px] text-foreground-muted">{relTime(msg.created_at)}</span>
-                            <span className="text-[10px] text-foreground-muted">by {adminName}</span>
-                          </div>
-                          <p className="text-[11px] text-foreground-muted mt-0.5 font-mono truncate">
-                            {msg.tool_calls.map(tc => tc.tool).join(', ')}
-                          </p>
-                        </div>
-                        <span className="text-[10px] text-foreground-muted shrink-0">{isExpanded ? '▲' : '▼'}</span>
-                      </button>
-                      {isExpanded && (
-                        <div className="border-t border-border-default divide-y divide-border-default">
-                          {msg.tool_calls.map((tc, i) => {
-                            const outputStr = typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output, null, 2)
-                            const inputStr = JSON.stringify(tc.input, null, 2)
-                            return (
-                              <div key={i} className={`px-4 py-3 ${tc.isError ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
-                                <div className="flex items-center gap-2 mb-2">
-                                  {tc.isError
-                                    ? <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                                    : <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                                  }
-                                  <span className="text-xs font-semibold font-mono text-foreground">{tc.tool}</span>
-                                </div>
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-[11px]">
-                                  <div>
-                                    <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-1">Input</p>
-                                    <pre className="bg-surface-secondary rounded p-2 overflow-x-auto whitespace-pre-wrap break-all text-foreground font-mono leading-relaxed">{inputStr}</pre>
-                                  </div>
-                                  <div>
-                                    <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-1">Output</p>
-                                    <pre className={`rounded p-2 overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed ${tc.isError ? 'bg-red-100/50 dark:bg-red-900/20 text-red-800 dark:text-red-300' : 'bg-surface-secondary text-foreground'}`}>{outputStr}</pre>
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-              {toolLogsTotal > 50 && (
-                <div className="mt-4 flex items-center justify-between border-t border-border-default pt-4">
-                  <p className="text-xs text-foreground-muted">
-                    Showing {(toolLogsPage - 1) * 50 + 1}–{Math.min(toolLogsPage * 50, toolLogsTotal)} of {toolLogsTotal}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => setToolLogsPage(p => Math.max(1, p - 1))} disabled={toolLogsPage === 1} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40">
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="text-xs px-2 text-foreground">Page {toolLogsPage}</span>
-                    <button type="button" onClick={() => setToolLogsPage(p => p + 1)} disabled={toolLogsPage * 50 >= toolLogsTotal} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40">
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
 
       {pageTab === 'audit' && (
         <>

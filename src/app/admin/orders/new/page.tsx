@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ChevronLeft } from 'lucide-react'
 import LineItemsSection, { newLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 
 function fmt(n: number) {
@@ -116,6 +117,14 @@ export default function NewOfflineOrderPage() {
 
   return (
     <div className="p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <a href="/admin/orders" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+          Orders
+        </a>
+        <span className="text-border-default">/</span>
+        <span className="text-foreground font-medium">New Order</span>
+      </div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">New Offline Order</h1>
         <p className="text-foreground-secondary text-sm mt-1">Walk-in, credit sale, or B2B bulk order</p>

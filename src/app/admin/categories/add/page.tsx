@@ -4,6 +4,7 @@ import { getAllCategories } from '@/lib/queries'
 import { query } from '@/lib/db'
 import CategoryForm from '@/components/admin/CategoryForm'
 import { suggestIcon } from '@/lib/iconSuggest'
+import { ChevronLeft } from 'lucide-react'
 
 async function createCategory(formData: FormData) {
   'use server'
@@ -45,6 +46,14 @@ export default async function AddCategoryPage() {
 
   return (
     <div className="p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <a href="/admin/categories" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+          Categories
+        </a>
+        <span className="text-border-default">/</span>
+        <span className="text-foreground font-medium">Add Category</span>
+      </div>
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Add New Category</h1>
         <p className="text-foreground-secondary mt-1">Create a new product category</p>

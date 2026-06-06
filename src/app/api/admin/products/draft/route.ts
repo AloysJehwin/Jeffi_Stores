@@ -25,7 +25,9 @@ export async function POST(request: NextRequest) {
 
     const trimmed = name.trim()
     const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36)
-    const sku = 'DRAFT-' + Date.now().toString(36).toUpperCase()
+    // Temporary SKU — will be replaced when the admin saves with brand/category selected
+    const nameSlug = trimmed.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 16)
+    const sku = (nameSlug || 'DRAFT') + '-' + Date.now().toString(36).toUpperCase().slice(-4)
 
     const product = await queryOne<{ id: string }>(
       `INSERT INTO products (name, slug, sku, base_price, mrp, gst_percentage, stock_quantity, low_stock_threshold, is_active, is_featured, has_variants)

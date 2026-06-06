@@ -14,7 +14,7 @@ interface Toast {
 interface ConfirmDialog {
   title: string
   message: string
-  onConfirm: () => void
+  onConfirm?: () => void
   onCancel: () => void
   confirmText?: string
   cancelText?: string
@@ -23,7 +23,7 @@ interface ConfirmDialog {
 
 interface ToastContextType {
   showToast: (message: string, type?: ToastType) => void
-  showConfirm: (options: Omit<ConfirmDialog, 'onCancel'>) => Promise<boolean>
+  showConfirm: (options: Omit<ConfirmDialog, 'onCancel' | 'onConfirm'> & { onConfirm?: () => void }) => Promise<boolean>
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined)
@@ -75,11 +75,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id))
   }
 
-  function showConfirm(options: Omit<ConfirmDialog, 'onCancel'>): Promise<boolean> {
+  function showConfirm(options: Omit<ConfirmDialog, 'onCancel' | 'onConfirm'> & { onConfirm?: () => void }): Promise<boolean> {
     return new Promise(resolve => {
       setConfirmDialog({
         ...options,
-        onConfirm: () => { options.onConfirm(); setConfirmDialog(null); resolve(true) },
+        onConfirm: () => { options.onConfirm?.(); setConfirmDialog(null); resolve(true) },
         onCancel:  () => { setConfirmDialog(null); resolve(false) },
       })
     })
@@ -89,8 +89,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ showToast, showConfirm }}>
       {children}
 
-      {confirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/30 animate-fade-in">
+      {confirmDialog && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm bg-black/40 animate-fade-in">
           <div className="bg-surface-elevated rounded-lg shadow-xl max-w-md w-full p-6 animate-fade-in">
             <h3 className="text-lg font-bold text-foreground mb-2">{confirmDialog.title}</h3>
             <p className="text-foreground-secondary mb-6">{confirmDialog.message}</p>
@@ -103,7 +103,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {toasts.map((toast, index) => (
