@@ -69,8 +69,8 @@ export default function AdminShell({
         {/* Top bar */}
         <div className="relative flex items-center justify-between px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0">
 
-          {/* Fixed-position brand + toggle — never shifts with sidebar */}
-          <div className="fixed top-0 left-0 h-12 flex items-center gap-2 px-3 z-50 bg-secondary-500 dark:bg-secondary-700">
+          {/* Brand + toggle */}
+          <div className="flex items-center gap-2">
             {/* Mobile hamburger */}
             <div className="md:hidden flex items-center gap-2">
               <AdminMobileNav
@@ -102,9 +102,6 @@ export default function AdminShell({
               <span className="font-bold text-white text-sm select-none">Jeffi Stores</span>
             </div>
           </div>
-
-          {/* Spacer so right-side items stay pushed right */}
-          <div />
 
           {/* Right side: avatar + name + role + theme + logout */}
           <div className="flex items-center gap-3">
