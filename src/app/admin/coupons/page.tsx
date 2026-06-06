@@ -22,7 +22,7 @@ const COUPON_SORT_COLS: Record<string, string> = {
   status: 'is_active',
 }
 
-async function getFilteredCoupons(filters: { is_active?: string; search?: string; page?: number; sort?: string; dir?: string }) {
+async function getFilteredCoupons(filters: { is_active?: string; search?: string; campaign?: string; page?: number; sort?: string; dir?: string }) {
   const conditions: string[] = []
   const params: unknown[] = []
   let i = 1
@@ -35,6 +35,12 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
     conditions.push(`(code ILIKE $${i} OR description ILIKE $${i})`)
     params.push(`%${filters.search}%`)
     i++
+  }
+  if (filters.campaign === '__manual__') {
+    conditions.push(`(auto_generated = false OR auto_generated IS NULL)`)
+  } else if (filters.campaign) {
+    conditions.push(`generated_for_campaign = $${i++}`)
+    params.push(filters.campaign)
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
@@ -57,20 +63,23 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const sort = searchParams.sort
   const dir = searchParams.dir as 'asc' | 'desc' | undefined
+  const campaign = searchParams.campaign
 
   const [{ coupons, total }, allStats] = await Promise.all([
-    getFilteredCoupons({ is_active: searchParams.is_active, search: searchParams.search, page, sort, dir }),
+    getFilteredCoupons({ is_active: searchParams.is_active, search: searchParams.search, campaign, page, sort, dir }),
     getFilteredCoupons({}),
   ])
 
   const totalCoupons = allStats.total
   const activeCoupons = (allStats.coupons as { is_active: boolean }[]).filter(c => c.is_active).length
   const expiredCoupons = (allStats.coupons as { valid_until: string | null; is_active: boolean }[]).filter(c => c.valid_until && new Date(c.valid_until) < new Date()).length
+  const campaignCoupons = (allStats.coupons as { auto_generated: boolean }[]).filter(c => c.auto_generated).length
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
     if (searchParams.is_active) params.set('is_active', searchParams.is_active)
     if (searchParams.search) params.set('search', searchParams.search)
+    if (campaign) params.set('campaign', campaign)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
@@ -90,7 +99,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
         </Link>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 sm:gap-6 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total</p>
           <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCoupons}</p>
@@ -103,10 +112,17 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
           <p className="text-foreground-secondary text-sm">Expired</p>
           <p className="text-2xl sm:text-3xl font-bold text-red-500 mt-2">{expiredCoupons}</p>
         </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">From Campaigns</p>
+          <p className="text-2xl sm:text-3xl font-bold text-purple-600 mt-2">{campaignCoupons}</p>
+        </div>
       </div>
 
       <AdminFilters
-        filters={[{ name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] }]}
+        filters={[
+          { name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
+          { name: 'campaign', label: 'Source', options: [{ value: '__manual__', label: 'Manual' }, { value: 'winback_90', label: 'Winback 90d' }, { value: 'winback_180', label: 'Winback 180d' }] },
+        ]}
         searchPlaceholder="Search by code or description..."
         suggestType="coupons"
         />
@@ -142,7 +158,14 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
           {(coupons as CouponRow[]).map(c => (
             <div key={c.id} className="p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-mono font-bold text-accent-500">{c.code}</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-mono font-bold text-accent-500">{c.code}</span>
+                  {c.generated_for_campaign && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 w-fit">
+                      {c.generated_for_campaign}
+                    </span>
+                  )}
+                </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
                   {c.is_active ? 'Active' : 'Inactive'}
                 </span>
@@ -178,4 +201,6 @@ interface CouponRow {
   times_used: number
   valid_until: string | null
   is_active: boolean
+  auto_generated: boolean
+  generated_for_campaign: string | null
 }

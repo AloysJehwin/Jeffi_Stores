@@ -176,7 +176,7 @@ export async function validateCouponForUser(params: {
     id: string; discount_type: string; discount_value: number;
     min_purchase_amount: number | null; max_discount_amount: number | null;
     usage_limit: number | null; usage_limit_per_user: number | null;
-    times_used: number; valid_from: string | null; valid_until: string | null; is_active: boolean
+    times_used: number; valid_from: string | null; valid_until: string | null; is_active: boolean;
   }>(`SELECT * FROM coupons WHERE id = $1`, [params.couponId])
 
   if (!coupon || !coupon.is_active) return { appliedDiscount: 0, ok: false, reason: 'inactive' }

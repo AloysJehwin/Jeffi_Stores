@@ -132,9 +132,9 @@ export const TOOLS: ToolDef[] = [
       if (!id && !slug) throw new Error('Provide id or slug')
       const row = await queryOne(
         `SELECT p.id::text, p.name, p.slug, p.sku, p.short_description, p.description,
-                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)::text AS price,
                 p.mrp::text AS mrp, p.gst_percentage,
-                p.inventory_quantity AS stock, p.is_active, p.hsn_code,
+                (${EFFECTIVE_STOCK_SQL})::int AS stock, p.is_active, p.has_variants, p.hsn_code,
                 b.name AS brand, c.name AS category
          FROM products p LEFT JOIN brands b ON b.id = p.brand_id LEFT JOIN categories c ON c.id = p.category_id
          WHERE p.id = $1::uuid OR p.slug = $2 LIMIT 1`,
@@ -154,7 +154,8 @@ export const TOOLS: ToolDef[] = [
     mutating: false,
     handler: async ({ productId }) => {
       const rows = await queryMany(
-        `SELECT id::text, variant_name, sku, price::text, mrp::text, stock_quantity AS stock, is_active
+        `SELECT id::text, variant_name, sku, price::text, mrp::text,
+                stock_quantity, inventory_quantity, is_active
          FROM product_variants WHERE product_id = $1::uuid ORDER BY variant_name`,
         [productId]
       )

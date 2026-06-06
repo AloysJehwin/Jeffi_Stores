@@ -37,6 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       for (const item of items) {
         if (!item.product_id) continue
         const qty = parseFloat(item.quantity)
+        let stockBefore = 0
 
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             [item.sub_variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
+          stockBefore = stock
           if (stock < qty) {
             throw new Error(
               `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             )
             stock = parseFloat(svStock.rows[0]?.total as any) || 0
           }
+          stockBefore = stock
           if (stock < qty) {
             throw new Error(
               `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
@@ -93,6 +96,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             [item.product_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
+          stockBefore = stock
           if (stock < qty) {
             throw new Error(
               `Insufficient stock for "${item.product_name}" — available: ${stock}, required: ${qty}`
@@ -112,6 +116,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           quantityChange: -qty,
           referenceType: 'order',
           referenceId: params.id,
+          currentStock: stockBefore,
         })
       }
 

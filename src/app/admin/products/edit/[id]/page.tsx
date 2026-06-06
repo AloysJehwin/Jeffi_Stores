@@ -2,8 +2,9 @@ import { redirect, notFound } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
-import { generateProductSku, generateVariantSku } from '@/lib/sku'
+import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
+import { ChevronLeft } from 'lucide-react'
 
 function triggerEnrichment(productId: string) {
   const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.110.153.68:11434').replace(/\/$/, '')
@@ -138,36 +139,9 @@ async function updateProduct(productId: string, formData: FormData) {
 
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
+  const skuFromForm = (formData.get('sku') as string || '').trim().toUpperCase() || null
+
   try {
-    const existing = await queryOne<{ category_id: string | null; sku: string }>(
-      'SELECT category_id, sku FROM products WHERE id = $1',
-      [productId]
-    )
-    let newSku: string | null = null
-    if (existing) {
-      const categoryChanged = existing.category_id !== categoryId
-      let prefixStale = false
-      if (categoryId) {
-        const cat = await queryOne<{ sku_prefix: string | null; name: string }>(
-          'SELECT sku_prefix, name FROM categories WHERE id = $1',
-          [categoryId]
-        )
-        if (cat) {
-          const expectedPrefix = (cat.sku_prefix
-            || cat.name.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, '')
-            || 'PRD').toUpperCase()
-          const currentPrefix = (existing.sku || '').split('-')[0].toUpperCase()
-          if (currentPrefix !== expectedPrefix) prefixStale = true
-        }
-      }
-      if (categoryChanged || prefixStale) {
-        try {
-          newSku = (await generateProductSku(categoryId || null)).toUpperCase()
-        } catch {
-          newSku = null
-        }
-      }
-    }
 
     const setClauses: string[] = [
       'name = $1', 'slug = $2', 'description = $3', 'category_id = $4',
@@ -191,9 +165,9 @@ async function updateProduct(productId: string, formData: FormData) {
       costPrice,
       new Date().toISOString(),
     ]
-    if (newSku) {
+    if (skuFromForm) {
       setClauses.push(`sku = $${params.length + 1}`)
-      params.push(newSku)
+      params.push(skuFromForm)
     }
     if (!hasVariants) {
       setClauses.push(`mpn = $${params.length + 1}`, `gtin = $${params.length + 2}`)
@@ -461,6 +435,15 @@ export default async function EditProductPage({ params }: { params: { id: string
 
   return (
     <div className="p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-6 text-sm">
+        <a href="/admin/products" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+          Products
+        </a>
+        <span className="text-border-default">/</span>
+        <span className="text-foreground font-medium">Edit Product</span>
+      </div>
+
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Edit Product</h1>
         <p className="text-foreground-secondary mt-1">Update product information</p>

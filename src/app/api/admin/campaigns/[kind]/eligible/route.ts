@@ -69,7 +69,7 @@ async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
     }
   }
 
-  const allUserIds = Array.from(new Set([...rows, ...suppressed].map(r => r.user_id).filter(Boolean)))
+  const allUserIds = Array.from(new Set([...rows, ...suppressed].map(r => r.user_id || r.id).filter(Boolean)))
   const users = allUserIds.length > 0
     ? await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; marketing_opt_out: boolean }>(
         `SELECT id::text, email, first_name, last_name, marketing_opt_out FROM users WHERE id = ANY($1::uuid[])`,
@@ -83,11 +83,12 @@ async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
   }
 
   const eligible: EligibleRecipient[] = rows.map((r, idx) => {
-    const u = r.user_id ? userMap.get(r.user_id) : null
-    const refId = r.id || (r.user_id && r.product_id ? `${r.user_id}:${r.product_id}` : `${r.user_id || 'row'}-${idx}`)
+    const userId = r.user_id ?? r.id ?? null
+    const u = userId ? userMap.get(userId) : null
+    const refId = r.id || (r.user_id && r.product_id ? `${r.user_id}:${r.product_id}` : `${userId || 'row'}-${idx}`)
     return {
       reference_id: String(refId),
-      user_id: r.user_id ?? null,
+      user_id: userId,
       user_email: u?.email ?? null,
       user_name: u ? `${u.first_name || ''} ${u.last_name || ''}`.trim() || null : null,
       marketing_opt_out: u?.marketing_opt_out ?? false,
@@ -96,11 +97,12 @@ async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
   })
 
   const suppressedOut = suppressed.map((s, idx) => {
-    const u = s.user_id ? userMap.get(s.user_id) : null
-    const refId = s.reference_id || s.user_id || `sup-${idx}`
+    const userId = s.user_id ?? s.id ?? null
+    const u = userId ? userMap.get(userId) : null
+    const refId = s.reference_id || userId || `sup-${idx}`
     return {
       reference_id: String(refId),
-      user_id: s.user_id ?? null,
+      user_id: userId,
       user_email: u?.email ?? null,
       user_name: u ? `${u.first_name || ''} ${u.last_name || ''}`.trim() || null : null,
       reason: s.reason,

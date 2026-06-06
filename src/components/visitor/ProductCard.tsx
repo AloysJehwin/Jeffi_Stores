@@ -176,31 +176,31 @@ export default function ProductCard({
           </div>
 
           {/* Info */}
-          <div className="p-3 sm:p-5 flex flex-col flex-grow">
-            <h3 className="font-semibold text-base text-foreground mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[3rem]">
+          <div className="p-2.5 sm:p-5 flex flex-col flex-grow">
+            <h3 className="font-semibold text-sm sm:text-base text-foreground mb-1.5 sm:mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
               {name}
             </h3>
-            <div className="text-xs text-foreground-muted mb-3 space-y-1">
-              {brandName && <div>Brand: {brandName}</div>}
-              {categoryName && <div>Category: {categoryName}</div>}
+            <div className="text-xs text-foreground-muted mb-2 sm:mb-3 space-y-0.5">
+              {brandName && <div className="truncate">Brand: {brandName}</div>}
+              {categoryName && <div className="truncate">Category: {categoryName}</div>}
             </div>
             <div className="mt-auto">
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
+              <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2 mb-0.5 sm:mb-1">
+                <span className="text-base sm:text-xl font-bold text-primary-600 dark:text-primary-400 leading-tight">
                   {hasVariants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
                 {mrp && mrp > Number(displayPrice) && (
-                  <span className="text-sm text-foreground-muted line-through">
+                  <span className="text-xs sm:text-sm text-foreground-muted line-through leading-tight">
                     &#x20B9;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-foreground-muted mb-3">Inclusive of all taxes</p>
-              <div className="flex items-center justify-between">
-                <span className={`text-xs font-medium ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>
+              <div className="flex items-center justify-between gap-1">
+                <span className={`text-xs font-medium whitespace-nowrap ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
                 </span>
-                <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-sm transition-all group-hover:translate-x-1">
+                <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all group-hover:translate-x-1">
                   View Details &#x2192;
                 </span>
               </div>

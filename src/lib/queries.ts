@@ -36,6 +36,20 @@ export const VARIANT_MIN_PRICE_SQL = `
   ) AS combined_prices)
 `
 
+export const VARIANT_MIN_MRP_SQL = `
+  (SELECT MIN(mrp) FROM (
+    SELECT pv.mrp
+    FROM product_variants pv
+    WHERE pv.product_id = p.id AND pv.is_active = true AND pv.mrp IS NOT NULL AND pv.mrp > 0
+      AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+    UNION ALL
+    SELECT sv.mrp
+    FROM product_sub_variants sv
+    JOIN product_variants pv ON pv.id = sv.variant_id
+    WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.mrp IS NOT NULL AND sv.mrp > 0
+  ) AS combined_mrps)
+`
+
 export const EFFECTIVE_STOCK_SQL = `
   CASE
     WHEN p.has_variants = true THEN ${VARIANT_INVENTORY_TOTAL_SQL}
@@ -765,6 +779,21 @@ export async function getCustomerById(id: string) {
     FROM customer_health WHERE user_id = $1
   `, [id])
 
+  const assignedCoupons = await queryMany<{
+    id: string; code: string; discount_type: string; discount_value: number;
+    valid_until: string | null; times_used: number; description: string | null;
+  }>(`
+    SELECT DISTINCT ON (c.id) c.id, c.code, c.discount_type, c.discount_value, c.valid_until, c.times_used, c.description
+    FROM coupons c
+    WHERE c.is_active = true
+      AND (c.valid_until IS NULL OR c.valid_until > NOW())
+      AND (
+        c.generated_for_user_id = $1
+        OR EXISTS (SELECT 1 FROM coupon_eligible_users ceu WHERE ceu.coupon_id = c.id AND ceu.user_id = $1)
+      )
+    ORDER BY c.id, c.created_at DESC
+  `, [id])
+
   return {
     ...customer,
     recent_orders: recentOrders,
@@ -777,6 +806,7 @@ export async function getCustomerById(id: string) {
     notes,
     segments,
     health,
+    assigned_coupons: assignedCoupons,
   }
 }
 
@@ -934,7 +964,7 @@ export async function getOrder(id: string) {
             'sub_variant', CASE WHEN oi.sub_variant_id IS NOT NULL THEN
               json_build_object(
                 'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
-                'inventory_quantity', psv.stock_quantity
+                'inventory_quantity', psv.inventory_quantity
               )
             ELSE NULL END
           )

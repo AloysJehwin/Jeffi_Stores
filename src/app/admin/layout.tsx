@@ -30,6 +30,7 @@ export default async function AdminLayout({
 }) {
   const headersList = headers()
   const pathname = headersList.get('x-pathname') || ''
+  const cookieStore = cookies()
 
   const session = await getAdminSession()
 
@@ -98,6 +99,8 @@ export default async function AdminLayout({
     </form>
   )
 
+  const sidebarCollapsed = cookieStore.get('sidebar_collapsed')?.value === 'true'
+
   return (
     <AdminShell
       desktopNavLinks={desktopNavLinks}
@@ -107,6 +110,7 @@ export default async function AdminLayout({
       role={role}
       canUseAgent={role === 'super_admin' || scopes.includes('agent')}
       logoutForm={logoutForm}
+      initialCollapsed={sidebarCollapsed}
     >
       {children}
     </AdminShell>

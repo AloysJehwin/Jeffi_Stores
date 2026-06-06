@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import AdminSidebarNav from './AdminSidebarNav'
 import AdminMobileNav from './AdminMobileNav'
 import AdminAgentTrigger from './AdminAgentTrigger'
 import ThemeToggle from '@/components/ThemeToggle'
 import SessionGuard from './SessionGuard'
 
-const STORAGE_KEY = 'admin_sidebar_collapsed'
+const COOKIE_NAME = 'sidebar_collapsed'
 
 interface NavLink {
   href: string
@@ -24,6 +24,7 @@ interface Props {
   role: string
   canUseAgent: boolean
   logoutForm: React.ReactNode
+  initialCollapsed: boolean
 }
 
 export default function AdminShell({
@@ -35,20 +36,14 @@ export default function AdminShell({
   role,
   canUseAgent,
   logoutForm,
+  initialCollapsed,
 }: Props) {
-  const [collapsed, setCollapsed] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === 'true') setCollapsed(true)
-    setMounted(true)
-  }, [])
+  const [collapsed, setCollapsed] = useState(initialCollapsed)
 
   function toggle() {
     setCollapsed(c => {
       const next = !c
-      localStorage.setItem(STORAGE_KEY, String(next))
+      document.cookie = `${COOKIE_NAME}=${next}; path=/; max-age=31536000; SameSite=Lax`
       return next
     })
   }
@@ -60,54 +55,26 @@ export default function AdminShell({
         navLinks={desktopNavLinks}
         collapsed={collapsed}
         onToggle={toggle}
-        mounted={mounted}
       />
 
       {/* Right column: top bar + content */}
       <div className="flex flex-col flex-1 min-w-0 h-full">
 
         {/* Top bar */}
-        <div className="relative flex items-center justify-between px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0">
+        <div className="flex items-center px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0 gap-3">
 
-          {/* Fixed-position brand + toggle — never shifts with sidebar */}
-          <div className="fixed top-0 left-0 h-12 flex items-center gap-2 px-3 z-50 bg-secondary-500 dark:bg-secondary-700">
-            {/* Mobile hamburger */}
-            <div className="md:hidden flex items-center gap-2">
-              <AdminMobileNav
-                navLinks={allNavLinks}
-                username={displayName}
-                role={role}
-              />
-              <span className="font-bold text-white text-sm">Jeffi Admin</span>
-            </div>
-
-            {/* Desktop: toggle + brand */}
-            <div className="hidden md:flex items-center gap-2">
-              <button
-                type="button"
-                onClick={toggle}
-                title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                className="flex items-center justify-center w-7 h-7 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-              >
-                {collapsed ? (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
-                  </svg>
-                )}
-              </button>
-              <span className="font-bold text-white text-sm select-none">Jeffi Stores</span>
-            </div>
+          {/* Mobile hamburger */}
+          <div className="md:hidden flex items-center gap-2">
+            <AdminMobileNav
+              navLinks={allNavLinks}
+              username={displayName}
+              role={role}
+            />
+            <span className="font-bold text-white text-sm">Jeffi Admin</span>
           </div>
 
-          {/* Spacer so right-side items stay pushed right */}
-          <div />
-
           {/* Right side: avatar + name + role + theme + logout */}
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold shrink-0">
                 {usernameInitial}
@@ -132,3 +99,4 @@ export default function AdminShell({
     </div>
   )
 }
+

@@ -12,7 +12,14 @@ export const dynamic = 'force-dynamic'
 const VALID_PAYMENT_MODES = ['cash', 'upi', 'upi_qr']
 
 const cashSaleItemSchema = z.object({
+  product_id: z.string().uuid().nullable().optional(),
   product_name: z.string().default(''),
+  product_sku: z.string().optional(),
+  variant_id: z.string().uuid().nullable().optional(),
+  sub_variant_id: z.string().uuid().nullable().optional(),
+  variant_name: z.string().optional(),
+  hsn_code: z.string().optional(),
+  gst_rate: z.coerce.number().optional(),
   unit_price: z.coerce.number().min(0),
   quantity: z.coerce.number().positive(),
 })
@@ -130,16 +137,23 @@ export async function POST(request: NextRequest) {
       )
       const saleId = saleResult.rows[0].id
 
+      if (isGSTEnabled && invoiceNumber && fy && seq !== null) {
+        await client.query(
+          `INSERT INTO invoices (order_id, sale_id, invoice_number, financial_year, sequence_number) VALUES (NULL, $1, $2, $3, $4)`,
+          [saleId, invoiceNumber, fy, seq]
+        )
+      }
+
       for (const item of processedItems) {
         await client.query(
           `INSERT INTO cash_sale_items (
-            sale_id, product_id, product_name, product_sku, variant_id, variant_name,
+            sale_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,$11,$12,$13,$14,$15,$16)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14,$15,$16,$17)`,
           [
             saleId, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.variant_name,
+            item.variant_id, item.sub_variant_id, item.variant_name,
             item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
@@ -150,16 +164,17 @@ export async function POST(request: NextRequest) {
       for (const item of processedItems) {
         if (!item.product_id) continue
         const qty = item.quantity
+        let stockBefore = 0
 
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
             [item.sub_variant_id]
           )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < qty) {
+          stockBefore = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
+          if (stockBefore < qty) {
             throw new Error(
-              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
+              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stockBefore}, required: ${qty}`
             )
           }
           await client.query(
@@ -171,10 +186,10 @@ export async function POST(request: NextRequest) {
             `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
             [item.variant_id]
           )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < qty) {
+          stockBefore = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
+          if (stockBefore < qty) {
             throw new Error(
-              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
+              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stockBefore}, required: ${qty}`
             )
           }
           await client.query(
@@ -186,10 +201,10 @@ export async function POST(request: NextRequest) {
             `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
             [item.product_id]
           )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < qty) {
+          stockBefore = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
+          if (stockBefore < qty) {
             throw new Error(
-              `Insufficient stock for "${item.product_name}" — available: ${stock}, required: ${qty}`
+              `Insufficient stock for "${item.product_name}" — available: ${stockBefore}, required: ${qty}`
             )
           }
           await client.query(
@@ -206,6 +221,7 @@ export async function POST(request: NextRequest) {
           quantityChange: -qty,
           referenceType: 'cash_sale',
           referenceId: saleId,
+          currentStock: stockBefore,
         })
       }
 

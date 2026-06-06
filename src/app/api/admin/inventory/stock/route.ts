@@ -92,10 +92,12 @@ export async function PATCH(request: NextRequest) {
       await logStockMovement(client, {
         productId: product_id,
         variantId: variant_id || null,
+        subVariantId: sub_variant_id || null,
         transactionType: 'adjustment',
         quantityChange: change,
         referenceType: 'manual',
         referenceId: product_id,
+        currentStock: currentQty,
         notes: notes || `Manual adjustment to ${new_quantity}`,
       })
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Toggle from '@/components/ui/Toggle'
+import AIEnrichButton from './AIEnrichButton'
 
 interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
@@ -12,6 +13,8 @@ interface BrandFormProps {
 export default function BrandForm({ action, brand }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [brandName, setBrandName] = useState<string>(brand?.name || '')
+  const [description, setDescription] = useState<string>(brand?.description || '')
   const [isActive, setIsActive] = useState<boolean>(brand?.is_active ?? true)
   const [returnAllowed, setReturnAllowed] = useState<boolean>(brand?.return_allowed ?? true)
   const [returnDays, setReturnDays] = useState<number>(brand?.return_window_days ?? 7)
@@ -56,8 +59,9 @@ export default function BrandForm({ action, brand }: BrandFormProps) {
               id="name"
               name="name"
               required
-              defaultValue={brand?.name}
+              value={brandName}
               onChange={e => {
+                setBrandName(e.target.value)
                 const slugInput = document.getElementById('slug') as HTMLInputElement
                 if (slugInput && !brand) {
                   slugInput.value = generateSlug(e.target.value)
@@ -116,14 +120,23 @@ export default function BrandForm({ action, brand }: BrandFormProps) {
             <label htmlFor="description" className="block text-sm font-medium text-foreground-secondary mb-2">
               Description
             </label>
-            <textarea
-              id="description"
-              name="description"
-              rows={3}
-              defaultValue={brand?.description || ''}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="Enter brand description"
-            />
+            <AIEnrichButton
+              fieldLabel="Description"
+              value={description}
+              onChange={setDescription}
+              context={`Brand: ${brandName}`}
+              multiline
+            >
+              <textarea
+                id="description"
+                name="description"
+                rows={3}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                className="w-full px-4 py-2 pr-8 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="Enter brand description"
+              />
+            </AIEnrichButton>
           </div>
 
           <div className="md:col-span-2">
