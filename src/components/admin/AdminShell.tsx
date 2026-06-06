@@ -67,7 +67,7 @@ export default function AdminShell({
       <div className="flex flex-col flex-1 min-w-0 h-full">
 
         {/* Top bar */}
-        <div className="relative flex items-center justify-between px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0">
+        <div className="flex items-center px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0 gap-3">
 
           {/* Brand + toggle */}
           <div className="flex items-center gap-2">
@@ -104,7 +104,7 @@ export default function AdminShell({
           </div>
 
           {/* Right side: avatar + name + role + theme + logout */}
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold shrink-0">
                 {usernameInitial}
