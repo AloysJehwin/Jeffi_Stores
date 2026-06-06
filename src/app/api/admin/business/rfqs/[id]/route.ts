@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany, query } from '@/lib/db'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await requireAdminScope(request, 'business_rfqs')
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const rfq = await queryOne<any>(
     `SELECT r.*, u.first_name, u.last_name, u.email, u.phone, bp.company_name, bp.gst_number
      FROM business_rfqs r
-     JOIN users u ON u.id = r.user_id
+     JOIN users u ON u.id = r.user_id AND u.user_type = 'business'
      LEFT JOIN business_profiles bp ON bp.user_id = r.user_id
      WHERE r.id = $1`,
     [params.id]
@@ -27,4 +27,21 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   )
 
   return NextResponse.json({ rfq, items })
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  const admin = await requireAdminScope(request, 'business_rfqs')
+  if (admin instanceof NextResponse) return admin
+
+  const { status, adminNote } = await request.json()
+  if (!['reviewed', 'rejected'].includes(status)) {
+    return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+  }
+
+  await query(
+    `UPDATE business_rfqs SET status=$1, admin_note=$2, reviewed_at=NOW() WHERE id=$3`,
+    [status, adminNote || null, params.id]
+  )
+
+  return NextResponse.json({ ok: true })
 }
