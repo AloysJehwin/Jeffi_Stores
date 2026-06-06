@@ -209,7 +209,18 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle, mounted
   if (collapsed) {
     return (
       <aside className="hidden md:flex flex-col w-12 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto">
-        <div className="h-12 border-b border-white/10 shrink-0" />
+        <div className="h-12 flex items-center justify-center border-b border-white/10 shrink-0">
+          <button
+            type="button"
+            onClick={onToggle}
+            title="Expand sidebar"
+            className="flex items-center justify-center w-7 h-7 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
         <nav className="flex flex-col items-center gap-0 p-1.5 flex-1 overflow-y-auto pt-2">
           {ungrouped.map(link => {
             const isActive = pathname === link.href || (link.href !== '/admin/dashboard' && pathname?.startsWith(link.href))
@@ -256,7 +267,19 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle, mounted
 
   return (
     <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-y-auto">
-      <div className="h-12 border-b border-white/10 shrink-0" />
+      <div className="h-12 flex items-center gap-2 px-3 border-b border-white/10 shrink-0">
+        <button
+          type="button"
+          onClick={onToggle}
+          title="Collapse sidebar"
+          className="flex items-center justify-center w-7 h-7 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <span className="font-bold text-white text-sm select-none">Jeffi Stores</span>
+      </div>
       <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
         {ungrouped.map(link => (
           <a
