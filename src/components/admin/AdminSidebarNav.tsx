@@ -185,10 +185,9 @@ interface Props {
   navLinks: NavLink[]
   collapsed: boolean
   onToggle: () => void
-  mounted: boolean
 }
 
-export default function AdminSidebarNav({ navLinks, collapsed, onToggle, mounted }: Props) {
+export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props) {
   const pathname = usePathname()
 
   const ungrouped = navLinks.filter(l => !l.group)
@@ -199,12 +198,6 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle, mounted
     }
     return acc
   }, {})
-
-  if (!mounted) {
-    return (
-      <aside className="hidden md:block shrink-0 bg-secondary-500 dark:bg-secondary-700 h-screen w-12" />
-    )
-  }
 
   if (collapsed) {
     return (
