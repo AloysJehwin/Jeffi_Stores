@@ -7,6 +7,7 @@ interface NavLink {
   href: string
   label: string
   group?: string
+  exactMatch?: boolean
 }
 
 const NAV_ICONS: Record<string, JSX.Element> = {
@@ -187,6 +188,14 @@ interface Props {
   onToggle: () => void
 }
 
+function isNavActive(link: NavLink, currentPath: string | null): boolean {
+  if (!currentPath) return false
+  if (currentPath === link.href) return true
+  if (link.exactMatch || link.href === '/admin/dashboard') return false
+  return currentPath.startsWith(link.href + '/')
+}
+
+
 export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props) {
   const pathname = usePathname()
 
@@ -216,7 +225,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
         </div>
         <nav className="flex flex-col items-center gap-0 p-1.5 flex-1 overflow-y-auto pt-2">
           {ungrouped.map(link => {
-            const isActive = pathname === link.href || (link.href !== '/admin/dashboard' && pathname?.startsWith(link.href))
+            const isActive = isNavActive(link, pathname)
             return (
               <a
                 key={link.href}
@@ -237,7 +246,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
                 {groupName.slice(0, 3)}
               </span>
               {links.map(link => {
-                const isActive = pathname === link.href || (link.href !== '/admin/dashboard' && pathname?.startsWith(link.href))
+                const isActive = isNavActive(link, pathname)
                 return (
                   <a
                     key={link.href}
@@ -279,7 +288,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
             key={link.href}
             href={link.href}
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              pathname === link.href || (link.href !== '/admin/dashboard' && pathname?.startsWith(link.href))
+              isNavActive(link, pathname)
                 ? 'bg-white/20 text-white'
                 : 'text-gray-300 hover:bg-white/10 hover:text-white'
             }`}
@@ -302,7 +311,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
 }
 
 function SidebarGroup({ groupName, links, pathname }: { groupName: string; links: NavLink[]; pathname: string | null }) {
-  const isAnyActive = links.some(l => pathname === l.href || pathname?.startsWith(l.href))
+  const isAnyActive = links.some(l => isNavActive(l, pathname))
   const [isOpen, setIsOpen] = useState(isAnyActive)
 
   return (
@@ -330,7 +339,7 @@ function SidebarGroup({ groupName, links, pathname }: { groupName: string; links
               key={link.href}
               href={link.href}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                pathname === link.href || pathname?.startsWith(link.href)
+                isNavActive(link, pathname)
                   ? 'bg-white/20 text-white'
                   : 'text-gray-400 hover:bg-white/10 hover:text-white'
               }`}

@@ -1181,7 +1181,7 @@ export default function FinancialClient() {
 
   function handleTabChange(key: Tab) {
     setTab(key)
-    router.replace(`/admin/financial?tab=${key}`, { scroll: false })
+    router.push(`/admin/financial?tab=${key}`, { scroll: false })
   }
 
   return (

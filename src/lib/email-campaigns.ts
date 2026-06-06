@@ -106,18 +106,20 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
 }
 
 interface Recipient {
+  user_id: string
   email: string
   first_name: string | null
 }
 
 async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
-  const base = `SELECT u.email, u.first_name FROM users u`
+  const base = `SELECT u.id AS user_id, u.email, u.first_name FROM users u`
+  const base_cp = `SELECT u.id AS user_id, u.email, u.first_name FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
   const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL`
 
   if (audienceType === 'customer_type') {
     const types = audienceFilter.customerTypes as string[]
     return queryMany<Recipient>(
-      `${base} JOIN customer_profiles cp ON cp.user_id = u.id ${where} AND cp.customer_type = ANY($1)`,
+      `${base_cp} ${where} AND cp.customer_type = ANY($1)`,
       [types]
     )
   }
@@ -127,6 +129,34 @@ async function resolveAudience(audienceType: string, audienceFilter: Record<stri
     return queryMany<Recipient>(
       `${base} ${where} AND u.id IN (SELECT DISTINCT user_id FROM orders WHERE created_at > NOW() - INTERVAL '${days} days' AND user_id IS NOT NULL)`
     )
+  }
+
+  if (audienceType === 'specific_user') {
+    const userId = audienceFilter.userId as string
+    return queryMany<Recipient>(
+      `SELECT u.id AS user_id, u.email, u.first_name FROM users u WHERE u.id = $1 AND u.email IS NOT NULL`,
+      [userId]
+    )
+  }
+
+  if (audienceType === 'segment') {
+    const seg = audienceFilter.segment as string
+    const segConditions: Record<string, string> = {
+      vip:      `COALESCE(o.lifetime_value,0)>=50000`,
+      loyal:    `COALESCE(o.paid_orders,0)>=5 AND COALESCE(o.lifetime_value,0)>=25000`,
+      b2b:      `(cp.gst_number IS NOT NULL OR cp.company_name IS NOT NULL)`,
+      repeat:   `COALESCE(o.order_count,0)>=3`,
+      one_time: `COALESCE(o.order_count,0)=1`,
+      new:      `u.created_at>=NOW()-INTERVAL'30 days'`,
+      at_risk:  `o.last_order_at IS NOT NULL AND o.last_order_at<NOW()-INTERVAL'90 days' AND o.last_order_at>=NOW()-INTERVAL'180 days'`,
+      dormant:  `o.last_order_at IS NOT NULL AND o.last_order_at<NOW()-INTERVAL'180 days'`,
+      lead:     `COALESCE(o.order_count,0)=0`,
+    }
+    const cond = segConditions[seg]
+    if (cond) {
+      const from = `SELECT u.id AS user_id, u.email, u.first_name FROM users u LEFT JOIN (SELECT user_id, COUNT(*) AS order_count, SUM(total_amount) AS lifetime_value, MAX(created_at) AS last_order_at, COUNT(*) FILTER (WHERE payment_status='paid') AS paid_orders FROM orders GROUP BY user_id) o ON o.user_id=u.id LEFT JOIN customer_profiles cp ON cp.user_id=u.id`
+      return queryMany<Recipient>(`${from} ${where} AND ${cond}`)
+    }
   }
 
   return queryMany<Recipient>(`${base} ${where}`)
@@ -154,9 +184,38 @@ export async function sendCampaign(campaignId: string): Promise<{ sent: number; 
   let sent = 0
   let failed = 0
 
+  // Resolve coupon once — add recipients to coupon_eligible_users, not clone
+  const sourceCouponId = campaign.audience_filter.couponId as string | undefined
+  let sourceCoupon: {
+    id: string; code: string; discount_type: string; discount_value: number;
+  } | null = null
+  if (sourceCouponId) {
+    sourceCoupon = await queryOne(
+      `SELECT id, code, discount_type, discount_value FROM coupons WHERE id = $1`,
+      [sourceCouponId]
+    )
+  }
+
   for (const recipient of recipients) {
-    const { subject, html } = renderCampaignEmail(campaign.template_key, { ...campaign.template_data, subject: campaign.subject }, recipient.first_name || undefined)
     try {
+      let templateData: Record<string, string> = { ...campaign.template_data, subject: campaign.subject }
+
+      if (sourceCoupon) {
+        // Grant coupon access to this recipient
+        await query(
+          `INSERT INTO coupon_eligible_users (coupon_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [sourceCoupon.id, recipient.user_id]
+        )
+        const valLabel = sourceCoupon.discount_type === 'percentage'
+          ? `${sourceCoupon.discount_value}% off`
+          : `₹${sourceCoupon.discount_value} off`
+        templateData = {
+          ...templateData,
+          body: [templateData.body, `\nUse coupon code <strong>${sourceCoupon.code}</strong> for ${valLabel} on your next order.`].filter(Boolean).join('\n'),
+        }
+      }
+
+      const { subject, html } = renderCampaignEmail(campaign.template_key, templateData, recipient.first_name || undefined)
       await transporter.sendMail({ from: FROM, to: recipient.email, subject, html })
       await query(
         `INSERT INTO email_campaign_logs (campaign_id, email, status) VALUES ($1, $2, 'sent')`,

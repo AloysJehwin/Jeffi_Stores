@@ -79,7 +79,7 @@ export default function GSTPage() {
 
   function handleTabChange(id: Tab) {
     setTab(id)
-    router.replace(`/admin/gst?tab=${id}`, { scroll: false })
+    router.push(`/admin/gst?tab=${id}`, { scroll: false })
   }
   const [preset, setPreset] = useState('this_month')
   const initial = getPresetRange('this_month')

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 
 import { useState } from 'react'
 import Link from 'next/link'
-import CrmCampaignPanel from './CrmCampaignPanel'
+import CrmMailerPanel from './CrmMailerPanel'
 
 interface ChurnRisk {
   id: string
@@ -114,10 +114,10 @@ export default function ChurnRisksCard({ items }: { items: ChurnRisk[] }) {
                   {items.map(c => <Row key={c.id} c={c} large />)}
                 </div>
               </div>
-              {/* Right: campaign panel */}
+              {/* Right: mailer panel */}
               <div className="flex flex-col flex-1 min-w-0">
                 <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
-                  <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Campaign</h3>
+                  <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Send Mailer</h3>
                   <Link
                     href="/admin/customers?segment=dormant"
                     className="text-xs text-accent-500 hover:text-accent-600 font-medium"
@@ -127,8 +127,9 @@ export default function ChurnRisksCard({ items }: { items: ChurnRisk[] }) {
                   </Link>
                 </div>
                 <div className="overflow-y-auto flex-1 px-6 pb-6">
-                  <CrmCampaignPanel
-                    defaultKind="winback_180"
+                  <CrmMailerPanel
+                    segmentKey="at_risk"
+                    segmentLabel="Churn Risk"
                     recipientCount={items.length}
                     onClose={() => setOpen(false)}
                   />

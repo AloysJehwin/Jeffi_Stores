@@ -72,7 +72,27 @@ export default function QuotationsClient() {
   const { showToast, showConfirm } = useToast()
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [view, setView] = useState<View>('list')
+  const [view, setViewState] = useState<View>(() => {
+    return searchParams.get('view') === 'editor' ? 'editor' : 'list'
+  })
+
+  // sync view state when URL changes (browser back/forward)
+  useEffect(() => {
+    const next: View = searchParams.get('view') === 'editor' ? 'editor' : 'list'
+    setViewState(next)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  function navigateView(next: View) {
+    setViewState(next)
+    if (next === 'list') {
+      router.back()
+    } else {
+      const params = new URLSearchParams(window.location.search)
+      params.set('view', next)
+      router.push(`/admin/quotations?${params.toString()}`, { scroll: false })
+    }
+  }
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [selectedQuote, setSelectedQuote] = useState<Quotation | null>(null)
   const [loading, setLoading] = useState(true)
@@ -200,7 +220,7 @@ export default function QuotationsClient() {
     setIsFinal(false)
     setAutoSaveStatus('idle')
     isEditorMounted.current = false
-    setView('editor')
+    navigateView('editor')
   }
 
   async function openEdit(id: string) {
@@ -251,7 +271,7 @@ export default function QuotationsClient() {
       setConvertedOrderId(q.converted_order_id || null)
       setAutoSaveStatus('idle')
       isEditorMounted.current = false
-      setView('editor')
+      navigateView('editor')
     } catch {
       setError('Failed to load quotation')
     }
@@ -351,7 +371,7 @@ export default function QuotationsClient() {
       setTimeout(() => setAutoSaveStatus('idle'), 2000)
       if (newStatus === 'final') {
         setIsFinal(true)
-        setView('list')
+        navigateView('list')
       }
     } catch (e: any) {
       setSaveError(e.message || 'Save failed')
@@ -682,7 +702,7 @@ export default function QuotationsClient() {
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => setView('list')}
+        <button onClick={() => navigateView('list')}
           className="p-2 text-foreground-secondary hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />

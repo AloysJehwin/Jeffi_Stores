@@ -41,6 +41,14 @@ export default async function EditCouponPage({ params, searchParams }: { params:
   const isPersonal = coupon.auto_generated && coupon.generated_for_user_id
   const isCampaign = coupon.auto_generated && !!coupon.generated_for_campaign && !coupon.generated_for_user_id
 
+  // Count users assigned via coupon_eligible_users (mailer-assigned)
+  const mailerEligibleCount = await queryCount(
+    `SELECT COUNT(*) FROM coupon_eligible_users WHERE coupon_id = $1`,
+    [coupon.id]
+  )
+  const hasMailerEligible = mailerEligibleCount > 0
+
+
   const [eligibleUsers, usersTotal] = isPersonal
     ? [
         await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
@@ -67,6 +75,20 @@ export default async function EditCouponPage({ params, searchParams }: { params:
           `SELECT COUNT(DISTINCT user_id) FROM email_campaigns_sent WHERE campaign_kind = $1`,
           [coupon.generated_for_campaign]
         ),
+      ])
+    : hasMailerEligible
+    ? await Promise.all([
+        queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
+          `SELECT u.id, u.email, u.first_name, u.last_name,
+             COALESCE((SELECT COUNT(*) FROM coupon_usage cu WHERE cu.coupon_id = $1 AND cu.user_id = u.id), 0)::int AS times_used
+           FROM coupon_eligible_users ceu
+           JOIN users u ON u.id = ceu.user_id
+           WHERE ceu.coupon_id = $1
+           ORDER BY ceu.added_at DESC
+           LIMIT $2 OFFSET $3`,
+          [coupon.id, USERS_PAGE_SIZE, usersOffset]
+        ),
+        queryCount(`SELECT COUNT(*) FROM coupon_eligible_users WHERE coupon_id = $1`, [coupon.id]),
       ])
     : await Promise.all([
         queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
@@ -151,14 +173,22 @@ export default async function EditCouponPage({ params, searchParams }: { params:
                 ? 'This coupon is personal — only the user below can redeem it'
                 : isCampaign
                 ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} received this campaign — only they have this code`
+                : hasMailerEligible
+                ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} were granted this coupon via mailer — only they can redeem it`
                 : `All ${usersTotal} active users can redeem this coupon`}
             </p>
           </div>
-          {!coupon.auto_generated && (
+          {!coupon.auto_generated && !hasMailerEligible && (
             <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
               All Users
             </span>
           )}
+          {hasMailerEligible && !coupon.auto_generated && (
+            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+              Mailer-assigned
+            </span>
+          )}
+
           {coupon.generated_for_campaign && (
             <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
               {coupon.generated_for_campaign}
