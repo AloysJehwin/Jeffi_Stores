@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DateTimePicker from '@/components/ui/DateTimePicker'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 const TEMPLATES = [
   { value: 'review_form_share', label: 'Review Form Share', description: 'Send customers a link to your review incentive form with a coupon reward' },
@@ -218,8 +219,15 @@ export default function NewCampaignPage() {
               <input value={title} onChange={e => setTitle(e.target.value)} className={inputClass} placeholder="e.g. May Google Review Push" />
             </div>
             <div>
-              <label className={labelClass}>Email Subject *</label>
-              <input value={subject} onChange={e => setSubject(e.target.value)} className={inputClass} placeholder="Subject line customers will see" required />
+              <AIEnrichButton
+                fieldLabel="Email Subject"
+                value={subject}
+                onChange={setSubject}
+                context={`Template: ${templateKey}`}
+              >
+                <label className={labelClass}>Email Subject *</label>
+              </AIEnrichButton>
+              <input value={subject} onChange={e => setSubject(e.target.value)} className={`${inputClass} mt-1.5`} placeholder="Subject line customers will see" required />
             </div>
 
             {templateKey === 'review_form_share' && (
@@ -260,8 +268,18 @@ export default function NewCampaignPage() {
 
             {(templateKey === 'promotion' || templateKey === 'announcement') && (
               <>
-                <div><label className={labelClass}>Headline *</label><input value={templateData.headline || ''} onChange={e => setField('headline', e.target.value)} className={inputClass} placeholder="e.g. 20% Off Storewide This Weekend!" /></div>
-                <div><label className={labelClass}>Body *</label><textarea value={templateData.body || ''} onChange={e => setField('body', e.target.value)} rows={4} className={textareaClass} placeholder="Email body text..." /></div>
+                <div>
+                  <AIEnrichButton fieldLabel="Headline" value={templateData.headline || ''} onChange={v => setField('headline', v)} context={`Template: ${templateKey}`}>
+                    <label className={labelClass}>Headline *</label>
+                  </AIEnrichButton>
+                  <input value={templateData.headline || ''} onChange={e => setField('headline', e.target.value)} className={`${inputClass} mt-1.5`} placeholder="e.g. 20% Off Storewide This Weekend!" />
+                </div>
+                <div>
+                  <AIEnrichButton fieldLabel="Body" value={templateData.body || ''} onChange={v => setField('body', v)} context={`Subject: ${subject}; Template: ${templateKey}`}>
+                    <label className={labelClass}>Body *</label>
+                  </AIEnrichButton>
+                  <textarea value={templateData.body || ''} onChange={e => setField('body', e.target.value)} rows={4} className={`${textareaClass} mt-1.5`} placeholder="Email body text..." />
+                </div>
                 {templateKey === 'promotion' && (
                   <>
                     <div><label className={labelClass}>CTA Button Text</label><input value={templateData.ctaText || ''} onChange={e => setField('ctaText', e.target.value)} className={inputClass} placeholder="Shop Now" /></div>
@@ -275,7 +293,12 @@ export default function NewCampaignPage() {
               <>
                 <div><label className={labelClass}>Event Name *</label><input value={templateData.eventName || ''} onChange={e => setField('eventName', e.target.value)} className={inputClass} placeholder="e.g. Grand Sale Weekend" /></div>
                 <div><label className={labelClass}>Event Date</label><input value={templateData.eventDate || ''} onChange={e => setField('eventDate', e.target.value)} className={inputClass} placeholder="e.g. Saturday, 10 May 2025, 10am–8pm" /></div>
-                <div><label className={labelClass}>Event Details *</label><textarea value={templateData.eventDetails || ''} onChange={e => setField('eventDetails', e.target.value)} rows={4} className={textareaClass} placeholder="Tell customers what to expect..." /></div>
+                <div>
+                  <AIEnrichButton fieldLabel="Event Details" value={templateData.eventDetails || ''} onChange={v => setField('eventDetails', v)} context={`Event: ${templateData.eventName || ''}; Date: ${templateData.eventDate || ''}`}>
+                    <label className={labelClass}>Event Details *</label>
+                  </AIEnrichButton>
+                  <textarea value={templateData.eventDetails || ''} onChange={e => setField('eventDetails', e.target.value)} rows={4} className={`${textareaClass} mt-1.5`} placeholder="Tell customers what to expect..." />
+                </div>
                 <div><label className={labelClass}>CTA URL</label><input value={templateData.ctaUrl || ''} onChange={e => setField('ctaUrl', e.target.value)} className={inputClass} placeholder="https://jeffistores.in" /></div>
               </>
             )}
