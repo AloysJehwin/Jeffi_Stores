@@ -455,10 +455,13 @@ function BusinessSignUpPage() {
               <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Locality / Area</label>
                 {localities.length > 0 ? (
-                  <select value={locality} onChange={e => setLocality(e.target.value)} className={inputCls}>
-                    <option value="">Select locality…</option>
-                    {localities.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
+                  <AdminSelect
+                    value={locality}
+                    onChange={setLocality}
+                    placeholder="Select locality…"
+                    options={localities.map(l => ({ value: l, label: l }))}
+                    sm
+                  />
                 ) : (
                   <input type="text" value={locality} onChange={e => setLocality(e.target.value)}
                     className={inputCls} placeholder="Locality / area name" />
