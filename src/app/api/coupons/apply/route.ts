@@ -35,8 +35,6 @@ export async function POST(request: NextRequest) {
       valid_from: string | null
       valid_until: string | null
       is_active: boolean
-      auto_generated: boolean
-      generated_for_user_id: string | null
     }>(
       `SELECT * FROM coupons WHERE code = $1`,
       [code.toUpperCase().trim()]
@@ -48,10 +46,6 @@ export async function POST(request: NextRequest) {
 
     if (!coupon.is_active) {
       return NextResponse.json({ error: 'This coupon is no longer active' }, { status: 400 })
-    }
-
-    if (coupon.auto_generated && coupon.generated_for_user_id && coupon.generated_for_user_id !== authUser.userId) {
-      return NextResponse.json({ error: 'This coupon is not valid for your account' }, { status: 403 })
     }
 
     const now = new Date()

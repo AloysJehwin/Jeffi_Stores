@@ -6,7 +6,7 @@ import {
   canSendMarketing,
   alreadySentForReference,
   recordSent,
-  generateCouponForUser,
+  generateCouponForCampaign,
   getAssignedCouponCode,
   buildUnsubscribeUrl,
   renderTemplate,
@@ -163,7 +163,7 @@ export function renderHeroProduct(item: { name: string; imageUrl?: string | null
     </table>`
 }
 
-export async function resolveCoupon(campaign: Campaign, userId: string): Promise<{ couponCode: string; discountPercent: number }> {
+export async function resolveCoupon(campaign: Campaign, _userId: string): Promise<{ couponCode: string; discountPercent: number }> {
   if (campaign.coupon_id) {
     const info = await getAssignedCouponCode(campaign.coupon_id)
     if (info) {
@@ -172,8 +172,7 @@ export async function resolveCoupon(campaign: Campaign, userId: string): Promise
     }
   }
   if (campaign.discount_percent > 0) {
-    const code = await generateCouponForUser({
-      userId,
+    const code = await generateCouponForCampaign({
       campaignKind: campaign.kind as CampaignKind,
       discountPercent: campaign.discount_percent,
       expiresInDays: 14,
