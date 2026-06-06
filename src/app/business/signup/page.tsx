@@ -418,12 +418,6 @@ function BusinessSignUpPage() {
 
               {/* Structured address */}
               <div>
-                <label className="block text-xs font-medium text-foreground-secondary mb-1">Flat / Building / Street</label>
-                <input type="text" value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
-                  className={inputCls} placeholder="e.g. 12, MG Road" />
-              </div>
-
-              <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1">PIN Code *</label>
                 <div className="relative">
                   <input
