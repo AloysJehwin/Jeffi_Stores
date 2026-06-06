@@ -643,8 +643,14 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                           onChange={e => {
                             const raw = e.target.value
                             const next = { ...form.parameters }
-                            if (raw === '') delete next[key]
-                            else next[key] = def.type === 'integer' ? parseInt(raw, 10) : parseFloat(raw)
+                            if (raw === '') {
+                              delete next[key]
+                            } else {
+                              const parsed = def.type === 'integer' ? parseInt(raw, 10) : parseFloat(raw)
+                              // treat 0 as blank for fields with min >= 1
+                              if (parsed === 0 && (def.min ?? 0) >= 1) delete next[key]
+                              else next[key] = parsed
+                            }
                             setForm({ ...form, parameters: next })
                           }}
                           className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
