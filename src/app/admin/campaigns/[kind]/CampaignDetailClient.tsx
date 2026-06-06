@@ -479,22 +479,22 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         </div>
 
         <div className="mt-4">
+          <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+            Subject line
+          </label>
           <AIEnrichButton
             fieldLabel="Subject line"
             value={form.subject_template}
             onChange={v => setForm({ ...form, subject_template: v })}
             context={`Campaign: ${campaign.name ?? ''}`}
           >
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-              Subject line
-            </label>
+            <input
+              type="text"
+              value={form.subject_template}
+              onChange={e => setForm({ ...form, subject_template: e.target.value })}
+              className="w-full px-3 py-2 pr-8 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            />
           </AIEnrichButton>
-          <input
-            type="text"
-            value={form.subject_template}
-            onChange={e => setForm({ ...form, subject_template: e.target.value })}
-            className="w-full mt-1.5 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-          />
         </div>
 
         <div className="mt-4">

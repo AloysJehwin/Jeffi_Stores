@@ -136,22 +136,23 @@ export default function CouponForm({ action, submitLabel, defaultValues: d = {} 
           </div>
 
           <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-3">
+            <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Description</h2>
             <AIEnrichButton
               fieldLabel="Coupon Description"
               value={couponDescription}
               onChange={setCouponDescription}
               context={`Coupon code: ${d.code ?? 'new coupon'}`}
+              multiline
             >
-              <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Description</h2>
+              <textarea
+                name="description"
+                rows={3}
+                value={couponDescription}
+                onChange={e => setCouponDescription(e.target.value)}
+                className={`${inputClass} pr-8`}
+                placeholder="e.g. 10% off for Google review submission"
+              />
             </AIEnrichButton>
-            <textarea
-              name="description"
-              rows={3}
-              value={couponDescription}
-              onChange={e => setCouponDescription(e.target.value)}
-              className={inputClass}
-              placeholder="e.g. 10% off for Google review submission"
-            />
           </div>
         </div>
 
