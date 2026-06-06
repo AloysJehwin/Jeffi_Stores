@@ -176,10 +176,15 @@ export async function validateCouponForUser(params: {
     id: string; discount_type: string; discount_value: number;
     min_purchase_amount: number | null; max_discount_amount: number | null;
     usage_limit: number | null; usage_limit_per_user: number | null;
-    times_used: number; valid_from: string | null; valid_until: string | null; is_active: boolean
+    times_used: number; valid_from: string | null; valid_until: string | null; is_active: boolean;
+    auto_generated: boolean; generated_for_user_id: string | null;
   }>(`SELECT * FROM coupons WHERE id = $1`, [params.couponId])
 
   if (!coupon || !coupon.is_active) return { appliedDiscount: 0, ok: false, reason: 'inactive' }
+
+  if (coupon.auto_generated && coupon.generated_for_user_id && coupon.generated_for_user_id !== params.userId) {
+    return { appliedDiscount: 0, ok: false, reason: 'not_eligible' }
+  }
 
   const now = new Date()
   const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null
