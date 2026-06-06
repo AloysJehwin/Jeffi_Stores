@@ -48,6 +48,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
   )
   const hasMailerEligible = mailerEligibleCount > 0
 
+
   const [eligibleUsers, usersTotal] = isPersonal
     ? [
         await queryMany<{ id: string; email: string; first_name: string | null; last_name: string | null; times_used: number }>(
@@ -187,6 +188,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
               Mailer-assigned
             </span>
           )}
+
           {coupon.generated_for_campaign && (
             <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
               {coupon.generated_for_campaign}

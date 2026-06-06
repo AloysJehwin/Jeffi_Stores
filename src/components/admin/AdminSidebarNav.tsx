@@ -195,6 +195,7 @@ function isNavActive(link: NavLink, currentPath: string | null): boolean {
   return currentPath.startsWith(link.href + '/')
 }
 
+
 export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props) {
   const pathname = usePathname()
 
