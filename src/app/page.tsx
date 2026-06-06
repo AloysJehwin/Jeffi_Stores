@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
-import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import ProductCard from '@/components/visitor/ProductCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +18,8 @@ async function getFeaturedProducts() {
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
+      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+      ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
@@ -184,72 +185,29 @@ export default async function HomePage() {
                   ? product.variant_min_price
                   : (product.price_ex_gst || product.base_price)
                 const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
-                const mrp = product.mrp ? Number(product.mrp) : null
-                const mrpDiscount = mrp && mrp > Number(displayPrice)
-                  ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
+                const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                const inclPrice = hasVariants && product.variant_min_price
+                  ? Number(product.variant_min_price)
+                  : Number(product.base_price)
+                const mrpDiscount = mrp && mrp > inclPrice
+                  ? Math.round(((mrp - inclPrice) / mrp) * 100)
                   : 0
 
                 return (
-                  <Link key={product.id} href={`/products/${product.slug}`} className="group">
-                    <div className="bg-surface-elevated rounded-xl shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-all duration-200 h-full flex flex-col">
-                      <div className="relative aspect-[5/3] border-2 border-gray-300 dark:border-gray-600 overflow-hidden rounded-lg mx-2 mt-2 md:mx-3 md:mt-3">
-                        {primaryImage ? (
-                          <>
-                            <img
-                              src={primaryImage.image_url}
-                              alt=""
-                              aria-hidden="true"
-                              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-60"
-                            />
-                            <div className="relative w-full h-full group-hover:scale-105 transition-transform duration-300">
-                              <ImgWithSkeleton
-                                src={primaryImage.image_url}
-                                alt={product.name}
-                                className="w-full h-full object-contain"
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-surface-secondary">
-                            <svg className="w-10 h-10 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                        )}
-                        {mrpDiscount > 0 && (
-                          <div className="absolute top-2 left-2 bg-accent-500 text-white px-1.5 py-0.5 rounded text-xs font-bold">
-                            {mrpDiscount}% off
-                          </div>
-                        )}
-                        {effectiveStock === 0 && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <span className="bg-white text-secondary-700 text-xs font-bold px-2 py-1 rounded-full">Out of Stock</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-2.5 md:p-4 flex flex-col flex-1">
-                        {(product.categories?.name || product.brands?.name) && (
-                          <p className="text-xs text-foreground-muted mb-0.5 truncate">{product.categories?.name || product.brands?.name}</p>
-                        )}
-                        <h3 className="font-semibold text-xs sm:text-sm text-foreground mb-1.5 group-hover:text-primary-600 transition-colors line-clamp-2 leading-snug flex-1">
-                          {product.name}
-                        </h3>
-                        <div className="flex items-baseline gap-1.5 mt-auto flex-wrap">
-                          <span className="text-sm sm:text-base font-extrabold text-primary-600 dark:text-primary-400">
-                            {hasVariants ? 'From ' : ''}₹{Number(displayPrice).toLocaleString('en-IN')}
-                          </span>
-                          {mrp && mrp > Number(displayPrice) && (
-                            <span className="text-xs text-foreground-muted line-through">
-                              ₹{mrp.toLocaleString('en-IN')}
-                            </span>
-                          )}
-                        </div>
-                        <p className={`text-xs font-medium mt-1 ${effectiveStock > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                          {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
+                  <ProductCard
+                    key={product.id}
+                    id={product.id}
+                    name={product.name}
+                    slug={product.slug}
+                    hasVariants={hasVariants}
+                    displayPrice={Number(displayPrice)}
+                    mrp={mrp}
+                    mrpDiscount={mrpDiscount}
+                    effectiveStock={effectiveStock}
+                    primaryImage={primaryImage || null}
+                    brandName={product.brands?.name || null}
+                    categoryName={product.categories?.name || null}
+                  />
                 )
               })}
             </div>

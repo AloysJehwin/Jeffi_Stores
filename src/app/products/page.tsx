@@ -129,7 +129,18 @@ async function getProducts(searchParams: any) {
         FROM product_sub_variants sv
         JOIN product_variants pv ON pv.id = sv.variant_id
         WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
-      ) AS combined_prices) AS variant_min_price
+      ) AS combined_prices) AS variant_min_price,
+      (SELECT MIN(mrp) FROM (
+        SELECT pv.mrp
+        FROM product_variants pv
+        WHERE pv.product_id = p.id AND pv.is_active = true AND pv.mrp IS NOT NULL AND pv.mrp > 0
+          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+        UNION ALL
+        SELECT sv.mrp
+        FROM product_sub_variants sv
+        JOIN product_variants pv ON pv.id = sv.variant_id
+        WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.mrp IS NOT NULL AND sv.mrp > 0
+      ) AS combined_mrps) AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
@@ -424,9 +435,12 @@ export default async function ProductsPage({
                       ? product.variant_min_price
                       : (product.price_ex_gst || product.base_price)
                     const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
-                    const mrp = product.mrp ? Number(product.mrp) : null
-                    const mrpDiscount = mrp && mrp > Number(displayPrice)
-                      ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
+                    const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                    const inclPrice = hasVariants && product.variant_min_price
+                      ? Number(product.variant_min_price)
+                      : Number(product.base_price)
+                    const mrpDiscount = mrp && mrp > inclPrice
+                      ? Math.round(((mrp - inclPrice) / mrp) * 100)
                       : 0
 
                     return (
