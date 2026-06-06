@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       .sign(JWT_SECRET)
 
     const cookieStore = await cookies()
-    cookieStore.set('auth_token', token, {
+    cookieStore.set('business_auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

@@ -120,10 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      const endpoint = user?.isBusiness ? '/api/business/logout' : '/api/auth/logout'
+      await fetch(endpoint, { method: 'POST' })
     } finally {
       setUser(null)
-      window.location.href = '/'
+      window.location.href = user?.isBusiness ? '/business/signin' : '/'
     }
   }
 
