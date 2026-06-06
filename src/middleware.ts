@@ -59,6 +59,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL(`/purchaseorder${slug}`, request.url))
   }
 
+  if (hostname.startsWith('business.')) {
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    const slug = pathname === '/' ? '' : pathname
+    return NextResponse.rewrite(new URL(`/business${slug}`, request.url))
+  }
+
   if (pathname.startsWith('/forms/')) {
     const slug = pathname.replace('/forms/', '')
     return NextResponse.redirect(new URL(`https://forms.jeffistores.in/${slug}`, request.url), 301)

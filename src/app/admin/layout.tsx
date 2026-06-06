@@ -71,6 +71,8 @@ export default async function AdminLayout({
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews', group: 'Marketing' },
     { href: '/admin/agent', label: 'AI Agent', scope: 'agent', group: 'AI', exactMatch: true },
     { href: '/admin/agent/logs', label: 'Agent Logs', scope: 'agent', group: 'AI' },
+    { href: '/admin/business/customers', label: 'Business Customers', scope: 'business_customers', group: 'Business' },
+    { href: '/admin/business/rfqs', label: 'Business RFQs', scope: 'business_rfqs', group: 'Business' },
     { href: '/admin/inflation', label: 'Inflation', scope: 'inflation', group: 'Settings' },
     { href: '/admin/audit', label: 'Audit Log', scope: 'audit', group: 'Settings', superAdminOnly: true },
     { href: '/admin/team', label: 'Team Members', scope: 'settings', group: 'Settings', superAdminOnly: true },

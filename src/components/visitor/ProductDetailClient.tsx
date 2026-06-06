@@ -5,6 +5,8 @@ import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
 
 import ProductActions from './ProductActions'
+import BusinessPriceBadge from './BusinessPriceBadge'
+import RequestQuoteButton from './RequestQuoteButton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
@@ -363,6 +365,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                   </span>
                 </div>
               )}
+              <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />
             </div>
 
             <div className="mb-6">
@@ -405,6 +408,16 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           lengthRate={product.length_rate ? Number(product.length_rate) : null}
           lengthUnit={product.length_unit || null}
           onVariantChange={handleVariantChange}
+        />
+
+        <RequestQuoteButton
+          items={[{
+            productId: product.id,
+            description: product.name,
+            quantity: 1,
+            unit: 'Nos',
+          }]}
+          className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
         />
 
         {/* Product Specifications */}

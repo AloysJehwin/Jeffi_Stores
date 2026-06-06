@@ -165,6 +165,20 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/audit'],
     group: 'Settings',
   },
+  {
+    key: 'business_customers',
+    label: 'Business Customers',
+    description: 'Manage business partner accounts and approvals',
+    routes: ['/admin/business/customers'],
+    group: 'Business',
+  },
+  {
+    key: 'business_rfqs',
+    label: 'Business RFQs',
+    description: 'View and manage business partner RFQ requests',
+    routes: ['/admin/business/rfqs'],
+    group: 'Business',
+  },
 ]
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
@@ -211,6 +225,9 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/audit')) return 'audit'
   if (pathname.startsWith('/api/admin/cron')) return 'audit'
   if (pathname.startsWith('/api/internal/cron-record')) return null
+  if (pathname.startsWith('/api/admin/business/customers')) return 'business_customers'
+  if (pathname.startsWith('/api/admin/business/discounts')) return 'business_customers'
+  if (pathname.startsWith('/api/admin/business/rfqs')) return 'business_rfqs'
   if (pathname.startsWith('/api/brands')) return 'brands'
   if (pathname.startsWith('/api/customers')) return 'customers'
 
