@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const items = await queryMany<any>(
-    `SELECT ri.*, p.name AS product_name, pv.name AS variant_name
+    `SELECT ri.*, p.name AS product_name, pv.variant_name
      FROM business_rfq_items ri
      LEFT JOIN products p ON p.id = ri.product_id
      LEFT JOIN product_variants pv ON pv.id = ri.variant_id
