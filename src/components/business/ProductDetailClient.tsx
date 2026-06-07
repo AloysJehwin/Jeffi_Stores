@@ -237,7 +237,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
         confirmText: 'Sign In',
         cancelText: 'Maybe Later',
         type: 'info',
-        onConfirm: () => router.push(`/login?redirect=/business/products/${product.slug}`),
+        onConfirm: () => router.push(`/business/signin?redirect=/business/products/${product.slug}`),
       })
       return
     }
