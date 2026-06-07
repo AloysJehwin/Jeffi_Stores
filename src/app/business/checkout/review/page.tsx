@@ -189,7 +189,7 @@ function CheckoutReviewPage() {
         })
         .catch(() => {})
     } else if (!intentToken && !cartLoading && cartCount === 0) {
-      router.replace('/cart')
+      router.replace('/business/cart')
     }
   }, [cartCount, user, authLoading, cartLoading, router, isBuyNow, intentToken])
 
