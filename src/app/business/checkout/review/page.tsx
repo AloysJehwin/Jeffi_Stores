@@ -102,7 +102,7 @@ function CheckoutReviewPage() {
       const currentUrl = intentToken
         ? `/business/checkout/review?intent=${encodeURIComponent(intentToken)}`
         : '/business/checkout/review'
-      router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`)
+      router.push(`/business/signin?redirect=${encodeURIComponent(currentUrl)}`)
       return
     }
 
@@ -113,7 +113,7 @@ function CheckoutReviewPage() {
         .then(async r => {
           const d = await r.json()
           if (!r.ok) {
-            router.push('/')
+            router.push('/business')
             return
           }
           if (d.mode === 'cart') {
@@ -146,7 +146,7 @@ function CheckoutReviewPage() {
             })
             .catch(() => {})
         })
-        .catch(() => router.push('/'))
+        .catch(() => router.push('/business'))
       return
     }
 
@@ -160,7 +160,7 @@ function CheckoutReviewPage() {
       const productName = searchParams.get('productName') || ''
       const variantName = searchParams.get('variantName')
 
-      if (!productId || !price) { router.push('/'); return }
+      if (!productId || !price) { router.push('/business'); return }
 
       setBuyNowItem({
         productId,
@@ -337,7 +337,7 @@ function CheckoutReviewPage() {
       if (buyNowItem.buyUnit) params.set('buyUnit', buyNowItem.buyUnit)
       params.set('price', String(buyNowItem.price))
     }
-    router.push(`/checkout?${params.toString()}`)
+    router.push(`/business/checkout?${params.toString()}`)
   }
 
   if (authLoading || cartLoading) {

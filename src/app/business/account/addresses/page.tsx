@@ -54,7 +54,7 @@ export default function AddressesPage() {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push('/login?redirect=/account/addresses')
+      router.push('/business/signin?redirect=/account/addresses')
     }
     if (user) {
       fetchAddresses()

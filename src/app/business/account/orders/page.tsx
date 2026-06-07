@@ -57,7 +57,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push('/login?redirect=/account/orders')
+      router.push('/business/signin?redirect=/account/orders')
     }
     if (user) {
       fetchOrders(page)
@@ -259,7 +259,7 @@ export default function OrdersPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <Link
-                                  href={`/products/${item.products?.slug}`}
+                                  href={`/business/products/${item.products?.slug}`}
                                   className="font-medium text-foreground hover:text-accent-600 dark:hover:text-accent-400 mb-1 block"
                                 >
                                   {item.product_name}
@@ -291,7 +291,7 @@ export default function OrdersPage() {
                       {/* View Details */}
                       <div className="mt-4 pt-4 border-t border-border-default flex items-center justify-between">
                         <Link
-                          href={`/account/orders/${order.id}`}
+                          href={`/business/account/orders/${order.id}`}
                           className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm"
                         >
                           View Order Details

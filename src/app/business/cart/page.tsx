@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
-import RequestQuoteButton from '@/components/visitor/RequestQuoteButton'
+import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 
 interface AppliedCoupon {
   couponId: string
@@ -192,7 +192,7 @@ export default function CartPage() {
                   <div key={item.id} className="p-4 sm:p-6 border-b border-border-default last:border-b-0">
                     <div className="flex gap-4 sm:gap-6">
                       {/* Product Image */}
-                      <Link href={`/products/${item.products.slug}`} className="flex-shrink-0">
+                      <Link href={`/business/products/${item.products.slug}`} className="flex-shrink-0">
                         <div className="w-24 h-24 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
                           {primaryImage ? (
                             <img
@@ -212,7 +212,7 @@ export default function CartPage() {
 
                       {/* Product Details */}
                       <div className="flex-1">
-                        <Link href={`/products/${item.products.slug}`} className="text-base sm:text-lg font-semibold text-foreground hover:text-accent-600 transition-colors">
+                        <Link href={`/business/products/${item.products.slug}`} className="text-base sm:text-lg font-semibold text-foreground hover:text-accent-600 transition-colors">
                           {item.products.name}
                         </Link>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -385,7 +385,7 @@ export default function CartPage() {
                     const isUpdating = updatingItems.has(item.id)
                     return (
                       <div key={item.id} className="p-4 sm:p-6 flex gap-4">
-                        <Link href={`/products/${item.products.slug}`} className="shrink-0">
+                        <Link href={`/business/products/${item.products.slug}`} className="shrink-0">
                           <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
                             {primaryImage ? (
                               <img
@@ -403,7 +403,7 @@ export default function CartPage() {
                           </div>
                         </Link>
                         <div className="flex-1 min-w-0">
-                          <Link href={`/products/${item.products.slug}`} className="text-base font-semibold text-foreground hover:text-accent-600 transition-colors line-clamp-1">
+                          <Link href={`/business/products/${item.products.slug}`} className="text-base font-semibold text-foreground hover:text-accent-600 transition-colors line-clamp-1">
                             {item.products.name}
                           </Link>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -550,7 +550,7 @@ export default function CartPage() {
               ) : (
                 <div className="space-y-3">
                   <Link
-                    href="/login?redirect=/checkout"
+                    href="/business/signin?redirect=/checkout"
                     className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                   >
                     Login to Checkout
@@ -559,7 +559,7 @@ export default function CartPage() {
                     </svg>
                   </Link>
                   <p className="text-sm text-foreground-secondary text-center">
-                    New customer? <Link href="/signup" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">Create an account</Link>
+                    New customer? <Link href="/business/signup" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">Create an account</Link>
                   </p>
                 </div>
               )}

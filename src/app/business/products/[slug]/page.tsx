@@ -4,9 +4,9 @@ import { cache } from 'react'
 import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
-import ProductDetailClient from '@/components/visitor/ProductDetailClient'
+import ProductDetailClient from '@/components/business/ProductDetailClient'
 import ProductReviews from '@/components/visitor/ProductReviews'
-import ProductCard from '@/components/visitor/ProductCard'
+import ProductCard from '@/components/business/ProductCard'
 import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 
@@ -336,7 +336,7 @@ export default async function ProductDetailPage({
               <>
                 <span className="text-foreground-muted">/</span>
                 <Link
-                  href={`/categories/${product.categories.slug}`}
+                  href={`/business/categories/${product.categories.slug}`}
                   className="text-foreground-muted hover:text-accent-500 whitespace-nowrap hidden sm:inline"
                 >
                   {product.categories.name}
