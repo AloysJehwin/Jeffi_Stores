@@ -98,9 +98,9 @@ export default function AccountPage() {
         lastName: user.lastName || '',
         phone: (user.phone || '').replace(/^\+91/, ''),
       })
-      fetch('/api/user/dashboard')
-        .then(r => r.json())
-        .then(setDashboard)
+      fetch('/api/user/dashboard', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.stats) setDashboard(d) })
         .catch(() => {})
     }
   }, [user, isLoading, router])
@@ -364,17 +364,17 @@ export default function AccountPage() {
             {/* Stats bar */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-surface-elevated rounded-xl border border-border-default p-4 text-center">
-                <p className="text-2xl font-bold text-foreground">{dashboard?.stats.total_orders ?? '—'}</p>
+                <p className="text-2xl font-bold text-foreground">{dashboard?.stats?.total_orders ?? '—'}</p>
                 <p className="text-xs text-foreground-muted mt-1">Total Orders</p>
               </div>
               <div className="bg-surface-elevated rounded-xl border border-border-default p-4 text-center">
                 <p className="text-lg sm:text-2xl font-bold text-foreground leading-tight">
-                  {dashboard ? `₹${Number(dashboard.stats.total_spent).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—'}
+                  {dashboard ? `₹${Number(dashboard.stats?.total_spent ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—'}
                 </p>
                 <p className="text-xs text-foreground-muted mt-1">Total Spent</p>
               </div>
               <div className="bg-surface-elevated rounded-xl border border-border-default p-4 text-center">
-                <p className="text-2xl font-bold text-accent-600 dark:text-accent-400">{dashboard?.stats.active_orders ?? '—'}</p>
+                <p className="text-2xl font-bold text-accent-600 dark:text-accent-400">{dashboard?.stats?.active_orders ?? '—'}</p>
                 <p className="text-xs text-foreground-muted mt-1">Active Orders</p>
               </div>
             </div>
