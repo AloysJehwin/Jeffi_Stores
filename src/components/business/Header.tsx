@@ -88,7 +88,7 @@ export default function BusinessHeader() {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              <SearchBar isOpen={searchOpen} onOpen={() => setSearchOpen(true)} onClose={() => setSearchOpen(false)} />
+              <SearchBar isOpen={searchOpen} onOpen={() => setSearchOpen(true)} onClose={() => setSearchOpen(false)} basePath="/business/products" />
 
               {/* Cart */}
               <Link href="/business/cart" className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group">
