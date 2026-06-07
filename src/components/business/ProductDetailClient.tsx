@@ -192,6 +192,8 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
 
 export default function ProductDetailClient({ product, initialSkuParam }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
+  const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const { user } = useAuth()
@@ -408,11 +410,14 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           lengthRate={product.length_rate ? Number(product.length_rate) : null}
           lengthUnit={product.length_unit || null}
           onVariantChange={handleVariantChange}
+          onSelectionChange={(vId, svId) => { setSelectedVariantId(vId); setSelectedSubVariantId(svId) }}
         />
 
         <RequestQuoteButton
           items={[{
             productId: product.id,
+            variantId: selectedVariantId || undefined,
+            subVariantId: selectedSubVariantId || undefined,
             description: product.name,
             quantity: 1,
             unit: 'Nos',

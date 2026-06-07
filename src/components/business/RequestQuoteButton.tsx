@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 interface QuoteItem {
   productId?: string
   variantId?: string
+  subVariantId?: string
   description: string
   quantity: number
   unit?: string

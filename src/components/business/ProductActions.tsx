@@ -62,6 +62,7 @@ interface ProductActionsProps {
   lengthRate?: number | null
   lengthUnit?: string | null
   onVariantChange?: (variant: Variant | null) => void
+  onSelectionChange?: (variantId: string | null, subVariantId: string | null) => void
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -86,7 +87,7 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
   variants, variantType, initialSkuParam,
   weightRate, weightUnit, lengthRate, lengthUnit,
-  onVariantChange,
+  onVariantChange, onSelectionChange,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -192,6 +193,10 @@ export default function ProductActions({
   useEffect(() => {
     if (onVariantChange) onVariantChange(selectedVariant ?? null)
   }, [selectedVariantId])
+
+  useEffect(() => {
+    if (onSelectionChange) onSelectionChange(selectedVariantId, selectedSubVariantId)
+  }, [selectedVariantId, selectedSubVariantId])
 
   const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
 
