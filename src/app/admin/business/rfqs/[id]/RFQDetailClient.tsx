@@ -55,6 +55,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
   const [adminNote, setAdminNote] = useState('')
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -92,7 +93,11 @@ export default function RFQDetailClient({ id }: { id: string }) {
   }
 
   const handleConvert = async () => {
-    if (!confirm('Convert this RFQ to a quotation? Rates will start at ₹0 — fill them in after.')) return
+    setConfirmOpen(true)
+  }
+
+  const doConvert = async () => {
+    setConfirmOpen(false)
     setConverting(true)
     const res = await fetch(`/api/admin/business/rfqs/${id}/convert-to-quotation`, { method: 'POST', credentials: 'include' })
     const data = await res.json()
@@ -121,6 +126,29 @@ export default function RFQDetailClient({ id }: { id: string }) {
         <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-lg shadow-lg text-sm font-medium text-white ${toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}>
           {toast.msg}
         </div>
+      )}
+
+      {confirmOpen && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmOpen(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            <div className="bg-surface-elevated border border-border-default rounded-2xl shadow-2xl w-full max-w-sm pointer-events-auto p-6 space-y-4">
+              <h3 className="text-base font-semibold text-foreground">Convert to Quotation?</h3>
+              <p className="text-sm text-foreground-secondary">A draft quotation will be created with the prices from this RFQ. You can edit the rates in the quotation before sending.</p>
+              <div className="flex gap-3 pt-1">
+                <button onClick={doConvert} disabled={converting}
+                  className="flex-1 px-4 py-2.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                  {converting && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  Convert
+                </button>
+                <button onClick={() => setConfirmOpen(false)}
+                  className="px-4 py-2.5 border border-border-default text-sm font-medium rounded-lg hover:bg-surface-secondary transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Breadcrumb */}

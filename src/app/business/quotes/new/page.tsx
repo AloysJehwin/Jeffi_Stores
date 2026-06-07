@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import CustomSelect from '@/components/visitor/CustomSelect'
 
 interface RFQItem {
   description: string
@@ -12,6 +13,7 @@ interface RFQItem {
 }
 
 const UNITS = ['Nos', 'Pcs', 'Kg', 'g', 'L', 'mL', 'Box', 'Set', 'Pair', 'Roll', 'Sheet', 'Bag']
+const UNIT_OPTIONS = UNITS.map(u => ({ value: u, label: u }))
 
 const emptyItem = (): RFQItem => ({ description: '', quantity: 1, unit: 'Nos', requested_price: '', notes: '' })
 
@@ -118,13 +120,11 @@ export default function NewRFQPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Unit</label>
-                  <select
+                  <CustomSelect
                     value={item.unit}
-                    onChange={e => updateItem(i, 'unit', e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-                  >
-                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
+                    options={UNIT_OPTIONS}
+                    onChange={v => updateItem(i, 'unit', v)}
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Target Price (₹) <span className="text-foreground-muted font-normal">optional</span></label>
