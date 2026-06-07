@@ -12,6 +12,7 @@ interface RFQItem {
   notes: string | null
   product_name: string | null
   variant_name: string | null
+  sub_variant_name: string | null
 }
 
 interface RFQ {
@@ -239,7 +240,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                     <td className="px-5 py-3.5 text-foreground-muted font-mono text-xs">{i + 1}</td>
                     <td className="px-5 py-3.5">
                       <p className="font-medium text-foreground">{item.description}</p>
-                      {item.product_name && <p className="text-xs text-foreground-muted mt-0.5">{item.product_name}{item.variant_name ? ` — ${item.variant_name}` : ''}</p>}
+                      {item.product_name && <p className="text-xs text-foreground-muted mt-0.5">{item.product_name}{item.variant_name ? ` — ${item.variant_name}` : ''}{item.sub_variant_name ? ` / ${item.sub_variant_name}` : ''}</p>}
                       {item.notes && <p className="text-xs text-foreground-muted italic mt-0.5">{item.notes}</p>}
                     </td>
                     <td className="px-5 py-3.5 text-right text-foreground font-medium">
