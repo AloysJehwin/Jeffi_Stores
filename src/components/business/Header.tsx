@@ -44,7 +44,7 @@ export default function BusinessHeader() {
   const NAV = [
     { href: '/business/products', label: 'Products' },
     { href: '/business/categories', label: 'Categories' },
-    { href: '/about', label: 'About Us' },
+    { href: '/business/about', label: 'About Us' },
     { href: '/business/support', label: 'Support' },
   ]
 
