@@ -5,7 +5,7 @@ import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
 import Pagination from '@/components/ui/Pagination'
-import ProductCard from '@/components/visitor/ProductCard'
+import ProductCard from '@/components/business/ProductCard'
 
 const PAGE_SIZE = 21
 
@@ -190,7 +190,7 @@ function buildPageUrl(searchParams: Record<string, string | undefined>, page: nu
   if (searchParams.order)    params.set('order',    searchParams.order)
   if (page > 1) params.set('page', String(page))
   const qs = params.toString()
-  return `/products${qs ? `?${qs}` : ''}`
+  return `/business/products${qs ? `?${qs}` : ''}`
 }
 
 export default async function ProductsPage({
@@ -250,7 +250,7 @@ export default async function ProductsPage({
                         if (searchParams.sort) p.set('sort', searchParams.sort)
                         if (searchParams.order) p.set('order', searchParams.order)
                         if (searchParams.search) p.set('search', searchParams.search)
-                        return `/products${p.toString() ? `?${p.toString()}` : ''}`
+                        return `/business/products${p.toString() ? `?${p.toString()}` : ''}`
                       }
 
                       return (
@@ -338,7 +338,7 @@ export default async function ProductsPage({
                         if (searchParams.sort) p.set('sort', searchParams.sort)
                         if (searchParams.order) p.set('order', searchParams.order)
                         if (searchParams.search) p.set('search', searchParams.search)
-                        return `/products${p.toString() ? `?${p.toString()}` : ''}`
+                        return `/business/products${p.toString() ? `?${p.toString()}` : ''}`
                       }
 
                       const clearBrandsUrl = (() => {
@@ -347,7 +347,7 @@ export default async function ProductsPage({
                         if (searchParams.sort) p.set('sort', searchParams.sort)
                         if (searchParams.order) p.set('order', searchParams.order)
                         if (searchParams.search) p.set('search', searchParams.search)
-                        return `/products${p.toString() ? `?${p.toString()}` : ''}`
+                        return `/business/products${p.toString() ? `?${p.toString()}` : ''}`
                       })()
 
                       return (

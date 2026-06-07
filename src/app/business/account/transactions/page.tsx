@@ -74,7 +74,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     if (!authLoading && !user && authWasLoading.current) {
-      router.push('/login?redirect=/account/transactions')
+      router.push('/business/signin?redirect=/account/transactions')
       return
     }
     if (user) {
@@ -178,7 +178,7 @@ export default function TransactionsPage() {
                             {txn.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
                           </span>
                           <Link
-                            href={`/account/orders/${txn.orderId}`}
+                            href={`/business/account/orders/${txn.orderId}`}
                             className="text-sm text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium"
                           >
                             Order #{txn.orderNumber}

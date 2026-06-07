@@ -89,7 +89,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push('/login?redirect=/account')
+      router.push('/business/signin?redirect=/account')
     }
     if (user) {
       setAvatarUrl(user.avatarUrl)
@@ -266,13 +266,13 @@ export default function AccountPage() {
   if (!user) return null
 
   const quickActions = [
-    { label: 'My Orders', href: '/account/orders', icon: (
+    { label: 'My Orders', href: '/business/account/orders', icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
     )},
     { label: 'Transactions', href: '/account/transactions', icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
     )},
-    { label: 'Addresses', href: '/account/addresses', icon: (
+    { label: 'Addresses', href: '/business/account/addresses', icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
     )},
     { label: 'Wishlist', href: '/wishlist', icon: (
@@ -398,7 +398,7 @@ export default function AccountPage() {
                   {searchHistory.map(q => (
                     <Link
                       key={q}
-                      href={`/products?search=${encodeURIComponent(q)}`}
+                      href={`/business/products?search=${encodeURIComponent(q)}`}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-border-secondary text-xs text-foreground-secondary hover:text-accent-600 hover:border-accent-300 dark:hover:text-accent-400 dark:hover:border-accent-700 transition-colors"
                     >
                       <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -575,7 +575,7 @@ export default function AccountPage() {
               ) : (
                 <div className="space-y-3">
                   {dashboard.recentOrders.map(order => (
-                    <Link key={order.id} href={`/account/orders/${order.id}`} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface transition-colors group">
+                    <Link key={order.id} href={`/business/account/orders/${order.id}`} className="flex items-center gap-3 p-3 rounded-lg hover:bg-surface transition-colors group">
                       {/* Thumbnails */}
                       <div className="flex -space-x-2 flex-shrink-0">
                         {order.items.slice(0, 3).map((item, i) => (
