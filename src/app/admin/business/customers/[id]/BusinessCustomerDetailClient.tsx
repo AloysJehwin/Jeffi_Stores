@@ -58,7 +58,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/admin/business/customers/${id}`).then(r => r.json()),
+      fetch(`/api/admin/business/customers/${id}`, { credentials: 'include' }).then(r => r.json()),
       fetch('/api/categories').then(r => r.json()),
     ]).then(([data, catData]) => {
       setCustomer(data.customer)
@@ -72,6 +72,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
     setActionLoading(true)
     const res = await fetch(`/api/admin/business/customers/${id}/approve`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'approve' }),
     })
@@ -88,6 +89,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
     setActionLoading(true)
     const res = await fetch(`/api/admin/business/customers/${id}/approve`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'reject', rejectionNote }),
     })
@@ -105,6 +107,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
     setSavingDiscount(categoryId)
     const res = await fetch('/api/admin/business/discounts', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: id, categoryId, discountPct: pct }),
     })

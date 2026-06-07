@@ -61,7 +61,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
   }
 
   useEffect(() => {
-    fetch(`/api/admin/business/rfqs/${id}`)
+    fetch(`/api/admin/business/rfqs/${id}`, { credentials: 'include' })
       .then(r => r.json())
       .then(d => {
         setRfq(d.rfq)
@@ -76,6 +76,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
     setActionLoading(true)
     const res = await fetch(`/api/admin/business/rfqs/${id}`, {
       method: 'PATCH',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, adminNote }),
     })
@@ -92,7 +93,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
   const handleConvert = async () => {
     if (!confirm('Convert this RFQ to a quotation? Rates will start at ₹0 — fill them in after.')) return
     setConverting(true)
-    const res = await fetch(`/api/admin/business/rfqs/${id}/convert-to-quotation`, { method: 'POST' })
+    const res = await fetch(`/api/admin/business/rfqs/${id}/convert-to-quotation`, { method: 'POST', credentials: 'include' })
     const data = await res.json()
     if (res.ok) {
       setRfq(r => r ? { ...r, status: 'converted', converted_quotation_id: data.quotationId } : r)
