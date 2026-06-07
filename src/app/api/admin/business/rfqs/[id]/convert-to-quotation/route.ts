@@ -11,6 +11,22 @@ function buildQuoteNumber(now: Date, seq: number): string {
   return `QT/${fy}/${mon}/${seq}`
 }
 
+// Parse "Address Line, City, State, Pincode" into parts
+function parseAddress(raw: string | null): { addr1: string; addr2: string | null; city: string; state: string; pincode: string | null } {
+  if (!raw) return { addr1: '', addr2: null, city: '', state: 'Chhattisgarh', pincode: null }
+  const parts = raw.split(',').map(s => s.trim()).filter(Boolean)
+  // Last part may be pincode (6 digits), second-last is state, third-last is city
+  let pincode: string | null = null
+  if (parts.length > 0 && /^\d{6}$/.test(parts[parts.length - 1])) {
+    pincode = parts.pop()!
+  }
+  const state = parts.pop() || 'Chhattisgarh'
+  const city = parts.pop() || ''
+  const addr1 = parts[0] || ''
+  const addr2 = parts.slice(1).join(', ') || null
+  return { addr1, addr2, city, state, pincode }
+}
+
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await requireAdminScope(request, 'business_rfqs')
   if (admin instanceof NextResponse) return admin
@@ -27,7 +43,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (rfq.converted_quotation_id) return NextResponse.json({ error: 'Already converted' }, { status: 409 })
 
   const items = await queryMany<any>(
-    `SELECT * FROM business_rfq_items WHERE rfq_id = $1 ORDER BY position, created_at`,
+    `SELECT ri.*,
+       p.name AS product_name, p.price_ex_gst AS product_price, p.mrp AS product_mrp,
+       p.gst_percentage AS product_gst, p.hsn_code AS product_hsn,
+       pv.variant_name, pv.price_ex_gst AS variant_price, pv.mrp AS variant_mrp, pv.sku AS variant_sku,
+       psv.sub_variant_name, psv.price_ex_gst AS sv_price, psv.mrp AS sv_mrp, psv.sku AS sv_sku
+     FROM business_rfq_items ri
+     LEFT JOIN products p ON p.id = ri.product_id
+     LEFT JOIN product_variants pv ON pv.id = ri.variant_id
+     LEFT JOIN product_sub_variants psv ON psv.id = ri.sub_variant_id
+     WHERE ri.rfq_id = $1
+     ORDER BY ri.position, ri.created_at`,
     [params.id]
   )
   if (items.length === 0) return NextResponse.json({ error: 'RFQ has no items' }, { status: 400 })
@@ -47,30 +73,100 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const seq = (parseInt(maxRow?.max_seq || '0') || 0) + 1
   const quoteNumber = buildQuoteNumber(now, seq)
 
+  // Parse business address
+  const addr = parseAddress(rfq.business_address)
+  const consigneeName = rfq.company_name || `${rfq.first_name} ${rfq.last_name}`.trim()
+
+  // Calculate line totals for subtotal/tax
+  let subtotal = 0
+  let cgst = 0
+  let sgst = 0
+
+  const lineItems = items.map((item: any) => {
+    // Pick best available price: requested_price > sub_variant > variant > product
+    const baseRate = item.requested_price
+      ? Number(item.requested_price)
+      : item.sv_price
+        ? Number(item.sv_price)
+        : item.variant_price
+          ? Number(item.variant_price)
+          : item.product_price
+            ? Number(item.product_price)
+            : 0
+
+    const gstRate = Number(item.product_gst ?? 18)
+    const discountPct = 0
+    const qty = Number(item.quantity)
+    const amount = baseRate * qty * (1 - discountPct / 100)
+    const taxableAmount = amount
+    const itemCgst = taxableAmount * (gstRate / 2) / 100
+    const itemSgst = taxableAmount * (gstRate / 2) / 100
+
+    subtotal += amount
+    cgst += itemCgst
+    sgst += itemSgst
+
+    // Build description: use product/variant names if available, else the free-text description
+    let description = item.description
+    if (item.product_name && item.product_name !== item.description) {
+      description = item.product_name
+      if (item.variant_name) description += ` — ${item.variant_name}`
+      if (item.sub_variant_name) description += ` / ${item.sub_variant_name}`
+    }
+
+    return {
+      description,
+      hsn_code: item.product_hsn || null,
+      gst_rate: gstRate,
+      quantity: qty,
+      unit: item.unit || 'Nos',
+      rate: baseRate,
+      discount_pct: discountPct,
+      amount,
+      product_id: item.product_id || null,
+      variant_id: item.variant_id || null,
+      sub_variant_id: item.sub_variant_id || null,
+    }
+  })
+
+  const total = subtotal + cgst + sgst
+
   const qt = await queryOne<any>(
     `INSERT INTO quotations (
       quote_number, quote_date, status,
-      consignee_name, consignee_email, consignee_phone,
+      consignee_name, consignee_addr1, consignee_addr2, consignee_city, consignee_state,
+      consignee_pincode, consignee_gstin, consignee_email, consignee_phone,
       buyer_same, notes, subtotal, cgst_amount, sgst_amount, total_amount, created_by
-    ) VALUES ($1,$2,'draft',$3,$4,$5,true,$6,0,0,0,0,$7)
+    ) VALUES ($1,$2,'draft',$3,$4,$5,$6,$7,$8,$9,$10,$11,true,$12,$13,$14,$15,$16,$17)
     RETURNING *`,
     [
       quoteNumber,
       now.toISOString().slice(0, 10),
-      rfq.company_name || `${rfq.first_name} ${rfq.last_name}`.trim(),
+      consigneeName,
+      addr.addr1,
+      addr.addr2,
+      addr.city,
+      addr.state,
+      addr.pincode,
+      rfq.gst_number || null,
       rfq.email,
       rfq.phone || null,
-      rfq.notes || `Converted from RFQ ${rfq.rfq_number}`,
+      rfq.notes ? `${rfq.notes}\n\nConverted from RFQ ${rfq.rfq_number}` : `Converted from RFQ ${rfq.rfq_number}`,
+      subtotal.toFixed(4),
+      cgst.toFixed(4),
+      sgst.toFixed(4),
+      total.toFixed(4),
       admin.adminId,
     ]
   )
 
-  for (let idx = 0; idx < items.length; idx++) {
-    const item = items[idx]
+  for (let idx = 0; idx < lineItems.length; idx++) {
+    const li = lineItems[idx]
     await query(
-      `INSERT INTO quotation_items (quotation_id, position, description, quantity, unit, rate, gst_rate, discount_pct, amount, product_id, variant_id)
-       VALUES ($1,$2,$3,$4,$5,0,18,0,0,$6,$7)`,
-      [qt!.id, idx, item.description, item.quantity, item.unit, item.product_id || null, item.variant_id || null]
+      `INSERT INTO quotation_items
+         (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [qt!.id, idx, li.description, li.hsn_code, li.gst_rate, li.quantity, li.unit, li.rate, li.discount_pct, li.amount, li.product_id, li.variant_id, li.sub_variant_id]
     )
   }
 
