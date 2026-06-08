@@ -5,7 +5,6 @@ import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
-import { useRouter } from 'next/navigation'
 
 interface ProductCardProps {
   id: string
@@ -35,10 +34,7 @@ export default function ProductCard({
   const shownDiscount = businessPrice && mrp && mrp > 0
     ? Math.round(((mrp - businessPrice) / mrp) * 100)
     : mrpDiscount
-  const { showToast, showConfirm } = useToast()
-  const router = useRouter()
-  const [isInWishlist, setIsInWishlist] = useState(false)
-  const [wishlistLoading, setWishlistLoading] = useState(false)
+  const { showToast } = useToast()
   const [showQuickView, setShowQuickView] = useState(false)
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -63,41 +59,6 @@ export default function ProductCard({
   function cancelLongPress() {
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
   }
-
-  const handleWishlist = useCallback(async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!user) {
-      showConfirm({
-        title: 'Sign In Required',
-        message: 'Please sign in to save items to your wishlist.',
-        confirmText: 'Sign In',
-        cancelText: 'Maybe Later',
-        type: 'info',
-        onConfirm: () => router.push(`/login?redirect=/business/products/${slug}`),
-      })
-      return
-    }
-    setWishlistLoading(true)
-    try {
-      if (isInWishlist) {
-        const res = await fetch(`/api/wishlist?productId=${id}`, { method: 'DELETE', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
-        if (res.ok) { setIsInWishlist(false); showToast('Removed from wishlist', 'success') }
-      } else {
-        const res = await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
-          body: JSON.stringify({ productId: id }),
-          credentials: 'include',
-        })
-        if (res.ok) { setIsInWishlist(true); showToast('Added to wishlist!', 'success') }
-      }
-    } catch {
-      showToast('Failed to update wishlist', 'error')
-    } finally {
-      setWishlistLoading(false)
-    }
-  }, [id, slug, isInWishlist, user])
 
   const handleShare = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -160,18 +121,8 @@ export default function ProductCard({
               </div>
             )}
 
-            {/* Wishlist + Share icons — top right */}
+            {/* Share icon — top right */}
             <div className="absolute top-2 right-2 flex flex-col gap-1.5">
-              <button
-                onClick={handleWishlist}
-                disabled={wishlistLoading}
-                aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-                className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-700/95 backdrop-blur-sm shadow flex items-center justify-center text-gray-600 dark:text-zinc-200 hover:text-red-500 dark:hover:text-red-400 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
-              >
-                <svg className={`w-4 h-4 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`} fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: isInWishlist ? '#ef4444' : undefined }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </button>
               <button
                 onClick={handleShare}
                 aria-label="Share product"

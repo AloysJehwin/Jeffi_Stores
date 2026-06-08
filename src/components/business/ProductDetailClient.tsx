@@ -8,7 +8,6 @@ import ProductActions from '@/components/business/ProductActions'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
-import { useRouter } from 'next/navigation'
 
 interface ProductImage {
   id: string
@@ -193,11 +192,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
-  const [isInWishlist, setIsInWishlist] = useState(false)
-  const [wishlistLoading, setWishlistLoading] = useState(false)
   const { user } = useAuth()
-  const { showToast, showConfirm } = useToast()
-  const router = useRouter()
+  const { showToast } = useToast()
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -240,36 +236,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
     : 0
   const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays }
 
-  const handleWishlist = useCallback(async () => {
-    if (!user) {
-      showConfirm({
-        title: 'Sign In Required',
-        message: 'Please sign in to save items to your wishlist.',
-        confirmText: 'Sign In',
-        cancelText: 'Maybe Later',
-        type: 'info',
-        onConfirm: () => router.push(`/business/signin?redirect=/business/products/${product.slug}`),
-      })
-      return
-    }
-    setWishlistLoading(true)
-    try {
-      if (isInWishlist) {
-        const res = await fetch(`/api/wishlist?productId=${product.id}`, { method: 'DELETE', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
-        if (res.ok) { setIsInWishlist(false); showToast('Removed from wishlist', 'success') }
-      } else {
-        const res = await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
-          body: JSON.stringify({ productId: product.id }),
-          credentials: 'include',
-        })
-        if (res.ok) { setIsInWishlist(true); showToast('Added to wishlist!', 'success') }
-      }
-    } catch { showToast('Failed to update wishlist', 'error') }
-    finally { setWishlistLoading(false) }
-  }, [user, isInWishlist, product.id, product.slug])
-
   const handleShare = useCallback(async () => {
     const url = window.location.href
     const shareData = { title: product.name, text: `Check out ${product.name}`, url }
@@ -311,16 +277,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             {product.name}
           </h1>
           <div className="flex items-center gap-2 shrink-0 mt-1">
-            <button
-              onClick={handleWishlist}
-              disabled={wishlistLoading}
-              aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-              className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
-            >
-              <svg className={`w-5 h-5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`} fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: isInWishlist ? '#ef4444' : undefined }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
-            </button>
             <button
               onClick={handleShare}
               aria-label="Share product"
