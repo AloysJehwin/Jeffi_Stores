@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (Array.isArray(items)) {
       const computedItems = items.map((item: any) => ({
         ...item,
-        amount: Number(item.quantity) * Number(item.rate),
+        amount: Number(item.quantity) * Number(item.rate) * (1 - (Number(item.discount_pct) || 0) / 100),
       }))
       totals = calcTotals(computedItems)
 
