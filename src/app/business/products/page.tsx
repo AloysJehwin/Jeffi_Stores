@@ -224,7 +224,7 @@ export default async function ProductsPage({
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Search
                   </label>
-                  <ProductsSearch defaultValue={searchParams.search} />
+                  <ProductsSearch defaultValue={searchParams.search} portalHeader="business" />
                 </div>
 
                 {/* Categories Filter */}

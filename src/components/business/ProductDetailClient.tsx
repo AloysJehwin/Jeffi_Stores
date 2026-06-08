@@ -204,7 +204,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   }, [product.slug])
 
   useEffect(() => {
-    fetch(`/api/products/${product.id}/view`, { method: 'POST', credentials: 'include' }).catch(() => {})
+    fetch(`/api/products/${product.id}/view`, { method: 'POST', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } }).catch(() => {})
   }, [product.id])
 
   const hasVariants = product.has_variants && product.product_variants?.length > 0

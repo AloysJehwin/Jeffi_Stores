@@ -136,7 +136,7 @@ export default async function BusinessSupportPage() {
         </div>
         {user ? (
           <div className="rounded-2xl border border-border-default overflow-hidden shadow-sm" style={{ height: '65vh', minHeight: '480px', maxHeight: '680px' }}>
-            <SupportChat />
+            <SupportChat portalHeader="business" />
           </div>
         ) : (
           <div className="bg-surface-elevated rounded-2xl border border-border-default py-16 text-center shadow-sm">
