@@ -8,6 +8,7 @@ interface AccountSearchCtx {
   placeholder: string
   setQuery: (q: string) => void
   register: (opts: { suggestions: string[]; placeholder: string }) => void
+  clear: () => void
 }
 
 const Ctx = createContext<AccountSearchCtx>({
@@ -16,6 +17,7 @@ const Ctx = createContext<AccountSearchCtx>({
   placeholder: 'Search…',
   setQuery: () => {},
   register: () => {},
+  clear: () => {},
 })
 
 export function AccountSearchProvider({ children }: { children: ReactNode }) {
@@ -28,10 +30,17 @@ export function AccountSearchProvider({ children }: { children: ReactNode }) {
   const register = useCallback(({ suggestions: s, placeholder: p }: { suggestions: string[]; placeholder: string }) => {
     setSuggestions(s)
     setPlaceholder(p)
+    setQueryState('')
+  }, [])
+
+  const clear = useCallback(() => {
+    setSuggestions([])
+    setPlaceholder('Search…')
+    setQueryState('')
   }, [])
 
   return (
-    <Ctx.Provider value={{ query, suggestions, placeholder, setQuery, register }}>
+    <Ctx.Provider value={{ query, suggestions, placeholder, setQuery, register, clear }}>
       {children}
     </Ctx.Provider>
   )

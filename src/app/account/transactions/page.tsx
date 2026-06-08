@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
-import { useAccountSearch } from '@/contexts/AccountSearchContext'
 
 interface Transaction {
   id: string
@@ -61,38 +60,27 @@ function getMethodLabel(method: string, gateway: string) {
 export default function TransactionsPage() {
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
-  const { query: searchQuery, register } = useAccountSearch()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterMethod, setFilterMethod] = useState<string>('all')
 
-  const suggestions = useMemo(() => {
+  const availableMethods = useMemo(() => {
     const set = new Set<string>()
-    transactions.forEach(t => {
-      set.add(t.orderNumber)
-      if (t.transactionId) set.add(t.transactionId)
-      set.add(getStatusLabel(t.status))
-      set.add(getMethodLabel(t.paymentMethod, t.paymentGateway))
-    })
+    transactions.forEach(t => set.add(getMethodLabel(t.paymentMethod, t.paymentGateway)))
     return Array.from(set)
   }, [transactions])
 
-  useEffect(() => {
-    register({ suggestions, placeholder: 'Search transactions…' })
-  }, [suggestions, register])
-
   const filteredTransactions = useMemo(() => {
-    if (!searchQuery.trim()) return transactions
-    const q = searchQuery.toLowerCase()
-    return transactions.filter(t =>
-      t.orderNumber.toLowerCase().includes(q) ||
-      (t.transactionId && t.transactionId.toLowerCase().includes(q)) ||
-      getStatusLabel(t.status).toLowerCase().includes(q) ||
-      getMethodLabel(t.paymentMethod, t.paymentGateway).toLowerCase().includes(q)
-    )
-  }, [transactions, searchQuery])
+    return transactions.filter(t => {
+      if (filterStatus !== 'all' && t.status !== filterStatus) return false
+      if (filterMethod !== 'all' && getMethodLabel(t.paymentMethod, t.paymentGateway) !== filterMethod) return false
+      return true
+    })
+  }, [transactions, filterStatus, filterMethod])
 
   const authWasLoading = useRef(false)
   useEffect(() => {
@@ -145,6 +133,40 @@ export default function TransactionsPage() {
       <AccountMobileHeader />
 
       <div className="container mx-auto px-4 pt-4">
+
+        {/* Filters */}
+        {transactions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(['all', 'completed', 'pending', 'failed', 'refunded'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    filterStatus === s
+                      ? 'bg-accent-500 text-white'
+                      : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                  }`}
+                >
+                  {s === 'all' ? 'All' : getStatusLabel(s)}
+                </button>
+              ))}
+            </div>
+            {availableMethods.length > 1 && (
+              <select
+                value={filterMethod}
+                onChange={e => setFilterMethod(e.target.value)}
+                className="text-xs px-3 py-1 rounded-full border border-border-default bg-surface-elevated text-foreground-secondary focus:outline-none focus:ring-1 focus:ring-accent-500"
+              >
+                <option value="all">All Methods</option>
+                {availableMethods.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
         <div>
             {transactions.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
