@@ -465,9 +465,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       <div className="bg-surface min-h-screen">
         <MobileAccountHeader />
         <div className="container mx-auto px-4">
-          <div className="hidden lg:block py-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Order Details</h1>
-          </div>
           <div className="py-4">
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <h3 className="text-xl font-semibold text-foreground mb-2">Order Not Found</h3>
@@ -489,10 +486,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     <div className="bg-surface min-h-screen">
       <MobileAccountHeader />
       <div className="container mx-auto px-4">
-        <div className="hidden lg:block py-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Order Details</h1>
-        </div>
-
         <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
             {/* Back link */}
             <Link
