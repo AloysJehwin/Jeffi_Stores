@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import CustomSelect from '@/components/visitor/CustomSelect'
@@ -50,6 +50,12 @@ export default function AddressesPage() {
   const [pinLookupState, setPinLookupState] = useState<'idle' | 'loading' | 'found' | 'error'>('idle')
   const [localities, setLocalities] = useState<string[]>([])
   const pinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [filterType, setFilterType] = useState<string>('all')
+
+  const filteredAddresses = useMemo(() =>
+    filterType === 'all' ? addresses : addresses.filter(a => a.address_type === filterType || a.address_type === 'both'),
+    [addresses, filterType]
+  )
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -203,13 +209,26 @@ export default function AddressesPage() {
 
       <BusinessAccountMobileHeader />
 
-      <div className="container mx-auto px-4">
-        <div className="hidden lg:block pt-6 pb-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Addresses</h1>
-        </div>
-
+      <div className="container mx-auto px-4 pt-4">
         <div>
-            <div className="mb-6">
+
+            {/* Type filter + Add button row */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-1.5">
+                {(['all', 'shipping', 'billing'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setFilterType(t)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                      filterType === t
+                        ? 'bg-accent-500 text-white'
+                        : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                    }`}
+                  >
+                    {t === 'all' ? 'All' : t}
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -221,7 +240,7 @@ export default function AddressesPage() {
                   setLocalities([])
                   setShowForm(!showForm)
                 }}
-                className="px-6 py-3 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold"
+                className="px-5 py-2 bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors font-semibold text-sm"
               >
                 {showForm ? 'Cancel' : '+ Add New Address'}
               </button>
@@ -468,7 +487,7 @@ export default function AddressesPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {addresses.map((address) => (
+                {filteredAddresses.map((address) => (
                   <div key={address.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 relative">
                     {address.is_default && (
                       <span className="absolute top-4 right-4 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-semibold rounded-full">

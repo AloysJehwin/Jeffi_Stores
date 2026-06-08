@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 
@@ -65,6 +65,22 @@ export default function TransactionsPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterMethod, setFilterMethod] = useState<string>('all')
+
+  const availableMethods = useMemo(() => {
+    const set = new Set<string>()
+    transactions.forEach(t => set.add(getMethodLabel(t.paymentMethod, t.paymentGateway)))
+    return Array.from(set)
+  }, [transactions])
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      if (filterStatus !== 'all' && t.status !== filterStatus) return false
+      if (filterMethod !== 'all' && getMethodLabel(t.paymentMethod, t.paymentGateway) !== filterMethod) return false
+      return true
+    })
+  }, [transactions, filterStatus, filterMethod])
 
   const authWasLoading = useRef(false)
   useEffect(() => {
@@ -116,10 +132,40 @@ export default function TransactionsPage() {
       {/* Mobile header */}
       <BusinessAccountMobileHeader />
 
-      <div className="container mx-auto px-4">
-        <div className="hidden lg:block pt-6 pb-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Transactions</h1>
-        </div>
+      <div className="container mx-auto px-4 pt-4">
+
+        {/* Filters */}
+        {transactions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(['all', 'completed', 'pending', 'failed', 'refunded'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    filterStatus === s
+                      ? 'bg-accent-500 text-white'
+                      : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                  }`}
+                >
+                  {s === 'all' ? 'All' : getStatusLabel(s)}
+                </button>
+              ))}
+            </div>
+            {availableMethods.length > 1 && (
+              <select
+                value={filterMethod}
+                onChange={e => setFilterMethod(e.target.value)}
+                className="text-xs px-3 py-1 rounded-full border border-border-default bg-surface-elevated text-foreground-secondary focus:outline-none focus:ring-1 focus:ring-accent-500"
+              >
+                <option value="all">All Methods</option>
+                {availableMethods.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
 
         <div>
             {transactions.length === 0 ? (
@@ -150,7 +196,7 @@ export default function TransactionsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {transactions.map((txn) => (
+                {filteredTransactions.map((txn) => (
                   <div
                     key={txn.id}
                     className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5"

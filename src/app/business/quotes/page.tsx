@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { BusinessAccountNavBar } from '@/components/business/AccountSidebar'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
@@ -29,6 +29,12 @@ export default function MyQuotesPage() {
   const router = useRouter()
   const [rfqs, setRfqs] = useState<RFQ[]>([])
   const [loading, setLoading] = useState(true)
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+
+  const filteredRfqs = useMemo(() =>
+    filterStatus === 'all' ? rfqs : rfqs.filter(r => r.status === filterStatus),
+    [rfqs, filterStatus]
+  )
 
   useEffect(() => {
     if (!isLoading && (!user || !user.isBusiness || user.approvalStatus !== 'approved')) {
@@ -59,6 +65,26 @@ export default function MyQuotesPage() {
       <div className="hidden lg:block"><BusinessAccountNavBar /></div>
       <BusinessAccountMobileHeader />
       <div className="container mx-auto px-4 pt-4 pb-8">
+
+        {/* Status filter */}
+        {rfqs.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mb-4">
+            {(['all', 'pending', 'reviewed', 'converted', 'rejected'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                  filterStatus === s
+                    ? 'bg-accent-500 text-white'
+                    : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                }`}
+              >
+                {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
           <div className="px-6 py-4 border-b border-border-default">
             <p className="text-sm text-foreground-secondary">Track your RFQ submissions. Our team will review and respond.</p>
@@ -77,7 +103,7 @@ export default function MyQuotesPage() {
             </div>
           ) : (
             <div className="divide-y divide-border-default">
-              {rfqs.map(rfq => (
+              {filteredRfqs.map(rfq => (
                 <div key={rfq.id} className="p-5 flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
