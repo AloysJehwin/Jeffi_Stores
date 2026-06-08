@@ -649,6 +649,7 @@ export async function getCustomers(filters: {
       SELECT
         u.id, u.email, u.phone, u.first_name, u.last_name,
         u.is_active, u.is_flagged, u.flag_reason, u.created_at,
+        u.user_type,
         cp.customer_type,
         COALESCE(o.order_count, 0) AS order_count,
         COALESCE(o.lifetime_value, 0) AS lifetime_value,
@@ -659,10 +660,15 @@ export async function getCustomers(filters: {
         COALESCE(
           (SELECT array_agg(ct.tag ORDER BY ct.created_at DESC) FROM customer_tags ct WHERE ct.user_id = u.id),
           ARRAY[]::varchar[]
-        ) AS tags
+        ) AS tags,
+        bp.company_name AS bp_company_name,
+        bp.approval_status AS bp_approval_status,
+        bp.gst_number AS bp_gst_number,
+        bp.industry AS bp_industry
       FROM users u
       LEFT JOIN customer_profiles cp ON u.id = cp.user_id
       LEFT JOIN customer_health ch ON ch.user_id = u.id
+      LEFT JOIN business_profiles bp ON bp.user_id = u.id
       LEFT JOIN (
         SELECT user_id,
                COUNT(*) AS order_count,
@@ -699,9 +705,19 @@ export async function getCustomerById(id: string) {
     SELECT
       u.id, u.email, u.phone, u.first_name, u.last_name,
       u.is_active, u.is_flagged, u.flag_reason, u.created_at,
-      cp.customer_type, cp.company_name, cp.gst_number, cp.credit_limit
+      u.user_type,
+      cp.customer_type, cp.company_name, cp.gst_number, cp.credit_limit,
+      bp.company_name AS bp_company_name,
+      bp.approval_status AS bp_approval_status,
+      bp.gst_number AS bp_gst_number,
+      bp.industry AS bp_industry,
+      bp.business_address AS bp_business_address,
+      bp.created_at AS bp_created_at,
+      bp.approved_at AS bp_approved_at,
+      bp.rejection_note AS bp_rejection_note
     FROM users u
     LEFT JOIN customer_profiles cp ON u.id = cp.user_id
+    LEFT JOIN business_profiles bp ON bp.user_id = u.id
     WHERE u.id = $1 AND u.is_guest = false
   `, [id])
 

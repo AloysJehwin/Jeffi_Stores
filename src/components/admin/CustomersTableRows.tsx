@@ -47,15 +47,24 @@ function CustomerDetailModal({ customer, onClose }: { customer: any; onClose: ()
         </div>
 
         <div className="p-5 space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
-              customer.is_flagged ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-              : customer.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-              : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
-            }`}>
-              {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
-            </span>
-          </div>
+              <div className="flex flex-wrap gap-2">
+                <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                  customer.is_flagged ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                  : customer.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                  : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
+                }`}>
+                  {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
+                </span>
+                {customer.user_type === 'business' && (
+                  <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                    customer.bp_approval_status === 'approved' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                    : customer.bp_approval_status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                  }`}>
+                    Business{customer.bp_approval_status !== 'approved' ? ` · ${customer.bp_approval_status === 'rejected' ? 'Rejected' : 'Pending'}` : ''}
+                  </span>
+                )}
+              </div>
 
           <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-surface-secondary">
             <div>
@@ -140,6 +149,14 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
                   <span className={`font-medium ${customer.is_flagged ? 'text-red-600 dark:text-red-400' : customer.is_active ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
                     {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
                   </span>
+                  {customer.user_type === 'business' && (
+                    <>
+                      <span className="text-foreground-muted">Type</span>
+                      <span className={`font-medium ${customer.bp_approval_status === 'approved' ? 'text-blue-600 dark:text-blue-400' : customer.bp_approval_status === 'rejected' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                        Business{customer.bp_company_name ? ` · ${customer.bp_company_name}` : ''}
+                      </span>
+                    </>
+                  )}
                   <span className="text-foreground-muted">Joined</span>
                   <span className="text-foreground">{new Date(customer.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 </div>
@@ -211,18 +228,31 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
             )}
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
-            <Tooltip content={
-              customer.is_flagged ? 'Account flagged — potential fraud or policy violation' :
-              customer.is_active ? 'Account in good standing' : 'Account deactivated'
-            }>
-              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-default ${
-                customer.is_flagged ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                : customer.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-              }`}>
-                {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
-              </span>
-            </Tooltip>
+            <div className="flex flex-col gap-1">
+              <Tooltip content={
+                customer.is_flagged ? 'Account flagged — potential fraud or policy violation' :
+                customer.is_active ? 'Account in good standing' : 'Account deactivated'
+              }>
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-default ${
+                  customer.is_flagged ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                  : customer.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                  : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                }`}>
+                  {customer.is_flagged ? 'Flagged' : customer.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </Tooltip>
+              {customer.user_type === 'business' && (
+                <Tooltip content={`Business partner · ${customer.bp_approval_status === 'approved' ? 'Approved' : customer.bp_approval_status === 'rejected' ? 'Rejected' : 'Pending approval'}${customer.bp_company_name ? ` · ${customer.bp_company_name}` : ''}`}>
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-default ${
+                    customer.bp_approval_status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                    : customer.bp_approval_status === 'rejected' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                    : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
+                  }`}>
+                    Business{customer.bp_approval_status !== 'approved' ? ` · ${customer.bp_approval_status === 'rejected' ? 'Rejected' : 'Pending'}` : ''}
+                  </span>
+                </Tooltip>
+              )}
+            </div>
           </td>
           <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-end gap-1">

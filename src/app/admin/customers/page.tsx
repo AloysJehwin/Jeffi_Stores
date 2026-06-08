@@ -145,6 +145,15 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
                       'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
                     }`}>{score}</span>
                   )}
+                  {customer.user_type === 'business' && (
+                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
+                      customer.bp_approval_status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                      : customer.bp_approval_status === 'rejected' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                      : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
+                    }`}>
+                      Biz
+                    </span>
+                  )}
                   <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                     customer.is_flagged ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                     : customer.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
