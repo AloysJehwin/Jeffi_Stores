@@ -412,6 +412,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             <RequestQuoteButton
               items={[{
                 productId: product.id,
+                variantId: selectedVariantId || undefined,
+                subVariantId: selectedSubVariantId || undefined,
                 description: product.name,
                 quantity: 1,
                 unit: 'Nos',
