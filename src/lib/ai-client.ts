@@ -65,6 +65,7 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
         model,
         messages: req.messages,
         stream: false,
+        think: false,
         format: req.jsonMode ? 'json' : undefined,
         options: {
           temperature: req.temperature ?? 0.2,
@@ -79,6 +80,10 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
     }
     const data = await res.json()
     let content = data?.message?.content
+    // Qwen3 extended-thinking mode returns content in a separate 'thinking' field with empty content
+    if ((typeof content !== 'string' || content.trim() === '') && typeof data?.message?.thinking === 'string') {
+      content = data.message.thinking
+    }
     if (typeof content !== 'string') throw new AiClientError('Ollama response missing message.content', 'ollama')
     // Strip <think>...</think> reasoning blocks emitted by Qwen3 and similar models
     content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trimStart()

@@ -7,7 +7,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
-import RequestQuoteButton from '@/components/visitor/RequestQuoteButton'
 
 interface AppliedCoupon {
   couponId: string
@@ -571,17 +570,6 @@ export default function CartPage() {
                 Continue Shopping
               </Link>
 
-              <RequestQuoteButton
-                items={cartItems.map(item => ({
-                  productId: item.products?.id,
-                  variantId: item.variant?.id,
-                  description: [item.products?.name, item.variant?.variant_name, item.sub_variant?.sub_variant_name].filter(Boolean).join(' — '),
-                  quantity: Math.round(Number(item.quantity)) || 1,
-                  unit: item.buy_unit || 'Nos',
-                }))}
-                label="Request Quote for Cart"
-                className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
-              />
             </div>
           </div>
           )}

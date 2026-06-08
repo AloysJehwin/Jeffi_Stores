@@ -67,7 +67,7 @@ export default function OrdersPage() {
   const fetchOrders = async (p: number) => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/orders?page=${p}`)
+      const response = await fetch(`/api/orders?page=${p}`, { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       if (response.ok) {
         const data = await response.json()
         setOrders(data.orders || [])
@@ -83,7 +83,7 @@ export default function OrdersPage() {
   const handleCancelOrder = async (orderId: string) => {
     setCancellingOrderId(orderId)
     try {
-      await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
+      await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       await fetchOrders(page)
     } catch {
     } finally {

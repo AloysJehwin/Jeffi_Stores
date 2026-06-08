@@ -87,7 +87,7 @@ function CheckoutPage() {
     fetchAddress(addressId)
 
     if (intentToken) {
-      fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include' })
+      fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
         .then(async r => {
           const d = await r.json()
           if (!r.ok) { router.push('/business'); return }
@@ -190,7 +190,7 @@ function CheckoutPage() {
 
   const fetchAddress = async (addressId: string) => {
     try {
-      const response = await fetch('/api/user/addresses', { credentials: 'include' })
+      const response = await fetch('/api/user/addresses', { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       if (response.status === 401) {
         router.push('/business/signin?redirect=/checkout')
         return
@@ -223,7 +223,7 @@ function CheckoutPage() {
       const response = await fetch('/api/razorpay/verify', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
         body: JSON.stringify({ razorpay_order_id, razorpay_payment_id, razorpay_signature, ...payload }),
       })
       const data = await response.json()
@@ -243,7 +243,7 @@ function CheckoutPage() {
       const rzpResponse = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
         body: JSON.stringify(payload),
       })
       const rzpData = await rzpResponse.json()
@@ -277,6 +277,7 @@ function CheckoutPage() {
               fetch(`/api/orders/${payload.orderId}`, {
                 method: 'DELETE',
                 credentials: 'include',
+                headers: { 'X-Auth-Portal': 'business' },
                 keepalive: true,
               }).catch(() => {})
             }
@@ -293,7 +294,7 @@ function CheckoutPage() {
           fetch(`/api/orders/${payload.orderId}/payment-failed`, {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
             body: JSON.stringify({ errorDescription: response.error.description }),
             keepalive: true,
           }).catch(() => {})
@@ -310,7 +311,7 @@ function CheckoutPage() {
         await fetch(`/api/orders/${payload.orderId}/payment-failed`, {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
           body: JSON.stringify({ errorDescription: err.message }),
         }).catch(() => {})
         window.location.href = `/business/account/orders/${payload.orderId}`
@@ -325,7 +326,7 @@ function CheckoutPage() {
     if (!existingOrder) return
     setIsCancellingPrevious(true)
     try {
-      const response = await fetch(`/api/orders/${existingOrder.id}/cancel`, { method: 'POST', credentials: 'include' })
+      const response = await fetch(`/api/orders/${existingOrder.id}/cancel`, { method: 'POST', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to cancel order')
       setExistingOrder(null)
@@ -374,7 +375,7 @@ function CheckoutPage() {
         const draftRes = await fetch('/api/orders/draft', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
           body: JSON.stringify(draftBody),
         })
         const draftData = await draftRes.json()
@@ -426,7 +427,7 @@ function CheckoutPage() {
       const response = await fetch(endpoint, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
         body: JSON.stringify(body),
       })
 

@@ -40,6 +40,8 @@ export async function authenticateBusiness(request: NextRequest): Promise<UserJW
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     if (!payload.userId || typeof payload.userId !== 'string') return null
+    // Reject tokens that don't explicitly belong to business
+    if (payload.type !== 'business') return null
     if (!payload.isBusiness) return null
     return {
       userId: payload.userId as string,
@@ -97,15 +99,25 @@ export async function authenticateUser(request: NextRequest): Promise<UserJWTPay
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     if (!payload.userId || typeof payload.userId !== 'string') return null
+    // Reject tokens that belong to business or admin
+    if (payload.type !== 'customer') return null
     return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
   } catch {
     return null
   }
 }
 
-// Authenticates regular users OR business users (tries both cookies).
-// Used by shared endpoints like support chat that serve both portals.
+// Authenticates regular users OR business users.
+// Checks X-Auth-Portal header to determine which cookie to use:
+//   X-Auth-Portal: business → ONLY tries business_auth_token (no customer fallback)
+//   (default)               → tries auth_token first, then business_auth_token
+// No cross-portal fallback when portal is explicit — prevents a user logged into both
+// portals from having writes land on the wrong account if one token expires.
 export async function authenticateAnyUser(request: NextRequest): Promise<UserJWTPayload | null> {
+  const portal = request.headers.get('x-auth-portal')
+  if (portal === 'business') {
+    return await authenticateBusiness(request)
+  }
   return (await authenticateUser(request)) ?? (await authenticateBusiness(request))
 }
 

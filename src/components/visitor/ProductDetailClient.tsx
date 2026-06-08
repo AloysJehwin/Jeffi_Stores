@@ -6,7 +6,6 @@ import ProductImageGallery from './ProductImageGallery'
 
 import ProductActions from './ProductActions'
 import BusinessPriceBadge from './BusinessPriceBadge'
-import RequestQuoteButton from './RequestQuoteButton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
@@ -410,15 +409,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           onVariantChange={handleVariantChange}
         />
 
-        <RequestQuoteButton
-          items={[{
-            productId: product.id,
-            description: product.name,
-            quantity: 1,
-            unit: 'Nos',
-          }]}
-          className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
-        />
 
         {/* Product Specifications */}
         <div className="mt-6 pt-6 border-t border-border-default">

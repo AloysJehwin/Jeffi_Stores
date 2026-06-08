@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { queryOne } from '@/lib/db'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { parseBody, zNonEmpty, zCurrency } from '@/lib/validate'
 
 const ApplyCouponSchema = z.object({

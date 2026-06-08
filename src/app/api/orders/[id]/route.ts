@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
-import { authenticateUser, authenticateAdmin } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice } from '@/lib/invoice'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'

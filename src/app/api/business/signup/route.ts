@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       metadata: { email, source: 'business_otp', companyName },
     }).catch(() => {})
 
-    const token = await new SignJWT({ userId: newUser.id, email: newUser.email, isBusiness: true, approvalStatus: 'pending' })
+    const token = await new SignJWT({ userId: newUser.id, email: newUser.email, type: 'business', isBusiness: true, approvalStatus: 'pending' })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('30d')
       .sign(JWT_SECRET)

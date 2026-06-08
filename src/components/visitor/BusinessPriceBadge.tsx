@@ -22,7 +22,7 @@ export default function BusinessPriceBadge({ price, categoryId }: Props) {
     <div className="mt-3 pt-3 border-t border-accent-200 dark:border-accent-800 flex items-center gap-3 flex-wrap">
       <div className="flex items-center gap-1.5">
         <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
-          Business {discountPct}% off
+          Business {discountPct}% extra off
         </span>
         <span className="text-lg font-bold text-accent-600 dark:text-accent-400">
           Rs. {discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}

@@ -412,6 +412,7 @@ export default async function ProductDetailPage({
                     primaryImage={relatedPrimaryImage || null}
                     brandName={relatedProduct.brands?.name || null}
                     categoryName={relatedProduct.categories?.name || null}
+                    categoryId={relatedProduct.categories?.id || null}
                   />
                 )
               })}

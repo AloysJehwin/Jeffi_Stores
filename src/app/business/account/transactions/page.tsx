@@ -85,7 +85,7 @@ export default function TransactionsPage() {
   const fetchTransactions = async (p: number) => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/transactions?page=${p}`)
+      const response = await fetch(`/api/transactions?page=${p}`, { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       if (response.ok) {
         const data = await response.json()
         setTransactions(data.transactions || [])

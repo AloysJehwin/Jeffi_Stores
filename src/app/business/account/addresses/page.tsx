@@ -63,7 +63,7 @@ export default function AddressesPage() {
 
   const fetchAddresses = async () => {
     try {
-      const response = await fetch('/api/user/addresses')
+      const response = await fetch('/api/user/addresses', { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       if (response.ok) {
         const data = await response.json()
         setAddresses(data.addresses || [])
@@ -115,7 +115,8 @@ export default function AddressesPage() {
 
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+        credentials: 'include',
         body: JSON.stringify(formData),
       })
 
@@ -166,7 +167,7 @@ export default function AddressesPage() {
       type: 'danger',
       onConfirm: async () => {
         try {
-          const response = await fetch(`/api/user/addresses/${addressId}`, { method: 'DELETE', credentials: 'include' })
+          const response = await fetch(`/api/user/addresses/${addressId}`, { method: 'DELETE', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
           if (response.ok) {
             await fetchAddresses()
             showToast('Address deleted successfully', 'success')

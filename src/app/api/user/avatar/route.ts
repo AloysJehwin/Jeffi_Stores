@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { uploadAvatarImage } from '@/lib/s3'
 import { query } from '@/lib/db'
 

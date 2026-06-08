@@ -5,7 +5,6 @@ import Link from 'next/link'
 import ProductImageGallery from '@/components/visitor/ProductImageGallery'
 
 import ProductActions from '@/components/business/ProductActions'
-import BusinessPriceBadge from '@/components/visitor/BusinessPriceBadge'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -209,8 +208,18 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   }, [product.id])
 
   const hasVariants = product.has_variants && product.product_variants?.length > 0
-  const displayPrice = Number(product.base_price)
+  const baseDisplayPrice = Number(product.base_price)
   const mrp = product.mrp ? Number(product.mrp) : null
+
+  // Apply per-category business discount
+  const categoryId = product.categories?.id
+  const businessDiscountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
+    ? (user.businessDiscountMap?.[categoryId] ?? 0)
+    : 0
+  const displayPrice = businessDiscountPct > 0
+    ? baseDisplayPrice * (1 - businessDiscountPct / 100)
+    : baseDisplayPrice
+
   const mrpDiscount = mrp && mrp > displayPrice
     ? Math.round(((mrp - displayPrice) / mrp) * 100)
     : 0
@@ -336,16 +345,41 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
         {!hasVariants && (
           <>
             <div className="bg-surface rounded-lg p-4 sm:p-6 mb-6">
-              <div className="flex items-baseline gap-3 mb-2">
-                <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                  Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-                {mrp && mrp > displayPrice && (
-                  <span className="text-xl text-foreground-muted line-through">
-                    Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              {businessDiscountPct > 0 ? (
+                <>
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-sm text-foreground-secondary w-36 shrink-0">Regular price</span>
+                    <span className="text-lg text-foreground-muted line-through">
+                      Rs. {baseDisplayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                    {mrp && mrp > baseDisplayPrice && (
+                      <span className="text-sm text-foreground-muted line-through">
+                        MRP Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-sm font-semibold text-accent-600 dark:text-accent-400 w-36 shrink-0">Your business price</span>
+                    <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
+                      Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap">
+                      ✦ {businessDiscountPct}% extra off
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-baseline gap-3 mb-2">
+                  <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
+                    Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                )}
-              </div>
+                  {mrp && mrp > displayPrice && (
+                    <span className="text-xl text-foreground-muted line-through">
+                      Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+              )}
               {mrpDiscount > 0 && (
                 <div className="flex items-center gap-2 mb-2">
                   <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
@@ -367,7 +401,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                   </span>
                 </div>
               )}
-              <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />
             </div>
 
             <div className="mb-6">
@@ -411,6 +444,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           lengthUnit={product.length_unit || null}
           onVariantChange={handleVariantChange}
           onSelectionChange={(vId, svId) => { setSelectedVariantId(vId); setSelectedSubVariantId(svId) }}
+          categoryId={categoryId ?? null}
         />
 
         <RequestQuoteButton

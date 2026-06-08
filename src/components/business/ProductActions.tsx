@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface VariantImage {
   id: string
@@ -63,6 +64,7 @@ interface ProductActionsProps {
   lengthUnit?: string | null
   onVariantChange?: (variant: Variant | null) => void
   onSelectionChange?: (variantId: string | null, subVariantId: string | null) => void
+  categoryId?: string | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -87,11 +89,12 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
   variants, variantType, initialSkuParam,
   weightRate, weightUnit, lengthRate, lengthUnit,
-  onVariantChange, onSelectionChange,
+  onVariantChange, onSelectionChange, categoryId,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
   const router = useRouter()
+  const { user } = useAuth()
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
@@ -200,9 +203,16 @@ export default function ProductActions({
 
   const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
 
-  const effectivePrice = hasVariants
+  const businessDiscountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
+    ? (user.businessDiscountMap?.[categoryId] ?? 0)
+    : 0
+
+  const rawEffectivePrice = hasVariants
     ? (selectedSubVariant?.price != null ? Number(selectedSubVariant.price) : (selectedVariant?.price ?? basePrice))
     : (salePrice ?? basePrice)
+  const effectivePrice = businessDiscountPct > 0
+    ? rawEffectivePrice * (1 - businessDiscountPct / 100)
+    : rawEffectivePrice
   const effectiveMrp = hasVariants
     ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))
     : mrp
@@ -484,16 +494,41 @@ export default function ProductActions({
       {hasVariants && (
         <>
           <div className="bg-surface rounded-lg p-6">
-            <div className="flex items-baseline gap-3 mb-2">
-              <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </span>
-              {effectiveMrp && effectiveMrp > effectivePrice && (
-                <span className="text-xl text-foreground-muted line-through">
-                  Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            {businessDiscountPct > 0 ? (
+              <>
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="text-sm text-foreground-secondary w-36 shrink-0">Regular price</span>
+                  <span className="text-lg text-foreground-muted line-through">
+                    Rs. {rawEffectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                  {effectiveMrp && effectiveMrp > rawEffectivePrice && (
+                    <span className="text-sm text-foreground-muted line-through">
+                      MRP Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-sm font-semibold text-accent-600 dark:text-accent-400 w-36 shrink-0">Your business price</span>
+                  <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
+                    Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap">
+                    ✦ {businessDiscountPct}% extra off
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-baseline gap-3 mb-2">
+                <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
+                  Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
-              )}
-            </div>
+                {effectiveMrp && effectiveMrp > effectivePrice && (
+                  <span className="text-xl text-foreground-muted line-through">
+                    Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                )}
+              </div>
+            )}
             {perUnitRate && (
               <p className="text-sm font-medium text-accent-600 dark:text-accent-400 mb-2">
                 {perUnitRate}

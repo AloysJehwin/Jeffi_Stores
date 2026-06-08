@@ -81,7 +81,7 @@ export default function AccountPage() {
   const cropContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch('/api/user/search-history', { credentials: 'include' })
+    fetch('/api/user/search-history', { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       .then(r => r.ok ? r.json() : { history: [] })
       .then(data => setSearchHistory(Array.isArray(data.history) ? data.history : []))
       .catch(() => {})
@@ -98,7 +98,7 @@ export default function AccountPage() {
         lastName: user.lastName || '',
         phone: (user.phone || '').replace(/^\+91/, ''),
       })
-      fetch('/api/user/dashboard', { credentials: 'include' })
+      fetch('/api/user/dashboard', { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.stats) setDashboard(d) })
         .catch(() => {})
@@ -116,7 +116,8 @@ export default function AccountPage() {
     try {
       const response = await fetch('/api/user/update', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+        credentials: 'include',
         body: JSON.stringify(formData),
       })
       if (!response.ok) throw new Error()
@@ -181,7 +182,7 @@ export default function AccountPage() {
       })
       const fd = new FormData()
       fd.append('file', blob, 'avatar.jpg')
-      const res = await fetch('/api/user/avatar', { method: 'POST', body: fd, credentials: 'include' })
+      const res = await fetch('/api/user/avatar', { method: 'POST', body: fd, credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       if (!res.ok) throw new Error((await res.json()).error || 'Upload failed')
       const data = await res.json()
       setAvatarUrl(data.avatarUrl + `?t=${Date.now()}`)

@@ -19,13 +19,22 @@ interface ProductCardProps {
   primaryImage?: { image_url: string; thumbnail_url?: string } | null
   brandName?: string | null
   categoryName?: string | null
+  categoryId?: string | null
 }
 
 export default function ProductCard({
   id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
-  effectiveStock, primaryImage, brandName, categoryName,
+  effectiveStock, primaryImage, brandName, categoryName, categoryId,
 }: ProductCardProps) {
   const { user } = useAuth()
+
+  // Apply per-category business discount off the selling price, show combined % off MRP
+  const discountPct = categoryId ? (user?.businessDiscountMap?.[categoryId] ?? 0) : 0
+  const businessPrice = discountPct > 0 ? displayPrice * (1 - discountPct / 100) : null
+  const shownPrice = businessPrice ?? displayPrice
+  const shownDiscount = businessPrice && mrp && mrp > 0
+    ? Math.round(((mrp - businessPrice) / mrp) * 100)
+    : mrpDiscount
   const { showToast, showConfirm } = useToast()
   const router = useRouter()
   const [isInWishlist, setIsInWishlist] = useState(false)
@@ -145,9 +154,9 @@ export default function ProductCard({
               </div>
             )}
 
-            {mrpDiscount > 0 && (
+            {shownDiscount > 0 && (
               <div className="absolute top-2 left-2 bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
-                {mrpDiscount}% off
+                {shownDiscount}% off
               </div>
             )}
 
@@ -187,14 +196,21 @@ export default function ProductCard({
             <div className="mt-auto">
               <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2 mb-0.5 sm:mb-1">
                 <span className="text-base sm:text-xl font-bold text-primary-600 dark:text-primary-400 leading-tight">
-                  {hasVariants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  {hasVariants ? 'From ' : ''}&#x20B9;{Number(shownPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
-                {mrp && mrp > Number(displayPrice) && (
+                {businessPrice ? (
+                  <span className="text-xs sm:text-sm text-foreground-muted line-through leading-tight">
+                    &#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                ) : mrp && mrp > Number(displayPrice) ? (
                   <span className="text-xs sm:text-sm text-foreground-muted line-through leading-tight">
                     &#x20B9;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                )}
+                ) : null}
               </div>
+              {businessPrice && (
+                <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mb-0.5">Your business price</p>
+              )}
               <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>
               <div className="flex items-center justify-between gap-1">
                 <span className={`text-xs font-medium whitespace-nowrap ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -242,9 +258,18 @@ export default function ProductCard({
 
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                {hasVariants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                {hasVariants ? 'From ' : ''}&#x20B9;{Number(shownPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
-              {mrp && mrp > Number(displayPrice) && (
+              {businessPrice ? (
+                <>
+                  <span className="text-sm text-foreground-muted line-through">
+                    &#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-xs font-semibold bg-accent-500 text-white px-2 py-0.5 rounded-full">
+                    {shownDiscount}% off
+                  </span>
+                </>
+              ) : mrp && mrp > Number(displayPrice) ? (
                 <>
                   <span className="text-sm text-foreground-muted line-through">
                     &#x20B9;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -253,7 +278,7 @@ export default function ProductCard({
                     {mrpDiscount}% off
                   </span>
                 </>
-              )}
+              ) : null}
             </div>
 
             <div className="flex items-center gap-2 mb-5">

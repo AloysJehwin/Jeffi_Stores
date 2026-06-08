@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryOne, queryMany } from '@/lib/db'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { sendNewReviewNotification } from '@/lib/email'
 import { uploadReviewImage } from '@/lib/s3'
 import { logActivity } from '@/lib/activity'

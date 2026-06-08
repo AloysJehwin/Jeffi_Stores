@@ -37,13 +37,18 @@ interface SignupData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { children: ReactNode; meEndpoint?: string }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  const isBusiness = meEndpoint === '/api/business/me'
+  const logoutEndpoint = isBusiness ? '/api/business/logout' : '/api/auth/logout'
+  const logoutRedirect = isBusiness ? '/business/signin' : '/'
+
   const fetchUser = async () => {
     try {
-      const response = await fetch('/api/auth/me')
+      const headers: HeadersInit = isBusiness ? { 'X-Auth-Portal': 'business' } : {}
+      const response = await fetch(meEndpoint, { credentials: 'include', headers })
       if (response.ok) {
         const data = await response.json()
         setUser(data.user)
@@ -120,11 +125,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      const endpoint = user?.isBusiness ? '/api/business/logout' : '/api/auth/logout'
-      await fetch(endpoint, { method: 'POST' })
+      await fetch(logoutEndpoint, { method: 'POST' })
     } finally {
       setUser(null)
-      window.location.href = user?.isBusiness ? '/business/signin' : '/'
+      window.location.href = logoutRedirect
     }
   }
 
