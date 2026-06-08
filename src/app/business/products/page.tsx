@@ -457,6 +457,7 @@ export default async function ProductsPage({
                         primaryImage={primaryImage}
                         brandName={product.brands?.name ?? null}
                         categoryName={product.categories?.name ?? null}
+                        categoryId={product.categories?.id ?? null}
                       />
                     )
                   })}

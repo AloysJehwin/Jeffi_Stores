@@ -33,7 +33,7 @@ export default function CartPage() {
     try {
       const res = await fetch('/api/checkout/intents', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
         credentials: 'include',
         body: JSON.stringify({ mode: 'cart' }),
       })
@@ -130,7 +130,7 @@ export default function CartPage() {
     try {
       const res = await fetch('/api/coupons/apply', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
         credentials: 'include',
         body: JSON.stringify({ code: couponCode.trim(), subtotal: total }),
       })
@@ -180,12 +180,17 @@ export default function CartPage() {
                   : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
                 const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
                 const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
+                const categoryId = item.products.category_id
+                const itemDiscountPct = (!isCustomQty && user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
+                  ? (user.businessDiscountMap?.[categoryId] ?? 0)
+                  : 0
+                const discountedPrice = itemDiscountPct > 0 ? Number(price) * (1 - itemDiscountPct / 100) : Number(price)
                 const itemTotal = isCustomQty
                   ? item.price_at_addition * item.quantity
-                  : price * item.quantity
+                  : discountedPrice * item.quantity
                 const isUpdating = updatingItems.has(item.id)
-                const showMrp = !isCustomQty && mrp !== null && Number(mrp) > Number(price)
-                const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
+                const showMrp = !isCustomQty && mrp !== null && Number(mrp) > discountedPrice
+                const discountPct = showMrp ? Math.round(((Number(mrp) - discountedPrice) / Number(mrp)) * 100) : 0
                 const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
 
                 return (
@@ -238,19 +243,41 @@ export default function CartPage() {
                           )}
                         </div>
 
-                        <div className="mt-2 flex items-center gap-3 flex-wrap">
-                          <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
-                          </span>
-                          {showMrp && (
+                        <div className="mt-2 flex flex-col gap-0.5">
+                          {itemDiscountPct > 0 ? (
                             <>
-                              <span className="text-sm text-foreground-muted line-through">
-                                ₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                              </span>
-                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">
-                                {discountPct}% off
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-foreground-muted">Regular:</span>
+                                <span className="text-sm text-foreground-muted line-through">
+                                  ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold text-accent-600 dark:text-accent-400">Business price:</span>
+                                <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                                  ₹{discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                </span>
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 whitespace-nowrap">
+                                  ✦ {itemDiscountPct}% extra off
+                                </span>
+                              </div>
                             </>
+                          ) : (
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
+                                ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                              </span>
+                              {showMrp && (
+                                <>
+                                  <span className="text-sm text-foreground-muted line-through">
+                                    ₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </span>
+                                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">
+                                    {discountPct}% off
+                                  </span>
+                                </>
+                              )}
+                            </div>
                           )}
                         </div>
 
@@ -358,6 +385,11 @@ export default function CartPage() {
                           <span className="text-lg font-bold text-foreground">
                             ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </span>
+                          {itemDiscountPct > 0 && (
+                            <span className="text-xs text-foreground-muted ml-2">
+                              ({item.quantity} × ₹{discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

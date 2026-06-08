@@ -109,7 +109,7 @@ function CheckoutReviewPage() {
     if (intentToken) {
       if (intentFetched.current) return
       intentFetched.current = true
-      fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include' })
+      fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
         .then(async r => {
           const d = await r.json()
           if (!r.ok) {
@@ -195,7 +195,7 @@ function CheckoutReviewPage() {
 
   const fetchAddresses = async () => {
     try {
-      const response = await fetch('/api/user/addresses', { credentials: 'include' })
+      const response = await fetch('/api/user/addresses', { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       if (response.ok) {
         const data = await response.json()
         setAddresses(data.addresses || [])
@@ -262,7 +262,7 @@ function CheckoutReviewPage() {
     try {
       const res = await fetch('/api/coupons/apply', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
         credentials: 'include',
         body: JSON.stringify({ code: couponCode, subtotal: cartSubtotal }),
       })
@@ -295,7 +295,7 @@ function CheckoutReviewPage() {
     setCouponCode(codeFromUrl)
     fetch('/api/coupons/apply', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
       credentials: 'include',
       body: JSON.stringify({ code: codeFromUrl, subtotal: cartSubtotal }),
     })

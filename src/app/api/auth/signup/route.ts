@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const existingUser = await queryOne(
-      'SELECT id FROM users WHERE email = $1',
+      "SELECT id FROM users WHERE email = $1 AND user_type != 'business'",
       [email.toLowerCase()]
     )
 
@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
 
     const token = await new SignJWT({
       userId: newUser.id,
-      email: newUser.email
+      email: newUser.email,
+      type: 'customer',
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('30d')

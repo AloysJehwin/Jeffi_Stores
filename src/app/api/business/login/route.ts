@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
     logActivity({ userId: user.id, kind: 'login', summary: 'Business login via OTP', metadata: { provider: 'otp' } }).catch(() => {})
 
-    const token = await new SignJWT({ userId: user.id, email: user.email, isBusiness: true, approvalStatus: 'approved' })
+    const token = await new SignJWT({ userId: user.id, email: user.email, type: 'business', isBusiness: true, approvalStatus: 'approved' })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('30d')
       .sign(JWT_SECRET)

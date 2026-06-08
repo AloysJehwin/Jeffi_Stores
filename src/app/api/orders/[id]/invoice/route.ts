@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany, query } from '@/lib/db'
-import { authenticateUser, authenticateAdmin } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { generateInvoicePDF, InvoiceBusinessSettings, InvoiceOrder, InvoiceOrderItem, InvoiceBuyerAddress } from '@/lib/invoice-pdf'
 import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem } from '@/lib/receipt-pdf'
 import { uploadInvoicePDF } from '@/lib/s3'

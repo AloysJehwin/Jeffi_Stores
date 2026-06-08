@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ approvalStatus, message: approvalStatus === 'rejected' ? 'Your application was not approved.' : 'Your account is awaiting approval.' })
     }
 
-    const token = await new SignJWT({ userId: user.id, email: user.email, isBusiness: true, approvalStatus: 'approved' })
+    const token = await new SignJWT({ userId: user.id, email: user.email, type: 'business', isBusiness: true, approvalStatus: 'approved' })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('30d')
       .sign(JWT_SECRET)

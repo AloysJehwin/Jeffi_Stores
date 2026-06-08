@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { queryOne } from '@/lib/db'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
 import {

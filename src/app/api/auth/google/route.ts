@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     const lastName = payload.family_name || payload.name?.split(' ').slice(1).join(' ') || ''
 
     let user = await queryOne<any>(
-      'SELECT * FROM users WHERE google_id = $1 OR email = $2 LIMIT 1',
+      "SELECT * FROM users WHERE (google_id = $1 OR email = $2) AND user_type != 'business' LIMIT 1",
       [googleId, email]
     )
 
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const token = await new SignJWT({ userId: user.id, email: user.email })
+    const token = await new SignJWT({ userId: user.id, email: user.email, type: 'customer' })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('30d')
       .sign(JWT_SECRET)

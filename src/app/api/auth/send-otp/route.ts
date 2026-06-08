@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       const existingUser = await queryOne(
         userType === 'business'
           ? "SELECT id FROM users WHERE email = $1 AND user_type = 'business'"
-          : 'SELECT id FROM users WHERE email = $1',
+          : "SELECT id FROM users WHERE email = $1 AND user_type != 'business'",
         [email.toLowerCase()]
       )
 
@@ -41,7 +41,9 @@ export async function POST(request: NextRequest) {
       }
     } else {
       const existingUser = await queryOne(
-        'SELECT id, first_name FROM users WHERE email = $1',
+        userType === 'business'
+          ? "SELECT id, first_name FROM users WHERE email = $1 AND user_type = 'business'"
+          : "SELECT id, first_name FROM users WHERE email = $1 AND user_type != 'business'",
         [email.toLowerCase()]
       )
 

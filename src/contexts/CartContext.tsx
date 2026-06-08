@@ -24,6 +24,7 @@ interface CartItem {
     stock_quantity: number
     is_in_stock: boolean
     brand_name: string | null
+    category_id: string | null
     product_images: Array<{
       thumbnail_url: string
       image_url: string
@@ -86,11 +87,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const prevUserIdRef = useRef<string | null | undefined>(undefined)
 
+  const portalHeaders = (): Record<string, string> =>
+    user?.isBusiness ? { 'X-Auth-Portal': 'business' } : {}
+
   const fetchCart = async () => {
     try {
+      const headers = portalHeaders()
       const [activeRes, savedRes] = await Promise.all([
-        fetch('/api/cart', { credentials: 'include' }),
-        fetch('/api/cart?saved=1', { credentials: 'include' }),
+        fetch('/api/cart', { credentials: 'include', headers }),
+        fetch('/api/cart?saved=1', { credentials: 'include', headers }),
       ])
       if (activeRes.ok) {
         const data = await activeRes.json()
@@ -126,7 +131,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('/api/cart', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...portalHeaders() },
         body: JSON.stringify({ productId, quantity, variantId: variantId || null, buyMode, buyUnit: buyUnit || null, subVariantId: subVariantId || null }),
         credentials: 'include',
       })
@@ -146,6 +151,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`/api/cart?id=${cartItemId}`, {
         method: 'DELETE',
+        headers: portalHeaders(),
         credentials: 'include',
       })
 
@@ -163,7 +169,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('/api/cart', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...portalHeaders() },
         body: JSON.stringify({ cartItemId, quantity }),
         credentials: 'include',
       })
@@ -183,7 +189,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('/api/cart', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...portalHeaders() },
         body: JSON.stringify({ cartItemId, savedForLater: true }),
         credentials: 'include',
       })
@@ -202,7 +208,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch('/api/cart', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...portalHeaders() },
         body: JSON.stringify({ cartItemId, savedForLater: false }),
         credentials: 'include',
       })

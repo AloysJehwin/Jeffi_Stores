@@ -55,7 +55,7 @@ function BusinessSignInPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, isSignup: false }),
+        body: JSON.stringify({ email, isSignup: false, userType: 'business' }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -136,7 +136,7 @@ function BusinessSignInPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, isSignup: false }),
+        body: JSON.stringify({ email, isSignup: false, userType: 'business' }),
       })
       const data = await res.json()
       if (!res.ok) {

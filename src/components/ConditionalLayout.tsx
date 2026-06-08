@@ -24,7 +24,7 @@ export default function ConditionalLayout({ children, isFormsSubdomain, isDocume
   if (isAdminPage || isFormsPage || isDocumentPage || isBusinessPage) {
     return (
       <ThemeProvider>
-        <AuthProvider>
+        <AuthProvider meEndpoint={isBusinessPage ? '/api/business/me' : '/api/auth/me'}>
           <ToastProvider>
             <ConfirmProvider>
               {children}
