@@ -127,6 +127,15 @@ export default async function CustomerDetailPage({
               <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${statusBadge[currentStatus]}`}>
                 {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
               </span>
+              {customer.user_type === 'business' && (
+                <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                  customer.bp_approval_status === 'approved' ? 'bg-blue-500/20 text-blue-200'
+                  : customer.bp_approval_status === 'rejected' ? 'bg-red-500/20 text-red-300'
+                  : 'bg-amber-500/20 text-amber-200'
+                }`}>
+                  Business Partner{customer.bp_approval_status !== 'approved' ? ` · ${customer.bp_approval_status === 'rejected' ? 'Rejected' : 'Pending'}` : ''}
+                </span>
+              )}
               {customer.customer_type && customer.customer_type !== 'retail' && (
                 <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-white/10 text-white/80 capitalize">
                   {customer.customer_type}
@@ -261,7 +270,7 @@ export default async function CustomerDetailPage({
             <CustomerTasks customerId={customer.id} />
           </div>
 
-          {/* Business details */}
+          {/* Business details (customer_profiles) */}
           {(customer.company_name || customer.gst_number || customer.credit_limit) && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
               <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">Business Details</h2>
@@ -284,6 +293,72 @@ export default async function CustomerDetailPage({
                     <p className="text-foreground font-semibold">₹{Number(customer.credit_limit).toLocaleString('en-IN')}</p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Business Partner Profile (business_profiles) */}
+          {customer.user_type === 'business' && customer.bp_company_name && (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Business Partner</h2>
+                <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${
+                  customer.bp_approval_status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : customer.bp_approval_status === 'rejected' ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                  : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                }`}>
+                  {customer.bp_approval_status === 'approved' ? 'Approved' : customer.bp_approval_status === 'rejected' ? 'Rejected' : 'Pending'}
+                </span>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="text-foreground-muted text-xs mb-0.5">Company</p>
+                  <p className="text-foreground font-medium">{customer.bp_company_name}</p>
+                </div>
+                {customer.bp_gst_number && (
+                  <div>
+                    <p className="text-foreground-muted text-xs mb-0.5">GST Number</p>
+                    <p className="text-foreground font-medium font-mono tracking-wide">{customer.bp_gst_number}</p>
+                  </div>
+                )}
+                {customer.bp_industry && (
+                  <div>
+                    <p className="text-foreground-muted text-xs mb-0.5">Industry</p>
+                    <p className="text-foreground">{customer.bp_industry}</p>
+                  </div>
+                )}
+                {customer.bp_business_address && (
+                  <div>
+                    <p className="text-foreground-muted text-xs mb-0.5">Business Address</p>
+                    <p className="text-foreground">{customer.bp_business_address}</p>
+                  </div>
+                )}
+                {customer.bp_created_at && (
+                  <div>
+                    <p className="text-foreground-muted text-xs mb-0.5">Applied</p>
+                    <p className="text-foreground">{new Date(customer.bp_created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                  </div>
+                )}
+                {customer.bp_approved_at && customer.bp_approval_status === 'approved' && (
+                  <div>
+                    <p className="text-foreground-muted text-xs mb-0.5">Approved On</p>
+                    <p className="text-foreground">{new Date(customer.bp_approved_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                  </div>
+                )}
+                {customer.bp_rejection_note && customer.bp_approval_status === 'rejected' && (
+                  <div>
+                    <p className="text-foreground-muted text-xs mb-0.5">Rejection Note</p>
+                    <p className="text-red-700 dark:text-red-400">{customer.bp_rejection_note}</p>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-border-default">
+                  <Link
+                    href={`/admin/business/customers/${customer.id}`}
+                    className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+                  >
+                    Manage in Business Customers →
+                  </Link>
+                </div>
               </div>
             </div>
           )}
