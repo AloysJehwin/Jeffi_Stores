@@ -14,6 +14,8 @@ interface RFQ {
   notes: string | null
   item_count: number
   converted_quotation_id: string | null
+  quote_number: string | null
+  quotation_view_token: string | null
   created_at: string
 }
 
@@ -117,9 +119,24 @@ export default function MyQuotesPage() {
                     Submitted {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
                   {rfq.status === 'converted' && rfq.converted_quotation_id && (
-                    <p className="text-xs text-green-700 dark:text-green-400 font-medium mt-1.5">
-                      Quotation sent — check your email
-                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <p className="text-xs text-green-700 dark:text-green-400 font-medium">
+                        Quotation ready
+                      </p>
+                      {rfq.quotation_view_token && (
+                        <a
+                          href={`https://quotation.jeffistores.in/q/${rfq.quotation_view_token}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 underline underline-offset-2"
+                        >
+                          View Quotation {rfq.quote_number && `(${rfq.quote_number})`}
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
