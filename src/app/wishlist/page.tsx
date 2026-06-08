@@ -6,7 +6,8 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { AccountNavBar } from '@/components/visitor/AccountSidebar'
-import AccountSearch from '@/components/visitor/AccountSearch'
+import { AccountSearchProvider, useAccountSearch } from '@/contexts/AccountSearchContext'
+import FeaturedProducts from '@/components/visitor/FeaturedProducts'
 
 interface WishlistItem {
   id: string
@@ -32,18 +33,30 @@ interface WishlistItem {
 }
 
 export default function WishlistPage() {
+  return (
+    <AccountSearchProvider>
+      <WishlistInner />
+    </AccountSearchProvider>
+  )
+}
+
+function WishlistInner() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { addToCart } = useCart()
   const { showToast, showConfirm } = useToast()
   const { user } = useAuth()
   const [addingToCart, setAddingToCart] = useState<Set<string>>(new Set())
-  const [searchQuery, setSearchQuery] = useState('')
+  const { query: searchQuery, register } = useAccountSearch()
 
   const suggestions = useMemo(() =>
     wishlistItems.map(i => i.products.name),
     [wishlistItems]
   )
+
+  useEffect(() => {
+    register({ suggestions, placeholder: 'Search wishlist…' })
+  }, [suggestions, register])
 
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return wishlistItems
@@ -145,14 +158,6 @@ export default function WishlistPage() {
     <div className="bg-surface min-h-screen">
       <div className="hidden lg:block"><AccountNavBar /></div>
       <div className="container mx-auto px-4 py-4 sm:py-6">
-        <div className="mb-3">
-          <AccountSearch
-            placeholder="Search wishlist by product name…"
-            suggestions={suggestions}
-            value={searchQuery}
-            onChange={setSearchQuery}
-          />
-        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredItems.map((item) => {
             const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
@@ -265,6 +270,7 @@ export default function WishlistPage() {
             )
           })}
           </div>
+          <FeaturedProducts />
       </div>
     </div>
   )

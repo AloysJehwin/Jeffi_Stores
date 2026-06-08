@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAccountSearch } from '@/contexts/AccountSearchContext'
+import AccountSearch from '@/components/visitor/AccountSearch'
 
 const navItems = [
   {
@@ -74,6 +76,7 @@ export { navItems }
 export function AccountNavBar() {
   const pathname = usePathname()
   const { user } = useAuth()
+  const { query, suggestions, placeholder, setQuery } = useAccountSearch()
   const items = (user?.isBusiness && user.approvalStatus === 'approved')
     ? [...navItems, businessNavItem]
     : navItems
@@ -105,6 +108,16 @@ export function AccountNavBar() {
               )
             })}
           </nav>
+          {suggestions.length > 0 || placeholder !== 'Search…' ? (
+            <div className="hidden sm:block w-52 flex-shrink-0">
+              <AccountSearch
+                placeholder={placeholder}
+                suggestions={suggestions}
+                value={query}
+                onChange={setQuery}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
