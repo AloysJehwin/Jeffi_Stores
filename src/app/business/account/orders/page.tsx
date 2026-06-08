@@ -2,10 +2,11 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
+import AccountSearch from '@/components/visitor/AccountSearch'
 
 interface OrderItem {
   id: string
@@ -43,6 +44,37 @@ interface Order {
   order_items: OrderItem[]
 }
 
+function getStatusColor(status: string) {
+  switch (status) {
+    case 'pending':        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+    case 'confirmed':      return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+    case 'shipped':        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+    case 'out_for_delivery': return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
+    case 'delivered':      return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+    case 'cancel_requested': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+    case 'cancelled':      return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+    case 'return_requested': return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+    case 'return_approved':
+    case 'return_received':  return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+    case 'return_rejected':  return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+    case 'returned':       return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+    default:               return 'bg-surface-secondary text-foreground'
+  }
+}
+
+function getStatusLabel(status: string) {
+  switch (status) {
+    case 'cancel_requested':  return 'Cancellation Requested'
+    case 'cancel_rejected':   return 'Cancellation Rejected'
+    case 'out_for_delivery':  return 'Out for Delivery'
+    case 'return_requested':  return 'Return Requested'
+    case 'return_approved':   return 'Return Approved'
+    case 'return_received':   return 'Return Received'
+    case 'return_rejected':   return 'Return Rejected'
+    default: return status.charAt(0).toUpperCase() + status.slice(1)
+  }
+}
+
 export default function OrdersPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
@@ -53,6 +85,27 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const suggestions = useMemo(() => {
+    const set = new Set<string>()
+    orders.forEach(o => {
+      set.add(o.order_number)
+      set.add(getStatusLabel(o.status))
+      o.order_items.forEach(i => set.add(i.product_name))
+    })
+    return Array.from(set)
+  }, [orders])
+
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery.trim()) return orders
+    const q = searchQuery.toLowerCase()
+    return orders.filter(o =>
+      o.order_number.toLowerCase().includes(q) ||
+      getStatusLabel(o.status).toLowerCase().includes(q) ||
+      o.order_items.some(i => i.product_name.toLowerCase().includes(q))
+    )
+  }, [orders, searchQuery])
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -91,49 +144,6 @@ export default function OrdersPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-      case 'confirmed':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-      case 'shipped':
-        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
-      case 'out_for_delivery':
-        return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
-      case 'delivered':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-      case 'cancel_requested':
-        return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-      case 'cancelled':
-        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-      case 'return_requested':
-        return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-      case 'return_approved':
-      case 'return_received':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-      case 'return_rejected':
-        return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-      case 'returned':
-        return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
-      default:
-        return 'bg-surface-secondary text-foreground'
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'cancel_requested':  return 'Cancellation Requested'
-      case 'cancel_rejected':   return 'Cancellation Rejected'
-      case 'out_for_delivery':  return 'Out for Delivery'
-      case 'return_requested':  return 'Return Requested'
-      case 'return_approved':   return 'Return Approved'
-      case 'return_received':   return 'Return Received'
-      case 'return_rejected':   return 'Return Rejected'
-      default: return status.charAt(0).toUpperCase() + status.slice(1)
-    }
-  }
-
   if (isLoading || loading) {
     return (
       <div className="container mx-auto px-4 py-16">
@@ -155,10 +165,19 @@ export default function OrdersPage() {
       {/* Mobile header */}
       <BusinessAccountMobileHeader />
 
-      <div className="container mx-auto px-4">
-        <div className="hidden lg:block pt-6 pb-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Orders</h1>
-        </div>
+      <div className="container mx-auto px-4 pt-4">
+
+        {/* Search */}
+        {orders.length > 0 && (
+          <div className="mb-4 hidden sm:block max-w-xs">
+            <AccountSearch
+              placeholder="Search orders…"
+              suggestions={suggestions}
+              value={searchQuery}
+              onChange={setSearchQuery}
+            />
+          </div>
+        )}
 
         <div>
             {orders.length === 0 ? (
@@ -187,7 +206,7 @@ export default function OrdersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {orders.map((order) => (
+                {filteredOrders.map((order) => (
                   <div key={order.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
                     {/* Order Header */}
                     <div className="bg-surface border-b border-border-default px-4 sm:px-6 py-4">
