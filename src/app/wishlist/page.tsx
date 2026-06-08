@@ -6,7 +6,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { AccountNavBar } from '@/components/visitor/AccountSidebar'
-import { AccountSearchProvider, useAccountSearch } from '@/contexts/AccountSearchContext'
+import { AccountSearchProvider } from '@/contexts/AccountSearchContext'
 import FeaturedProducts from '@/components/visitor/FeaturedProducts'
 
 interface WishlistItem {
@@ -47,22 +47,15 @@ function WishlistInner() {
   const { showToast, showConfirm } = useToast()
   const { user } = useAuth()
   const [addingToCart, setAddingToCart] = useState<Set<string>>(new Set())
-  const { query: searchQuery, register } = useAccountSearch()
-
-  const suggestions = useMemo(() =>
-    wishlistItems.map(i => i.products.name),
-    [wishlistItems]
-  )
-
-  useEffect(() => {
-    register({ suggestions, placeholder: 'Search wishlist…' })
-  }, [suggestions, register])
+  const [filterStock, setFilterStock] = useState<'all' | 'in' | 'out'>('all')
 
   const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return wishlistItems
-    const q = searchQuery.toLowerCase()
-    return wishlistItems.filter(i => i.products.name.toLowerCase().includes(q))
-  }, [wishlistItems, searchQuery])
+    if (filterStock === 'all') return wishlistItems
+    return wishlistItems.filter(i => {
+      const inStock = (i.products.has_variants ? Number(i.products.variant_stock_total) : i.products.stock_quantity) > 0
+      return filterStock === 'in' ? inStock : !inStock
+    })
+  }, [wishlistItems, filterStock])
 
   const fetchWishlist = async () => {
     try {
@@ -158,6 +151,24 @@ function WishlistInner() {
     <div className="bg-surface min-h-screen">
       <div className="hidden lg:block"><AccountNavBar /></div>
       <div className="container mx-auto px-4 py-4 sm:py-6">
+
+        {/* Stock filter */}
+        <div className="flex items-center gap-1.5 mb-4">
+          {([['all', 'All'], ['in', 'In Stock'], ['out', 'Out of Stock']] as const).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setFilterStock(val)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                filterStock === val
+                  ? 'bg-accent-500 text-white'
+                  : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredItems.map((item) => {
             const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
