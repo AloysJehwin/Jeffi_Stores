@@ -252,11 +252,10 @@ export default function QuotationsClient() {
       const loadedItems: LineItem[] = (data.items || []).map((i: any) => {
         const gstRate = Number(i.gst_rate) || 0
         const rateExGst = Number(i.rate) || 0
+        // rate is pre-discount ex-GST; show unit_price as pre-discount incl. GST so the discount field is meaningful
         const unitPrice = rateExGst * (1 + gstRate / 100)
+        const discPct = Number(i.discount_pct) || 0
         const mrp = Number(i.mrp) || 0
-        const discPct = mrp > 0 && unitPrice < mrp
-          ? Math.round((1 - unitPrice / mrp) * 100 * 100) / 100
-          : Number(i.discount_pct) || 0
         return {
           id: i.id || Math.random().toString(36).slice(2),
           product_id: i.product_id || null,
@@ -344,7 +343,10 @@ export default function QuotationsClient() {
         items: items.map(i => {
           const gstRate = Number(i.gst_rate) || 0
           const unitPrice = Number(i.unit_price) || 0
-          const rateExGst = i.price_ex_gst || unitPrice / (1 + gstRate / 100)
+          const discPct = Number(i.discount_pct) || 0
+          // unit_price is inclusive of GST; convert to ex-GST rate, then apply discount
+          const baseExGst = i.price_ex_gst || unitPrice / (1 + gstRate / 100)
+          const rateExGst = baseExGst * (1 - discPct / 100)
           return {
             description: i.product_name,
             hsn_code: i.hsn_code || null,
@@ -352,7 +354,7 @@ export default function QuotationsClient() {
             quantity: i.quantity,
             unit: i.unit,
             rate: rateExGst,
-            discount_pct: 0,
+            discount_pct: discPct,
             amount: (Number(i.quantity) || 0) * rateExGst,
             product_id: i.product_id || null,
             variant_id: i.variant_id || null,

@@ -60,7 +60,8 @@ export function newLineItem(): LineItem {
 }
 
 function calcLine(it: LineItem) {
-  return (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)
+  const gross = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)
+  return gross * (1 - (Number(it.discount_pct) || 0) / 100)
 }
 
 function fmt(n: number) {
@@ -397,14 +398,19 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                 <div>
                   <label className={labelCls}>Disc %</label>
                   <input type="number" min="0" max="100" step="any" value={item.discount_pct}
-                    readOnly className={inputCls + ' bg-surface-elevated text-foreground-muted cursor-default'} placeholder="0" />
+                    onChange={e => updateItem(item.id, 'discount_pct', e.target.value)}
+                    className={inputCls} placeholder="0" />
                 </div>
               </div>
 
               {(Number(item.unit_price) > 0 || item.mrp > 0) && (
                 <div className="flex items-center justify-between text-xs text-foreground-secondary">
                   {item.mrp > 0 && item.discount_pct > 0 ? (
-                    <span>MRP: <span className="line-through text-foreground-muted">₹{fmt(item.mrp)}</span> · Disc: <span className="text-green-600 dark:text-green-400 font-medium">{item.discount_pct}%</span></span>
+                    <span>
+                      MRP: <span className="line-through text-foreground-muted">₹{fmt(item.mrp)}</span>
+                      {' · '}Disc: <span className="text-green-600 dark:text-green-400 font-medium">{item.discount_pct}%</span>
+                      {' · '}Net: <span className="font-medium text-foreground">₹{fmt(Number(item.unit_price) * (1 - Number(item.discount_pct) / 100))}</span>
+                    </span>
                   ) : <span />}
                   {Number(item.unit_price) > 0 ? (
                     <span>Line total: <span className="font-semibold text-foreground">₹{fmt(calcLine(item))}</span></span>

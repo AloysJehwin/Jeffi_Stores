@@ -11,11 +11,9 @@ function buildQuoteNumber(now: Date, seq: number): string {
   return `QT/${fy}/${mon}/${seq}`
 }
 
-// Parse "Address Line, City, State, Pincode" into parts
 function parseAddress(raw: string | null): { addr1: string; addr2: string | null; city: string; state: string; pincode: string | null } {
   if (!raw) return { addr1: '', addr2: null, city: '', state: 'Chhattisgarh', pincode: null }
   const parts = raw.split(',').map(s => s.trim()).filter(Boolean)
-  // Last part may be pincode (6 digits), second-last is state, third-last is city
   let pincode: string | null = null
   if (parts.length > 0 && /^\d{6}$/.test(parts[parts.length - 1])) {
     pincode = parts.pop()!
@@ -42,10 +40,21 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (rfq.converted_quotation_id) return NextResponse.json({ error: 'Already converted' }, { status: 409 })
 
+  // Load per-category business discounts for this user
+  const discountRows = await queryMany<{ category_id: string; discount_pct: string }>(
+    `SELECT category_id, discount_pct FROM business_discounts WHERE user_id = $1`,
+    [rfq.user_id]
+  )
+  const discountMap: Record<string, number> = {}
+  for (const row of discountRows) {
+    discountMap[row.category_id] = Number(row.discount_pct)
+  }
+
   const items = await queryMany<any>(
     `SELECT ri.*,
        p.name AS product_name, p.price_ex_gst AS product_price, p.mrp AS product_mrp,
        p.gst_percentage AS product_gst, p.hsn_code AS product_hsn,
+       p.category_id AS product_category_id,
        pv.variant_name, pv.price_ex_gst AS variant_price, pv.mrp AS variant_mrp, pv.sku AS variant_sku,
        psv.sub_variant_name, psv.price_ex_gst AS sv_price, psv.mrp AS sv_mrp, psv.sku AS sv_sku
      FROM business_rfq_items ri
@@ -73,40 +82,51 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const seq = (parseInt(maxRow?.max_seq || '0') || 0) + 1
   const quoteNumber = buildQuoteNumber(now, seq)
 
-  // Parse business address
   const addr = parseAddress(rfq.business_address)
   const consigneeName = rfq.company_name || `${rfq.first_name} ${rfq.last_name}`.trim()
 
-  // Calculate line totals for subtotal/tax
   let subtotal = 0
   let cgst = 0
   let sgst = 0
 
   const lineItems = items.map((item: any) => {
     const gstRate = Number(item.product_gst ?? 18)
-    // requested_price is the customer's target price inclusive of GST — convert to ex-GST for the rate column
-    // sv_price / variant_price / product_price are already ex-GST
-    const baseRate = item.requested_price
-      ? Number(item.requested_price) / (1 + gstRate / 100)
-      : item.sv_price
+
+    // If the customer submitted a requested_price (incl. GST), use it as-is converted to ex-GST.
+    // Otherwise fall back to catalog price (already ex-GST), then apply the business discount.
+    let baseRateExGst: number
+    let discountPct: number
+
+    if (item.requested_price) {
+      // Customer specified their target — honour it, no further discount
+      baseRateExGst = Number(item.requested_price) / (1 + gstRate / 100)
+      discountPct = 0
+    } else {
+      // Use catalog ex-GST price
+      const catalogExGst = item.sv_price
         ? Number(item.sv_price)
         : item.variant_price
           ? Number(item.variant_price)
           : item.product_price
             ? Number(item.product_price)
             : 0
-    const discountPct = 0
+      const categoryDiscount = item.product_category_id
+        ? (discountMap[item.product_category_id] ?? 0)
+        : 0
+      baseRateExGst = catalogExGst
+      discountPct = categoryDiscount
+    }
+
+    const rateAfterDiscount = baseRateExGst * (1 - discountPct / 100)
     const qty = Number(item.quantity)
-    const amount = baseRate * qty * (1 - discountPct / 100)
-    const taxableAmount = amount
-    const itemCgst = taxableAmount * (gstRate / 2) / 100
-    const itemSgst = taxableAmount * (gstRate / 2) / 100
+    const amount = rateAfterDiscount * qty
+    const itemCgst = amount * (gstRate / 2) / 100
+    const itemSgst = amount * (gstRate / 2) / 100
 
     subtotal += amount
     cgst += itemCgst
     sgst += itemSgst
 
-    // Build description: use product/variant names if available, else the free-text description
     let description = item.description
     if (item.product_name && item.product_name !== item.description) {
       description = item.product_name
@@ -120,8 +140,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       gst_rate: gstRate,
       quantity: qty,
       unit: item.unit || 'Nos',
-      rate: baseRate,
-      discount_pct: discountPct,
+      rate: baseRateExGst,       // pre-discount rate, so admin can see original and adjust
+      discount_pct: discountPct,  // business discount shown separately on the quotation
       amount,
       product_id: item.product_id || null,
       variant_id: item.variant_id || null,
