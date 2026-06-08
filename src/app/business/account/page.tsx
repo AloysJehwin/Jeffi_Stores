@@ -387,7 +387,7 @@ export default function AccountPage() {
                   <h2 className="text-sm font-semibold text-foreground">Recent Searches</h2>
                   <button
                     onClick={() => {
-                      fetch('/api/user/search-history', { method: 'DELETE', credentials: 'include' }).catch(() => {})
+                      fetch('/api/user/search-history', { method: 'DELETE', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } }).catch(() => {})
                       setSearchHistory([])
                     }}
                     className="text-xs text-foreground-muted hover:text-foreground transition-colors"
