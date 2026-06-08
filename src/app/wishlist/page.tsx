@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { AccountNavBar } from '@/components/visitor/AccountSidebar'
+import AccountSearch from '@/components/visitor/AccountSearch'
 
 interface WishlistItem {
   id: string
@@ -37,6 +38,18 @@ export default function WishlistPage() {
   const { showToast, showConfirm } = useToast()
   const { user } = useAuth()
   const [addingToCart, setAddingToCart] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const suggestions = useMemo(() =>
+    wishlistItems.map(i => i.products.name),
+    [wishlistItems]
+  )
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return wishlistItems
+    const q = searchQuery.toLowerCase()
+    return wishlistItems.filter(i => i.products.name.toLowerCase().includes(q))
+  }, [wishlistItems, searchQuery])
 
   const fetchWishlist = async () => {
     try {
@@ -132,8 +145,16 @@ export default function WishlistPage() {
     <div className="bg-surface min-h-screen">
       <div className="hidden lg:block"><AccountNavBar /></div>
       <div className="container mx-auto px-4 py-4 sm:py-6">
+        <div className="mb-3">
+          <AccountSearch
+            placeholder="Search wishlist by product name…"
+            suggestions={suggestions}
+            value={searchQuery}
+            onChange={setSearchQuery}
+          />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {wishlistItems.map((item) => {
+            {filteredItems.map((item) => {
             const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
             const hasVariants = item.products.has_variants
             const price = hasVariants && item.products.variant_min_price

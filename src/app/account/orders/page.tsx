@@ -2,10 +2,11 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
+import AccountSearch from '@/components/visitor/AccountSearch'
 
 interface OrderItem {
   id: string
@@ -53,6 +54,27 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const suggestions = useMemo(() => {
+    const set = new Set<string>()
+    orders.forEach(o => {
+      set.add(o.order_number)
+      set.add(getStatusLabel(o.status))
+      o.order_items.forEach(i => set.add(i.product_name))
+    })
+    return Array.from(set)
+  }, [orders])
+
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery.trim()) return orders
+    const q = searchQuery.toLowerCase()
+    return orders.filter(o =>
+      o.order_number.toLowerCase().includes(q) ||
+      getStatusLabel(o.status).toLowerCase().includes(q) ||
+      o.order_items.some(i => i.product_name.toLowerCase().includes(q))
+    )
+  }, [orders, searchQuery])
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -161,7 +183,15 @@ export default function OrdersPage() {
         </div>
 
         <div>
-            {orders.length === 0 ? (
+            <div className="mb-3">
+              <AccountSearch
+                placeholder="Search by order number, product or status…"
+                suggestions={suggestions}
+                value={searchQuery}
+                onChange={setSearchQuery}
+              />
+            </div>
+            {filteredOrders.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg
                   className="w-16 h-16 text-foreground-muted mx-auto mb-4"
@@ -187,7 +217,7 @@ export default function OrdersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {orders.map((order) => (
+                {filteredOrders.map((order) => (
                   <div key={order.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
                     {/* Order Header */}
                     <div className="bg-surface border-b border-border-default px-4 sm:px-6 py-4">

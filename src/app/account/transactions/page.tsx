@@ -2,9 +2,10 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
+import AccountSearch from '@/components/visitor/AccountSearch'
 
 interface Transaction {
   id: string
@@ -65,6 +66,29 @@ export default function TransactionsPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const suggestions = useMemo(() => {
+    const set = new Set<string>()
+    transactions.forEach(t => {
+      set.add(t.orderNumber)
+      if (t.transactionId) set.add(t.transactionId)
+      set.add(getStatusLabel(t.status))
+      set.add(getMethodLabel(t.paymentMethod, t.paymentGateway))
+    })
+    return Array.from(set)
+  }, [transactions])
+
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return transactions
+    const q = searchQuery.toLowerCase()
+    return transactions.filter(t =>
+      t.orderNumber.toLowerCase().includes(q) ||
+      (t.transactionId && t.transactionId.toLowerCase().includes(q)) ||
+      getStatusLabel(t.status).toLowerCase().includes(q) ||
+      getMethodLabel(t.paymentMethod, t.paymentGateway).toLowerCase().includes(q)
+    )
+  }, [transactions, searchQuery])
 
   const authWasLoading = useRef(false)
   useEffect(() => {
@@ -122,6 +146,14 @@ export default function TransactionsPage() {
         </div>
 
         <div>
+            <div className="mb-3">
+              <AccountSearch
+                placeholder="Search by order number, transaction ID or payment method…"
+                suggestions={suggestions}
+                value={searchQuery}
+                onChange={setSearchQuery}
+              />
+            </div>
             {transactions.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg
@@ -150,7 +182,7 @@ export default function TransactionsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {transactions.map((txn) => (
+                {filteredTransactions.map((txn) => (
                   <div
                     key={txn.id}
                     className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5"

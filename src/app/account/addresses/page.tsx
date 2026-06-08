@@ -3,10 +3,11 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import CustomSelect from '@/components/visitor/CustomSelect'
+import AccountSearch from '@/components/visitor/AccountSearch'
 
 interface Address {
   id: string
@@ -49,7 +50,32 @@ export default function AddressesPage() {
   const [formData, setFormData] = useState({ ...emptyForm })
   const [pinLookupState, setPinLookupState] = useState<'idle' | 'loading' | 'found' | 'error'>('idle')
   const [localities, setLocalities] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
   const pinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const suggestions = useMemo(() => {
+    const set = new Set<string>()
+    addresses.forEach(a => {
+      set.add(a.full_name)
+      set.add(a.city)
+      set.add(a.state)
+      set.add(a.postal_code)
+      set.add(a.address_line1)
+    })
+    return Array.from(set)
+  }, [addresses])
+
+  const filteredAddresses = useMemo(() => {
+    if (!searchQuery.trim()) return addresses
+    const q = searchQuery.toLowerCase()
+    return addresses.filter(a =>
+      a.full_name.toLowerCase().includes(q) ||
+      a.city.toLowerCase().includes(q) ||
+      a.state.toLowerCase().includes(q) ||
+      a.postal_code.toLowerCase().includes(q) ||
+      a.address_line1.toLowerCase().includes(q)
+    )
+  }, [addresses, searchQuery])
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -457,6 +483,17 @@ export default function AddressesPage() {
               </div>
             )}
 
+            {addresses.length > 0 && (
+              <div className="mb-3">
+                <AccountSearch
+                  placeholder="Search by name, city, state or pin code…"
+                  suggestions={suggestions}
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                />
+              </div>
+            )}
+
             {addresses.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -467,7 +504,7 @@ export default function AddressesPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {addresses.map((address) => (
+                {filteredAddresses.map((address) => (
                   <div key={address.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 relative">
                     {address.is_default && (
                       <span className="absolute top-4 right-4 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-semibold rounded-full">
