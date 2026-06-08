@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryMany, queryOne } from '@/lib/db'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { cookies } from 'next/headers'
 import { getUserIdForSession } from '@/lib/guest-user'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'

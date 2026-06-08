@@ -81,12 +81,12 @@ export default function ProductCard({
     setWishlistLoading(true)
     try {
       if (isInWishlist) {
-        const res = await fetch(`/api/wishlist?productId=${id}`, { method: 'DELETE', credentials: 'include' })
+        const res = await fetch(`/api/wishlist?productId=${id}`, { method: 'DELETE', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
         if (res.ok) { setIsInWishlist(false); showToast('Removed from wishlist', 'success') }
       } else {
         const res = await fetch('/api/wishlist', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
           body: JSON.stringify({ productId: id }),
           credentials: 'include',
         })
