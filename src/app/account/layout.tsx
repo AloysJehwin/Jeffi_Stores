@@ -3,6 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+import { AccountNavBar } from '@/components/visitor/AccountSidebar'
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -16,5 +17,12 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 
   if (isLoading || user?.isBusiness) return null
 
-  return <>{children}</>
+  return (
+    <div className="flex flex-col min-h-screen bg-surface">
+      <AccountNavBar />
+      <div className="flex-1">
+        {children}
+      </div>
+    </div>
+  )
 }

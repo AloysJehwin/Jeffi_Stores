@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import BusinessAccountSidebar from '@/components/business/AccountSidebar'
+// BusinessAccountNavBar is rendered by layout.tsx for all /business/account/* pages
 
 interface DashboardData {
   stats: { total_orders: number; total_spent: number; active_orders: number }
@@ -268,7 +268,7 @@ export default function AccountPage() {
   if (!user) return null
 
   return (
-    <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
+    <div className="bg-surface min-h-screen">
 
       {/* Hero header — mobile only */}
       <div className="bg-gradient-to-br from-accent-600 to-accent-500 dark:from-accent-700 dark:to-accent-600 px-4 pt-8 pb-6 lg:hidden">
@@ -330,17 +330,12 @@ export default function AccountPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 h-full">
-        <div className="hidden lg:block py-8">
-          <h1 className="text-3xl font-bold text-foreground">My Account</h1>
+      <div className="container mx-auto px-4">
+        <div className="hidden lg:block pt-6 pb-2">
+          <h1 className="text-2xl font-bold text-foreground">My Account</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:h-[calc(100%-5rem)]">
-          <div className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto pt-8 pb-8">
-            <BusinessAccountSidebar />
-          </div>
-
-          <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:pt-8 lg:pb-8 space-y-4">
+        <div className="py-4 sm:py-6 space-y-4 max-w-3xl lg:max-w-none">
 
             {/* Desktop stats row */}
             <div className="hidden lg:grid grid-cols-3 gap-3">
@@ -628,7 +623,6 @@ export default function AccountPage() {
 
           </div>
         </div>
-      </div>
 
       <input
         ref={fileInputRef}
