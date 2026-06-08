@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, ChevronLeft } from 'lucide-react'
+import { Check, ChevronLeft, Pencil } from 'lucide-react'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -91,6 +91,15 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {o.status === 'draft' && (
+            <a
+              href={`/admin/invoices?view=edit&edit=${o.id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              Edit
+            </a>
+          )}
           <a
             href={`/api/orders/${o.id}/invoice`}
             target="_blank"
