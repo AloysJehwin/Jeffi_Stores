@@ -104,8 +104,8 @@ function BusinessSignInPage() {
         submittedOtpRef.current = ''
         return
       }
-      // Refresh auth context
-      window.location.href = '/'
+      // Redirect to business portal
+      window.location.href = '/business'
     } catch (err: any) {
       setError(err.message)
       setOtp('')
@@ -181,7 +181,8 @@ function BusinessSignInPage() {
         router.push('/business/pending')
         return
       }
-      window.location.href = '/'
+      // Redirect to business portal
+      window.location.href = '/business'
     } catch (err: any) {
       setError(err.message)
     } finally {
