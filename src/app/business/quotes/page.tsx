@@ -104,24 +104,22 @@ export default function MyQuotesPage() {
           ) : (
             <div className="divide-y divide-border-default">
               {filteredRfqs.map(rfq => (
-                <div key={rfq.id} className="p-5 flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-foreground font-mono text-sm">{rfq.rfq_number}</span>
-                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}>
-                        {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-foreground-secondary">{rfq.item_count} item{rfq.item_count !== 1 ? 's' : ''}</p>
-                    {rfq.notes && <p className="text-sm text-foreground-muted mt-1 line-clamp-1">{rfq.notes}</p>}
-                    <p className="text-xs text-foreground-muted mt-1">
-                      Submitted {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                  {rfq.status === 'converted' && rfq.converted_quotation_id && (
-                    <span className="text-xs text-green-700 dark:text-green-400 font-medium shrink-0">
-                      Quotation sent — check your email
+                <div key={rfq.id} className="p-5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-foreground font-mono text-sm">{rfq.rfq_number}</span>
+                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}>
+                      {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
                     </span>
+                  </div>
+                  <p className="text-sm text-foreground-secondary">{rfq.item_count} item{rfq.item_count !== 1 ? 's' : ''}</p>
+                  {rfq.notes && <p className="text-sm text-foreground-muted mt-1 line-clamp-1">{rfq.notes}</p>}
+                  <p className="text-xs text-foreground-muted mt-1">
+                    Submitted {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                  {rfq.status === 'converted' && rfq.converted_quotation_id && (
+                    <p className="text-xs text-green-700 dark:text-green-400 font-medium mt-1.5">
+                      Quotation sent — check your email
+                    </p>
                   )}
                 </div>
               ))}
