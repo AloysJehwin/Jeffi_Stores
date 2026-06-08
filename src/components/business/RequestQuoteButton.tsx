@@ -34,31 +34,39 @@ function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
   const pct = discountPct ? parseFloat(discountPct) : null
   const derived = target ?? (pct != null && pct > 0 && pct < 100 ? currentPrice * (1 - pct / 100) : null)
   const effectivePct = derived != null ? Math.round(((currentPrice - derived) / currentPrice) * 100) : null
-
-  if (derived == null && pct == null && target == null) return null
+  const saving = derived != null ? currentPrice - derived : null
 
   return (
-    <div className="mt-2 p-3 bg-surface rounded-lg border border-border-default text-xs space-y-1.5">
-      <div className="flex justify-between text-foreground-secondary">
-        <span>Current price</span>
-        <span className="font-medium text-foreground">₹{currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+    <div className="mt-2 rounded-xl border border-accent-200 dark:border-accent-800 bg-accent-50/50 dark:bg-accent-900/20 overflow-hidden">
+      <div className="px-4 py-3 grid grid-cols-3 divide-x divide-accent-200 dark:divide-accent-800">
+        <div className="pr-3 text-center">
+          <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-0.5">Current</p>
+          <p className="text-sm font-bold text-foreground">₹{currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+        </div>
+        <div className="px-3 text-center">
+          <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-0.5">Your Target</p>
+          <p className={`text-sm font-bold ${derived != null ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted'}`}>
+            {derived != null ? `₹${derived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+          </p>
+        </div>
+        <div className="pl-3 text-center">
+          <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-0.5">Discount</p>
+          <p className={`text-sm font-bold ${effectivePct != null && effectivePct > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}`}>
+            {effectivePct != null && effectivePct > 0 ? `${effectivePct}% off` : '—'}
+          </p>
+        </div>
       </div>
-      {derived != null && (
-        <>
-          <div className="flex justify-between text-foreground-secondary">
-            <span>Your target price</span>
-            <span className="font-semibold text-accent-600 dark:text-accent-400">₹{derived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-          </div>
-          {effectivePct != null && effectivePct > 0 && (
-            <div className="flex justify-between">
-              <span className="text-foreground-muted">Discount requested</span>
-              <span className="font-semibold text-green-600 dark:text-green-400">{effectivePct}% off</span>
-            </div>
-          )}
-          {derived >= currentPrice && (
-            <p className="text-amber-600 dark:text-amber-400">Target price is at or above current price</p>
-          )}
-        </>
+      {saving != null && saving > 0 && (
+        <div className="px-4 py-2 bg-green-50 dark:bg-green-900/20 border-t border-green-100 dark:border-green-900/40 text-center">
+          <p className="text-xs font-medium text-green-700 dark:text-green-400">
+            You save ₹{saving.toLocaleString('en-IN', { minimumFractionDigits: 2 })} per unit
+          </p>
+        </div>
+      )}
+      {derived != null && derived >= currentPrice && (
+        <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-t border-amber-100 dark:border-amber-900/40 text-center">
+          <p className="text-xs text-amber-700 dark:text-amber-400">Target price is at or above current price</p>
+        </div>
       )}
     </div>
   )
@@ -201,11 +209,6 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                       </svg>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground leading-snug">{item.description}</p>
-                        {item.currentPrice != null && item.currentPrice > 0 && (
-                          <p className="text-xs text-foreground-muted mt-0.5">
-                            Current price: <span className="font-semibold text-foreground">₹{item.currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span> per unit
-                          </p>
-                        )}
                       </div>
                     </div>
 
@@ -249,7 +252,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                               step={0.01}
                               value={fields[i].requested_price}
                               onChange={e => updateField(i, 'requested_price', e.target.value)}
-                              placeholder="0.00"
+                              placeholder="e.g. 350.00"
                               className="w-full pl-7 pr-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
                             />
                           </div>
@@ -272,8 +275,8 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                         </div>
                       </div>
 
-                      {/* Live price breakdown */}
-                      {item.currentPrice != null && item.currentPrice > 0 && (fields[i].requested_price || fields[i].discount_pct) && (
+                      {/* Live price breakdown — always shown when price is known */}
+                      {item.currentPrice != null && item.currentPrice > 0 && (
                         <PriceBreakdown
                           currentPrice={item.currentPrice}
                           requestedPrice={fields[i].requested_price}
