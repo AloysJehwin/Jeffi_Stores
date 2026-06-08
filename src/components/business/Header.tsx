@@ -31,6 +31,7 @@ export default function BusinessHeader() {
 
   useEffect(() => {
     setMobileMenuOpen(false)
+    setUserMenuOpen(false)
   }, [pathname])
 
   useEffect(() => {
