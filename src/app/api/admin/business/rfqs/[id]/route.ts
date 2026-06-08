@@ -17,7 +17,20 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const items = await queryMany<any>(
-    `SELECT ri.*, p.name AS product_name, pv.variant_name, psv.sub_variant_name
+    `SELECT ri.*,
+            p.name AS product_name,
+            p.sku AS product_sku,
+            p.base_price,
+            pv.variant_name,
+            pv.sku AS variant_sku,
+            pv.price AS variant_price,
+            psv.sub_variant_name,
+            psv.sku AS sub_variant_sku,
+            psv.price AS sub_variant_price,
+            (SELECT pi.image_url FROM product_images pi
+             WHERE pi.product_id = p.id
+             ORDER BY pi.is_primary DESC, pi.display_order ASC
+             LIMIT 1) AS product_image_url
      FROM business_rfq_items ri
      LEFT JOIN products p ON p.id = ri.product_id
      LEFT JOIN product_variants pv ON pv.id = ri.variant_id
