@@ -61,8 +61,7 @@ export default function MyQuotesPage() {
           <div>
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               <div className="px-6 py-4 border-b border-border-default">
-                <h1 className="text-xl font-bold text-foreground">My Quote Requests</h1>
-                <p className="text-sm text-foreground-secondary mt-0.5">Track your RFQ submissions. Our team will review and respond.</p>
+                <p className="text-sm text-foreground-secondary">Track your RFQ submissions. Our team will review and respond.</p>
               </div>
 
               {rfqs.length === 0 ? (

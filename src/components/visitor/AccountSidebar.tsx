@@ -81,11 +81,21 @@ export function AccountNavBar() {
     ? [...navItems, businessNavItem]
     : navItems
 
+  const activeLabel = (() => {
+    const all = (user?.isBusiness && user.approvalStatus === 'approved')
+      ? [...navItems, businessNavItem]
+      : navItems
+    const match = all.slice().reverse().find(item =>
+      item.exact ? pathname === item.href : pathname.startsWith(item.href)
+    )
+    return match?.label ?? 'My Account'
+  })()
+
   return (
     <div className="sticky top-0 z-20 bg-surface shadow-sm pt-4">
       <div className="container mx-auto px-4 py-2">
         <div className="bg-surface-elevated rounded-xl border border-border-default px-3 py-1.5 flex items-center gap-3">
-          <span className="text-sm font-semibold text-foreground whitespace-nowrap pl-1 hidden sm:block">My Account</span>
+          <span className="text-sm font-semibold text-foreground whitespace-nowrap pl-1 hidden sm:block">{activeLabel}</span>
           <div className="hidden sm:block w-px h-5 bg-border-default flex-shrink-0" />
           <nav className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
             {items.map((item) => {

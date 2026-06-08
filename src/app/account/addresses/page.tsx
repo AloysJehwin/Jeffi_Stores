@@ -233,11 +233,7 @@ export default function AddressesPage() {
 
       <AccountMobileHeader />
 
-      <div className="container mx-auto px-4">
-        <div className="hidden lg:block pt-6 pb-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Addresses</h1>
-        </div>
-
+      <div className="container mx-auto px-4 pt-4">
         <div>
             <div className="mb-6">
               <button
