@@ -6,6 +6,27 @@ import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import CustomSelect from '@/components/visitor/CustomSelect'
 
+interface SubVariantOption {
+  id: string
+  sub_variant_name: string
+  sku?: string | null
+  price?: number | null
+  mrp?: number | null
+  stock_quantity?: number
+  is_active?: boolean
+}
+
+interface VariantOption {
+  id: string
+  variant_name: string
+  sku?: string | null
+  price?: number | null
+  mrp?: number | null
+  stock_quantity?: number
+  unit?: string | null
+  sub_variants?: SubVariantOption[]
+}
+
 interface QuoteItem {
   productId?: string
   variantId?: string
@@ -19,6 +40,11 @@ interface QuoteItem {
   categoryName?: string | null
   sku?: string | null
   stockStatus?: 'in' | 'out' | null
+  // If provided, the modal renders a variant selector for this item
+  variants?: VariantOption[]
+  // base price before variant selection (for business-discount computation)
+  basePriceBeforeVariant?: number | null
+  businessDiscountPct?: number
 }
 
 interface Props {
@@ -64,7 +90,7 @@ function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
       {saving != null && saving > 0 && (
         <div className="px-4 py-2 bg-green-50 dark:bg-green-900/20 border-t border-green-100 dark:border-green-900/40 text-center">
           <p className="text-xs font-medium text-green-700 dark:text-green-400">
-            You save ₹{saving.toLocaleString('en-IN', { minimumFractionDigits: 2 })} per unit
+            Potential saving of ₹{saving.toLocaleString('en-IN', { minimumFractionDigits: 2 })} per unit if approved
           </p>
         </div>
       )}
@@ -85,6 +111,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  // Per-item form state
   const [fields, setFields] = useState(() =>
     items.map(item => ({
       quantity: item.quantity || 1,
@@ -92,6 +119,9 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
       requested_price: '',
       discount_pct: '',
       notes: '',
+      // variant selection state (only used when item.variants is provided)
+      selectedVariantId: item.variantId || '',
+      selectedSubVariantId: item.subVariantId || '',
     }))
   )
   const [overallNotes, setOverallNotes] = useState('')
@@ -101,10 +131,16 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
   function updateField(i: number, key: string, value: string | number) {
     setFields(prev => prev.map((f, idx) => {
       if (idx !== i) return f
-      // mutually exclusive: clearing the other when one is set
       if (key === 'requested_price' && value !== '') return { ...f, requested_price: String(value), discount_pct: '' }
       if (key === 'discount_pct' && value !== '') return { ...f, discount_pct: String(value), requested_price: '' }
       return { ...f, [key]: value }
+    }))
+  }
+
+  function updateVariantSelection(i: number, variantId: string, subVariantId: string) {
+    setFields(prev => prev.map((f, idx) => {
+      if (idx !== i) return f
+      return { ...f, selectedVariantId: variantId, selectedSubVariantId: subVariantId }
     }))
   }
 
@@ -115,9 +151,49 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
       requested_price: '',
       discount_pct: '',
       notes: '',
+      selectedVariantId: item.variantId || '',
+      selectedSubVariantId: item.subVariantId || '',
     })))
     setOverallNotes('')
     setOpen(true)
+  }
+
+  // Compute the effective price/sku/stock for an item given current variant selection
+  function resolveItemState(item: QuoteItem, f: typeof fields[0]) {
+    if (!item.variants?.length) {
+      return {
+        currentPrice: item.currentPrice ?? null,
+        sku: item.sku ?? null,
+        stockStatus: item.stockStatus ?? null,
+        description: item.description,
+        variantId: item.variantId,
+        subVariantId: item.subVariantId,
+      }
+    }
+    const variant = item.variants.find(v => v.id === f.selectedVariantId) ?? null
+    const subVariant = variant?.sub_variants?.find(sv => sv.id === f.selectedSubVariantId) ?? null
+
+    const rawPrice = subVariant?.price ?? variant?.price ?? null
+    const discPct = item.businessDiscountPct ?? 0
+    const currentPrice = rawPrice != null
+      ? (discPct > 0 ? Number(rawPrice) * (1 - discPct / 100) : Number(rawPrice))
+      : item.currentPrice ?? null
+
+    const sku = subVariant?.sku || variant?.sku || item.sku || null
+    const stockQty = subVariant?.stock_quantity ?? variant?.stock_quantity ?? null
+    const stockStatus: 'in' | 'out' | null = stockQty != null ? (stockQty > 0 ? 'in' : 'out') : item.stockStatus ?? null
+
+    const descParts = [item.description.split(' — ')[0], variant?.variant_name, subVariant?.sub_variant_name].filter(Boolean)
+    const description = descParts.join(' — ')
+
+    return {
+      currentPrice,
+      sku,
+      stockStatus,
+      description,
+      variantId: variant?.id ?? item.variantId,
+      subVariantId: subVariant?.id ?? item.subVariantId,
+    }
   }
 
   async function handleSubmit() {
@@ -127,17 +203,18 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
         notes: overallNotes.trim() || null,
         items: items.map((item, i) => {
           const f = fields[i]
+          const resolved = resolveItemState(item, f)
           let requested_price: number | null = null
           if (f.requested_price) {
             requested_price = parseFloat(f.requested_price)
-          } else if (f.discount_pct && item.currentPrice) {
-            requested_price = item.currentPrice * (1 - parseFloat(f.discount_pct) / 100)
+          } else if (f.discount_pct && resolved.currentPrice) {
+            requested_price = resolved.currentPrice * (1 - parseFloat(f.discount_pct) / 100)
           }
           return {
             productId: item.productId,
-            variantId: item.variantId,
-            subVariantId: item.subVariantId,
-            description: item.description,
+            variantId: resolved.variantId,
+            subVariantId: resolved.subVariantId,
+            description: resolved.description,
             quantity: Number(f.quantity) || 1,
             unit: f.unit,
             requested_price,
@@ -187,7 +264,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
           />
 
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-            <div className="bg-surface-elevated border border-border-default rounded-2xl shadow-2xl w-full max-w-xl pointer-events-auto flex flex-col max-h-[92dvh]">
+            <div className="bg-surface-elevated border border-border-default rounded-2xl shadow-2xl w-full max-w-2xl pointer-events-auto flex flex-col max-h-[92dvh]">
 
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
@@ -204,126 +281,168 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
 
               {/* Body */}
               <div className="overflow-y-auto flex-1 px-5 py-4 space-y-6">
-                {items.map((item, i) => (
-                  <div key={i} className={items.length > 1 ? 'pb-5 border-b border-border-default last:border-0 last:pb-0 space-y-3' : 'space-y-3'}>
+                {items.map((item, i) => {
+                  const f = fields[i]
+                  const resolved = resolveItemState(item, f)
+                  const hasVariantSelector = (item.variants?.length ?? 0) > 0
+                  const selectedVariant = hasVariantSelector
+                    ? item.variants!.find(v => v.id === f.selectedVariantId) ?? null
+                    : null
+                  const subVariants = selectedVariant?.sub_variants?.filter(sv => sv.is_active !== false) ?? []
 
-                    {/* Product label */}
-                    <div className="flex items-start gap-3 p-3 bg-surface-secondary rounded-xl">
-                      {item.imageUrl ? (
-                        <div className="w-16 h-16 rounded-lg border border-border-default bg-surface flex-shrink-0 overflow-hidden">
-                          <img src={item.imageUrl} alt={item.description} className="w-full h-full object-contain p-1" />
+                  return (
+                    <div key={i} className={items.length > 1 ? 'pb-5 border-b border-border-default last:border-0 last:pb-0 space-y-3' : 'space-y-3'}>
+
+                      {/* Product chip */}
+                      <div className="flex items-start gap-3 p-3 bg-surface-secondary rounded-xl">
+                        {item.imageUrl ? (
+                          <div className="w-16 h-16 rounded-lg border border-border-default bg-surface flex-shrink-0 overflow-hidden">
+                            <img src={item.imageUrl} alt={item.description} className="w-full h-full object-contain p-1" />
+                          </div>
+                        ) : (
+                          <div className="w-16 h-16 rounded-lg border border-border-default bg-surface flex-shrink-0 flex items-center justify-center">
+                            <svg className="w-7 h-7 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          {/* Base product name only (variant shown in selector) */}
+                          <p className="text-sm font-semibold text-foreground leading-snug">
+                            {item.description.split(' — ')[0]}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+                            {item.brandName && <span className="text-xs text-foreground-muted">{item.brandName}</span>}
+                            {item.categoryName && <span className="text-xs text-foreground-muted">{item.categoryName}</span>}
+                            {resolved.sku && <span className="text-xs font-mono text-foreground-muted">SKU: {resolved.sku}</span>}
+                          </div>
+                          {resolved.stockStatus != null && (
+                            <span className={`inline-flex items-center gap-1 mt-1 text-[11px] font-medium ${resolved.stockStatus === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${resolved.stockStatus === 'in' ? 'bg-green-500' : 'bg-red-500'}`} />
+                              {resolved.stockStatus === 'in' ? 'In Stock' : 'Out of Stock'}
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        <div className="w-16 h-16 rounded-lg border border-border-default bg-surface flex-shrink-0 flex items-center justify-center">
-                          <svg className="w-7 h-7 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                          </svg>
+                      </div>
+
+                      {/* Variant selector (only when product has variants and not pre-selected from cart) */}
+                      {hasVariantSelector && (
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                              Variant <span className="text-red-500">*</span>
+                            </label>
+                            <CustomSelect
+                              value={f.selectedVariantId}
+                              options={item.variants!.map(v => ({ value: v.id, label: v.variant_name }))}
+                              onChange={varId => updateVariantSelection(i, varId, '')}
+                              placeholder="Select a variant"
+                            />
+                          </div>
+                          {subVariants.length > 0 && (
+                            <div>
+                              <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                {selectedVariant?.sub_variants?.length ? 'Size / Option' : 'Sub-variant'}
+                              </label>
+                              <CustomSelect
+                                value={f.selectedSubVariantId}
+                                options={subVariants.map(sv => ({ value: sv.id, label: sv.sub_variant_name }))}
+                                onChange={svId => updateVariantSelection(i, f.selectedVariantId, svId)}
+                                placeholder="Select an option"
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-foreground leading-snug">{item.description}</p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
-                          {item.brandName && <span className="text-xs text-foreground-muted">{item.brandName}</span>}
-                          {item.categoryName && <span className="text-xs text-foreground-muted">{item.categoryName}</span>}
-                          {item.sku && <span className="text-xs font-mono text-foreground-muted">SKU: {item.sku}</span>}
+
+                      {/* Quantity + Unit */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                            Quantity <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={f.quantity}
+                            onChange={e => updateField(i, 'quantity', e.target.value)}
+                            className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                          />
                         </div>
-                        {item.stockStatus != null && (
-                          <span className={`inline-flex items-center gap-1 mt-1 text-[11px] font-medium ${item.stockStatus === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${item.stockStatus === 'in' ? 'bg-green-500' : 'bg-red-500'}`} />
-                            {item.stockStatus === 'in' ? 'In Stock' : 'Out of Stock'}
-                          </span>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">Unit</label>
+                          <CustomSelect
+                            value={f.unit}
+                            options={UNIT_OPTIONS}
+                            onChange={v => updateField(i, 'unit', v)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Pricing section */}
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-foreground-secondary">
+                          Target Price <span className="text-foreground-muted font-normal">— optional, enter one</span>
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] text-foreground-muted mb-1">₹ per unit</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted text-sm">₹</span>
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={f.requested_price}
+                                onChange={e => updateField(i, 'requested_price', e.target.value)}
+                                placeholder="e.g. 350.00"
+                                className="w-full pl-7 pr-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[11px] text-foreground-muted mb-1">% discount</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min={0}
+                                max={99}
+                                step={0.1}
+                                value={f.discount_pct}
+                                onChange={e => updateField(i, 'discount_pct', e.target.value)}
+                                placeholder="e.g. 10"
+                                className="w-full pl-3 pr-8 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted text-sm">%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {resolved.currentPrice != null && resolved.currentPrice > 0 && (
+                          <PriceBreakdown
+                            currentPrice={resolved.currentPrice}
+                            requestedPrice={f.requested_price}
+                            discountPct={f.discount_pct}
+                          />
                         )}
                       </div>
-                    </div>
 
-                    {/* Quantity + Unit */}
-                    <div className="grid grid-cols-2 gap-3">
+                      {/* Item notes */}
                       <div>
                         <label className="block text-xs font-medium text-foreground-secondary mb-1">
-                          Quantity <span className="text-red-500">*</span>
+                          Item Notes <span className="text-foreground-muted font-normal">— grade, brand, specs, etc.</span>
                         </label>
                         <input
-                          type="number"
-                          min={1}
-                          value={fields[i].quantity}
-                          onChange={e => updateField(i, 'quantity', e.target.value)}
+                          type="text"
+                          value={f.notes}
+                          onChange={e => updateField(i, 'notes', e.target.value)}
+                          placeholder="e.g. Grade 10.9, stainless, specific tolerance…"
                           className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-secondary mb-1">Unit</label>
-                        <CustomSelect
-                          value={fields[i].unit}
-                          options={UNIT_OPTIONS}
-                          onChange={v => updateField(i, 'unit', v)}
-                        />
-                      </div>
                     </div>
-
-                    {/* Pricing section */}
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-foreground-secondary">
-                        Target Price <span className="text-foreground-muted font-normal">— optional, enter one</span>
-                      </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] text-foreground-muted mb-1">₹ per unit</label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted text-sm">₹</span>
-                            <input
-                              type="number"
-                              min={0}
-                              step={0.01}
-                              value={fields[i].requested_price}
-                              onChange={e => updateField(i, 'requested_price', e.target.value)}
-                              placeholder="e.g. 350.00"
-                              className="w-full pl-7 pr-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[11px] text-foreground-muted mb-1">% discount</label>
-                          <div className="relative">
-                            <input
-                              type="number"
-                              min={0}
-                              max={99}
-                              step={0.1}
-                              value={fields[i].discount_pct}
-                              onChange={e => updateField(i, 'discount_pct', e.target.value)}
-                              placeholder="e.g. 10"
-                              className="w-full pl-3 pr-8 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted text-sm">%</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Live price breakdown — always shown when price is known */}
-                      {item.currentPrice != null && item.currentPrice > 0 && (
-                        <PriceBreakdown
-                          currentPrice={item.currentPrice}
-                          requestedPrice={fields[i].requested_price}
-                          discountPct={fields[i].discount_pct}
-                        />
-                      )}
-                    </div>
-
-                    {/* Item notes */}
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">
-                        Item Notes <span className="text-foreground-muted font-normal">— grade, brand, specs, etc.</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={fields[i].notes}
-                        onChange={e => updateField(i, 'notes', e.target.value)}
-                        placeholder="e.g. Grade 10.9, stainless, specific tolerance…"
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-                      />
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
 
                 {/* Overall notes */}
                 <div>
