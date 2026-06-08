@@ -28,7 +28,8 @@ const QUICK_REPLIES = [
   { label: 'Latest order', query: 'latest order' },
 ]
 
-export default function SupportChat() {
+export default function SupportChat({ portalHeader }: { portalHeader?: string } = {}) {
+  const ph: Record<string, string> = portalHeader ? { 'X-Auth-Portal': portalHeader } : {}
   const [mode, setMode] = useState<'bot' | 'live'>('bot')
   const [messages, setMessages] = useState<Message[]>([
     { id: 'welcome', sender: 'bot', message: "Hello! I'm the Jeffi Stores support bot.\n\nSelect a topic below and I'll look up your information right away." }
@@ -65,14 +66,14 @@ export default function SupportChat() {
 
   async function resumeSession() {
     try {
-      const res = await fetch('/api/support/sessions', { credentials: 'include' })
+      const res = await fetch('/api/support/sessions', { credentials: 'include', headers: ph })
       if (!res.ok) return
       const data = await res.json()
       if (data.session) {
         setSession(data.session)
         if (data.session.admin_name) setAdminName(data.session.admin_name)
         setMode('live')
-        const msgsRes = await fetch(`/api/support/sessions/${data.session.id}/messages`, { credentials: 'include' })
+        const msgsRes = await fetch(`/api/support/sessions/${data.session.id}/messages`, { credentials: 'include', headers: ph })
         if (msgsRes.ok) {
           const msgsData = await msgsRes.json()
           if (msgsData.messages?.length) {
@@ -87,7 +88,7 @@ export default function SupportChat() {
 
   async function pollMessages(sessionId: string) {
     try {
-      const res = await fetch(`/api/support/sessions/${sessionId}/messages`, { credentials: 'include' })
+      const res = await fetch(`/api/support/sessions/${sessionId}/messages`, { credentials: 'include', headers: ph })
       if (!res.ok) return
       const data = await res.json()
       if (!data.messages?.length) return
@@ -110,7 +111,7 @@ export default function SupportChat() {
     setMessages(prev => [...prev, userMsg])
     setIsSending(true)
     try {
-      const res = await fetch(`/api/support/bot?msg=${encodeURIComponent(query)}`, { credentials: 'include' })
+      const res = await fetch(`/api/support/bot?msg=${encodeURIComponent(query)}`, { credentials: 'include', headers: ph })
       const data = await res.json()
       const reply = res.ok ? (data.reply || "I didn't get a response. Please try again.") : (data.error || 'Something went wrong.')
       setMessages(prev => [...prev, { id: Date.now().toString() + 'b', sender: 'bot', message: reply }])
@@ -125,7 +126,7 @@ export default function SupportChat() {
   async function connectToAgent() {
     setIsConnecting(true)
     try {
-      const res = await fetch('/api/support/sessions', { method: 'POST', credentials: 'include' })
+      const res = await fetch('/api/support/sessions', { method: 'POST', credentials: 'include', headers: ph })
       const data = await res.json()
       if (res.status === 401) {
         showToast('Please sign in to connect to a support agent.', 'error')
@@ -153,7 +154,7 @@ export default function SupportChat() {
     try {
       const res = await fetch(`/api/support/sessions/${session.id}/messages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...ph },
         body: JSON.stringify({ message: text }),
         credentials: 'include',
       })
@@ -173,7 +174,7 @@ export default function SupportChat() {
     try {
       await fetch(`/api/support/sessions/${session.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...ph },
         body: JSON.stringify({ status: 'closed' }),
         credentials: 'include',
       })
