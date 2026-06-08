@@ -151,8 +151,13 @@ export default function BusinessHeader() {
       {/* Mobile drawer */}
       {mobileMenuOpen && (
         <>
-          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setMobileMenuOpen(false)} />
-          <div className="fixed top-0 left-0 bottom-0 z-50 w-4/5 max-w-xs bg-surface-elevated shadow-xl flex flex-col overflow-y-auto">
+          <div
+            className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${mobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div
+            className={`fixed top-0 left-0 bottom-0 z-50 w-4/5 max-w-xs bg-surface-elevated shadow-xl flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          >
             <div className="flex items-center justify-between p-4 border-b border-border-default">
               <Link href="/business" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
                 <img src="/images/logo.png" alt="Jeffi Stores" className="h-10 w-auto" />
@@ -168,19 +173,13 @@ export default function BusinessHeader() {
               </button>
             </div>
 
-            {user && (
-              <div className="p-4 border-b border-border-default bg-accent-50 dark:bg-accent-900/20">
-                <p className="font-semibold text-foreground">{user.firstName} {user.lastName}</p>
-                <p className="text-xs text-foreground-muted mt-0.5">{user.email}</p>
-              </div>
-            )}
-
-            <nav className="flex-1 p-4 space-y-1">
+            {/* Main nav */}
+            <nav className="flex flex-col p-4 gap-1">
               {NAV.map(({ href, label }) => (
                 <Link
                   key={href}
                   href={href}
-                  className={`block px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                     pathname.startsWith(href) ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400' : 'text-foreground-secondary hover:bg-surface-secondary'
                   }`}
                 >
@@ -189,11 +188,68 @@ export default function BusinessHeader() {
               ))}
             </nav>
 
-            <div className="p-4 border-t border-border-default flex items-center justify-between">
-              <ThemeToggle variant="header" />
-              <button onClick={logout} className="text-sm text-red-500 font-medium hover:text-red-700 transition-colors">
+            <div className="border-t border-border-default mx-4" />
+
+            {/* Cart */}
+            <div className="flex flex-col p-4 gap-1">
+              <Link
+                href="/business/cart"
+                className="flex items-center justify-between px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span className="font-medium">Cart</span>
+                {cartCount > 0 && (
+                  <span className="bg-accent-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            </div>
+
+            <div className="border-t border-border-default mx-4" />
+
+            {/* Account section */}
+            <div className="flex flex-col p-4 gap-1">
+              {user && (
+                <div className="flex items-center gap-3 px-4 py-2">
+                  <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt={user.firstName} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-accent-500 text-white flex items-center justify-center font-semibold">
+                        {`${user.firstName.charAt(0)}${user.lastName?.charAt(0) || ''}`.toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{user.firstName} {user.lastName}</p>
+                    <p className="text-xs text-foreground-muted truncate">{user.email}</p>
+                  </div>
+                </div>
+              )}
+              <Link href="/business/account" className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
+                My Profile
+              </Link>
+              <Link href="/business/account/orders" className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
+                My Orders
+              </Link>
+              <Link href="/business/quotes" className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
+                My Quotes
+              </Link>
+              <button
+                type="button"
+                onClick={() => { logout(); setMobileMenuOpen(false) }}
+                className="px-4 py-3 rounded-lg text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium transition-colors text-sm"
+              >
                 Sign Out
               </button>
+            </div>
+
+            <div className="mt-auto p-4 border-t border-border-default">
+              <div className="flex items-center justify-between px-4">
+                <span className="text-sm text-foreground-muted">Theme</span>
+                <ThemeToggle variant="header" />
+              </div>
             </div>
           </div>
         </>
