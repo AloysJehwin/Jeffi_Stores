@@ -169,11 +169,7 @@ export default function OrdersPage() {
       {/* Mobile header */}
       <AccountMobileHeader />
 
-      <div className="container mx-auto px-4">
-        <div className="hidden lg:block pt-6 pb-2">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Orders</h1>
-        </div>
-
+      <div className="container mx-auto px-4 pt-4">
         <div>
             {filteredOrders.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
