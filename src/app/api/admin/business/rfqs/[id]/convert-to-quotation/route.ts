@@ -83,9 +83,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   let sgst = 0
 
   const lineItems = items.map((item: any) => {
-    // Pick best available price: requested_price > sub_variant > variant > product
+    const gstRate = Number(item.product_gst ?? 18)
+    // requested_price is the customer's target price inclusive of GST — convert to ex-GST for the rate column
+    // sv_price / variant_price / product_price are already ex-GST
     const baseRate = item.requested_price
-      ? Number(item.requested_price)
+      ? Number(item.requested_price) / (1 + gstRate / 100)
       : item.sv_price
         ? Number(item.sv_price)
         : item.variant_price
@@ -93,8 +95,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           : item.product_price
             ? Number(item.product_price)
             : 0
-
-    const gstRate = Number(item.product_gst ?? 18)
     const discountPct = 0
     const qty = Number(item.quantity)
     const amount = baseRate * qty * (1 - discountPct / 100)
