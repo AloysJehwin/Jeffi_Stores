@@ -13,6 +13,7 @@ interface QuoteItem {
   description: string
   quantity: number
   unit?: string
+  currentPrice?: number | null
 }
 
 interface Props {
@@ -24,6 +25,45 @@ interface Props {
 const UNITS = ['Nos', 'Pcs', 'Kg', 'g', 'L', 'mL', 'Box', 'Set', 'Pair', 'Roll', 'Sheet', 'Bag']
 const UNIT_OPTIONS = UNITS.map(u => ({ value: u, label: u }))
 
+function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
+  currentPrice: number
+  requestedPrice: string
+  discountPct: string
+}) {
+  const target = requestedPrice ? parseFloat(requestedPrice) : null
+  const pct = discountPct ? parseFloat(discountPct) : null
+  const derived = target ?? (pct != null && pct > 0 && pct < 100 ? currentPrice * (1 - pct / 100) : null)
+  const effectivePct = derived != null ? Math.round(((currentPrice - derived) / currentPrice) * 100) : null
+
+  if (derived == null && pct == null && target == null) return null
+
+  return (
+    <div className="mt-2 p-3 bg-surface rounded-lg border border-border-default text-xs space-y-1.5">
+      <div className="flex justify-between text-foreground-secondary">
+        <span>Current price</span>
+        <span className="font-medium text-foreground">₹{currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+      </div>
+      {derived != null && (
+        <>
+          <div className="flex justify-between text-foreground-secondary">
+            <span>Your target price</span>
+            <span className="font-semibold text-accent-600 dark:text-accent-400">₹{derived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          {effectivePct != null && effectivePct > 0 && (
+            <div className="flex justify-between">
+              <span className="text-foreground-muted">Discount requested</span>
+              <span className="font-semibold text-green-600 dark:text-green-400">{effectivePct}% off</span>
+            </div>
+          )}
+          {derived >= currentPrice && (
+            <p className="text-amber-600 dark:text-amber-400">Target price is at or above current price</p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function RequestQuoteButton({ items, className, label = 'Request Quote' }: Props) {
   const { user } = useAuth()
   const { showToast } = useToast()
@@ -32,12 +72,12 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // per-item form state (quantity, unit, target price, notes)
   const [fields, setFields] = useState(() =>
     items.map(item => ({
       quantity: item.quantity || 1,
       unit: item.unit || 'Nos',
       requested_price: '',
+      discount_pct: '',
       notes: '',
     }))
   )
@@ -46,15 +86,21 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
   if (!user?.isBusiness || user.approvalStatus !== 'approved') return null
 
   function updateField(i: number, key: string, value: string | number) {
-    setFields(prev => prev.map((f, idx) => idx === i ? { ...f, [key]: value } : f))
+    setFields(prev => prev.map((f, idx) => {
+      if (idx !== i) return f
+      // mutually exclusive: clearing the other when one is set
+      if (key === 'requested_price' && value !== '') return { ...f, requested_price: String(value), discount_pct: '' }
+      if (key === 'discount_pct' && value !== '') return { ...f, discount_pct: String(value), requested_price: '' }
+      return { ...f, [key]: value }
+    }))
   }
 
   function handleOpen() {
-    // reset fields fresh each time (in case items changed)
     setFields(items.map(item => ({
       quantity: item.quantity || 1,
       unit: item.unit || 'Nos',
       requested_price: '',
+      discount_pct: '',
       notes: '',
     })))
     setOverallNotes('')
@@ -66,16 +112,25 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
     try {
       const payload = {
         notes: overallNotes.trim() || null,
-        items: items.map((item, i) => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          subVariantId: item.subVariantId,
-          description: item.description,
-          quantity: Number(fields[i].quantity) || 1,
-          unit: fields[i].unit,
-          requested_price: fields[i].requested_price ? parseFloat(fields[i].requested_price) : null,
-          notes: fields[i].notes.trim() || null,
-        })),
+        items: items.map((item, i) => {
+          const f = fields[i]
+          let requested_price: number | null = null
+          if (f.requested_price) {
+            requested_price = parseFloat(f.requested_price)
+          } else if (f.discount_pct && item.currentPrice) {
+            requested_price = item.currentPrice * (1 - parseFloat(f.discount_pct) / 100)
+          }
+          return {
+            productId: item.productId,
+            variantId: item.variantId,
+            subVariantId: item.subVariantId,
+            description: item.description,
+            quantity: Number(f.quantity) || 1,
+            unit: f.unit,
+            requested_price,
+            notes: f.notes.trim() || null,
+          }
+        }),
       }
       const res = await fetch('/api/business/rfqs', {
         method: 'POST',
@@ -113,15 +168,13 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
 
       {open && (
         <>
-          {/* Backdrop */}
           <div
             className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
             onClick={() => !loading && setOpen(false)}
           />
 
-          {/* Modal */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-            <div className="bg-surface-elevated border border-border-default rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto flex flex-col max-h-[90dvh]">
+            <div className="bg-surface-elevated border border-border-default rounded-2xl shadow-2xl w-full max-w-xl pointer-events-auto flex flex-col max-h-[92dvh]">
 
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
@@ -137,16 +190,23 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
               </div>
 
               {/* Body */}
-              <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
-
+              <div className="overflow-y-auto flex-1 px-5 py-4 space-y-6">
                 {items.map((item, i) => (
-                  <div key={i} className="space-y-3">
+                  <div key={i} className={items.length > 1 ? 'pb-5 border-b border-border-default last:border-0 last:pb-0 space-y-3' : 'space-y-3'}>
+
                     {/* Product label */}
                     <div className="flex items-start gap-3 p-3 bg-surface-secondary rounded-xl">
                       <svg className="w-5 h-5 text-accent-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                       </svg>
-                      <p className="text-sm font-medium text-foreground leading-snug">{item.description}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground leading-snug">{item.description}</p>
+                        {item.currentPrice != null && item.currentPrice > 0 && (
+                          <p className="text-xs text-foreground-muted mt-0.5">
+                            Current price: <span className="font-semibold text-foreground">₹{item.currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span> per unit
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     {/* Quantity + Unit */}
@@ -173,20 +233,53 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                       </div>
                     </div>
 
-                    {/* Target price */}
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">
-                        Target Price (₹ per unit) <span className="text-foreground-muted font-normal">— optional</span>
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={fields[i].requested_price}
-                        onChange={e => updateField(i, 'requested_price', e.target.value)}
-                        placeholder="Your target price"
-                        className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-                      />
+                    {/* Pricing section */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-foreground-secondary">
+                        Target Price <span className="text-foreground-muted font-normal">— optional, enter one</span>
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] text-foreground-muted mb-1">₹ per unit</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted text-sm">₹</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={fields[i].requested_price}
+                              onChange={e => updateField(i, 'requested_price', e.target.value)}
+                              placeholder="0.00"
+                              className="w-full pl-7 pr-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-foreground-muted mb-1">% discount</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min={0}
+                              max={99}
+                              step={0.1}
+                              value={fields[i].discount_pct}
+                              onChange={e => updateField(i, 'discount_pct', e.target.value)}
+                              placeholder="e.g. 10"
+                              className="w-full pl-3 pr-8 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted text-sm">%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Live price breakdown */}
+                      {item.currentPrice != null && item.currentPrice > 0 && (fields[i].requested_price || fields[i].discount_pct) && (
+                        <PriceBreakdown
+                          currentPrice={item.currentPrice}
+                          requestedPrice={fields[i].requested_price}
+                          discountPct={fields[i].discount_pct}
+                        />
+                      )}
                     </div>
 
                     {/* Item notes */}

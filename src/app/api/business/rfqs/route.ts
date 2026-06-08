@@ -24,8 +24,10 @@ export async function GET(request: NextRequest) {
   const [rfqs, total] = await Promise.all([
     queryMany<any>(
       `SELECT r.id, r.rfq_number, r.status, r.notes, r.converted_quotation_id, r.created_at,
-              (SELECT COUNT(*) FROM business_rfq_items ri WHERE ri.rfq_id = r.id)::int AS item_count
+              (SELECT COUNT(*) FROM business_rfq_items ri WHERE ri.rfq_id = r.id)::int AS item_count,
+              q.quote_number, q.view_token AS quotation_view_token
        FROM business_rfqs r
+       LEFT JOIN quotations q ON q.id = r.converted_quotation_id
        WHERE r.user_id = $1
        ORDER BY r.created_at DESC
        LIMIT $2 OFFSET $3`,
