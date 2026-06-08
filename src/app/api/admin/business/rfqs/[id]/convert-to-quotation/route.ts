@@ -136,8 +136,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       quote_number, quote_date, status,
       consignee_name, consignee_addr1, consignee_addr2, consignee_city, consignee_state,
       consignee_pincode, consignee_gstin, consignee_email, consignee_phone,
-      buyer_same, notes, subtotal, cgst_amount, sgst_amount, total_amount, created_by
-    ) VALUES ($1,$2,'draft',$3,$4,$5,$6,$7,$8,$9,$10,$11,true,$12,$13,$14,$15,$16,$17)
+      buyer_same,
+      buyer_name, buyer_addr1, buyer_addr2, buyer_city, buyer_state, buyer_pincode, buyer_gstin, buyer_email, buyer_phone,
+      notes, subtotal, cgst_amount, sgst_amount, total_amount, created_by
+    ) VALUES ($1,$2,'draft',$3,$4,$5,$6,$7,$8,$9,$10,$11,true,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,$12,$13,$14,$15,$16,$17)
     RETURNING *`,
     [
       quoteNumber,
