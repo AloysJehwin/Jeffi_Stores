@@ -11,8 +11,15 @@ interface RFQItem {
   requested_price: number | null
   notes: string | null
   product_name: string | null
+  product_sku: string | null
+  product_image_url: string | null
+  base_price: number | null
   variant_name: string | null
+  variant_sku: string | null
+  variant_price: number | null
   sub_variant_name: string | null
+  sub_variant_sku: string | null
+  sub_variant_price: number | null
 }
 
 interface RFQ {
@@ -44,6 +51,15 @@ const STATUS_LABEL: Record<string, string> = {
   reviewed: 'Reviewed',
   converted: 'Converted to Quotation',
   rejected: 'Rejected',
+}
+
+function resolveItemPrice(item: RFQItem): number | null {
+  const raw = item.sub_variant_price ?? item.variant_price ?? item.base_price ?? null
+  return raw != null ? Number(raw) : null
+}
+
+function resolveItemSku(item: RFQItem): string | null {
+  return item.sub_variant_sku || item.variant_sku || item.product_sku || null
 }
 
 export default function RFQDetailClient({ id }: { id: string }) {
@@ -92,10 +108,6 @@ export default function RFQDetailClient({ id }: { id: string }) {
     setActionLoading(false)
   }
 
-  const handleConvert = async () => {
-    setConfirmOpen(true)
-  }
-
   const doConvert = async () => {
     setConfirmOpen(false)
     setConverting(true)
@@ -110,7 +122,11 @@ export default function RFQDetailClient({ id }: { id: string }) {
     setConverting(false)
   }
 
-  const totalRequested = items.reduce((sum, i) => sum + (i.requested_price ? i.requested_price * i.quantity : 0), 0)
+  const totalRequested = items.reduce((sum, i) => sum + (i.requested_price ? Number(i.requested_price) * i.quantity : 0), 0)
+  const totalCatalog = items.reduce((sum, i) => {
+    const p = resolveItemPrice(i)
+    return sum + (p != null ? p * i.quantity : 0)
+  }, 0)
 
   if (loading) return (
     <div className="p-6 flex items-center justify-center py-24">
@@ -190,7 +206,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
               </>
             )}
             {rfq.status === 'reviewed' && (
-              <button onClick={handleConvert} disabled={converting}
+              <button onClick={() => setConfirmOpen(true)} disabled={converting}
                 className="px-5 py-2 bg-accent-500 text-white text-sm font-semibold rounded-lg hover:bg-accent-600 transition-colors disabled:opacity-60 flex items-center gap-2">
                 {converting && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                 Convert to Quotation
@@ -209,9 +225,9 @@ export default function RFQDetailClient({ id }: { id: string }) {
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Items', value: String(items.length) },
-            { label: 'Total Requested', value: totalRequested > 0 ? `₹${totalRequested.toLocaleString('en-IN')}` : '—' },
+            { label: 'Catalog Value', value: totalCatalog > 0 ? `₹${totalCatalog.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—' },
+            { label: 'Requested Value', value: totalRequested > 0 ? `₹${totalRequested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—' },
             { label: 'GST Number', value: rfq.gst_number || '—' },
-            { label: 'Contact', value: `${rfq.first_name} ${rfq.last_name || ''}`.trim() },
           ].map(({ label, value }) => (
             <div key={label} className="bg-white/5 rounded-xl p-3.5 border border-white/10">
               <p className="text-zinc-400 text-xs mb-1">{label}</p>
@@ -243,61 +259,196 @@ export default function RFQDetailClient({ id }: { id: string }) {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Items table */}
-        <div className="lg:col-span-2">
-          <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-            <div className="px-5 py-4 border-b border-border-default flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Requested Items</h2>
-              <span className="text-xs text-foreground-muted">{items.length} item{items.length !== 1 ? 's' : ''}</span>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border-default">
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-foreground-muted w-8">#</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold text-foreground-muted">Description</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-foreground-muted">Qty</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-foreground-muted">Target Price</th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold text-foreground-muted">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {items.length === 0 ? (
-                  <tr><td colSpan={5} className="px-5 py-8 text-center text-foreground-muted">No items</td></tr>
-                ) : items.map((item, i) => (
-                  <tr key={item.id} className="hover:bg-surface-secondary/50 transition-colors">
-                    <td className="px-5 py-3.5 text-foreground-muted font-mono text-xs">{i + 1}</td>
-                    <td className="px-5 py-3.5">
-                      <p className="font-medium text-foreground">{item.description}</p>
-                      {item.product_name && <p className="text-xs text-foreground-muted mt-0.5">{item.product_name}{item.variant_name ? ` — ${item.variant_name}` : ''}{item.sub_variant_name ? ` / ${item.sub_variant_name}` : ''}</p>}
-                      {item.notes && <p className="text-xs text-foreground-muted italic mt-0.5">{item.notes}</p>}
-                    </td>
-                    <td className="px-5 py-3.5 text-right text-foreground font-medium">
-                      {item.quantity} <span className="text-foreground-muted font-normal">{item.unit}</span>
-                    </td>
-                    <td className="px-5 py-3.5 text-right text-foreground">
-                      {item.requested_price != null ? `₹${Number(item.requested_price).toLocaleString('en-IN')}` : <span className="text-foreground-muted">—</span>}
-                    </td>
-                    <td className="px-5 py-3.5 text-right font-semibold text-foreground">
-                      {item.requested_price != null
-                        ? `₹${(Number(item.requested_price) * item.quantity).toLocaleString('en-IN')}`
-                        : <span className="text-foreground-muted font-normal">—</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              {totalRequested > 0 && (
-                <tfoot>
-                  <tr className="border-t-2 border-border-default bg-surface-secondary/40">
-                    <td colSpan={4} className="px-5 py-3 text-right text-sm font-semibold text-foreground-secondary">Total Requested Value</td>
-                    <td className="px-5 py-3 text-right font-bold text-foreground">₹{totalRequested.toLocaleString('en-IN')}</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
+        {/* Items — card layout */}
+        <div className="lg:col-span-2 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
+              Requested Items <span className="ml-1 text-foreground-muted font-normal normal-case">({items.length})</span>
+            </h2>
+            {totalRequested > 0 && totalCatalog > 0 && (
+              <span className="text-xs text-foreground-muted">
+                Discount requested: <span className="font-semibold text-accent-500">
+                  {Math.round(((totalCatalog - totalRequested) / totalCatalog) * 100)}%
+                </span>
+              </span>
+            )}
           </div>
+
+          {items.length === 0 ? (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center text-foreground-muted text-sm">
+              No items found.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {items.map((item, i) => {
+                const catalogPrice = resolveItemPrice(item)
+                const sku = resolveItemSku(item)
+                const discount = (item.requested_price != null && catalogPrice != null && catalogPrice > 0)
+                  ? Math.round(((catalogPrice - Number(item.requested_price)) / catalogPrice) * 100)
+                  : null
+                const itemCatalogTotal = catalogPrice != null ? catalogPrice * item.quantity : null
+                const itemRequestedTotal = item.requested_price != null ? Number(item.requested_price) * item.quantity : null
+
+                return (
+                  <div key={item.id} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+                    <div className="flex gap-0">
+                      {/* Position number */}
+                      <div className="flex items-center justify-center w-10 shrink-0 bg-surface-secondary border-r border-border-default">
+                        <span className="text-xs font-mono text-foreground-muted">{i + 1}</span>
+                      </div>
+
+                      {/* Product image */}
+                      <div className="w-20 h-20 shrink-0 bg-surface border-r border-border-default overflow-hidden self-stretch flex items-center justify-center">
+                        {item.product_image_url ? (
+                          <img
+                            src={item.product_image_url}
+                            alt={item.description}
+                            className="w-full h-full object-contain p-1.5"
+                          />
+                        ) : (
+                          <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                        )}
+                      </div>
+
+                      {/* Main content */}
+                      <div className="flex-1 min-w-0 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            {/* Description (what the customer typed) */}
+                            <p className="font-semibold text-foreground text-sm leading-snug">{item.description}</p>
+
+                            {/* Resolved product/variant names */}
+                            {(item.product_name || item.variant_name || item.sub_variant_name) && (
+                              <p className="text-xs text-foreground-muted mt-0.5">
+                                {[item.product_name, item.variant_name, item.sub_variant_name].filter(Boolean).join(' — ')}
+                              </p>
+                            )}
+
+                            {/* SKU + qty */}
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5">
+                              {sku && (
+                                <span className="text-[11px] font-mono text-foreground-muted bg-surface px-1.5 py-0.5 rounded border border-border-default">
+                                  SKU: {sku}
+                                </span>
+                              )}
+                              <span className="text-xs text-foreground-secondary">
+                                Qty: <span className="font-semibold text-foreground">{item.quantity} {item.unit}</span>
+                              </span>
+                            </div>
+
+                            {/* Item notes */}
+                            {item.notes && (
+                              <p className="text-xs text-foreground-muted italic mt-1.5 border-l-2 border-accent-300 dark:border-accent-700 pl-2">
+                                {item.notes}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Price column */}
+                          <div className="shrink-0 text-right space-y-1 min-w-[120px]">
+                            {catalogPrice != null && (
+                              <div>
+                                <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Catalog</p>
+                                <p className="text-sm font-medium text-foreground-secondary">
+                                  ₹{catalogPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  <span className="text-foreground-muted text-[10px] ml-0.5">/unit</span>
+                                </p>
+                              </div>
+                            )}
+                            {item.requested_price != null ? (
+                              <div>
+                                <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Requested</p>
+                                <p className="text-sm font-bold text-accent-500">
+                                  ₹{Number(item.requested_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  <span className="text-foreground-muted font-normal text-[10px] ml-0.5">/unit</span>
+                                </p>
+                                {discount != null && discount > 0 && (
+                                  <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 mt-0.5">
+                                    {discount}% off
+                                  </span>
+                                )}
+                                {discount != null && discount <= 0 && (
+                                  <span className="inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 mt-0.5">
+                                    At/above catalog
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Requested</p>
+                                <p className="text-xs text-foreground-muted">No target price</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Line totals */}
+                        {(itemCatalogTotal != null || itemRequestedTotal != null) && (
+                          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border-default">
+                            {itemCatalogTotal != null && (
+                              <div className="text-xs text-foreground-muted">
+                                Catalog total:&nbsp;
+                                <span className="text-foreground font-medium">
+                                  ₹{itemCatalogTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            )}
+                            {itemRequestedTotal != null && (
+                              <div className="text-xs text-foreground-muted">
+                                Requested total:&nbsp;
+                                <span className="font-semibold text-accent-500">
+                                  ₹{itemRequestedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            )}
+                            {itemCatalogTotal != null && itemRequestedTotal != null && itemCatalogTotal > itemRequestedTotal && (
+                              <div className="ml-auto text-xs text-green-600 dark:text-green-400 font-medium">
+                                Saves ₹{(itemCatalogTotal - itemRequestedTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Summary row */}
+          {(totalCatalog > 0 || totalRequested > 0) && (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 flex flex-wrap items-center gap-6">
+              {totalCatalog > 0 && (
+                <div>
+                  <p className="text-xs text-foreground-muted mb-0.5">Total Catalog Value</p>
+                  <p className="font-semibold text-foreground">₹{totalCatalog.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                </div>
+              )}
+              {totalRequested > 0 && (
+                <div>
+                  <p className="text-xs text-foreground-muted mb-0.5">Total Requested Value</p>
+                  <p className="font-bold text-accent-500">₹{totalRequested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                </div>
+              )}
+              {totalCatalog > 0 && totalRequested > 0 && totalCatalog > totalRequested && (
+                <div className="ml-auto">
+                  <p className="text-xs text-foreground-muted mb-0.5">Total Discount Requested</p>
+                  <p className="font-bold text-green-600 dark:text-green-400">
+                    ₹{(totalCatalog - totalRequested).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    <span className="text-xs font-normal text-foreground-muted ml-1">
+                      ({Math.round(((totalCatalog - totalRequested) / totalCatalog) * 100)}%)
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Right — details + notes */}
+        {/* Right — customer details + notes */}
         <div className="space-y-5">
           {/* From */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
@@ -316,13 +467,19 @@ export default function RFQDetailClient({ id }: { id: string }) {
                 </div>
               ))}
             </dl>
+            <div className="mt-4 pt-4 border-t border-border-default">
+              <Link href={`/admin/business/customers/${rfq.user_id}`}
+                className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+                View customer profile →
+              </Link>
+            </div>
           </div>
 
           {/* Customer notes */}
           {rfq.notes && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
               <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-3">Customer Note</h2>
-              <p className="text-sm text-foreground">{rfq.notes}</p>
+              <p className="text-sm text-foreground whitespace-pre-line">{rfq.notes}</p>
             </div>
           )}
 
@@ -330,7 +487,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
           {rfq.admin_note && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
               <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-3">Admin Note</h2>
-              <p className="text-sm text-foreground">{rfq.admin_note}</p>
+              <p className="text-sm text-foreground whitespace-pre-line">{rfq.admin_note}</p>
             </div>
           )}
 
