@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
-import AccountSearch from '@/components/visitor/AccountSearch'
+import { useAccountSearch } from '@/contexts/AccountSearchContext'
 
 interface OrderItem {
   id: string
@@ -78,6 +78,7 @@ function getStatusLabel(status: string) {
 export default function OrdersPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
+  const { query: searchQuery, register } = useAccountSearch()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null)
@@ -85,7 +86,6 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
-  const [searchQuery, setSearchQuery] = useState('')
 
   const suggestions = useMemo(() => {
     const set = new Set<string>()
@@ -96,6 +96,10 @@ export default function OrdersPage() {
     })
     return Array.from(set)
   }, [orders])
+
+  useEffect(() => {
+    register({ suggestions, placeholder: 'Search orders…' })
+  }, [suggestions, register])
 
   const filteredOrders = useMemo(() => {
     if (!searchQuery.trim()) return orders
@@ -171,14 +175,6 @@ export default function OrdersPage() {
         </div>
 
         <div>
-            <div className="mb-3">
-              <AccountSearch
-                placeholder="Search by order number, product or status…"
-                suggestions={suggestions}
-                value={searchQuery}
-                onChange={setSearchQuery}
-              />
-            </div>
             {filteredOrders.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg

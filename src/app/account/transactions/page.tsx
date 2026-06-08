@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
-import AccountSearch from '@/components/visitor/AccountSearch'
+import { useAccountSearch } from '@/contexts/AccountSearchContext'
 
 interface Transaction {
   id: string
@@ -61,12 +61,12 @@ function getMethodLabel(method: string, gateway: string) {
 export default function TransactionsPage() {
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
+  const { query: searchQuery, register } = useAccountSearch()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
-  const [searchQuery, setSearchQuery] = useState('')
 
   const suggestions = useMemo(() => {
     const set = new Set<string>()
@@ -78,6 +78,10 @@ export default function TransactionsPage() {
     })
     return Array.from(set)
   }, [transactions])
+
+  useEffect(() => {
+    register({ suggestions, placeholder: 'Search transactions…' })
+  }, [suggestions, register])
 
   const filteredTransactions = useMemo(() => {
     if (!searchQuery.trim()) return transactions
@@ -146,14 +150,6 @@ export default function TransactionsPage() {
         </div>
 
         <div>
-            <div className="mb-3">
-              <AccountSearch
-                placeholder="Search by order number, transaction ID or payment method…"
-                suggestions={suggestions}
-                value={searchQuery}
-                onChange={setSearchQuery}
-              />
-            </div>
             {transactions.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg

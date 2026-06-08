@@ -7,7 +7,8 @@ import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import CustomSelect from '@/components/visitor/CustomSelect'
-import AccountSearch from '@/components/visitor/AccountSearch'
+import { useAccountSearch } from '@/contexts/AccountSearchContext'
+import FeaturedProducts from '@/components/visitor/FeaturedProducts'
 
 interface Address {
   id: string
@@ -50,8 +51,8 @@ export default function AddressesPage() {
   const [formData, setFormData] = useState({ ...emptyForm })
   const [pinLookupState, setPinLookupState] = useState<'idle' | 'loading' | 'found' | 'error'>('idle')
   const [localities, setLocalities] = useState<string[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
   const pinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { query: searchQuery, register } = useAccountSearch()
 
   const suggestions = useMemo(() => {
     const set = new Set<string>()
@@ -64,6 +65,10 @@ export default function AddressesPage() {
     })
     return Array.from(set)
   }, [addresses])
+
+  useEffect(() => {
+    register({ suggestions, placeholder: 'Search addresses…' })
+  }, [suggestions, register])
 
   const filteredAddresses = useMemo(() => {
     if (!searchQuery.trim()) return addresses
@@ -483,17 +488,6 @@ export default function AddressesPage() {
               </div>
             )}
 
-            {addresses.length > 0 && (
-              <div className="mb-3">
-                <AccountSearch
-                  placeholder="Search by name, city, state or pin code…"
-                  suggestions={suggestions}
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                />
-              </div>
-            )}
-
             {addresses.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -549,6 +543,7 @@ export default function AddressesPage() {
                 ))}
               </div>
             )}
+            <FeaturedProducts />
           </div>
         </div>
       </div>
