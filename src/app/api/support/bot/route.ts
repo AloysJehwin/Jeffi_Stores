@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser } from '@/lib/jwt'
 import { queryMany } from '@/lib/db'
 
 function getBotReply(msg: string, orders: any[]): { reply: string } {
@@ -55,7 +55,7 @@ function getBotReply(msg: string, orders: any[]): { reply: string } {
 }
 
 export async function GET(request: NextRequest) {
-  const authUser = await authenticateUser(request)
+  const authUser = await authenticateAnyUser(request)
   if (!authUser) {
     return NextResponse.json({ reply: "Your session has expired. Please log in again to use support chat." })
   }
