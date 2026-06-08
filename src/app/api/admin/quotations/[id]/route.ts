@@ -143,9 +143,22 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (existing.status !== 'draft') return NextResponse.json({ error: 'Only draft quotations can be deleted' }, { status: 400 })
 
+    // Detach any RFQ that points to this quotation before deleting
+    await query(
+      `UPDATE business_rfqs SET converted_quotation_id = NULL, status = 'reviewed' WHERE converted_quotation_id = $1`,
+      [params.id]
+    )
+
     await query(`DELETE FROM quotations WHERE id = $1`, [params.id])
     return NextResponse.json({ ok: true })
   } catch (e: any) {
+    // FK violation fallback (shouldn't reach here after the detach above, but just in case)
+    if (e?.code === '23503') {
+      return NextResponse.json(
+        { error: 'This quotation was created from a business RFQ and cannot be deleted while that link exists. Please handle the RFQ first.' },
+        { status: 409 }
+      )
+    }
     return NextResponse.json({ error: e?.message || 'Failed to delete' }, { status: 500 })
   }
 }
