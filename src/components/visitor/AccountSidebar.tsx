@@ -79,29 +79,33 @@ export function AccountNavBar() {
     : navItems
 
   return (
-    <div className="sticky top-0 z-20 bg-surface-elevated border-b border-border-default shadow-sm">
-      <div className="container mx-auto px-4">
-        <nav className="flex items-center gap-1 overflow-x-auto scrollbar-none py-1">
-          {items.map((item) => {
-            const isActive = item.exact
-              ? pathname === item.href
-              : pathname.startsWith(item.href)
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
-                  isActive
-                    ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400'
-                    : 'text-foreground-secondary hover:bg-surface-secondary hover:text-foreground'
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
+    <div className="sticky top-0 z-20 bg-surface border-b border-border-default shadow-sm">
+      <div className="container mx-auto px-4 py-2">
+        <div className="bg-surface-elevated rounded-xl border border-border-default px-3 py-1.5 flex items-center gap-3">
+          <span className="text-sm font-semibold text-foreground whitespace-nowrap pl-1 hidden sm:block">My Account</span>
+          <div className="hidden sm:block w-px h-5 bg-border-default flex-shrink-0" />
+          <nav className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
+            {items.map((item) => {
+              const isActive = item.exact
+                ? pathname === item.href
+                : pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                    isActive
+                      ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400'
+                      : 'text-foreground-secondary hover:bg-surface-secondary hover:text-foreground'
+                  }`}
+                >
+                  {item.icon}
+                  {item.label}
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
       </div>
     </div>
   )
