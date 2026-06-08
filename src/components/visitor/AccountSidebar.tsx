@@ -79,7 +79,7 @@ export function AccountNavBar() {
     : navItems
 
   return (
-    <div className="sticky top-0 z-20 bg-surface border-b border-border-default shadow-sm">
+    <div className="sticky top-0 z-20 bg-surface shadow-sm">
       <div className="container mx-auto px-4 py-2">
         <div className="bg-surface-elevated rounded-xl border border-border-default px-3 py-1.5 flex items-center gap-3">
           <span className="text-sm font-semibold text-foreground whitespace-nowrap pl-1 hidden sm:block">My Account</span>

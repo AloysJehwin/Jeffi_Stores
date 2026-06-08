@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/contexts/AuthContext'
-import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
+import { navItems } from '@/components/visitor/AccountSidebar'
 
 interface WishlistItem {
   id: string
@@ -149,31 +149,21 @@ export default function WishlistPage() {
 
   if (wishlistItems.length === 0) {
     return (
-      <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
+      <div className="bg-surface min-h-screen">
         <MobileHeader />
-        <div className="container mx-auto px-4 h-full">
-          <div className="hidden lg:block py-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Wishlist</h1>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:h-[calc(100%-5rem)]">
-            <div className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto pt-8 pb-8">
-              <AccountSidebar />
-            </div>
-            <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:pt-8 lg:pb-8">
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
-                <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-                <h3 className="text-xl font-semibold text-foreground mb-2">Your wishlist is empty</h3>
-                <p className="text-foreground-secondary mb-6">Save your favorite items to buy them later</p>
-                <Link
-                  href="/products"
-                  className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
-                >
-                  Browse Products
-                </Link>
-              </div>
-            </div>
+        <div className="container mx-auto px-4 py-4 sm:py-6">
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
+            <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+            <h3 className="text-xl font-semibold text-foreground mb-2">Your wishlist is empty</h3>
+            <p className="text-foreground-secondary mb-6">Save your favorite items to buy them later</p>
+            <Link
+              href="/products"
+              className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+            >
+              Browse Products
+            </Link>
           </div>
         </div>
       </div>
@@ -181,20 +171,10 @@ export default function WishlistPage() {
   }
 
   return (
-    <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
+    <div className="bg-surface min-h-screen">
       <MobileHeader />
-      <div className="container mx-auto px-4 h-full">
-        <div className="hidden lg:block py-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Wishlist</h1>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:h-[calc(100%-5rem)]">
-          <div className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto pt-8 pb-8">
-            <AccountSidebar />
-          </div>
-
-          <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:pt-8 lg:pb-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="container mx-auto px-4 py-4 sm:py-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {wishlistItems.map((item) => {
             const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
             const hasVariants = item.products.has_variants
@@ -305,9 +285,7 @@ export default function WishlistPage() {
               </div>
             )
           })}
-            </div>
           </div>
-        </div>
       </div>
     </div>
   )
