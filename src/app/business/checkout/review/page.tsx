@@ -777,6 +777,7 @@ function CheckoutReviewPage() {
             fetchAddresses()
             setSelectedAddress(newAddress)
           }}
+          portalHeader="business"
         />
       </div>
     </div>
