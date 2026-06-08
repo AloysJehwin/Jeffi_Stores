@@ -65,6 +65,30 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL(`/business${slug}`, request.url))
   }
 
+  // Business portal auth — applies to /business/* paths (not subdomain, not API, not public pages)
+  if (pathname.startsWith('/business/')) {
+    const PUBLIC_BUSINESS = ['/business/signin', '/business/signup', '/business/pending']
+    const isPublic = PUBLIC_BUSINESS.some(p => pathname.startsWith(p))
+    if (!isPublic) {
+      const token = request.cookies.get('business_auth_token')?.value
+      if (!token) {
+        return NextResponse.redirect(new URL('/business/signin', request.url))
+      }
+      const payload = await verifyToken(token)
+      if (!payload || !payload.isBusiness) {
+        const res = NextResponse.redirect(new URL('/business/signin', request.url))
+        res.cookies.delete('business_auth_token')
+        return res
+      }
+      if (payload.approvalStatus === 'pending') {
+        return NextResponse.redirect(new URL('/business/pending', request.url))
+      }
+      if (payload.approvalStatus === 'rejected') {
+        return NextResponse.redirect(new URL('/business/signin?rejected=1', request.url))
+      }
+    }
+  }
+
   if (pathname.startsWith('/forms/')) {
     const slug = pathname.replace('/forms/', '')
     return NextResponse.redirect(new URL(`https://forms.jeffistores.in/${slug}`, request.url), 301)
