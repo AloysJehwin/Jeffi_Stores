@@ -103,6 +103,12 @@ export async function authenticateUser(request: NextRequest): Promise<UserJWTPay
   }
 }
 
+// Authenticates regular users OR business users (tries both cookies).
+// Used by shared endpoints like support chat that serve both portals.
+export async function authenticateAnyUser(request: NextRequest): Promise<UserJWTPayload | null> {
+  return (await authenticateUser(request)) ?? (await authenticateBusiness(request))
+}
+
 export async function requireAdminScope(
   request: NextRequest,
   scope: string | null

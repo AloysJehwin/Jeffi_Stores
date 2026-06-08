@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser } from '@/lib/jwt'
 import { queryMany, queryOne } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
 import { z } from 'zod'
@@ -21,7 +21,7 @@ export async function GET(
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const authUser = await authenticateUser(request)
+    const authUser = await authenticateAnyUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -59,7 +59,7 @@ export async function POST(
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const authUser = await authenticateUser(request)
+    const authUser = await authenticateAnyUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
