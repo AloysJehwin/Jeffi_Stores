@@ -5,7 +5,6 @@ import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import CustomSelect from '@/components/visitor/CustomSelect'
 
@@ -199,21 +198,16 @@ export default function AddressesPage() {
   }
 
   return (
-    <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
+    <div className="bg-surface min-h-screen">
 
       <AccountMobileHeader />
 
-      <div className="container mx-auto px-4 h-full">
-        <div className="hidden lg:block py-8">
+      <div className="container mx-auto px-4">
+        <div className="hidden lg:block pt-6 pb-2">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Addresses</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:h-[calc(100%-5rem)]">
-          <div className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto pt-8 pb-8">
-            <AccountSidebar />
-          </div>
-
-          <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:pt-8 lg:pb-8">
+        <div>
             <div className="mb-6">
               <button
                 type="button"
@@ -521,6 +515,5 @@ export default function AddressesPage() {
           </div>
         </div>
       </div>
-    </div>
   )
 }

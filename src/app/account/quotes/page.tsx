@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import AccountSidebar from '@/components/visitor/AccountSidebar'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 
 interface RFQ {
@@ -58,11 +57,8 @@ export default function MyQuotesPage() {
     <div className="bg-surface min-h-screen py-6 lg:py-8">
       <div className="container mx-auto px-4">
         <AccountMobileHeader />
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="hidden lg:block lg:col-span-1">
-            <AccountSidebar />
-          </div>
-          <div className="lg:col-span-3">
+        <div className="grid grid-cols-1 gap-6">
+          <div>
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               <div className="px-6 py-4 border-b border-border-default">
                 <h1 className="text-xl font-bold text-foreground">My Quote Requests</h1>
