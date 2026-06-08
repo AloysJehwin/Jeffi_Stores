@@ -403,18 +403,46 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           categoryId={categoryId ?? null}
         />
 
-        <RequestQuoteButton
-          items={[{
-            productId: product.id,
-            variantId: selectedVariantId || undefined,
-            subVariantId: selectedSubVariantId || undefined,
-            description: product.name,
-            quantity: 1,
-            unit: 'Nos',
-            currentPrice: displayPrice,
-          }]}
-          className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
-        />
+        {(() => {
+          const selectedVariant = selectedVariantId
+            ? product.product_variants?.find(v => v.id === selectedVariantId) ?? null
+            : null
+          const selectedSubVariant = selectedSubVariantId && selectedVariant
+            ? selectedVariant.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
+            : null
+          const sku = selectedSubVariant?.sku || selectedVariant?.sku || product.sku || null
+          const stockQty = selectedSubVariant
+            ? Number(selectedSubVariant.stock_quantity ?? 0)
+            : selectedVariant
+              ? Number(selectedVariant.stock_quantity ?? 0)
+              : Number(product.stock_quantity ?? 0)
+          const stockStatus: 'in' | 'out' = stockQty > 0 ? 'in' : 'out'
+          const primaryImage = product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
+          const descriptionParts = [
+            product.name,
+            selectedVariant?.variant_name,
+            selectedSubVariant?.sub_variant_name,
+          ].filter(Boolean)
+          return (
+            <RequestQuoteButton
+              items={[{
+                productId: product.id,
+                variantId: selectedVariantId || undefined,
+                subVariantId: selectedSubVariantId || undefined,
+                description: descriptionParts.join(' — '),
+                quantity: 1,
+                unit: selectedVariant?.unit || 'Nos',
+                currentPrice: displayPrice,
+                imageUrl: primaryImage?.image_url ?? null,
+                brandName: product.brands?.name ?? null,
+                categoryName: product.categories?.name ?? null,
+                sku,
+                stockStatus,
+              }]}
+              className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
+            />
+          )
+        })()}
 
         {/* Product Specifications */}
         <div className="mt-6 pt-6 border-t border-border-default">

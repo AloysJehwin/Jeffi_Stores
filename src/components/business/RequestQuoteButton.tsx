@@ -14,6 +14,11 @@ interface QuoteItem {
   quantity: number
   unit?: string
   currentPrice?: number | null
+  imageUrl?: string | null
+  brandName?: string | null
+  categoryName?: string | null
+  sku?: string | null
+  stockStatus?: 'in' | 'out' | null
 }
 
 interface Props {
@@ -204,11 +209,30 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
 
                     {/* Product label */}
                     <div className="flex items-start gap-3 p-3 bg-surface-secondary rounded-xl">
-                      <svg className="w-5 h-5 text-accent-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
+                      {item.imageUrl ? (
+                        <div className="w-16 h-16 rounded-lg border border-border-default bg-surface flex-shrink-0 overflow-hidden">
+                          <img src={item.imageUrl} alt={item.description} className="w-full h-full object-contain p-1" />
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg border border-border-default bg-surface flex-shrink-0 flex items-center justify-center">
+                          <svg className="w-7 h-7 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground leading-snug">{item.description}</p>
+                        <p className="text-sm font-semibold text-foreground leading-snug">{item.description}</p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+                          {item.brandName && <span className="text-xs text-foreground-muted">{item.brandName}</span>}
+                          {item.categoryName && <span className="text-xs text-foreground-muted">{item.categoryName}</span>}
+                          {item.sku && <span className="text-xs font-mono text-foreground-muted">SKU: {item.sku}</span>}
+                        </div>
+                        {item.stockStatus != null && (
+                          <span className={`inline-flex items-center gap-1 mt-1 text-[11px] font-medium ${item.stockStatus === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.stockStatus === 'in' ? 'bg-green-500' : 'bg-red-500'}`} />
+                            {item.stockStatus === 'in' ? 'In Stock' : 'Out of Stock'}
+                          </span>
+                        )}
                       </div>
                     </div>
 

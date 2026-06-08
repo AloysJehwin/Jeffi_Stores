@@ -614,13 +614,23 @@ export default function CartPage() {
                     ? (user.businessDiscountMap?.[categoryId] ?? 0)
                     : 0
                   const currentPrice = discountPct > 0 ? Number(price) * (1 - discountPct / 100) : Number(price)
+                  const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
+                  const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku || null
+                  const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity ?? 0
+                  const descriptionParts = [item.products?.name, item.variant?.variant_name, item.sub_variant?.sub_variant_name].filter(Boolean)
                   return {
                     productId: item.products?.id,
                     variantId: item.variant?.id,
-                    description: [item.products?.name, item.variant?.variant_name, item.sub_variant?.sub_variant_name].filter(Boolean).join(' — '),
+                    subVariantId: item.sub_variant?.id,
+                    description: descriptionParts.join(' — '),
                     quantity: Math.round(Number(item.quantity)) || 1,
                     unit: item.buy_unit || 'Nos',
                     currentPrice,
+                    imageUrl: primaryImage ? (primaryImage.thumbnail_url || primaryImage.image_url) : null,
+                    brandName: item.products?.brand_name ?? null,
+                    categoryName: null,
+                    sku,
+                    stockStatus: Number(stockQty) > 0 ? ('in' as const) : ('out' as const),
                   }
                 })}
                 label="Request Quote for Cart"
