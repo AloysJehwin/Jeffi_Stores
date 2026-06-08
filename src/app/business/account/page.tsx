@@ -26,7 +26,6 @@ interface DashboardData {
     postal_code: string
     phone: string
   } | null
-  wishlistCount: number
 }
 
 const statusColor: Record<string, string> = {
