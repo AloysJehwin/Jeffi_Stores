@@ -12,13 +12,16 @@ export default function GoogleCallbackPage() {
     const error = params.get('error')
 
     if (window.opener) {
+      // Use '*' as targetOrigin so it works across subdomains (jeffistores.in ↔ business.jeffistores.in).
+      // The message payload contains no secrets — the access_token is already in the hash fragment
+      // which is also visible to the opener's domain via the popup URL.
       window.opener.postMessage(
         {
           source: 'jeffi-google-oauth',
           accessToken,
           error,
         },
-        window.location.origin
+        '*'
       )
       setTimeout(() => window.close(), 100)
     }
