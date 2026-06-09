@@ -330,10 +330,6 @@ export default function AccountPage() {
       </div>
 
       <div className="container mx-auto px-4">
-        <div className="hidden lg:block pt-6 pb-2">
-          <h1 className="text-2xl font-bold text-foreground">My Account</h1>
-        </div>
-
         <div className="py-4 sm:py-6 space-y-4 max-w-3xl lg:max-w-none">
 
             {/* Desktop stats row */}
