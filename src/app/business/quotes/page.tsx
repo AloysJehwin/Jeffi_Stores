@@ -70,11 +70,6 @@ export default function MyQuotesPage() {
       <BusinessAccountMobileHeader />
       <div className="container mx-auto px-4 pt-4 pb-8">
 
-        <div className="mb-4">
-          <h1 className="text-xl font-bold text-foreground">My Quotes</h1>
-          <p className="text-sm text-foreground-secondary mt-0.5">Request for Quotation (RFQ) submissions and their status</p>
-        </div>
-
         {/* Status filter */}
         {rfqs.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap mb-4">
