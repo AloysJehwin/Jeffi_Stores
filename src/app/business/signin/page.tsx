@@ -208,7 +208,7 @@ function BusinessSignInPage() {
     try {
       const res = await fetch('/api/user/update', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
         credentials: 'include',
         body: JSON.stringify({ phone }),
       })
