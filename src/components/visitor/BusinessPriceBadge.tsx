@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { applyDiscount } from '@/lib/pricing'
 
 interface Props {
   price: number
@@ -16,7 +17,7 @@ export default function BusinessPriceBadge({ price, categoryId }: Props) {
   const discountPct = user.businessDiscountMap[categoryId] ?? 0
   if (discountPct <= 0) return null
 
-  const discountedPrice = price * (1 - discountPct / 100)
+  const discountedPrice = applyDiscount(price, discountPct)
 
   return (
     <div className="mt-3 pt-3 border-t border-accent-200 dark:border-accent-800 flex items-center gap-3 flex-wrap">

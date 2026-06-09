@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { attributeConversion } from '@/lib/marketing'
@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
       await handlePaymentLinkPaid(event.payload.payment_link.entity)
     } else if (eventType === 'payment_link.expired') {
       await handlePaymentLinkExpired(event.payload.payment_link.entity)
+    } else if (eventType === 'qr_code.credited') {
+      await handleQrCodeCredited(event.payload.qr_code.entity)
     }
 
     return NextResponse.json({ status: 'ok' })
@@ -190,6 +192,16 @@ async function handlePaymentLinkPaid(paymentLink: any) {
       sendPaymentStatusUpdate(user.email, userName, order.order_number, order.id, 'paid', parseFloat(order.total_amount)).catch(() => {})
     }
   }
+}
+
+async function handleQrCodeCredited(qrCode: any) {
+  const qrId = qrCode?.id
+  if (!qrId) return
+  await query(
+    `UPDATE orders SET payment_status = 'paid', updated_at = NOW()
+     WHERE razorpay_qr_id = $1 AND payment_status != 'paid'`,
+    [qrId]
+  )
 }
 
 async function handlePaymentLinkExpired(paymentLink: any) {

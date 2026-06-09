@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import CustomSelect from '@/components/visitor/CustomSelect'
+import { applyDiscount } from '@/lib/pricing'
 
 interface SubVariantOption {
   id: string
@@ -60,7 +61,7 @@ function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
 }) {
   const target = requestedPrice ? parseFloat(requestedPrice) : null
   const pct = discountPct ? parseFloat(discountPct) : null
-  const derived = target ?? (pct != null && pct > 0 && pct < 100 ? currentPrice * (1 - pct / 100) : null)
+  const derived = target ?? (pct != null && pct > 0 && pct < 100 ? applyDiscount(currentPrice, pct) : null)
   const effectivePct = derived != null ? Math.round(((currentPrice - derived) / currentPrice) * 100) : null
   const saving = derived != null ? currentPrice - derived : null
 
@@ -126,7 +127,7 @@ function resolveItemState(item: QuoteItem, f: FieldState) {
   const rawPrice = subVariant?.price ?? variant?.price ?? null
   const discPct = item.businessDiscountPct ?? 0
   const currentPrice = rawPrice != null
-    ? (discPct > 0 ? Number(rawPrice) * (1 - discPct / 100) : Number(rawPrice))
+    ? (discPct > 0 ? applyDiscount(Number(rawPrice), discPct) : Number(rawPrice))
     : item.currentPrice ?? null
   const sku = subVariant?.sku || variant?.sku || item.sku || null
   const stockQty = subVariant?.stock_quantity ?? variant?.stock_quantity ?? null
@@ -214,7 +215,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
           if (f.requested_price) {
             requested_price = parseFloat(f.requested_price)
           } else if (f.discount_pct && resolved.currentPrice) {
-            requested_price = resolved.currentPrice * (1 - parseFloat(f.discount_pct) / 100)
+            requested_price = applyDiscount(resolved.currentPrice, parseFloat(f.discount_pct))
           }
           return {
             productId: item.productId,

@@ -84,12 +84,22 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                           </div>
                           <div>
                             <p className="text-foreground-muted">Price</p>
-                            <p className="text-foreground font-medium">
-                              {product.has_variants
-                                ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN')}`
-                                : `Rs. ${Number(product.base_price || 0).toLocaleString('en-IN')}`
-                              }
-                            </p>
+                            {product.has_variants ? (
+                              <p className="text-foreground font-medium">
+                                From Rs. {Number(product.variant_min_price || 0).toLocaleString('en-IN')}
+                              </p>
+                            ) : (
+                              <div className="flex items-baseline gap-1">
+                                <p className="text-foreground font-medium">
+                                  Rs. {Number(product.base_price || 0).toLocaleString('en-IN')}
+                                </p>
+                                {product.mrp && Number(product.mrp) > Number(product.base_price || 0) && (
+                                  <span className="text-foreground-muted line-through text-[11px]">
+                                    Rs. {Number(product.mrp).toLocaleString('en-IN')}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className={product.has_variants && Array.isArray(product.product_variants) && product.product_variants.length > 0 ? 'col-span-2' : ''}>
                             <p className="text-foreground-muted mb-0.5">Stock</p>
@@ -159,10 +169,25 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
               </td>
               <td className="px-4 py-3">
                 <div className="text-sm font-semibold text-primary-500 truncate">
-                    {product.has_variants
-                      ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                      : `Rs. ${Number(product.base_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                    }
+                  {product.has_variants ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span>From Rs. {Number(product.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      {product.variant_min_mrp && Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
+                        <span className="text-xs text-foreground-muted line-through font-normal">
+                          Rs. {Number(product.variant_min_mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1.5">
+                      <span>Rs. {Number(product.base_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      {product.mrp && Number(product.mrp) > Number(product.base_price || 0) && (
+                        <span className="text-xs text-foreground-muted line-through font-normal">
+                          Rs. {Number(product.mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </td>
               <td className="px-4 py-3">

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { queryMany, queryOne } from '@/lib/db'
+import { mrpDiscountPct } from '@/lib/pricing'
 import SortDropdown from '@/components/visitor/SortDropdown'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
@@ -439,9 +440,7 @@ export default async function ProductsPage({
                     const inclPrice = hasVariants && product.variant_min_price
                       ? Number(product.variant_min_price)
                       : Number(product.base_price)
-                    const mrpDiscount = mrp && mrp > inclPrice
-                      ? Math.round(((mrp - inclPrice) / mrp) * 100)
-                      : 0
+                    const mrpDiscount = mrpDiscountPct(mrp, inclPrice)
 
                     return (
                       <ProductCard

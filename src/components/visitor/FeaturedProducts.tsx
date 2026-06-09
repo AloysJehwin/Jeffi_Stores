@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { mrpDiscountPct } from '@/lib/pricing'
 
 interface Product {
   id: string
@@ -34,7 +35,7 @@ export default function FeaturedProducts() {
           const image = p.product_images?.find(i => i.is_primary) || p.product_images?.[0]
           const price = (p.has_variants && p.variant_min_price) ? p.variant_min_price : p.base_price
           const mrp = p.mrp ? Number(p.mrp) : null
-          const discount = mrp && mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0
+          const discount = mrpDiscountPct(mrp, price)
           return (
             <Link key={p.id} href={`/products/${p.slug}`}
               className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden hover:shadow-md transition-shadow group"

@@ -26,7 +26,7 @@ export function trackRecentlyViewed(product: RecentProduct) {
   } catch {}
 }
 
-export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
+export default function RecentlyViewed({ excludeId, basePath = '/products' }: { excludeId?: string; basePath?: string }) {
   const [products, setProducts] = useState<RecentProduct[]>([])
   const [quickView, setQuickView] = useState<RecentProduct | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -74,7 +74,7 @@ export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
           return (
             <Link
               key={product.id}
-              href={`/products/${product.slug}`}
+              href={`${basePath}/${product.slug}`}
               className="group"
               onTouchStart={(e) => startLongPress(e, product)}
               onTouchEnd={cancelLongPress}
@@ -180,7 +180,7 @@ export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
           <p className="text-xs text-foreground-muted mb-5">Incl. all taxes</p>
 
           <Link
-            href={`/products/${quickView.slug}`}
+            href={`${basePath}/${quickView.slug}`}
             onClick={() => setQuickView(null)}
             className="block w-full text-center bg-accent-500 hover:bg-accent-600 text-white font-semibold py-3 rounded-xl transition-colors"
           >

@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import AddressFormModal from '@/components/visitor/AddressFormModal'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import { mrpDiscountPct } from '@/lib/pricing'
 
 export default function CheckoutReviewPageWrapper() {
   return (
@@ -489,7 +490,7 @@ function CheckoutReviewPage() {
                           {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
                             <>
                               {' '}<span className="line-through text-foreground-muted">₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                              {' '}<span className="text-accent-600 dark:text-accent-400 font-semibold">{Math.round(((buyNowItem.mrp - buyNowItem.price) / buyNowItem.mrp) * 100)}% off</span>
+                              {' '}<span className="text-accent-600 dark:text-accent-400 font-semibold">{mrpDiscountPct(buyNowItem.mrp, buyNowItem.price)}% off</span>
                             </>
                           )}
                         </p>
@@ -515,7 +516,7 @@ function CheckoutReviewPage() {
                     const itemTotal = price * item.quantity
                     const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
                     const showMrp = mrp !== null && Number(mrp) > Number(price)
-                    const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
+                    const discountPct = showMrp ? mrpDiscountPct(Number(mrp), Number(price)) : 0
                     const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
                     const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
                     const gstRate = Number(item.products.gst_percentage || 0)

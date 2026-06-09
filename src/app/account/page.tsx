@@ -329,7 +329,7 @@ export default function AccountPage() {
 
       <div className="container mx-auto px-4">
 
-        <div className="py-4 sm:py-6 space-y-4 max-w-3xl lg:max-w-none">
+        <div className="pt-2 pb-4 space-y-4 max-w-3xl lg:max-w-none">
 
             {/* Desktop stats row */}
             <div className="hidden lg:grid grid-cols-3 gap-3">

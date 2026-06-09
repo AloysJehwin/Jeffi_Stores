@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
 import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { lineItemExGst } from '@/lib/pricing'
+import { getRazorpayInstance } from '@/lib/razorpay'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,7 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}))
     const paymentMode: string = body.paymentMode || 'cash'
+    const enableDelivery: boolean = !!body.enableDelivery
 
     const isBuyerSame = quotation.buyer_same !== false
     const buyerState = isBuyerSame ? quotation.consignee_state : (quotation.buyer_state || quotation.consignee_state)
@@ -108,7 +110,8 @@ export async function POST(
 
     const taxAmount = Math.round((totalCgst + totalSgst + totalIgst) * 100) / 100
     const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100
-    const isPaid = paymentMode !== 'credit'
+    // cash and bank_transfer are immediately paid; upi_qr and credit are unpaid until confirmed
+    const isPaid = paymentMode === 'cash' || paymentMode === 'bank_transfer'
     const today = new Date().toISOString()
 
     const result = await withTransaction(async (client) => {
@@ -158,26 +161,28 @@ export async function POST(
       }
 
       const saveAsDraft = insufficientItems.length > 0
+      const orderStatus = saveAsDraft ? 'draft' : (enableDelivery ? 'processing' : 'delivered')
 
       const orderResult = await client.query(
         `INSERT INTO orders (
-          order_number, status, payment_status, source,
+          order_number, status, payment_status, payment_mode, source,
           customer_name, customer_phone, customer_email,
           buyer_gstin, is_igst,
           shipping_address_id,
           subtotal, tax_amount, taxable_amount,
           cgst_amount, sgst_amount, igst_amount, total_amount,
-          notes
+          needs_delivery, notes
         ) VALUES (
-          $1, $2, $3, 'offline',
-          $4, $5, $6, $7, $8, $9,
-          $10, $11, $12, $13, $14, $15, $16,
-          $17
+          $1, $2, $3, $4, 'offline',
+          $5, $6, $7, $8, $9, $10,
+          $11, $12, $13, $14, $15, $16, $17,
+          $18, $19
         ) RETURNING id, order_number`,
         [
           'OFF-' + Date.now(),
-          saveAsDraft ? 'draft' : 'delivered',
+          orderStatus,
           isPaid ? 'paid' : 'unpaid',
+          paymentMode,
           customerName,
           customerPhone,
           customerEmail,
@@ -191,6 +196,7 @@ export async function POST(
           Math.round(totalSgst * 100) / 100,
           Math.round(totalIgst * 100) / 100,
           totalAmount,
+          enableDelivery && !saveAsDraft,
           `Converted from quotation ${quotation.quote_number}`,
         ]
       )
@@ -301,6 +307,32 @@ export async function POST(
       }
     }
 
+    // Generate UPI QR after transaction so order ID is available
+    let qrImageUrl: string | null = null
+    if (!result.saveAsDraft && paymentMode === 'upi_qr') {
+      try {
+        const rzp = getRazorpayInstance() as any
+        const amountPaise = Math.round(totalAmount * 100)
+        const closeBy = Math.floor(Date.now() / 1000) + 24 * 60 * 60
+        const qr = await rzp.qrCode.create({
+          type: 'upi_qr',
+          name: `Invoice ${result.invoice_number}`,
+          usage: 'single_use',
+          fixed_amount: true,
+          payment_amount: amountPaise,
+          description: `Jeffi Stores Invoice ${result.invoice_number}`,
+          close_by: closeBy,
+        })
+        await query(
+          `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, updated_at = NOW() WHERE id = $3`,
+          [qr.id, qr.image_url, result.id]
+        )
+        qrImageUrl = qr.image_url
+      } catch (_) {
+        // QR generation failure is non-fatal — admin can generate from the invoice page
+      }
+    }
+
     return NextResponse.json({
       success: true,
       orderId: result.id,
@@ -309,6 +341,8 @@ export async function POST(
       invoiceUrl: result.invoice_number ? `/api/orders/${result.id}/invoice` : null,
       savedAsDraft: result.saveAsDraft,
       insufficientItems: result.insufficientItems,
+      qrImageUrl,
+      needsDelivery: enableDelivery && !result.saveAsDraft,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
