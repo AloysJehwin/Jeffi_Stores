@@ -22,7 +22,11 @@ export function openGoogleOAuthPopup({
       return
     }
 
-    const redirectUri = `${window.location.origin}/auth/google/callback`
+    // Always use the main domain for the OAuth redirect — business subdomain is not a registered redirect URI
+    const mainOrigin = window.location.hostname.startsWith('business.')
+      ? window.location.origin.replace(/^(https?:\/\/)business\./, '$1')
+      : window.location.origin
+    const redirectUri = `${mainOrigin}/auth/google/callback`
     const state = Math.random().toString(36).slice(2)
     const params = new URLSearchParams({
       client_id: clientId,
@@ -57,9 +61,15 @@ export function openGoogleOAuthPopup({
       settled = true
       window.removeEventListener('message', onMessage)
       window.clearInterval(closedInterval)
+      window.clearTimeout(timeoutId)
       try { popup.close() } catch {}
       resolve(result)
     }
+
+    // Safety net: resolve after 3 min so googleLoading never stays true forever
+    const timeoutId = window.setTimeout(() => {
+      finish({ accessToken: null, error: 'Sign-in timed out. Please try again.' })
+    }, 3 * 60 * 1000)
 
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return
