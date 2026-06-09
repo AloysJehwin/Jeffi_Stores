@@ -323,11 +323,22 @@ export async function POST(
           description: `Jeffi Stores Invoice ${result.invoice_number}`,
           close_by: closeBy,
         })
+        let fetchedImageUrl = qr.image_url
+        try {
+          const imgRes = await fetch(qr.image_url)
+          if (imgRes.ok) {
+            const contentType = imgRes.headers.get('content-type') || 'image/png'
+            const buf = await imgRes.arrayBuffer()
+            fetchedImageUrl = `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`
+          }
+        } catch (_) {
+          // keep redirect URL as fallback
+        }
         await query(
           `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, updated_at = NOW() WHERE id = $3`,
-          [qr.id, qr.image_url, result.id]
+          [qr.id, fetchedImageUrl, result.id]
         )
-        qrImageUrl = qr.image_url
+        qrImageUrl = fetchedImageUrl
       } catch (_) {
         // QR generation failure is non-fatal — admin can generate from the invoice page
       }

@@ -27,17 +27,63 @@ const STATUS_COLORS: Record<string, string> = {
 export default function InvoiceDetailClient({ id }: { id: string }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [qrLoading, setQrLoading] = useState(false)
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null)
   const router = useRouter()
 
-  useEffect(() => {
-    fetch(`/api/admin/invoices/${id}/detail`)
+  function loadData() {
+    return fetch(`/api/admin/invoices/${id}/detail`)
       .then(r => r.json())
       .then(j => {
         if (j.redirect) { router.replace(j.redirect); return }
-        setData(j); setLoading(false)
+        setData(j)
+        setQrImageUrl(j.order?.razorpay_qr_image_url || null)
+        setLoading(false)
+        return j
       })
-      .catch(() => setLoading(false))
+      .catch(() => { setLoading(false) })
+  }
+
+  useEffect(() => {
+    loadData()
   }, [id, router])
+
+  // Poll every 4s while QR is shown and payment is unpaid
+  useEffect(() => {
+    const order = data?.order
+    if (!order || order.payment_mode !== 'upi_qr' || order.payment_status === 'paid') return
+    const interval = setInterval(async () => {
+      const j = await fetch(`/api/admin/invoices/${id}/detail`).then(r => r.json()).catch(() => null)
+      if (!j?.order) return
+      if (j.order.payment_status === 'paid') {
+        setData(j)
+        clearInterval(interval)
+      }
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [id, data?.order?.payment_status, data?.order?.payment_mode])
+
+  async function generateQr() {
+    if (!data?.order) return
+    setQrLoading(true)
+    try {
+      const res = await fetch('/api/admin/razorpay/qr', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: data.order.id,
+          amountPaise: Math.round(parseFloat(data.order.total_amount) * 100),
+          description: `Jeffi Stores Invoice ${data.order.invoice_number}`,
+        }),
+      })
+      const json = await res.json()
+      if (res.ok && json.qrImageUrl) setQrImageUrl(json.qrImageUrl)
+      else alert(json.error || 'Failed to generate QR')
+    } finally {
+      setQrLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -59,6 +105,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   const o = data.order
   const items: any[] = data.items || []
   const isVoided = o.status === 'cancelled' || o.status === 'returned'
+  const showQrSection = o.payment_mode === 'upi_qr' && o.payment_status !== 'paid'
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -311,6 +358,29 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           </div>
         </div>
       </div>
+
+      {showQrSection && (
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">UPI QR Payment</p>
+          {qrImageUrl ? (
+            <div className="flex flex-col items-center gap-3">
+              <img src={qrImageUrl} alt="UPI QR Code" className="max-w-[240px] w-full rounded-lg border border-border-default" />
+              <p className="text-xs text-foreground-secondary text-center">Scan to pay {formatINR(parseFloat(o.total_amount))} — payment status updates automatically once scanned.</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-foreground-secondary flex-1">No QR generated yet.</p>
+              <button
+                onClick={generateQr}
+                disabled={qrLoading}
+                className="px-3 py-1.5 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 transition-colors"
+              >
+                {qrLoading ? 'Generating…' : 'Generate UPI QR'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {o.notes && (
         <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
