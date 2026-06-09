@@ -3,6 +3,7 @@ const ALLOWED_ORIGINS = [
   'https://www.jeffistores.in',
   'https://admin.jeffistores.in',
   'https://invoice.jeffistores.in',
+  'https://business.jeffistores.in',
 ].join(' ')
 
 const CSP = [

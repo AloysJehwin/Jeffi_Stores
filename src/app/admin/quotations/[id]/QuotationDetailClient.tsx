@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Pencil } from 'lucide-react'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -73,6 +73,15 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {q.status === 'draft' && (
+            <a
+              href={`/admin/quotations?view=editor&edit=${q.id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              Edit
+            </a>
+          )}
           <a
             href={`/api/admin/quotations/${q.id}/pdf`}
             target="_blank"

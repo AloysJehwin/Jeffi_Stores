@@ -3,13 +3,13 @@ import { queryOne, withTransaction } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 
-const VARIANT_FIELD_MAP: Record<string, string> = {
-  base_price: 'price',
+// Columns captured in snapshot — product col name → variant col name
+const COL_MAP: Record<string, string> = {
+  mrp_ex_gst: 'mrp_ex_gst',
   mrp: 'mrp',
   price_ex_gst: 'price_ex_gst',
+  base_price: 'price',
   wholeprice_ex_gst: 'wholeprice_ex_gst',
-  weight_rate: 'weight_rate',
-  length_rate: 'length_rate',
 }
 
 export async function POST(request: NextRequest) {
@@ -32,20 +32,22 @@ export async function POST(request: NextRequest) {
   if (log.is_rollback) return NextResponse.json({ error: 'Cannot roll back a rollback entry' }, { status: 400 })
 
   const snapshot: any[] = log.snapshot
+  const appliedCols = Object.keys(COL_MAP)
 
   try {
     await withTransaction(async (client) => {
       const rollbackId = crypto.randomUUID()
       await client.query(`SELECT set_config('audit.inflation_id', $1, true)`, [rollbackId])
+
       for (const p of snapshot) {
         const setClauses: string[] = []
         const values: any[] = []
         let i = 1
 
-        for (const f of log.applied_fields) {
-          const before = p.before[f]
+        for (const col of appliedCols) {
+          const before = p.before[col]
           if (before != null) {
-            setClauses.push(`${f} = $${i++}`)
+            setClauses.push(`${col} = $${i++}`)
             values.push(before)
           }
         }
@@ -60,11 +62,11 @@ export async function POST(request: NextRequest) {
           const vValues: any[] = []
           let vi = 1
 
-          for (const f of log.applied_fields) {
-            const col = VARIANT_FIELD_MAP[f]
-            const before = v.before[f]
+          for (const col of appliedCols) {
+            const variantCol = COL_MAP[col]
+            const before = v.before[col]
             if (before != null) {
-              vClauses.push(`${col} = $${vi++}`)
+              vClauses.push(`${variantCol} = $${vi++}`)
               vValues.push(before)
             }
           }
@@ -76,6 +78,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Restore sub-variants — not in snapshot (added after original feature), but we can recompute
+      // from the restored product mrp_ex_gst using each sv's own mrp_ex_gst ratio.
+      // For simplicity: rollback only restores product + variant rows (same as before).
+
       await client.query(
         `UPDATE price_inflation_log SET rolled_back_at = NOW(), rolled_back_by = $1 WHERE id = $2`,
         [(admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username) || 'admin', log_id]
@@ -84,7 +90,8 @@ export async function POST(request: NextRequest) {
       await client.query(
         `INSERT INTO price_inflation_log (id, category_id, category_name, percentage, applied_fields, product_count, applied_by, is_rollback)
          VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
-        [rollbackId, log.category_id, log.category_name, log.percentage, log.applied_fields, snapshot.length, (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username) || 'admin']
+        [rollbackId, log.category_id, log.category_name, log.percentage, log.applied_fields, snapshot.length,
+          (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username) || 'admin']
       )
     })
   } catch (e: any) {

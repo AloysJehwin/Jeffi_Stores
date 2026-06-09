@@ -37,7 +37,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   )
 }
 
-export default function ProductsSearch({ defaultValue }: { defaultValue?: string }) {
+export default function ProductsSearch({ defaultValue, portalHeader }: { defaultValue?: string; portalHeader?: string }) {
   const [query, setQuery] = useState(defaultValue || '')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -103,7 +103,7 @@ export default function ProductsSearch({ defaultValue }: { defaultValue?: string
     fetch('/api/user/search-history', {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(portalHeader ? { 'X-Auth-Portal': portalHeader } : {}) },
       body: JSON.stringify({ query: cleaned }),
     }).catch(() => {})
   }

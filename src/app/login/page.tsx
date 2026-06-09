@@ -21,15 +21,9 @@ function LoginPage() {
   const searchParams = useSearchParams()
   const rawRedirect = searchParams.get('redirect') || '/'
   const redirect = ['/login', '/signup'].some(p => rawRedirect.startsWith(p)) ? '/' : rawRedirect
-  const { user, isLoading: authLoading, login, googleLoginWithAccessToken } = useAuth()
+  const { user, isLoading: authLoading, login, googleLoginWithAccessToken, refreshUser } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
-
-  useEffect(() => {
-    if (!authLoading && user) {
-      router.replace(redirect)
-    }
-  }, [user, authLoading])
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [email, setEmail] = useState('')
@@ -44,6 +38,12 @@ function LoginPage() {
   const [phone, setPhone] = useState('')
   const [phoneSaving, setPhoneSaving] = useState(false)
   const [phoneError, setPhoneError] = useState('')
+
+  useEffect(() => {
+    if (!authLoading && user && !showPhoneModal) {
+      router.replace(redirect)
+    }
+  }, [user, authLoading, showPhoneModal])
 
   useEffect(() => {
     if (resendCooldown <= 0) return
@@ -194,6 +194,7 @@ function LoginPage() {
         const d = await res.json()
         throw new Error(d.error || 'Failed to save phone number')
       }
+      await refreshUser()
       router.push(redirect)
     } catch (err: any) {
       setPhoneError(err.message)

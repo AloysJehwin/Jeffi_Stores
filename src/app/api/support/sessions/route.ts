@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser } from '@/lib/jwt'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { sendSupportEscalationEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
@@ -12,7 +12,7 @@ const postSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const authUser = await authenticateUser(request)
+    const authUser = await authenticateAnyUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authUser = await authenticateUser(request)
+    const authUser = await authenticateAnyUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

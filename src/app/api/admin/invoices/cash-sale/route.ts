@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { withTransaction } from '@/lib/db'
 import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
+import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
 import { z } from 'zod'
 import { parseBody } from '@/lib/validate'
@@ -59,8 +60,9 @@ export async function POST(request: NextRequest) {
     const processedItems = items.map((item: any) => {
       const unitPrice = parseFloat(item.unit_price) || 0
       const qty = parseFloat(item.quantity) || 0
-      const lineTotal = unitPrice * qty
+      const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
+      const lineTotal = Math.round(lineItemFromMrpIncl(qty, unitPrice, discPct, gstRate) * 100) / 100
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
       subtotal += lineTotal

@@ -5,19 +5,14 @@ import { authenticateUser } from '@/lib/jwt'
 export async function GET(request: NextRequest) {
   try {
     const userPayload = await authenticateUser(request)
+    if (!userPayload) return NextResponse.json({ user: null })
 
-    if (!userPayload) {
-      return NextResponse.json({ user: null })
-    }
-
-    const user = await queryOne(
-      'SELECT id, email, first_name, last_name, phone, created_at, avatar_url FROM users WHERE id = $1',
+    const user = await queryOne<any>(
+      `SELECT id, email, first_name, last_name, phone, created_at, avatar_url
+       FROM users WHERE id = $1 AND user_type != 'business'`,
       [userPayload.userId]
     )
-
-    if (!user) {
-      return NextResponse.json({ user: null })
-    }
+    if (!user) return NextResponse.json({ user: null })
 
     return NextResponse.json({
       user: {

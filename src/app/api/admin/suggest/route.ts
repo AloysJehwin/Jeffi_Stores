@@ -39,13 +39,14 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
     product_id: string; variant_id: string | null; sub_variant_id: string | null
     name: string; variant_name: string | null
     sku: string; base_price: number | null; mrp: number | null; gst_percentage: number; hsn_code: string | null
-    inventory_quantity: number | null
+    inventory_quantity: number | null; discount_pct: number | null
   }>(
-    `SELECT product_id, variant_id, sub_variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code, inventory_quantity FROM (
+    `SELECT product_id, variant_id, sub_variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code, inventory_quantity, discount_pct FROM (
        SELECT p.id AS product_id, NULL::uuid AS variant_id, NULL::uuid AS sub_variant_id,
               p.name, NULL AS variant_name,
               p.sku, p.base_price, p.mrp, COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
               COALESCE(p.inventory_quantity,0)::numeric AS inventory_quantity,
+              COALESCE(p.discount_pct,0)::numeric AS discount_pct,
               p.search_vector
        FROM products p
        WHERE p.is_active = true AND p.has_variants = false AND ${sc.clause}
@@ -56,6 +57,7 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
               COALESCE(pv.mrp, p.mrp) AS mrp,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
               COALESCE(pv.inventory_quantity,0)::numeric AS inventory_quantity,
+              COALESCE(pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
               p.search_vector
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
@@ -68,6 +70,7 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
               COALESCE(ps.mrp, pv.mrp, p.mrp) AS mrp,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
               COALESCE(ps.inventory_quantity,0)::numeric AS inventory_quantity,
+              COALESCE(ps.discount_pct, pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
               p.search_vector
        FROM product_sub_variants ps
        JOIN product_variants pv ON pv.id = ps.variant_id
@@ -89,6 +92,7 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
       r.mrp != null ? String(r.mrp) : '',
       r.inventory_quantity != null ? String(r.inventory_quantity) : '',
       r.sub_variant_id ?? '',
+      r.discount_pct != null ? String(r.discount_pct) : '0',
     ].join('|')
     const priceStr = r.base_price != null ? ` · ₹${r.base_price}` : ''
     return { id: encoded, label: displayName, sublabel: `${r.sku}${priceStr}` }
