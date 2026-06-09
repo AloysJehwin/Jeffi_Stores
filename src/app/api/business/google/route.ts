@@ -114,20 +114,16 @@ export async function POST(request: NextRequest) {
       .sign(JWT_SECRET)
 
     const cookieStore = await cookies()
-    cookieStore.set('business_auth_token', token, {
+    const cookieOpts = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'strict' as const,
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
-    })
-    cookieStore.set('session_id', user.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60,
-      path: '/',
-    })
+      ...(process.env.NODE_ENV === 'production' ? { domain: '.jeffistores.in' } : {}),
+    }
+    cookieStore.set('business_auth_token', token, cookieOpts)
+    cookieStore.set('session_id', user.id, cookieOpts)
 
     return NextResponse.json({
       message: 'Login successful',

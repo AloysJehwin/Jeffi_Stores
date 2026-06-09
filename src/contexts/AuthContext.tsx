@@ -43,7 +43,10 @@ export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { childr
 
   const isBusiness = meEndpoint === '/api/business/me'
   const logoutEndpoint = isBusiness ? '/api/business/logout' : '/api/auth/logout'
-  const logoutRedirect = isBusiness ? '/business/signin' : '/'
+  // On business.jeffistores.in the /business/* prefix is added by middleware rewrite,
+  // so paths within the page must NOT include it — use /signin directly.
+  const isBusinessSubdomain = typeof window !== 'undefined' && window.location.hostname.startsWith('business.')
+  const logoutRedirect = isBusiness ? (isBusinessSubdomain ? '/signin' : '/business/signin') : '/'
 
   const fetchUser = async () => {
     try {
