@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
+import { applyDiscount, mrpDiscountPct, lineItemInclGst } from '@/lib/pricing'
 
 export interface LineItem {
   id: string
@@ -38,6 +39,7 @@ interface Suggestion {
   gst_percentage: number | null
   hsn_code: string | null
   inventory_quantity: number | null
+  discount_pct?: number | null
 }
 
 interface Category {
@@ -60,8 +62,12 @@ export function newLineItem(): LineItem {
 }
 
 function calcLine(it: LineItem) {
-  const gross = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)
-  return gross * (1 - (Number(it.discount_pct) || 0) / 100)
+  const qty = Number(it.quantity) || 0
+  const mrpIncl = Number(it.unit_price) || 0
+  const gstRate = Number(it.gst_rate) || 0
+  const discPct = Number(it.discount_pct) || 0
+  const mrpEx = mrpIncl / (1 + gstRate / 100)
+  return lineItemInclGst(qty, mrpEx, discPct, gstRate)
 }
 
 function fmt(n: number) {
@@ -69,11 +75,14 @@ function fmt(n: number) {
 }
 
 function decodeLineItemId(encoded: string) {
-  const [product_id, variant_id_raw, base_price_raw, gst_raw, hsn_raw, mrp_raw, inv_raw, sub_variant_id_raw] = encoded.split('|')
-  const unit_price = parseFloat(base_price_raw) || 0
+  const parts = encoded.split('|')
+  const [product_id, variant_id_raw, base_price_raw, gst_raw, hsn_raw, mrp_raw, inv_raw, sub_variant_id_raw, discount_pct_raw] = parts
   const mrp = parseFloat(mrp_raw) || 0
-  const discount_pct = mrp > 0 && unit_price < mrp
-    ? Math.round((1 - unit_price / mrp) * 100 * 100) / 100
+  const basePrice = parseFloat(base_price_raw) || 0
+  // unit_price = MRP incl. GST (anchor); fall back to base_price if no MRP
+  const unit_price = mrp > 0 ? mrp : basePrice
+  const discount_pct = discount_pct_raw !== undefined && discount_pct_raw !== ''
+    ? parseFloat(discount_pct_raw)
     : 0
   return {
     product_id,
@@ -148,9 +157,13 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     const mrp = Number(s.mrp) || 0
     const basePrice = Number(s.base_price) || 0
     const priceExGst = Number(s.price_ex_gst) || 0
-    const discount_pct = mrp > 0 && basePrice < mrp
-      ? Math.round((1 - basePrice / mrp) * 100 * 100) / 100
-      : 0
+    const gstRate = Number(s.gst_percentage ?? 18)
+    const discount_pct = s.discount_pct != null
+      ? Number(s.discount_pct)
+      : mrpDiscountPct(mrp, basePrice)
+    // unit_price = MRP incl. GST (anchor); discount_pct is applied on top
+    // Fall back to base_price if mrp is not set
+    const unit_price = mrp > 0 ? mrp : Math.round(basePrice * (1 + gstRate / 100) * 100) / 100
     return {
       ...it,
       product_id: s.product_id,
@@ -160,8 +173,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       sub_variant_id: s.sub_variant_id,
       variant_name: s.variant_name || '',
       hsn_code: s.hsn_code || '',
-      gst_rate: String(Math.round(Number(s.gst_percentage ?? 18))),
-      unit_price: basePrice,
+      gst_rate: String(Math.round(gstRate)),
+      unit_price,
       price_ex_gst: priceExGst || undefined,
       discount_pct,
       mrp,
@@ -192,11 +205,20 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
   }
 
   const rawTotal = items.reduce((s, it) => s + calcLine(it), 0)
-  const taxableValue = items.reduce((s, it) => s + calcLine(it) / (1 + (Number(it.gst_rate) || 0) / 100), 0)
-  const cgst = items.reduce((s, it) => s + (calcLine(it) / (1 + (Number(it.gst_rate) || 0) / 100)) * (Number(it.gst_rate) || 0) / 200, 0)
+  const taxableValue = items.reduce((s, it) => {
+    const gstRate = Number(it.gst_rate) || 0
+    const mrpEx = (Number(it.unit_price) || 0) / (1 + gstRate / 100)
+    return s + lineItemInclGst(Number(it.quantity) || 0, mrpEx, Number(it.discount_pct) || 0, 0)
+  }, 0)
+  const cgst = items.reduce((s, it) => {
+    const gstRate = Number(it.gst_rate) || 0
+    const mrpEx = (Number(it.unit_price) || 0) / (1 + gstRate / 100)
+    const exAmt = lineItemInclGst(Number(it.quantity) || 0, mrpEx, Number(it.discount_pct) || 0, 0)
+    return s + exAmt * gstRate / 200
+  }, 0)
   const sgst = cgst
-  const total = Math.round(rawTotal)
-  const roundOff = total - rawTotal
+  const total = Math.round(rawTotal * 100) / 100
+  const roundOff = Math.round((total - rawTotal) * 100) / 100
 
   return (
     <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
@@ -390,31 +412,29 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                   </div>
                 </div>
                 <div>
-                  <label className={labelCls}>Unit Price (incl. GST) <span className="text-red-500">*</span></label>
+                  <label className={labelCls}>MRP (incl. GST) <span className="text-red-500">*</span></label>
                   <input type="number" min="0" step="0.01" value={item.unit_price}
                     onChange={e => updateItem(item.id, 'unit_price', e.target.value)} required
                     className={inputCls} placeholder="0.00" />
                 </div>
                 <div>
-                  <label className={labelCls}>Disc %</label>
+                  <label className={labelCls}>Discount %</label>
                   <input type="number" min="0" max="100" step="any" value={item.discount_pct}
                     onChange={e => updateItem(item.id, 'discount_pct', e.target.value)}
                     className={inputCls} placeholder="0" />
                 </div>
               </div>
 
-              {(Number(item.unit_price) > 0 || item.mrp > 0) && (
+              {Number(item.unit_price) > 0 && (
                 <div className="flex items-center justify-between text-xs text-foreground-secondary">
-                  {item.mrp > 0 && item.discount_pct > 0 ? (
+                  {Number(item.discount_pct) > 0 ? (
                     <span>
-                      MRP: <span className="line-through text-foreground-muted">₹{fmt(item.mrp)}</span>
+                      MRP: <span className="line-through text-foreground-muted">₹{fmt(Number(item.unit_price))}</span>
                       {' · '}Disc: <span className="text-green-600 dark:text-green-400 font-medium">{item.discount_pct}%</span>
-                      {' · '}Net: <span className="font-medium text-foreground">₹{fmt(Number(item.unit_price) * (1 - Number(item.discount_pct) / 100))}</span>
+                      {' · '}Net: <span className="font-medium text-foreground">₹{fmt(calcLine({ ...item, quantity: 1 }))}</span>
                     </span>
                   ) : <span />}
-                  {Number(item.unit_price) > 0 ? (
-                    <span>Line total: <span className="font-semibold text-foreground">₹{fmt(calcLine(item))}</span></span>
-                  ) : null}
+                  <span>Line total: <span className="font-semibold text-foreground">₹{fmt(calcLine(item))}</span></span>
                 </div>
               )}
             </div>

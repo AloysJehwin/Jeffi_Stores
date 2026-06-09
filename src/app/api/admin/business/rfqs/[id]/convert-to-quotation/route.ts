@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { queryOne, queryMany, query } from '@/lib/db'
+import { stackDiscounts, applyDiscount, lineItemExGst } from '@/lib/pricing'
 
 function buildQuoteNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -55,8 +56,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
        p.name AS product_name, p.price_ex_gst AS product_price, p.mrp AS product_mrp,
        p.gst_percentage AS product_gst, p.hsn_code AS product_hsn,
        p.category_id AS product_category_id,
+       p.discount_pct AS product_discount_pct,
        pv.variant_name, pv.price_ex_gst AS variant_price, pv.mrp AS variant_mrp, pv.sku AS variant_sku,
-       psv.sub_variant_name, psv.price_ex_gst AS sv_price, psv.mrp AS sv_mrp, psv.sku AS sv_sku
+       pv.discount_pct AS variant_discount_pct,
+       psv.sub_variant_name, psv.price_ex_gst AS sv_price, psv.mrp AS sv_mrp, psv.sku AS sv_sku,
+       psv.discount_pct AS sv_discount_pct
      FROM business_rfq_items ri
      LEFT JOIN products p ON p.id = ri.product_id
      LEFT JOIN product_variants pv ON pv.id = ri.variant_id
@@ -98,28 +102,28 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     let discountPct: number
 
     if (item.requested_price) {
-      // Customer specified their target — honour it, no further discount
+      // Customer specified their target price (incl. GST) — use it as the net rate
       baseRateExGst = Number(item.requested_price) / (1 + gstRate / 100)
       discountPct = 0
     } else {
-      // Use catalog ex-GST price
-      const catalogExGst = item.sv_price
-        ? Number(item.sv_price)
-        : item.variant_price
-          ? Number(item.variant_price)
-          : item.product_price
-            ? Number(item.product_price)
+      // Use MRP as the rate anchor (incl. GST → convert to ex-GST)
+      const mrpInclGst = item.sv_mrp
+        ? Number(item.sv_mrp)
+        : item.variant_mrp
+          ? Number(item.variant_mrp)
+          : item.product_mrp
+            ? Number(item.product_mrp)
             : 0
-      const categoryDiscount = item.product_category_id
-        ? (discountMap[item.product_category_id] ?? 0)
-        : 0
-      baseRateExGst = catalogExGst
-      discountPct = categoryDiscount
+      baseRateExGst = mrpInclGst > 0 ? mrpInclGst / (1 + gstRate / 100) : 0
+
+      // Stack product discount and B2B category discount multiplicatively
+      const productDisc = Number(item.sv_discount_pct ?? item.variant_discount_pct ?? item.product_discount_pct ?? 0)
+      const b2bDisc = item.product_category_id ? (discountMap[item.product_category_id] ?? 0) : 0
+      discountPct = stackDiscounts(productDisc, b2bDisc)
     }
 
-    const rateAfterDiscount = baseRateExGst * (1 - discountPct / 100)
     const qty = Number(item.quantity)
-    const amount = rateAfterDiscount * qty
+    const amount = lineItemExGst(qty, baseRateExGst, discountPct)
     const itemCgst = amount * (gstRate / 2) / 100
     const itemSgst = amount * (gstRate / 2) / 100
 

@@ -5,6 +5,7 @@ import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
+import { lineItemExGst } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,8 +64,7 @@ export async function POST(
     const processedItems = qItems.map((item: any) => {
       const qty = parseFloat(item.quantity)
       const rate = parseFloat(item.rate)
-      const discountFactor = 1 - (parseFloat(item.discount_pct) || 0) / 100
-      const exGstLineTotal = qty * rate * discountFactor
+      const exGstLineTotal = lineItemExGst(qty, rate, parseFloat(item.discount_pct) || 0)
       const gstRate = parseFloat(item.gst_rate || '18')
 
       let cgst = 0, sgst = 0, igst = 0
@@ -96,7 +96,7 @@ export async function POST(
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
-        unit_price: parseFloat((rate * discountFactor).toFixed(4)),
+        unit_price: Math.round(rate * (1 + gstRate / 100) * 100) / 100,
         total_price: Math.round(incGstLineTotal * 100) / 100,
         taxable_amount: Math.round(exGstLineTotal * 100) / 100,
         cgst_amount: Math.round(cgst * 100) / 100,

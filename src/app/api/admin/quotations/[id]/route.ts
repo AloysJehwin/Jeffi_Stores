@@ -3,12 +3,14 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
+import { lineItemExGst } from '@/lib/pricing'
 
 function calcTotals(items: any[]) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
   const cgst = items.reduce((s: number, i: any) => s + i.amount * i.gst_rate / 200, 0)
   const sgst = cgst
-  const total = Math.round(subtotal + cgst + sgst)
+  const rawTotal = subtotal + cgst + sgst
+  const total = Math.round(rawTotal * 100) / 100
   return { subtotal, cgst_amount: cgst, sgst_amount: sgst, total_amount: total }
 }
 
@@ -54,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (Array.isArray(items)) {
       const computedItems = items.map((item: any) => ({
         ...item,
-        amount: Number(item.quantity) * Number(item.rate) * (1 - (Number(item.discount_pct) || 0) / 100),
+        amount: lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
       }))
       totals = calcTotals(computedItems)
 
