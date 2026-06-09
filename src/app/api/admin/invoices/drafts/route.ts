@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, withTransaction } from '@/lib/db'
 import { isInterState, calculateGST } from '@/lib/gst'
+import { lineItemFromMrpIncl } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,8 +56,9 @@ export async function POST(request: NextRequest) {
     const processedItems = (items || []).map((item: any) => {
       const unitPrice = parseFloat(item.unit_price) || 0
       const qty = parseFloat(item.quantity) || 0
-      const lineTotal = unitPrice * qty
+      const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
+      const lineTotal = Math.round(lineItemFromMrpIncl(qty, unitPrice, discPct, gstRate) * 100) / 100
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
       subtotal += lineTotal
@@ -70,6 +72,7 @@ export async function POST(request: NextRequest) {
         product_name: item.product_name || '',
         product_sku: item.product_sku || '',
         variant_id: item.variant_id || null,
+        sub_variant_id: item.sub_variant_id || null,
         variant_name: item.variant_name || null,
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
@@ -133,13 +136,13 @@ export async function POST(request: NextRequest) {
       for (const item of processedItems) {
         await client.query(
           `INSERT INTO order_items (
-            order_id, product_id, product_name, product_sku, variant_id, variant_name,
+            order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,$11,$12,$13,$14,$15,$16)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14,$15,$16,$17)`,
           [
             orderId, item.product_id, item.product_name, item.product_sku,
-            item.variant_id, item.variant_name,
+            item.variant_id, item.sub_variant_id, item.variant_name,
             item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,

@@ -12,6 +12,7 @@ import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/So
 import DatePicker from '@/components/ui/DatePicker'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
+import { lineItemExGst } from '@/lib/pricing'
 
 interface Quotation {
   id: string
@@ -344,9 +345,9 @@ export default function QuotationsClient() {
           const gstRate = Number(i.gst_rate) || 0
           const unitPrice = Number(i.unit_price) || 0
           const discPct = Number(i.discount_pct) || 0
-          // unit_price is inclusive of GST; convert to ex-GST rate, then apply discount
-          const baseExGst = i.price_ex_gst || unitPrice / (1 + gstRate / 100)
-          const rateExGst = baseExGst * (1 - discPct / 100)
+          // rate = MRP ex-GST (anchor); fall back to unit_price ex-GST if no MRP set
+          const mrpInclGst = Number(i.mrp) || unitPrice
+          const rateExGst = mrpInclGst / (1 + gstRate / 100)
           return {
             description: i.product_name,
             hsn_code: i.hsn_code || null,
@@ -355,7 +356,7 @@ export default function QuotationsClient() {
             unit: i.unit,
             rate: rateExGst,
             discount_pct: discPct,
-            amount: (Number(i.quantity) || 0) * rateExGst,
+            amount: lineItemExGst(Number(i.quantity) || 0, rateExGst, discPct),
             product_id: i.product_id || null,
             variant_id: i.variant_id || null,
             sub_variant_id: i.sub_variant_id || null,
