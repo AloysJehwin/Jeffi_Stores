@@ -19,7 +19,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   const signinPath = isSubdomain ? '/signin' : '/business/signin'
   const pendingPath = isSubdomain ? '/pending' : '/business/pending'
 
-  const isAuthPage = authPages.some(p => pathname.startsWith(p)) || AUTH_PAGES.some(p => pathname.startsWith(p))
+  const isAuthPage = AUTH_PAGES.some(p => pathname.startsWith(p)) || AUTH_PAGES_SUBDOMAIN.some(p => pathname.startsWith(p))
 
   useEffect(() => {
     if (isLoading || isAuthPage) return
