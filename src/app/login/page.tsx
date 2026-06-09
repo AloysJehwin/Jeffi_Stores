@@ -21,7 +21,7 @@ function LoginPage() {
   const searchParams = useSearchParams()
   const rawRedirect = searchParams.get('redirect') || '/'
   const redirect = ['/login', '/signup'].some(p => rawRedirect.startsWith(p)) ? '/' : rawRedirect
-  const { user, isLoading: authLoading, login, googleLoginWithAccessToken } = useAuth()
+  const { user, isLoading: authLoading, login, googleLoginWithAccessToken, refreshUser } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
 
@@ -194,6 +194,7 @@ function LoginPage() {
         const d = await res.json()
         throw new Error(d.error || 'Failed to save phone number')
       }
+      await refreshUser()
       router.push(redirect)
     } catch (err: any) {
       setPhoneError(err.message)
