@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     )
 
     if (!user) {
-      return NextResponse.json({ error: 'No business account found. Please sign up.' }, { status: 404 })
+      return NextResponse.json({ error: 'No business account found. Please sign up.', notBusinessAccount: true }, { status: 404 })
     }
 
     if (!user.is_active) {
