@@ -61,8 +61,29 @@ export async function middleware(request: NextRequest) {
 
   if (hostname.startsWith('business.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    // Public pages on the subdomain (paths are /signin, /signup, /pending — no /business/ prefix)
+    const PUBLIC_BUSINESS_SUBDOMAIN = ['/signin', '/signup', '/pending']
+    const isPublicSubdomain = PUBLIC_BUSINESS_SUBDOMAIN.some(p => pathname.startsWith(p))
+    if (!isPublicSubdomain) {
+      const token = request.cookies.get('business_auth_token')?.value
+      if (!token) {
+        return NextResponse.redirect(new URL('/signin', request.url))
+      }
+      const payload = await verifyToken(token)
+      if (!payload || !payload.isBusiness) {
+        const res = NextResponse.redirect(new URL('/signin', request.url))
+        res.cookies.delete('business_auth_token')
+        return res
+      }
+      if (payload.approvalStatus === 'pending') {
+        return NextResponse.redirect(new URL('/pending', request.url))
+      }
+      if (payload.approvalStatus === 'rejected') {
+        return NextResponse.redirect(new URL('/signin?rejected=1', request.url))
+      }
+    }
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/business${slug}`, request.url))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/business${slug}`, request.url)))
   }
 
   // Business portal auth — applies to /business/* paths (not subdomain, not API, not public pages)
