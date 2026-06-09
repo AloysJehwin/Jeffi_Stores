@@ -101,6 +101,8 @@ export async function GET(
       shippingAmount: parseFloat(order.shipping_amount || '0'),
       status: order.status,
       paymentStatus: order.payment_status,
+      paymentMode: order.payment_mode || null,
+      razorpayQrImageUrl: order.razorpay_qr_image_url || null,
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       deliveredAt: order.delivered_at || null,

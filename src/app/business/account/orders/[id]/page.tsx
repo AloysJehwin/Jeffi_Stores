@@ -42,6 +42,8 @@ interface OrderDetails {
   shippingAmount: number
   status: string
   paymentStatus: string
+  paymentMode: string | null
+  razorpayQrImageUrl: string | null
   createdAt: string
   updatedAt: string
   deliveredAt: string | null
@@ -172,6 +174,8 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     if (!order || order.status === 'cancelled' || order.status === 'cancel_requested') return
     if (order.paymentStatus !== 'failed' && order.paymentStatus !== 'unpaid') return
     if (!isRazorpayEnabled) return
+    // UPI QR orders are paid by scanning — no countdown or auto-cancel
+    if (order.paymentMode === 'upi_qr') return
     const deadline = new Date(order.createdAt).getTime() + 10 * 60 * 1000
     const tick = () => {
       const remaining = Math.max(0, deadline - Date.now())
@@ -183,8 +187,25 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     return () => clearInterval(interval)
   }, [order, handleAutoCancel])
 
-  const handleCancelOrder = async () => {
-    setIsCancelling(true)
+  // Poll every 5s for UPI QR orders until paid
+  useEffect(() => {
+    if (!order || order.paymentMode !== 'upi_qr' || order.paymentStatus === 'paid') return
+    if (order.status === 'cancelled' || order.status === 'cancel_requested') return
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/orders/${params.id}`, { credentials: 'include', headers: PH })
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.order?.paymentStatus === 'paid') {
+          setOrder(data.order)
+          clearInterval(interval)
+        }
+      } catch { /* ignore */ }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [params.id, order?.paymentMode, order?.paymentStatus, order?.status])
+
+  const handleCancelOrder = async () => {    setIsCancelling(true)
     try {
       const res = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
@@ -572,7 +593,24 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
               </div>
             )}
 
-            {order.paymentStatus === 'unpaid' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
+            {order.paymentStatus === 'unpaid' && order.paymentMode === 'upi_qr' && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+                <h3 className="text-base font-semibold text-foreground mb-3">Pay via UPI QR</h3>
+                {order.razorpayQrImageUrl ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <img src={order.razorpayQrImageUrl} alt="UPI QR Code" className="max-w-[240px] w-full rounded-lg border border-border-default" />
+                    <p className="text-sm text-foreground-secondary text-center">
+                      Scan to pay {order.totalAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                    </p>
+                    <p className="text-xs text-foreground-muted text-center">Payment status updates automatically once scanned.</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground-secondary">Your order is awaiting payment. Our team will share a QR code shortly, or please contact us for payment details.</p>
+                )}
+              </div>
+            )}
+
+            {order.paymentStatus === 'unpaid' && order.paymentMode !== 'upi_qr' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex gap-3 flex-1">
@@ -599,7 +637,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
               </div>
             )}
 
-            {order.paymentStatus === 'unpaid' && !isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
+            {order.paymentStatus === 'unpaid' && order.paymentMode !== 'upi_qr' && !isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex gap-3">
                   <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

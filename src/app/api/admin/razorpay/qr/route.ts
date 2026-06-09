@@ -31,12 +31,25 @@ export async function POST(request: NextRequest) {
       close_by: closeBy,
     })
 
+    // Fetch the actual QR PNG from Razorpay's short URL and store as base64 data URL
+    let qrImageUrl = qr.image_url
+    try {
+      const imgRes = await fetch(qr.image_url)
+      if (imgRes.ok) {
+        const contentType = imgRes.headers.get('content-type') || 'image/png'
+        const buf = await imgRes.arrayBuffer()
+        qrImageUrl = `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`
+      }
+    } catch (_) {
+      // keep redirect URL as fallback
+    }
+
     await query(
       `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, updated_at = NOW() WHERE id = $3`,
-      [qr.id, qr.image_url, orderId]
+      [qr.id, qrImageUrl, orderId]
     )
 
-    return NextResponse.json({ qrId: qr.id, qrImageUrl: qr.image_url })
+    return NextResponse.json({ qrId: qr.id, qrImageUrl })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

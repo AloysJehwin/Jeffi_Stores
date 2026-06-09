@@ -729,6 +729,99 @@ export default function QuotationsClient() {
           </div>
         </div>
         {selectedQuote && <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />}
+
+        {showConvertModal && (
+          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && setShowConvertModal(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-md" onClick={e => e.stopPropagation()}>
+              {!convertQrImageUrl ? (
+                <>
+                  <div className="flex items-center justify-between p-5 border-b border-border-default">
+                    <h2 className="text-base font-bold text-foreground">Convert to Invoice</h2>
+                    <button onClick={() => setShowConvertModal(false)} disabled={convertingInvoice}
+                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="p-5 space-y-5">
+                    <div>
+                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Payment Mode</p>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'cash', label: 'Cash', desc: 'Paid immediately — marks order as paid' },
+                          { value: 'bank_transfer', label: 'Bank Transfer', desc: 'Paid via bank — marks order as paid' },
+                          { value: 'credit', label: 'Credit', desc: 'Deferred payment — order stays unpaid' },
+                          { value: 'upi_qr', label: 'UPI QR', desc: 'Generate a one-time Razorpay QR code' },
+                        ].map(opt => (
+                          <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${convertPaymentMode === opt.value ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20' : 'border-border-default hover:bg-surface-secondary'}`}>
+                            <input type="radio" name="paymentMode" value={opt.value}
+                              checked={convertPaymentMode === opt.value}
+                              onChange={() => setConvertPaymentMode(opt.value)}
+                              className="mt-0.5 accent-secondary-500" />
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                              <p className="text-xs text-foreground-secondary">{opt.desc}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Delivery</p>
+                      <label className="flex items-start gap-3 p-3 rounded-lg border border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
+                        <input type="checkbox" checked={convertEnableDelivery}
+                          onChange={e => setConvertEnableDelivery(e.target.checked)}
+                          className="mt-0.5 accent-secondary-500" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Enable delivery tracking</p>
+                          <p className="text-xs text-foreground-secondary">Order will be set to Processing state — Delhivery shipment can be created from the order view</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                    <button onClick={() => setShowConvertModal(false)} disabled={convertingInvoice}
+                      className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => convertPendingQuoteId && convertToInvoice(convertPendingQuoteId, convertPaymentMode, convertEnableDelivery)}
+                      disabled={convertingInvoice || !convertPendingQuoteId}
+                      className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold disabled:opacity-50 transition-colors">
+                      {convertingInvoice ? 'Converting…' : 'Convert →'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between p-5 border-b border-border-default">
+                    <h2 className="text-base font-bold text-foreground">UPI QR Code</h2>
+                  </div>
+                  <div className="p-5 flex flex-col items-center gap-4">
+                    <img src={convertQrImageUrl} alt="UPI QR Code" className="max-w-[240px] w-full rounded-lg border border-border-default" />
+                    <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
+                    <p className="text-xs text-foreground-secondary text-center">Payment status will update automatically once scanned.</p>
+                  </div>
+                  <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                    <button
+                      onClick={() => { setShowConvertModal(false); setConvertQrImageUrl(null) }}
+                      className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                      Done
+                    </button>
+                    {convertResultOrderId && (
+                      <a href={`/admin/invoices/${convertResultOrderId}`}
+                        className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors">
+                        View Invoice →
+                      </a>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     )
   }
