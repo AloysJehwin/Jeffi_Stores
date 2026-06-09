@@ -101,21 +101,28 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     let baseRateExGst: number
     let discountPct: number
 
-    if (item.requested_price) {
-      // Customer specified their target price (incl. GST) — use it as the net rate
-      baseRateExGst = Number(item.requested_price) / (1 + gstRate / 100)
-      discountPct = 0
-    } else {
-      // Use MRP as the rate anchor (incl. GST → convert to ex-GST)
-      const mrpInclGst = item.sv_mrp
-        ? Number(item.sv_mrp)
-        : item.variant_mrp
-          ? Number(item.variant_mrp)
-          : item.product_mrp
-            ? Number(item.product_mrp)
-            : 0
-      baseRateExGst = mrpInclGst > 0 ? mrpInclGst / (1 + gstRate / 100) : 0
+    // Always use MRP as the rate anchor (incl. GST → ex-GST)
+    const mrpInclGst = item.sv_mrp
+      ? Number(item.sv_mrp)
+      : item.variant_mrp
+        ? Number(item.variant_mrp)
+        : item.product_mrp
+          ? Number(item.product_mrp)
+          : 0
+    baseRateExGst = mrpInclGst > 0 ? mrpInclGst / (1 + gstRate / 100) : 0
 
+    if (item.requested_price) {
+      // Customer specified their target price (incl. GST) — back-calculate the effective discount % vs MRP
+      const requestedExGst = Number(item.requested_price) / (1 + gstRate / 100)
+      discountPct = baseRateExGst > 0
+        ? Math.round(Math.max(0, (1 - requestedExGst / baseRateExGst) * 100) * 100) / 100
+        : 0
+      // If we have no MRP, fall back to storing requested price as the rate directly
+      if (baseRateExGst === 0) {
+        baseRateExGst = requestedExGst
+        discountPct = 0
+      }
+    } else {
       // Stack product discount and B2B category discount multiplicatively
       const productDisc = Number(item.sv_discount_pct ?? item.variant_discount_pct ?? item.product_discount_pct ?? 0)
       const b2bDisc = item.product_category_id ? (discountMap[item.product_category_id] ?? 0) : 0
