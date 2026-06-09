@@ -6,6 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 import AdminSelect from '@/components/admin/AdminSelect'
 
+// On business.jeffistores.in pages live at /signin, /signup, /pending — no /business prefix needed
+function bp(path: string) {
+  if (typeof window !== 'undefined' && window.location.hostname.startsWith('business.')) {
+    return path.replace(/^\/business/, '') || '/'
+  }
+  return path
+}
+
 export default function BusinessSignUpWrapper() {
   return (
     <Suspense>
@@ -119,7 +127,7 @@ function BusinessSignUpPage() {
           throw new Error(data.error || 'Please wait before requesting another OTP')
         }
         if (data.userExists) {
-          router.push(`/business/signin?email=${encodeURIComponent(email)}`)
+          router.push(`${bp('/business/signin')}?email=${encodeURIComponent(email)}`)
           return
         }
         throw new Error(data.error || 'Failed to send OTP')
@@ -205,7 +213,7 @@ function BusinessSignUpPage() {
       setGoogleLoading(false)
       return
     }
-    router.push(`/business/signup?google=1&token=${result.accessToken}`)
+    router.push(`${bp('/business/signup')}?google=1&token=${result.accessToken}`)
   }
 
   const handleDetailsSubmit = async (e: React.FormEvent) => {
@@ -241,7 +249,7 @@ function BusinessSignUpPage() {
       }
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Signup failed')
-      router.push('/business/pending')
+      router.push(bp('/business/pending'))
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -263,7 +271,7 @@ function BusinessSignUpPage() {
       <div className="flex items-center justify-center px-6 py-12 bg-surface">
         <div className="w-full max-w-sm">
           <div className="mb-8">
-            <Link href="/business/signin" className="text-sm text-foreground-muted hover:text-foreground mb-6 flex items-center gap-1">
+            <Link href={bp('/business/signin')} className="text-sm text-foreground-muted hover:text-foreground mb-6 flex items-center gap-1">
               ← Back to sign in
             </Link>
             <h1 className="text-3xl font-bold text-foreground">
@@ -328,7 +336,7 @@ function BusinessSignUpPage() {
               </form>
               <p className="mt-6 text-sm text-center text-foreground-secondary">
                 Already have an account?{' '}
-                <Link href="/business/signin" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">Sign in</Link>
+                <Link href={bp('/business/signin')} className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">Sign in</Link>
               </p>
             </>
           )}
