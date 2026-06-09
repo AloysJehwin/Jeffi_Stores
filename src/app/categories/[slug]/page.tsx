@@ -150,15 +150,12 @@ export default async function CategoryDetailPage({
                 const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                 const hasVariants = product.has_variants
                 const displayPrice = hasVariants && product.variant_min_price
-                  ? product.variant_min_price
-                  : (product.price_ex_gst || product.base_price)
-                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
-                const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
-                const inclPrice = hasVariants && product.variant_min_price
                   ? Number(product.variant_min_price)
                   : Number(product.base_price)
-                const mrpDiscount = mrp && mrp > inclPrice
-                  ? Math.round(((mrp - inclPrice) / mrp) * 100)
+                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                const mrpDiscount = mrp && mrp > displayPrice
+                  ? Math.round(((mrp - displayPrice) / mrp) * 100)
                   : 0
 
                 return (

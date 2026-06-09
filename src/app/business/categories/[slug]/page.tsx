@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
+import { mrpDiscountPct } from '@/lib/pricing'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import Pagination from '@/components/ui/Pagination'
@@ -147,16 +148,11 @@ export default async function BusinessCategoryDetailPage({
                 const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                 const hasVariants = product.has_variants
                 const displayPrice = hasVariants && product.variant_min_price
-                  ? product.variant_min_price
-                  : (product.price_ex_gst || product.base_price)
-                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
-                const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
-                const inclPrice = hasVariants && product.variant_min_price
                   ? Number(product.variant_min_price)
                   : Number(product.base_price)
-                const mrpDiscount = mrp && mrp > inclPrice
-                  ? Math.round(((mrp - inclPrice) / mrp) * 100)
-                  : 0
+                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                const mrpDiscount = mrpDiscountPct(mrp, displayPrice)
 
                 return (
                   <ProductCard

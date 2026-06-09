@@ -145,12 +145,31 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                   </span>
                 </div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-semibold text-primary-500">
-                    {product.has_variants
-                      ? `From Rs. ${Number(product.variant_min_price || 0).toLocaleString('en-IN')}`
-                      : `Rs. ${Number(product.base_price || 0).toLocaleString('en-IN')}`
-                    }
-                  </span>
+                  <div>
+                    {product.has_variants ? (
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-sm font-semibold text-primary-500">
+                          From Rs. {Number(product.variant_min_price || 0).toLocaleString('en-IN')}
+                        </span>
+                        {product.variant_min_mrp && Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
+                          <span className="text-xs text-foreground-muted line-through">
+                            Rs. {Number(product.variant_min_mrp).toLocaleString('en-IN')}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-sm font-semibold text-primary-500">
+                          Rs. {Number(product.base_price || 0).toLocaleString('en-IN')}
+                        </span>
+                        {product.mrp && Number(product.mrp) > Number(product.base_price || 0) && (
+                          <span className="text-xs text-foreground-muted line-through">
+                            Rs. {Number(product.mrp).toLocaleString('en-IN')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <span className="text-sm text-foreground">
                     Inv: {stock}
                     {isLow && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Low</span>}

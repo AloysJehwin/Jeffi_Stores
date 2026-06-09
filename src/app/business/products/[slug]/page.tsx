@@ -4,6 +4,7 @@ import { cache } from 'react'
 import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { mrpDiscountPct } from '@/lib/pricing'
 import ProductDetailClient from '@/components/business/ProductDetailClient'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ProductCard from '@/components/business/ProductCard'
@@ -297,9 +298,7 @@ export default async function ProductDetailPage({
   const mrp = product.mrp
     ? Number(product.mrp)
     : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
-  const mrpDiscount = mrp && mrp > Number(displayPrice)
-    ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100)
-    : 0
+  const mrpDiscount = mrpDiscountPct(mrp, Number(displayPrice))
 
   return (
     <div className="bg-surface min-h-screen">
@@ -325,7 +324,7 @@ export default async function ProductDetailPage({
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center gap-2 text-sm">
-            <Link href="/" className="text-foreground-muted hover:text-accent-500 whitespace-nowrap">
+            <Link href="/business" className="text-foreground-muted hover:text-accent-500 whitespace-nowrap">
               Home
             </Link>
             <span className="text-foreground-muted">/</span>
@@ -372,7 +371,7 @@ export default async function ProductDetailPage({
         <ProductReviews productId={product.id} productName={product.name} />
 
         {/* Recently Viewed */}
-        <RecentlyViewed excludeId={product.id} />
+        <RecentlyViewed excludeId={product.id} basePath="/business/products" />
 
         {/* Related Products */}
         {relatedProducts.length >= 4 && (

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
 
 interface ProductCardProps {
   id: string
@@ -29,10 +30,10 @@ export default function ProductCard({
 
   // Apply per-category business discount off the selling price, show combined % off MRP
   const discountPct = categoryId ? (user?.businessDiscountMap?.[categoryId] ?? 0) : 0
-  const businessPrice = discountPct > 0 ? displayPrice * (1 - discountPct / 100) : null
+  const businessPrice = discountPct > 0 ? applyDiscount(displayPrice, discountPct) : null
   const shownPrice = businessPrice ?? displayPrice
   const shownDiscount = businessPrice && mrp && mrp > 0
-    ? Math.round(((mrp - businessPrice) / mrp) * 100)
+    ? mrpDiscountPct(mrp, businessPrice)
     : mrpDiscount
   const { showToast } = useToast()
   const [showQuickView, setShowQuickView] = useState(false)

@@ -1,4 +1,5 @@
 import { queryOne, queryMany } from './db'
+export { applyDiscount as applyBusinessDiscount, applyDiscount } from './pricing'
 
 export async function getBusinessDiscountPct(userId: string, categoryId: string): Promise<number> {
   const row = await queryOne<{ discount_pct: string }>(
@@ -6,10 +7,6 @@ export async function getBusinessDiscountPct(userId: string, categoryId: string)
     [userId, categoryId]
   )
   return row ? parseFloat(row.discount_pct) : 0
-}
-
-export function applyBusinessDiscount(price: number, discountPct: number): number {
-  return price * (1 - discountPct / 100)
 }
 
 export async function getBusinessDiscountMap(userId: string): Promise<Record<string, number>> {

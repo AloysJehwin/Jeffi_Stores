@@ -19,6 +19,11 @@ interface RFQ {
   quotation_total: string | null
   requested_total: string | null
   created_at: string
+  order_id: string | null
+  invoice_number: string | null
+  payment_status: string | null
+  order_status: string | null
+  invoice_total: string | null
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -142,7 +147,15 @@ export default function MyQuotesPage() {
 
                     {/* Right */}
                     <div className="flex flex-col items-end gap-2 flex-shrink-0 text-right">
-                      {displayTotal !== null && displayTotal > 0 && (
+                      {/* Invoice total (when converted to invoice) */}
+                      {rfq.order_id && rfq.invoice_total ? (
+                        <div>
+                          <p className="text-xs text-foreground-muted leading-none mb-0.5">Invoice total</p>
+                          <p className="text-base font-bold text-foreground">
+                            ₹{Number(rfq.invoice_total).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          </p>
+                        </div>
+                      ) : displayTotal !== null && displayTotal > 0 ? (
                         <div>
                           <p className="text-xs text-foreground-muted leading-none mb-0.5">
                             {rfq.quotation_total ? 'Quoted value' : 'Requested value'}
@@ -151,14 +164,35 @@ export default function MyQuotesPage() {
                             ₹{displayTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                           </p>
                         </div>
+                      ) : null}
+
+                      {/* Payment status badge */}
+                      {rfq.order_id && rfq.payment_status && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          rfq.payment_status === 'paid'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : rfq.payment_status === 'partial'
+                              ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                        }`}>
+                          {rfq.payment_status === 'paid' ? 'Paid' : rfq.payment_status === 'partial' ? 'Partially paid' : 'Unpaid'}
+                        </span>
                       )}
 
-                      {rfq.status === 'converted' && rfq.quotation_view_token ? (
+                      {/* Order status badge */}
+                      {rfq.order_id && rfq.order_status && rfq.order_status === 'processing' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                          Shipment in progress
+                        </span>
+                      )}
+
+                      {/* View Quotation link (always show when quotation exists) */}
+                      {rfq.status === 'converted' && rfq.quotation_view_token && (
                         <a
                           href={`https://quotation.jeffistores.in/q/${rfq.quotation_view_token}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-xs font-medium transition-colors"
                         >
                           View Quotation
                           {rfq.quote_number && <span className="opacity-80">({rfq.quote_number})</span>}
@@ -166,28 +200,49 @@ export default function MyQuotesPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
                         </a>
-                      ) : rfq.status === 'pending' ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400 text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      )}
+
+                      {/* View Invoice link (primary CTA when invoice exists) */}
+                      {rfq.order_id && (
+                        <a
+                          href={`https://invoice.jeffistores.in/invoice/${rfq.order_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors"
+                        >
+                          View Invoice
+                          {rfq.invoice_number && <span className="opacity-80">({rfq.invoice_number})</span>}
+                          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
-                          Pending review
-                        </span>
-                      ) : rfq.status === 'reviewed' ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 text-xs font-medium bg-blue-50 dark:bg-blue-900/20">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                          </svg>
-                          In progress
-                        </span>
-                      ) : rfq.status === 'rejected' ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-medium bg-red-50 dark:bg-red-900/20">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                          </svg>
-                          Not accepted
-                        </span>
-                      ) : null}
+                        </a>
+                      )}
+
+                      {/* Status badge for non-converted, non-invoiced states */}
+                      {!rfq.order_id && (
+                        rfq.status === 'pending' ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400 text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Pending review
+                          </span>
+                        ) : rfq.status === 'reviewed' ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 text-xs font-medium bg-blue-50 dark:bg-blue-900/20">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            In progress
+                          </span>
+                        ) : rfq.status === 'rejected' ? (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-medium bg-red-50 dark:bg-red-900/20">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                            Not accepted
+                          </span>
+                        ) : null
+                      )}
                     </div>
                   </div>
                 )

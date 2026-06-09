@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
+import { mrpDiscountPct, applyDiscount } from '@/lib/pricing'
 
 interface AppliedCoupon {
   couponId: string
@@ -184,13 +185,13 @@ export default function CartPage() {
                 const itemDiscountPct = (!isCustomQty && user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
                   ? (user.businessDiscountMap?.[categoryId] ?? 0)
                   : 0
-                const discountedPrice = itemDiscountPct > 0 ? Number(price) * (1 - itemDiscountPct / 100) : Number(price)
+                const discountedPrice = itemDiscountPct > 0 ? applyDiscount(Number(price), itemDiscountPct) : Number(price)
                 const itemTotal = isCustomQty
                   ? item.price_at_addition * item.quantity
                   : discountedPrice * item.quantity
                 const isUpdating = updatingItems.has(item.id)
                 const showMrp = !isCustomQty && mrp !== null && Number(mrp) > discountedPrice
-                const discountPct = showMrp ? Math.round(((Number(mrp) - discountedPrice) / Number(mrp)) * 100) : 0
+                const discountPct = showMrp ? mrpDiscountPct(Number(mrp), discountedPrice) : 0
                 const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
 
                 return (
