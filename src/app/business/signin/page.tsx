@@ -37,6 +37,10 @@ function BusinessSignInPage() {
   const [error, setError] = useState('')
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
+  const [showPhoneModal, setShowPhoneModal] = useState(false)
+  const [phone, setPhone] = useState('')
+  const [phoneSaving, setPhoneSaving] = useState(false)
+  const [phoneError, setPhoneError] = useState('')
 
   const rejectedParam = searchParams.get('rejected')
 
@@ -181,7 +185,10 @@ function BusinessSignInPage() {
         router.push('/business/pending')
         return
       }
-      // Redirect to business portal
+      if (!data.phone) {
+        setShowPhoneModal(true)
+        return
+      }
       window.location.href = '/business'
     } catch (err: any) {
       setError(err.message)
@@ -190,7 +197,35 @@ function BusinessSignInPage() {
     }
   }
 
+  const handleSavePhone = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPhoneError('')
+    if (!phone || phone.length !== 10) {
+      setPhoneError('Enter a valid 10-digit mobile number')
+      return
+    }
+    setPhoneSaving(true)
+    try {
+      const res = await fetch('/api/user/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ phone }),
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        throw new Error(d.error || 'Failed to save phone number')
+      }
+      window.location.href = '/business'
+    } catch (err: any) {
+      setPhoneError(err.message)
+    } finally {
+      setPhoneSaving(false)
+    }
+  }
+
   return (
+    <>
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left — form */}
       <div className="flex items-center justify-center px-6 py-12 bg-surface">
@@ -343,5 +378,51 @@ function BusinessSignInPage() {
         </div>
       </div>
     </div>
+
+    {showPhoneModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm p-6">
+          <h2 className="text-lg font-semibold text-foreground mb-1">One last step</h2>
+          <p className="text-sm text-foreground-secondary mb-5">Please enter your mobile number to complete sign-in.</p>
+          {phoneError && (
+            <p className="mb-3 text-sm text-red-600 dark:text-red-400">{phoneError}</p>
+          )}
+          <form onSubmit={handleSavePhone} className="space-y-4">
+            <div>
+              <label htmlFor="phone-modal-b" className="block text-sm font-medium text-foreground-secondary mb-2">
+                Mobile Number
+              </label>
+              <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent-500 focus-within:border-accent-500">
+                <span className="px-3 py-3 bg-surface-secondary text-foreground-secondary text-sm border-r border-border-secondary">+91</span>
+                <input
+                  id="phone-modal-b"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={phone}
+                  onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                  placeholder="10-digit mobile number"
+                  autoFocus
+                  className="flex-1 px-3 py-3 bg-transparent text-foreground placeholder:text-foreground-muted focus:outline-none text-sm"
+                />
+              </div>
+              {phone.length > 0 && phone.length !== 10 && (
+                <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+              )}
+            </div>
+            <button
+              type="submit"
+              disabled={phoneSaving || phone.length !== 10}
+              className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center text-sm"
+            >
+              {phoneSaving ? (
+                <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />Saving…</>
+              ) : 'Continue'}
+            </button>
+          </form>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

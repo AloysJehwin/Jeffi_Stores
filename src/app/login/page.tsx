@@ -25,12 +25,6 @@ function LoginPage() {
   const { refreshCart } = useCart()
   const { showToast } = useToast()
 
-  useEffect(() => {
-    if (!authLoading && user) {
-      router.replace(redirect)
-    }
-  }, [user, authLoading])
-
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
@@ -44,6 +38,12 @@ function LoginPage() {
   const [phone, setPhone] = useState('')
   const [phoneSaving, setPhoneSaving] = useState(false)
   const [phoneError, setPhoneError] = useState('')
+
+  useEffect(() => {
+    if (!authLoading && user && !showPhoneModal) {
+      router.replace(redirect)
+    }
+  }, [user, authLoading, showPhoneModal])
 
   useEffect(() => {
     if (resendCooldown <= 0) return
