@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     queryMany<any>(
       `SELECT r.id, r.rfq_number, r.status, r.notes, r.converted_quotation_id, r.created_at,
               (SELECT COUNT(*) FROM business_rfq_items ri WHERE ri.rfq_id = r.id)::int AS item_count,
-              q.quote_number, q.view_token AS quotation_view_token
+              (SELECT SUM(ri.quantity * ri.requested_price) FROM business_rfq_items ri WHERE ri.rfq_id = r.id AND ri.requested_price IS NOT NULL) AS requested_total,
+              q.quote_number, q.view_token AS quotation_view_token, q.total_amount AS quotation_total
        FROM business_rfqs r
        LEFT JOIN quotations q ON q.id = r.converted_quotation_id
        WHERE r.user_id = $1

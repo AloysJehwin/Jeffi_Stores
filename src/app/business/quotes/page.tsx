@@ -16,6 +16,8 @@ interface RFQ {
   converted_quotation_id: string | null
   quote_number: string | null
   quotation_view_token: string | null
+  quotation_total: string | null
+  requested_total: string | null
   created_at: string
 }
 
@@ -68,6 +70,11 @@ export default function MyQuotesPage() {
       <BusinessAccountMobileHeader />
       <div className="container mx-auto px-4 pt-4 pb-8">
 
+        <div className="mb-4">
+          <h1 className="text-xl font-bold text-foreground">My Quotes</h1>
+          <p className="text-sm text-foreground-secondary mt-0.5">Request for Quotation (RFQ) submissions and their status</p>
+        </div>
+
         {/* Status filter */}
         {rfqs.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap mb-4">
@@ -88,10 +95,6 @@ export default function MyQuotesPage() {
         )}
 
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-          <div className="px-6 py-4 border-b border-border-default">
-            <p className="text-sm text-foreground-secondary">Track your RFQ submissions. Our team will review and respond.</p>
-          </div>
-
           {rfqs.length === 0 ? (
             <div className="p-12 text-center">
               <svg className="w-16 h-16 mx-auto text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -105,41 +108,95 @@ export default function MyQuotesPage() {
             </div>
           ) : (
             <div className="divide-y divide-border-default">
-              {filteredRfqs.map(rfq => (
-                <div key={rfq.id} className="p-5">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-foreground font-mono text-sm">{rfq.rfq_number}</span>
-                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}>
-                      {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-foreground-secondary">{rfq.item_count} item{rfq.item_count !== 1 ? 's' : ''}</p>
-                  {rfq.notes && <p className="text-sm text-foreground-muted mt-1 line-clamp-1">{rfq.notes}</p>}
-                  <p className="text-xs text-foreground-muted mt-1">
-                    Submitted {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </p>
-                  {rfq.status === 'converted' && rfq.converted_quotation_id && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <p className="text-xs text-green-700 dark:text-green-400 font-medium">
-                        Quotation ready
+              {filteredRfqs.map(rfq => {
+                const displayTotal = rfq.quotation_total
+                  ? Number(rfq.quotation_total)
+                  : rfq.requested_total
+                    ? Number(rfq.requested_total)
+                    : null
+
+                const statusMsg: Record<string, string> = {
+                  pending: 'Awaiting review by our team',
+                  reviewed: 'Under review — quotation being prepared',
+                  converted: 'Quotation issued',
+                  rejected: 'Not accepted — contact support for details',
+                }
+
+                return (
+                  <div key={rfq.id} className="p-5 flex items-start justify-between gap-4">
+                    {/* Left */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span className="font-semibold text-foreground font-mono text-sm">{rfq.rfq_number}</span>
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}>
+                          {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-foreground-secondary">
+                        {rfq.item_count} item{rfq.item_count !== 1 ? 's' : ''}
+                        {' · '}
+                        {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
-                      {rfq.quotation_view_token && (
+                      {rfq.notes && (
+                        <p className="text-xs text-foreground-muted mt-1 line-clamp-1 max-w-sm">{rfq.notes}</p>
+                      )}
+                      <p className="text-xs text-foreground-muted mt-1.5 italic">
+                        {statusMsg[rfq.status] ?? ''}
+                      </p>
+                    </div>
+
+                    {/* Right */}
+                    <div className="flex flex-col items-end gap-2 flex-shrink-0 text-right">
+                      {displayTotal !== null && displayTotal > 0 && (
+                        <div>
+                          <p className="text-xs text-foreground-muted leading-none mb-0.5">
+                            {rfq.quotation_total ? 'Quoted value' : 'Requested value'}
+                          </p>
+                          <p className="text-base font-bold text-foreground">
+                            ₹{displayTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          </p>
+                        </div>
+                      )}
+
+                      {rfq.status === 'converted' && rfq.quotation_view_token ? (
                         <a
                           href={`https://quotation.jeffistores.in/q/${rfq.quotation_view_token}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 underline underline-offset-2"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors"
                         >
-                          View Quotation {rfq.quote_number && `(${rfq.quote_number})`}
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          View Quotation
+                          {rfq.quote_number && <span className="opacity-80">({rfq.quote_number})</span>}
+                          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
                         </a>
-                      )}
+                      ) : rfq.status === 'pending' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400 text-xs font-medium bg-yellow-50 dark:bg-yellow-900/20">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Pending review
+                        </span>
+                      ) : rfq.status === 'reviewed' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 text-xs font-medium bg-blue-50 dark:bg-blue-900/20">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                          In progress
+                        </span>
+                      ) : rfq.status === 'rejected' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-xs font-medium bg-red-50 dark:bg-red-900/20">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                          Not accepted
+                        </span>
+                      ) : null}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
