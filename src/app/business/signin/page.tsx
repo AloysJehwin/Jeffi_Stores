@@ -96,7 +96,13 @@ function BusinessSignInPage() {
         body: JSON.stringify({ email, otp: otpValue }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Login failed')
+      if (!res.ok) {
+        if (data.notBusinessAccount) {
+          router.push(`/business/signup?email=${encodeURIComponent(email)}`)
+          return
+        }
+        throw new Error(data.error || 'Login failed')
+      }
 
       if (data.approvalStatus === 'pending') {
         router.push('/business/pending')
