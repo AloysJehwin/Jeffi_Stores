@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: 'Login successful',
       approvalStatus: 'approved',
+      phone: user.phone || null,
       user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name, companyName: user.company_name },
     })
   } catch (err: any) {
