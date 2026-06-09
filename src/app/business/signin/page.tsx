@@ -6,6 +6,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 
+// On business.jeffistores.in pages live at /signin, /signup, /pending — no /business prefix needed
+function bp(path: string) {
+  if (typeof window !== 'undefined' && window.location.hostname.startsWith('business.')) {
+    return path.replace(/^\/business/, '') || '/'
+  }
+  return path
+}
+
 export default function BusinessSignInWrapper() {
   return (
     <Suspense>
@@ -21,10 +29,10 @@ function BusinessSignInPage() {
 
   useEffect(() => {
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'approved') {
-      router.replace('/business')
+      router.replace(bp('/business'))
     }
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'pending') {
-      router.replace('/business/pending')
+      router.replace(bp('/business/pending'))
     }
   }, [user, authLoading])
 
@@ -69,7 +77,7 @@ function BusinessSignInPage() {
           throw new Error(data.error || 'Please wait before requesting another OTP')
         }
         if (data.userNotFound) {
-          router.push(`/business/signup?email=${encodeURIComponent(email)}`)
+          router.push(`${bp('/business/signup')}?email=${encodeURIComponent(email)}`)
           return
         }
         throw new Error(data.error || 'Failed to send OTP')
@@ -98,14 +106,14 @@ function BusinessSignInPage() {
       const data = await res.json()
       if (!res.ok) {
         if (data.notBusinessAccount) {
-          router.push(`/business/signup?email=${encodeURIComponent(email)}`)
+          router.push(`${bp('/business/signup')}?email=${encodeURIComponent(email)}`)
           return
         }
         throw new Error(data.error || 'Login failed')
       }
 
       if (data.approvalStatus === 'pending') {
-        router.push('/business/pending')
+        router.push(bp('/business/pending'))
         return
       }
       if (data.approvalStatus === 'rejected') {
@@ -115,7 +123,7 @@ function BusinessSignInPage() {
         return
       }
       // Redirect to business portal
-      window.location.href = '/business'
+      window.location.href = bp('/business')
     } catch (err: any) {
       setError(err.message)
       setOtp('')
@@ -184,18 +192,18 @@ function BusinessSignInPage() {
       if (!res.ok) throw new Error(data.error || 'Google sign-in failed')
 
       if (data.needsBusinessProfile) {
-        router.push(`/business/signup?google=1&token=${result.accessToken}`)
+        router.push(`${bp('/business/signup')}?google=1&token=${result.accessToken}`)
         return
       }
       if (data.approvalStatus === 'pending') {
-        router.push('/business/pending')
+        router.push(bp('/business/pending'))
         return
       }
       if (!data.phone) {
         setShowPhoneModal(true)
         return
       }
-      window.location.href = '/business'
+      window.location.href = bp('/business')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -222,7 +230,7 @@ function BusinessSignInPage() {
         const d = await res.json()
         throw new Error(d.error || 'Failed to save phone number')
       }
-      window.location.href = '/business'
+      window.location.href = bp('/business')
     } catch (err: any) {
       setPhoneError(err.message)
     } finally {
@@ -345,7 +353,7 @@ function BusinessSignInPage() {
 
           <p className="mt-6 text-sm text-center text-foreground-secondary">
             New business partner?{' '}
-            <Link href="/business/signup" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
+            <Link href={bp('/business/signup')} className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">
               Apply for access
             </Link>
           </p>

@@ -2,6 +2,13 @@
 
 import Link from 'next/link'
 
+function bp(path: string) {
+  if (typeof window !== 'undefined' && window.location.hostname.startsWith('business.')) {
+    return path.replace(/^\/business/, '') || '/'
+  }
+  return path
+}
+
 export default function BusinessPendingPage() {
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center px-4 py-12">
@@ -44,7 +51,7 @@ export default function BusinessPendingPage() {
             Browse Products
           </Link>
           <Link
-            href="/business/signin"
+            href={bp('/business/signin')}
             className="px-6 py-3 border border-border-default text-foreground-secondary rounded-lg hover:bg-surface-secondary transition-colors text-sm font-medium"
           >
             Sign In Again
