@@ -8,6 +8,7 @@ import ProductActions from '@/components/business/ProductActions'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
 
 interface ProductImage {
   id: string
@@ -213,11 +214,11 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
     ? (user.businessDiscountMap?.[categoryId] ?? 0)
     : 0
   const displayPrice = businessDiscountPct > 0
-    ? baseDisplayPrice * (1 - businessDiscountPct / 100)
+    ? applyDiscount(baseDisplayPrice, businessDiscountPct)
     : baseDisplayPrice
 
   const mrpDiscount = mrp && mrp > displayPrice
-    ? Math.round(((mrp - displayPrice) / mrp) * 100)
+    ? mrpDiscountPct(mrp, displayPrice)
     : 0
 
   const brand = product.brands
@@ -353,7 +354,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
               {product.wholeprice_ex_gst && (
                 <div className="mt-3 pt-3 border-t border-border-default">
                   <span className="text-sm text-foreground-secondary">
-                    Wholesale Price: <span className="font-semibold text-foreground">Rs. {Number(product.wholeprice_ex_gst).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    Wholesale Price: <span className="font-semibold text-foreground">Rs. {(Number(product.wholeprice_ex_gst) * (1 + (parseFloat(String(product.gst_percentage)) || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </span>
                 </div>
               )}
