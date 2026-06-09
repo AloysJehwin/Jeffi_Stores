@@ -93,6 +93,15 @@ export default function InvoicesClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
+  // open editor directly when ?edit=<id> is in the URL (e.g. from detail page Edit button)
+  useEffect(() => {
+    const editParam = searchParams.get('edit')
+    if (editParam && searchParams.get('view') === 'edit') {
+      openEdit({ id: editParam, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function navigateView(next: View) {
     setViewState(next)
     if (next === 'list') {
@@ -377,7 +386,9 @@ export default function InvoicesClient() {
             product_sku: it.product_sku, variant_id: it.variant_id,
             sub_variant_id: it.sub_variant_id || null,
             variant_name: it.variant_name, hsn_code: it.hsn_code,
-            gst_rate: it.gst_rate, quantity: it.quantity, unit_price: it.unit_price,
+            gst_rate: it.gst_rate, quantity: it.quantity,
+            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
+            discount_pct: Number(it.discount_pct) || 0,
           })),
         }),
       })
@@ -424,7 +435,9 @@ export default function InvoicesClient() {
             product_sku: it.product_sku, variant_id: it.variant_id,
             sub_variant_id: it.sub_variant_id || null,
             variant_name: it.variant_name, hsn_code: it.hsn_code,
-            gst_rate: it.gst_rate, quantity: it.quantity, unit_price: it.unit_price,
+            gst_rate: it.gst_rate, quantity: it.quantity,
+            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
+            discount_pct: Number(it.discount_pct) || 0,
           })),
         }),
       })
@@ -470,7 +483,9 @@ export default function InvoicesClient() {
             product_sku: it.product_sku, variant_id: it.variant_id,
             sub_variant_id: it.sub_variant_id || null,
             variant_name: it.variant_name, hsn_code: it.hsn_code,
-            gst_rate: it.gst_rate, quantity: it.quantity, unit_price: it.unit_price,
+            gst_rate: it.gst_rate, quantity: it.quantity,
+            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
+            discount_pct: Number(it.discount_pct) || 0,
           })),
         }),
       })

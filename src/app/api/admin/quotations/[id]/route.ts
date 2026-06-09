@@ -3,12 +3,14 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
+import { lineItemExGst } from '@/lib/pricing'
 
 function calcTotals(items: any[]) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
   const cgst = items.reduce((s: number, i: any) => s + i.amount * i.gst_rate / 200, 0)
   const sgst = cgst
-  const total = Math.round(subtotal + cgst + sgst)
+  const rawTotal = subtotal + cgst + sgst
+  const total = Math.round(rawTotal * 100) / 100
   return { subtotal, cgst_amount: cgst, sgst_amount: sgst, total_amount: total }
 }
 
@@ -54,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (Array.isArray(items)) {
       const computedItems = items.map((item: any) => ({
         ...item,
-        amount: Number(item.quantity) * Number(item.rate),
+        amount: lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
       }))
       totals = calcTotals(computedItems)
 
@@ -143,9 +145,22 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (existing.status !== 'draft') return NextResponse.json({ error: 'Only draft quotations can be deleted' }, { status: 400 })
 
+    // Detach any RFQ that points to this quotation before deleting
+    await query(
+      `UPDATE business_rfqs SET converted_quotation_id = NULL, status = 'reviewed' WHERE converted_quotation_id = $1`,
+      [params.id]
+    )
+
     await query(`DELETE FROM quotations WHERE id = $1`, [params.id])
     return NextResponse.json({ ok: true })
   } catch (e: any) {
+    // FK violation fallback (shouldn't reach here after the detach above, but just in case)
+    if (e?.code === '23503') {
+      return NextResponse.json(
+        { error: 'This quotation was created from a business RFQ and cannot be deleted while that link exists. Please handle the RFQ first.' },
+        { status: 409 }
+      )
+    }
     return NextResponse.json({ error: e?.message || 'Failed to delete' }, { status: 500 })
   }
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { cookies } from 'next/headers'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { getUserIdForSession } from '@/lib/guest-user'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { logActivity } from '@/lib/activity'
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst, 'mrp', p.mrp,
           'gst_percentage', p.gst_percentage,
           'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
-          'brand_name', b.name,
+          'brand_name', b.name, 'category_id', p.category_id,
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'image_url', pi.image_url, 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),

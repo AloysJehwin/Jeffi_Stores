@@ -1,0 +1,634 @@
+'use client'
+
+import { useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
+import { useRouter } from 'next/navigation'
+import CustomSelect from '@/components/visitor/CustomSelect'
+import { applyDiscount } from '@/lib/pricing'
+
+interface SubVariantOption {
+  id: string
+  sub_variant_name: string
+  sku?: string | null
+  price?: number | null
+  mrp?: number | null
+  stock_quantity?: number
+  is_active?: boolean
+}
+
+interface VariantOption {
+  id: string
+  variant_name: string
+  sku?: string | null
+  price?: number | null
+  mrp?: number | null
+  stock_quantity?: number
+  unit?: string | null
+  sub_variants?: SubVariantOption[]
+}
+
+interface QuoteItem {
+  productId?: string
+  variantId?: string
+  subVariantId?: string
+  description: string
+  quantity: number
+  unit?: string
+  currentPrice?: number | null
+  imageUrl?: string | null
+  brandName?: string | null
+  categoryName?: string | null
+  sku?: string | null
+  stockStatus?: 'in' | 'out' | null
+  variants?: VariantOption[]
+  businessDiscountPct?: number
+}
+
+interface Props {
+  items: QuoteItem[]
+  className?: string
+  label?: string
+}
+
+const UNITS = ['Nos', 'Pcs', 'Kg', 'g', 'L', 'mL', 'Box', 'Set', 'Pair', 'Roll', 'Sheet', 'Bag']
+const UNIT_OPTIONS = UNITS.map(u => ({ value: u, label: u }))
+
+function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
+  currentPrice: number
+  requestedPrice: string
+  discountPct: string
+}) {
+  const target = requestedPrice ? parseFloat(requestedPrice) : null
+  const pct = discountPct ? parseFloat(discountPct) : null
+  const derived = target ?? (pct != null && pct > 0 && pct < 100 ? applyDiscount(currentPrice, pct) : null)
+  const effectivePct = derived != null ? Math.round(((currentPrice - derived) / currentPrice) * 100) : null
+  const saving = derived != null ? currentPrice - derived : null
+
+  return (
+    <div className="rounded-xl border border-accent-200 dark:border-accent-800 bg-accent-50/50 dark:bg-accent-900/20 overflow-hidden">
+      <div className="px-3 py-2.5 grid grid-cols-3 divide-x divide-accent-200 dark:divide-accent-800">
+        <div className="pr-2 text-center">
+          <p className="text-[9px] uppercase tracking-wide text-foreground-muted mb-0.5">Current</p>
+          <p className="text-xs font-bold text-foreground">₹{currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+        </div>
+        <div className="px-2 text-center">
+          <p className="text-[9px] uppercase tracking-wide text-foreground-muted mb-0.5">Your Target</p>
+          <p className={`text-xs font-bold ${derived != null ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted'}`}>
+            {derived != null ? `₹${derived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+          </p>
+        </div>
+        <div className="pl-2 text-center">
+          <p className="text-[9px] uppercase tracking-wide text-foreground-muted mb-0.5">Discount</p>
+          <p className={`text-xs font-bold ${effectivePct != null && effectivePct > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}`}>
+            {effectivePct != null && effectivePct > 0 ? `${effectivePct}% off` : '—'}
+          </p>
+        </div>
+      </div>
+      {saving != null && saving > 0 && (
+        <div className="px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border-t border-green-100 dark:border-green-900/40 text-center">
+          <p className="text-[10px] font-medium text-green-700 dark:text-green-400">
+            Potential saving of ₹{saving.toLocaleString('en-IN', { minimumFractionDigits: 2 })} per unit if approved
+          </p>
+        </div>
+      )}
+      {derived != null && derived >= currentPrice && (
+        <div className="px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 border-t border-amber-100 dark:border-amber-900/40 text-center">
+          <p className="text-[10px] text-amber-700 dark:text-amber-400">Target price is at or above current price</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+type FieldState = {
+  quantity: number
+  unit: string
+  requested_price: string
+  discount_pct: string
+  notes: string
+  selectedVariantId: string
+  selectedSubVariantId: string
+}
+
+function resolveItemState(item: QuoteItem, f: FieldState) {
+  if (!item.variants?.length) {
+    return {
+      currentPrice: item.currentPrice ?? null,
+      sku: item.sku ?? null,
+      stockStatus: item.stockStatus ?? null,
+      description: item.description,
+      variantId: item.variantId,
+      subVariantId: item.subVariantId,
+    }
+  }
+  const variant = item.variants.find(v => v.id === f.selectedVariantId) ?? null
+  const subVariant = variant?.sub_variants?.find(sv => sv.id === f.selectedSubVariantId) ?? null
+  const rawPrice = subVariant?.price ?? variant?.price ?? null
+  const discPct = item.businessDiscountPct ?? 0
+  const currentPrice = rawPrice != null
+    ? (discPct > 0 ? applyDiscount(Number(rawPrice), discPct) : Number(rawPrice))
+    : item.currentPrice ?? null
+  const sku = subVariant?.sku || variant?.sku || item.sku || null
+  const stockQty = subVariant?.stock_quantity ?? variant?.stock_quantity ?? null
+  const stockStatus: 'in' | 'out' | null = stockQty != null ? (stockQty > 0 ? 'in' : 'out') : item.stockStatus ?? null
+  const descParts = [item.description.split(' — ')[0], variant?.variant_name, subVariant?.sub_variant_name].filter(Boolean)
+  return {
+    currentPrice,
+    sku,
+    stockStatus,
+    description: descParts.join(' — '),
+    variantId: variant?.id ?? item.variantId,
+    subVariantId: subVariant?.id ?? item.subVariantId,
+  }
+}
+
+function itemHasInput(f: FieldState) {
+  return !!(f.requested_price || f.discount_pct || f.notes)
+}
+
+export default function RequestQuoteButton({ items, className, label = 'Request Quote' }: Props) {
+  const { user } = useAuth()
+  const { showToast } = useToast()
+  const router = useRouter()
+
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [activeIdx, setActiveIdx] = useState(0)
+
+  const [fields, setFields] = useState<FieldState[]>(() =>
+    items.map(item => ({
+      quantity: item.quantity || 1,
+      unit: item.unit || 'Nos',
+      requested_price: '',
+      discount_pct: '',
+      notes: '',
+      selectedVariantId: item.variantId || '',
+      selectedSubVariantId: item.subVariantId || '',
+    }))
+  )
+  const [overallNotes, setOverallNotes] = useState('')
+
+  if (!user?.isBusiness || user.approvalStatus !== 'approved') return null
+
+  const multiItem = items.length > 1
+
+  function updateField(i: number, key: keyof FieldState, value: string | number) {
+    setFields(prev => prev.map((f, idx) => {
+      if (idx !== i) return f
+      if (key === 'requested_price' && value !== '') return { ...f, requested_price: String(value), discount_pct: '' }
+      if (key === 'discount_pct' && value !== '') return { ...f, discount_pct: String(value), requested_price: '' }
+      return { ...f, [key]: value }
+    }))
+  }
+
+  function updateVariantSelection(i: number, variantId: string, subVariantId: string) {
+    setFields(prev => prev.map((f, idx) =>
+      idx !== i ? f : { ...f, selectedVariantId: variantId, selectedSubVariantId: subVariantId }
+    ))
+  }
+
+  function handleOpen() {
+    setFields(items.map(item => ({
+      quantity: item.quantity || 1,
+      unit: item.unit || 'Nos',
+      requested_price: '',
+      discount_pct: '',
+      notes: '',
+      selectedVariantId: item.variantId || '',
+      selectedSubVariantId: item.subVariantId || '',
+    })))
+    setOverallNotes('')
+    setActiveIdx(0)
+    setOpen(true)
+  }
+
+  async function handleSubmit() {
+    setLoading(true)
+    try {
+      const payload = {
+        notes: overallNotes.trim() || null,
+        items: items.map((item, i) => {
+          const f = fields[i]
+          const resolved = resolveItemState(item, f)
+          let requested_price: number | null = null
+          if (f.requested_price) {
+            requested_price = parseFloat(f.requested_price)
+          } else if (f.discount_pct && resolved.currentPrice) {
+            requested_price = applyDiscount(resolved.currentPrice, parseFloat(f.discount_pct))
+          }
+          return {
+            productId: item.productId,
+            variantId: resolved.variantId,
+            subVariantId: resolved.subVariantId,
+            description: resolved.description,
+            quantity: Number(f.quantity) || 1,
+            unit: f.unit,
+            requested_price,
+            notes: f.notes.trim() || null,
+          }
+        }),
+      }
+      const res = await fetch('/api/business/rfqs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        showToast(data.error || 'Failed to submit quote request', 'error')
+        return
+      }
+      setOpen(false)
+      showToast(`Quote request ${data.rfq?.rfq_number} submitted! Our team will get back to you.`, 'success')
+      router.push('/business/quotes')
+    } catch {
+      showToast('Failed to submit quote request', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const activeItem = items[activeIdx]
+  const activeField = fields[activeIdx]
+  const activeResolved = resolveItemState(activeItem, activeField)
+  const activeVariant = activeItem.variants?.find(v => v.id === activeField.selectedVariantId) ?? null
+  const activeSubVariants = activeVariant?.sub_variants?.filter(sv => sv.is_active !== false) ?? []
+  const hasVariantSelector = (activeItem.variants?.length ?? 0) > 0
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleOpen}
+        className={className || 'w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors'}
+      >
+        <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+        </svg>
+        {label}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={() => !loading && setOpen(false)} />
+
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 pointer-events-none">
+            <div className="bg-surface-elevated border border-border-default rounded-2xl shadow-2xl w-full max-w-4xl pointer-events-auto flex flex-col max-h-[94dvh]">
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">Request a Quote</h2>
+                  {multiItem && (
+                    <p className="text-xs text-foreground-muted mt-0.5">{items.length} items · click each to set target price</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => !loading && setOpen(false)}
+                  className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Body — two-column layout */}
+              <div className="flex flex-1 min-h-0">
+
+                {/* LEFT — product info / item list */}
+                <div className={`flex flex-col border-r border-border-default shrink-0 ${multiItem ? 'w-64' : 'w-72'}`}>
+
+                  {multiItem ? (
+                    /* Cart: scrollable item list */
+                    <div className="flex-1 overflow-y-auto py-2">
+                      {items.map((item, i) => {
+                        const f = fields[i]
+                        const resolved = resolveItemState(item, f)
+                        const hasInput = itemHasInput(f)
+                        const isActive = i === activeIdx
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => setActiveIdx(i)}
+                            className={`w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors border-l-2 ${
+                              isActive
+                                ? 'bg-accent-50 dark:bg-accent-900/20 border-l-accent-500'
+                                : 'hover:bg-surface-secondary border-l-transparent'
+                            }`}
+                          >
+                            <div className="w-10 h-10 rounded-lg border border-border-default bg-surface flex-shrink-0 overflow-hidden">
+                              {item.imageUrl ? (
+                                <img src={item.imageUrl} alt={item.description} className="w-full h-full object-contain p-0.5" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-xs font-medium leading-snug line-clamp-2 ${isActive ? 'text-accent-600 dark:text-accent-400' : 'text-foreground'}`}>
+                                {item.description.split(' — ')[0]}
+                              </p>
+                              {resolved.description.includes(' — ') && (
+                                <p className="text-[10px] text-foreground-muted truncate mt-0.5">
+                                  {resolved.description.split(' — ').slice(1).join(' — ')}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {resolved.stockStatus != null && (
+                                  <span className={`flex items-center gap-0.5 text-[9px] font-medium ${resolved.stockStatus === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                                    <span className={`w-1 h-1 rounded-full ${resolved.stockStatus === 'in' ? 'bg-green-500' : 'bg-red-500'}`} />
+                                    {resolved.stockStatus === 'in' ? 'In Stock' : 'Out of Stock'}
+                                  </span>
+                                )}
+                                {hasInput && (
+                                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-accent-500 flex-shrink-0" title="Target price set" />
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    /* Single product: full product info panel */
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {/* Product image */}
+                      <div className="aspect-square w-full rounded-xl border border-border-default bg-surface overflow-hidden">
+                        {activeItem.imageUrl ? (
+                          <img src={activeItem.imageUrl} alt={activeItem.description} className="w-full h-full object-contain p-3" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg className="w-16 h-16 text-accent-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Product meta */}
+                      <div>
+                        <p className="text-sm font-semibold text-foreground leading-snug">
+                          {activeItem.description.split(' — ')[0]}
+                        </p>
+                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1.5">
+                          {activeItem.brandName && (
+                            <span className="text-xs text-foreground-muted">{activeItem.brandName}</span>
+                          )}
+                          {activeItem.categoryName && (
+                            <span className="text-xs text-foreground-muted">{activeItem.categoryName}</span>
+                          )}
+                        </div>
+                        {activeResolved.sku && (
+                          <p className="text-xs font-mono text-foreground-muted mt-1">SKU: {activeResolved.sku}</p>
+                        )}
+                        {activeResolved.stockStatus != null && (
+                          <span className={`inline-flex items-center gap-1 mt-2 text-xs font-medium ${activeResolved.stockStatus === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${activeResolved.stockStatus === 'in' ? 'bg-green-500' : 'bg-red-500'}`} />
+                            {activeResolved.stockStatus === 'in' ? 'In Stock' : 'Out of Stock'}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Variant selector */}
+                      {hasVariantSelector && (
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                              Variant <span className="text-red-500">*</span>
+                            </label>
+                            <CustomSelect
+                              value={activeField.selectedVariantId}
+                              options={activeItem.variants!.map(v => ({ value: v.id, label: v.variant_name }))}
+                              onChange={varId => updateVariantSelection(activeIdx, varId, '')}
+                              placeholder="Select a variant"
+                            />
+                          </div>
+                          {activeSubVariants.length > 0 && (
+                            <div>
+                              <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                Size / Option
+                              </label>
+                              <CustomSelect
+                                value={activeField.selectedSubVariantId}
+                                options={activeSubVariants.map(sv => ({ value: sv.id, label: sv.sub_variant_name }))}
+                                onChange={svId => updateVariantSelection(activeIdx, activeField.selectedVariantId, svId)}
+                                placeholder="Select an option"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Current price display */}
+                      {activeResolved.currentPrice != null && activeResolved.currentPrice > 0 && (
+                        <div className="pt-2 border-t border-border-default">
+                          <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-0.5">Current Price</p>
+                          <p className="text-xl font-bold text-primary-600 dark:text-primary-400">
+                            ₹{activeResolved.currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </p>
+                          {activeItem.businessDiscountPct && activeItem.businessDiscountPct > 0 && (
+                            <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-0.5">
+                              ✦ Includes your {activeItem.businessDiscountPct}% business discount
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* RIGHT — form for active item */}
+                <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                  <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+
+                    {/* For multi-item: show compact product info at top of form */}
+                    {multiItem && (
+                      <div className="flex items-start gap-3 p-3 bg-surface-secondary rounded-xl">
+                        <div className="w-14 h-14 rounded-lg border border-border-default bg-surface flex-shrink-0 overflow-hidden">
+                          {activeItem.imageUrl ? (
+                            <img src={activeItem.imageUrl} alt={activeItem.description} className="w-full h-full object-contain p-1" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <svg className="w-6 h-6 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{activeResolved.description}</p>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
+                            {activeItem.brandName && <span className="text-xs text-foreground-muted">{activeItem.brandName}</span>}
+                            {activeResolved.sku && <span className="text-xs font-mono text-foreground-muted">SKU: {activeResolved.sku}</span>}
+                          </div>
+                          <div className="flex items-center gap-3 mt-1">
+                            {activeResolved.stockStatus != null && (
+                              <span className={`flex items-center gap-1 text-[10px] font-medium ${activeResolved.stockStatus === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${activeResolved.stockStatus === 'in' ? 'bg-green-500' : 'bg-red-500'}`} />
+                                {activeResolved.stockStatus === 'in' ? 'In Stock' : 'Out of Stock'}
+                              </span>
+                            )}
+                            {activeResolved.currentPrice != null && activeResolved.currentPrice > 0 && (
+                              <span className="text-xs font-bold text-primary-600 dark:text-primary-400">
+                                ₹{activeResolved.currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Quantity + Unit */}
+                    <div className="grid grid-cols-[1fr_1fr] gap-3">
+                      <div className="min-w-0">
+                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                          Quantity <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={activeField.quantity}
+                          onChange={e => updateField(activeIdx, 'quantity', e.target.value)}
+                          className="w-full px-3 py-[10px] text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <label className="block text-xs font-medium text-foreground-secondary mb-1">Unit</label>
+                        <CustomSelect
+                          value={activeField.unit}
+                          options={UNIT_OPTIONS}
+                          onChange={v => updateField(activeIdx, 'unit', v)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Target price */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-foreground-secondary">
+                        Target Price <span className="text-foreground-muted font-normal">— optional, enter one</span>
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] text-foreground-muted mb-1">₹ per unit</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted text-sm">₹</span>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={activeField.requested_price}
+                              onChange={e => updateField(activeIdx, 'requested_price', e.target.value)}
+                              placeholder="e.g. 350.00"
+                              className="w-full pl-7 pr-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-foreground-muted mb-1">% discount</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min={0}
+                              max={99}
+                              step={0.1}
+                              value={activeField.discount_pct}
+                              onChange={e => updateField(activeIdx, 'discount_pct', e.target.value)}
+                              placeholder="e.g. 10"
+                              className="w-full pl-3 pr-8 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted text-sm">%</span>
+                          </div>
+                        </div>
+                      </div>
+                      {activeResolved.currentPrice != null && activeResolved.currentPrice > 0 && (
+                        <PriceBreakdown
+                          currentPrice={activeResolved.currentPrice}
+                          requestedPrice={activeField.requested_price}
+                          discountPct={activeField.discount_pct}
+                        />
+                      )}
+                    </div>
+
+                    {/* Item notes */}
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                        Item Notes <span className="text-foreground-muted font-normal">— grade, brand, specs, etc.</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={activeField.notes}
+                        onChange={e => updateField(activeIdx, 'notes', e.target.value)}
+                        placeholder="e.g. Grade 10.9, stainless, specific tolerance…"
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      />
+                    </div>
+
+                    {/* Multi-item navigation hint */}
+                    {multiItem && (
+                      <div className="flex items-center justify-between pt-1">
+                        <button
+                          onClick={() => setActiveIdx(i => Math.max(0, i - 1))}
+                          disabled={activeIdx === 0}
+                          className="text-xs text-accent-600 dark:text-accent-400 disabled:opacity-30 hover:underline"
+                        >
+                          ← Previous item
+                        </button>
+                        <span className="text-xs text-foreground-muted">{activeIdx + 1} / {items.length}</span>
+                        <button
+                          onClick={() => setActiveIdx(i => Math.min(items.length - 1, i + 1))}
+                          disabled={activeIdx === items.length - 1}
+                          className="text-xs text-accent-600 dark:text-accent-400 disabled:opacity-30 hover:underline"
+                        >
+                          Next item →
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Overall notes (always visible in right panel) */}
+                    <div className="pt-2 border-t border-border-default">
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                        Additional Notes <span className="text-foreground-muted font-normal">— delivery, urgency, project context</span>
+                      </label>
+                      <textarea
+                        value={overallNotes}
+                        onChange={e => setOverallNotes(e.target.value)}
+                        rows={2}
+                        placeholder="Any other requirements or context for this quote…"
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Footer inside right panel */}
+                  <div className="px-5 py-4 border-t border-border-default shrink-0 flex gap-3">
+                    <button
+                      onClick={handleSubmit}
+                      disabled={loading}
+                      className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60"
+                    >
+                      {loading && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                      {loading ? 'Submitting…' : `Submit Quote${multiItem ? ` (${items.length} items)` : ''}`}
+                    </button>
+                    <button
+                      onClick={() => setOpen(false)}
+                      disabled={loading}
+                      className="px-5 py-2.5 border border-border-default text-sm font-medium rounded-lg hover:bg-surface-secondary transition-colors disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  )
+}

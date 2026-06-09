@@ -33,13 +33,13 @@ export async function POST(request: NextRequest) {
 
     const otpVerification = await verifyOTP(email, otp)
     if (!otpVerification.valid) {
-      const existingUser = await queryOne('SELECT id FROM users WHERE email = $1', [email.toLowerCase()])
+      const existingUser = await queryOne("SELECT id FROM users WHERE email = $1 AND user_type != 'business'", [email.toLowerCase()])
       await recordFailedLogin(request, email, 'invalid_otp', existingUser?.id ?? null)
       return NextResponse.json({ error: otpVerification.message }, { status: 400 })
     }
 
     const user = await queryOne(
-      'SELECT * FROM users WHERE email = $1',
+      "SELECT * FROM users WHERE email = $1 AND user_type != 'business'",
       [email.toLowerCase()]
     )
 
@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
     const token = await new SignJWT({
       userId: user.id,
       email: user.email,
+      type: 'customer',
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setExpirationTime('30d')

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, query } from '@/lib/db'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { sendPaymentStatusUpdate, sendPaymentFailedAdminNotification } from '@/lib/email'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { logActivity } from '@/lib/activity'

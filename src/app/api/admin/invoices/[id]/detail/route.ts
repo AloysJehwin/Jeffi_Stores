@@ -22,9 +22,10 @@ export async function GET(
         o.subtotal, o.tax_amount, o.taxable_amount,
         o.cgst_amount, o.sgst_amount, o.igst_amount,
         o.total_amount, o.discount_amount, o.shipping_amount,
-        o.payment_status, o.status, o.source, o.notes,
+        o.payment_status, o.payment_mode, o.status, o.source, o.notes,
         o.tracking_number, o.shipping_method, o.shipped_at,
         o.irn, o.irn_status, o.eway_bill_no,
+        o.razorpay_qr_id, o.razorpay_qr_image_url, o.needs_delivery,
         a.full_name, a.address_line1, a.address_line2, a.city, a.state, a.postal_code, a.phone AS address_phone,
         inv.pdf_url
       FROM orders o

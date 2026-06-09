@@ -11,7 +11,7 @@ function calcTotals(items: any[]) {
   const cgst = items.reduce((s: number, i: any) => s + i.amount * i.gst_rate / 200, 0)
   const sgst = cgst
   const rawTotal = subtotal + cgst + sgst
-  const total = Math.round(rawTotal)
+  const total = Math.round(rawTotal * 100) / 100
   return { subtotal, cgst_amount: cgst, sgst_amount: sgst, total_amount: total }
 }
 

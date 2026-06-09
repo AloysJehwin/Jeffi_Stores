@@ -10,6 +10,10 @@ interface User {
   phone: string | null
   createdAt: string
   avatarUrl: string | null
+  isBusiness?: boolean
+  approvalStatus?: string
+  companyName?: string
+  businessDiscountMap?: Record<string, number>
 }
 
 interface AuthContextType {
@@ -33,13 +37,21 @@ interface SignupData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { children: ReactNode; meEndpoint?: string }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  const isBusiness = meEndpoint === '/api/business/me'
+  const logoutEndpoint = isBusiness ? '/api/business/logout' : '/api/auth/logout'
+  // On business.jeffistores.in the /business/* prefix is added by middleware rewrite,
+  // so paths within the page must NOT include it — use /signin directly.
+  const isBusinessSubdomain = typeof window !== 'undefined' && window.location.hostname.startsWith('business.')
+  const logoutRedirect = isBusiness ? (isBusinessSubdomain ? '/signin' : '/business/signin') : '/'
+
   const fetchUser = async () => {
     try {
-      const response = await fetch('/api/auth/me')
+      const headers: HeadersInit = isBusiness ? { 'X-Auth-Portal': 'business' } : {}
+      const response = await fetch(meEndpoint, { credentials: 'include', headers })
       if (response.ok) {
         const data = await response.json()
         setUser(data.user)
@@ -116,10 +128,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
+      await fetch(logoutEndpoint, { method: 'POST' })
     } finally {
       setUser(null)
-      window.location.href = '/'
+      window.location.href = logoutRedirect
     }
   }
 

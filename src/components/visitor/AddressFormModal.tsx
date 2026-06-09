@@ -47,9 +47,10 @@ interface AddressFormModalProps {
   onClose: () => void
   onSaved: (address: Address) => void
   editAddress?: Address | null
+  portalHeader?: string
 }
 
-export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress }: AddressFormModalProps) {
+export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress, portalHeader }: AddressFormModalProps) {
   const { showToast } = useToast()
   const { user } = useAuth()
   const [isSaving, setIsSaving] = useState(false)
@@ -199,7 +200,7 @@ export default function AddressFormModal({ isOpen, onClose, onSaved, editAddress
 
       const response = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(portalHeader ? { 'X-Auth-Portal': portalHeader } : {}) },
         credentials: 'include',
         body: JSON.stringify(formData),
       })

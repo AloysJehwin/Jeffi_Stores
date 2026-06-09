@@ -12,6 +12,7 @@ import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/So
 import DatePicker from '@/components/ui/DatePicker'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
+import { lineItemExGst } from '@/lib/pricing'
 
 interface Quotation {
   id: string
@@ -83,6 +84,15 @@ export default function QuotationsClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
+  // open editor directly when ?edit=<id> is in the URL (e.g. from detail page Edit button)
+  useEffect(() => {
+    const editParam = searchParams.get('edit')
+    if (editParam && searchParams.get('view') === 'editor') {
+      openEdit(editParam)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function navigateView(next: View) {
     setViewState(next)
     if (next === 'list') {
@@ -125,6 +135,13 @@ export default function QuotationsClient() {
   const [downloading, setDownloading] = useState(false)
   const [convertingInvoice, setConvertingInvoice] = useState(false)
   const [convertedOrderId, setConvertedOrderId] = useState<string | null>(null)
+  const [showConvertModal, setShowConvertModal] = useState(false)
+  const [convertPendingQuoteId, setConvertPendingQuoteId] = useState<string | null>(null)
+  const [convertPaymentMode, setConvertPaymentMode] = useState('cash')
+  const [convertEnableDelivery, setConvertEnableDelivery] = useState(false)
+  const [convertQrImageUrl, setConvertQrImageUrl] = useState<string | null>(null)
+  const [convertQrTotal, setConvertQrTotal] = useState(0)
+  const [convertResultOrderId, setConvertResultOrderId] = useState<string | null>(null)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -243,11 +260,10 @@ export default function QuotationsClient() {
       const loadedItems: LineItem[] = (data.items || []).map((i: any) => {
         const gstRate = Number(i.gst_rate) || 0
         const rateExGst = Number(i.rate) || 0
+        // rate is pre-discount ex-GST; show unit_price as pre-discount incl. GST so the discount field is meaningful
         const unitPrice = rateExGst * (1 + gstRate / 100)
+        const discPct = Number(i.discount_pct) || 0
         const mrp = Number(i.mrp) || 0
-        const discPct = mrp > 0 && unitPrice < mrp
-          ? Math.round((1 - unitPrice / mrp) * 100 * 100) / 100
-          : Number(i.discount_pct) || 0
         return {
           id: i.id || Math.random().toString(36).slice(2),
           product_id: i.product_id || null,
@@ -277,20 +293,26 @@ export default function QuotationsClient() {
     }
   }
 
-  async function convertToInvoice(quoteId: string, paymentMode = 'cash') {
+  async function convertToInvoice(quoteId: string, paymentMode: string, enableDelivery: boolean) {
     setConvertingInvoice(true)
     try {
       const res = await fetch(`/api/admin/quotations/${quoteId}/convert-to-invoice`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentMode }),
+        body: JSON.stringify({ paymentMode, enableDelivery }),
       })
       const data = await res.json()
       if (!res.ok) { showToast(data.error || 'Conversion failed', 'error'); return }
-      showToast(`Invoice ${data.invoiceNumber} created`, 'success')
       setConvertedOrderId(data.orderId)
+      setConvertResultOrderId(data.orderId)
       loadList()
-      if (data.invoiceUrl) window.open(data.invoiceUrl, '_blank')
+      if (data.qrImageUrl) {
+        setConvertQrImageUrl(data.qrImageUrl)
+      } else {
+        setShowConvertModal(false)
+        showToast(`Invoice ${data.invoiceNumber} created`, 'success')
+        if (data.orderId) window.location.href = `/admin/invoices/${data.orderId}`
+      }
     } catch {
       showToast('Failed to convert quotation', 'error')
     } finally {
@@ -335,7 +357,10 @@ export default function QuotationsClient() {
         items: items.map(i => {
           const gstRate = Number(i.gst_rate) || 0
           const unitPrice = Number(i.unit_price) || 0
-          const rateExGst = i.price_ex_gst || unitPrice / (1 + gstRate / 100)
+          const discPct = Number(i.discount_pct) || 0
+          // rate = MRP ex-GST (anchor); fall back to unit_price ex-GST if no MRP set
+          const mrpInclGst = Number(i.mrp) || unitPrice
+          const rateExGst = mrpInclGst / (1 + gstRate / 100)
           return {
             description: i.product_name,
             hsn_code: i.hsn_code || null,
@@ -343,8 +368,8 @@ export default function QuotationsClient() {
             quantity: i.quantity,
             unit: i.unit,
             rate: rateExGst,
-            discount_pct: 0,
-            amount: (Number(i.quantity) || 0) * rateExGst,
+            discount_pct: discPct,
+            amount: lineItemExGst(Number(i.quantity) || 0, rateExGst, discPct),
             product_id: i.product_id || null,
             variant_id: i.variant_id || null,
             sub_variant_id: i.sub_variant_id || null,
@@ -668,9 +693,18 @@ export default function QuotationsClient() {
                           </button>
                         )}
                         {q.status === 'final' && !q.converted_order_id && (
-                          <button onClick={() => convertToInvoice(q.id)} disabled={convertingInvoice} title="Convert to Invoice"
+                          <button
+                            onClick={() => {
+                              setConvertPendingQuoteId(q.id)
+                              setConvertPaymentMode('cash')
+                              setConvertEnableDelivery(false)
+                              setConvertQrImageUrl(null)
+                              setConvertQrTotal(q.total_amount || 0)
+                              setShowConvertModal(true)
+                            }}
+                            title="Convert to Invoice"
                             className="px-2 py-1 rounded text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap">
-                            {convertingInvoice ? '…' : '→ Invoice'}
+                            → Invoice
                           </button>
                         )}
                         {q.status === 'final' && q.converted_order_id && (
@@ -695,6 +729,99 @@ export default function QuotationsClient() {
           </div>
         </div>
         {selectedQuote && <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />}
+
+        {showConvertModal && (
+          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && setShowConvertModal(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-md" onClick={e => e.stopPropagation()}>
+              {!convertQrImageUrl ? (
+                <>
+                  <div className="flex items-center justify-between p-5 border-b border-border-default">
+                    <h2 className="text-base font-bold text-foreground">Convert to Invoice</h2>
+                    <button onClick={() => setShowConvertModal(false)} disabled={convertingInvoice}
+                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="p-5 space-y-5">
+                    <div>
+                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Payment Mode</p>
+                      <div className="space-y-2">
+                        {[
+                          { value: 'cash', label: 'Cash', desc: 'Paid immediately — marks order as paid' },
+                          { value: 'bank_transfer', label: 'Bank Transfer', desc: 'Paid via bank — marks order as paid' },
+                          { value: 'credit', label: 'Credit', desc: 'Deferred payment — order stays unpaid' },
+                          { value: 'upi_qr', label: 'UPI QR', desc: 'Generate a one-time Razorpay QR code' },
+                        ].map(opt => (
+                          <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${convertPaymentMode === opt.value ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20' : 'border-border-default hover:bg-surface-secondary'}`}>
+                            <input type="radio" name="paymentMode" value={opt.value}
+                              checked={convertPaymentMode === opt.value}
+                              onChange={() => setConvertPaymentMode(opt.value)}
+                              className="mt-0.5 accent-secondary-500" />
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                              <p className="text-xs text-foreground-secondary">{opt.desc}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Delivery</p>
+                      <label className="flex items-start gap-3 p-3 rounded-lg border border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
+                        <input type="checkbox" checked={convertEnableDelivery}
+                          onChange={e => setConvertEnableDelivery(e.target.checked)}
+                          className="mt-0.5 accent-secondary-500" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Enable delivery tracking</p>
+                          <p className="text-xs text-foreground-secondary">Order will be set to Processing state — Delhivery shipment can be created from the order view</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                    <button onClick={() => setShowConvertModal(false)} disabled={convertingInvoice}
+                      className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => convertPendingQuoteId && convertToInvoice(convertPendingQuoteId, convertPaymentMode, convertEnableDelivery)}
+                      disabled={convertingInvoice || !convertPendingQuoteId}
+                      className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold disabled:opacity-50 transition-colors">
+                      {convertingInvoice ? 'Converting…' : 'Convert →'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between p-5 border-b border-border-default">
+                    <h2 className="text-base font-bold text-foreground">UPI QR Code</h2>
+                  </div>
+                  <div className="p-5 flex flex-col items-center gap-4">
+                    <img src={convertQrImageUrl} alt="UPI QR Code" className="max-w-[240px] w-full rounded-lg border border-border-default" />
+                    <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
+                    <p className="text-xs text-foreground-secondary text-center">Payment status will update automatically once scanned.</p>
+                  </div>
+                  <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                    <button
+                      onClick={() => { setShowConvertModal(false); setConvertQrImageUrl(null) }}
+                      className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                      Done
+                    </button>
+                    {convertResultOrderId && (
+                      <a href={`/admin/invoices/${convertResultOrderId}`}
+                        className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors">
+                        View Invoice →
+                      </a>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -731,7 +858,21 @@ export default function QuotationsClient() {
           </div>
           {!convertedOrderId && editId && (
             <button
-              onClick={() => convertToInvoice(editId)}
+              onClick={() => {
+                setConvertPendingQuoteId(editId)
+                setConvertPaymentMode('cash')
+                setConvertEnableDelivery(false)
+                setConvertQrImageUrl(null)
+                setConvertQrTotal(items.reduce((sum, i) => {
+                  const qty = parseFloat(String(i.quantity)) || 0
+                  const rate = parseFloat(String(i.unit_price)) || 0
+                  const disc = parseFloat(String(i.discount_pct)) || 0
+                  const gst = parseFloat(String(i.gst_rate)) || 0
+                  const ex = lineItemExGst(qty, rate, disc)
+                  return sum + ex + ex * gst / 100
+                }, 0))
+                setShowConvertModal(true)
+              }}
               disabled={convertingInvoice}
               className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap">
               {convertingInvoice ? 'Converting…' : '→ Convert to Invoice'}
@@ -886,6 +1027,99 @@ export default function QuotationsClient() {
           {downloading ? 'Generating…' : 'Download PDF'}
         </button>
       </div>
+
+      {showConvertModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && setShowConvertModal(false)}>
+        <div className="absolute inset-0 bg-black/50" />
+        <div className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-md" onClick={e => e.stopPropagation()}>
+          {!convertQrImageUrl ? (
+            <>
+              <div className="flex items-center justify-between p-5 border-b border-border-default">
+                <h2 className="text-base font-bold text-foreground">Convert to Invoice</h2>
+                <button onClick={() => setShowConvertModal(false)} disabled={convertingInvoice}
+                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-5 space-y-5">
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Payment Mode</p>
+                  <div className="space-y-2">
+                    {[
+                      { value: 'cash', label: 'Cash', desc: 'Paid immediately — marks order as paid' },
+                      { value: 'bank_transfer', label: 'Bank Transfer', desc: 'Paid via bank — marks order as paid' },
+                      { value: 'credit', label: 'Credit', desc: 'Deferred payment — order stays unpaid' },
+                      { value: 'upi_qr', label: 'UPI QR', desc: 'Generate a one-time Razorpay QR code' },
+                    ].map(opt => (
+                      <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${convertPaymentMode === opt.value ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20' : 'border-border-default hover:bg-surface-secondary'}`}>
+                        <input type="radio" name="paymentMode" value={opt.value}
+                          checked={convertPaymentMode === opt.value}
+                          onChange={() => setConvertPaymentMode(opt.value)}
+                          className="mt-0.5 accent-secondary-500" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                          <p className="text-xs text-foreground-secondary">{opt.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Delivery</p>
+                  <label className="flex items-start gap-3 p-3 rounded-lg border border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
+                    <input type="checkbox" checked={convertEnableDelivery}
+                      onChange={e => setConvertEnableDelivery(e.target.checked)}
+                      className="mt-0.5 accent-secondary-500" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Enable delivery tracking</p>
+                      <p className="text-xs text-foreground-secondary">Order will be set to Processing state — Delhivery shipment can be created from the order view</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                <button onClick={() => setShowConvertModal(false)} disabled={convertingInvoice}
+                  className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => convertPendingQuoteId && convertToInvoice(convertPendingQuoteId, convertPaymentMode, convertEnableDelivery)}
+                  disabled={convertingInvoice || !convertPendingQuoteId}
+                  className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold disabled:opacity-50 transition-colors">
+                  {convertingInvoice ? 'Converting…' : 'Convert →'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between p-5 border-b border-border-default">
+                <h2 className="text-base font-bold text-foreground">UPI QR Code</h2>
+              </div>
+              <div className="p-5 flex flex-col items-center gap-4">
+                <img src={convertQrImageUrl} alt="UPI QR Code" className="w-60 h-60 rounded-lg border border-border-default" />
+                <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
+                <p className="text-xs text-foreground-secondary text-center">Payment status will update automatically once scanned.</p>
+              </div>
+              <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                <button
+                  onClick={() => { setShowConvertModal(false); setConvertQrImageUrl(null) }}
+                  className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                  Done
+                </button>
+                {convertResultOrderId && (
+                  <a href={`/admin/invoices/${convertResultOrderId}`}
+                    className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors">
+                    View Invoice →
+                  </a>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )}
     </div>
   )
 }

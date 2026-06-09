@@ -81,6 +81,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const { user } = useAuth()
   const { showToast } = useToast()
   const router = useRouter()
+  const portalHeaders: Record<string, string> = user?.isBusiness ? { 'X-Auth-Portal': 'business' } : {}
   const [reviews, setReviews] = useState<Review[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -92,6 +93,8 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const [comment, setComment] = useState('')
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [isGenerating, setIsGenerating] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [expandedReview, setExpandedReview] = useState<Review | null>(null)
   const [editingReview, setEditingReview] = useState<Review | null>(null)
@@ -211,7 +214,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
       fd.append('existingImageUrls', JSON.stringify(editExistingUrls))
       fd.append('existingImageThumbUrls', JSON.stringify(editExistingThumbUrls))
       for (const img of editImages) fd.append('images', img)
-      const res = await fetch('/api/reviews', { method: 'PATCH', body: fd })
+      const res = await fetch('/api/reviews', { method: 'PATCH', body: fd, credentials: 'include', headers: portalHeaders })
       const data = await res.json()
       if (res.ok) {
         showToast(data.message || 'Review updated!', 'success')
@@ -258,7 +261,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
       if (title.trim()) fd.append('title', title.trim())
       for (const img of images) fd.append('images', img)
 
-      const res = await fetch('/api/reviews', { method: 'POST', body: fd })
+      const res = await fetch('/api/reviews', { method: 'POST', body: fd, credentials: 'include', headers: portalHeaders })
       const data = await res.json()
       if (res.ok) {
         showToast(data.message || 'Review submitted!', 'success')
@@ -268,6 +271,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
         setComment('')
         setImages([])
         setImagePreviews([])
+        setSelectedTags([])
         fetchReviews()
       } else {
         showToast(data.error || 'Failed to submit review', 'error')
@@ -276,6 +280,43 @@ export default function ProductReviews({ productId, productName }: ProductReview
       showToast('Failed to submit review', 'error')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const REVIEW_TAGS: Record<number, string[]> = {
+    5: ['Great quality', 'Fast delivery', 'Worth the price', 'Exactly as described', 'Well packed', 'Will buy again', 'Highly recommend'],
+    4: ['Good quality', 'Decent delivery', 'Good value', 'Mostly as described', 'Nicely packed', 'Would consider again'],
+    3: ['Average quality', 'Delivery was okay', 'Acceptable price', 'Somewhat as described', 'Packaging could improve'],
+    2: ['Below expectations', 'Delayed delivery', 'Not worth the price', 'Not as described', 'Poor packaging'],
+    1: ['Very poor quality', 'Very late delivery', 'Not worth it', 'Totally different product', 'Damaged on arrival'],
+  }
+
+  const activeTags = REVIEW_TAGS[rating] || []
+
+  function toggleTag(tag: string) {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag].slice(0, 4)
+    )
+  }
+
+  const handleGenerateReview = async () => {
+    setIsGenerating(true)
+    try {
+      const res = await fetch('/api/reviews/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productName, rating, tags: selectedTags }),
+      })
+      const data = await res.json()
+      if (res.ok && data.review) {
+        setComment(data.review)
+      } else {
+        showToast(data.error || 'Failed to generate review', 'error')
+      }
+    } catch {
+      showToast('Could not reach the server', 'error')
+    } finally {
+      setIsGenerating(false)
     }
   }
 
@@ -601,7 +642,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
       {(showForm || editingReview) && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto"
-          onClick={() => { setShowForm(false); setEditingReview(null) }}
+          onClick={() => { setShowForm(false); setEditingReview(null); setSelectedTags([]) }}
         >
           <div
             className="bg-surface-elevated rounded-xl border border-border-default shadow-2xl w-full max-w-lg my-8 max-h-[90vh] overflow-y-auto"
@@ -611,7 +652,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
               <h3 className="text-base font-bold text-foreground">{editingReview ? 'Edit Your Review' : 'Write a Review'}</h3>
               <button
                 type="button"
-                onClick={() => { setShowForm(false); setEditingReview(null) }}
+                onClick={() => { setShowForm(false); setEditingReview(null); setSelectedTags([]) }}
                 className="p-1 text-foreground-muted hover:text-foreground rounded-lg transition-colors"
                 aria-label="Close"
               >
@@ -627,7 +668,9 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 <StarRow
                   rating={editingReview ? editRating : rating}
                   interactive
-                  onRate={editingReview ? setEditRating : setRating}
+                  onRate={(n) => {
+                    if (editingReview) { setEditRating(n) } else { setRating(n); setSelectedTags([]) }
+                  }}
                   hoverRating={editingReview ? editHoverRating : hoverRating}
                   onHover={editingReview ? setEditHoverRating : setHoverRating}
                   size="lg"
@@ -650,6 +693,52 @@ export default function ProductReviews({ productId, productName }: ProductReview
                   className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
                 />
               </div>
+
+              {!editingReview && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                    What stands out? <span className="text-foreground-muted font-normal">(pick up to 4)</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {activeTags.map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                          selectedTags.includes(tag)
+                            ? 'bg-accent-500 text-white border-accent-500'
+                            : 'bg-surface text-foreground-secondary border-border-secondary hover:border-accent-400 hover:text-accent-600 dark:hover:text-accent-400'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGenerateReview}
+                    disabled={isGenerating}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border border-accent-400 text-accent-600 dark:text-accent-400 hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+                        Generating…
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                        </svg>
+                        Generate with AI
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-foreground-muted mt-1.5">AI writes a draft — you can edit it before submitting.</p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Review <span className="text-red-500">*</span></label>
@@ -749,7 +838,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowForm(false); setEditingReview(null) }}
+                  onClick={() => { setShowForm(false); setEditingReview(null); setSelectedTags([]) }}
                   className="px-5 py-2.5 rounded-lg text-sm font-semibold text-foreground-secondary bg-surface-secondary hover:bg-border-default transition-colors"
                 >
                   Cancel

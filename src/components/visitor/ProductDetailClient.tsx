@@ -5,6 +5,7 @@ import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
 
 import ProductActions from './ProductActions'
+import BusinessPriceBadge from './BusinessPriceBadge'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
@@ -359,10 +360,11 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
               {product.wholeprice_ex_gst && (
                 <div className="mt-3 pt-3 border-t border-border-default">
                   <span className="text-sm text-foreground-secondary">
-                    Wholesale Price: <span className="font-semibold text-foreground">Rs. {Number(product.wholeprice_ex_gst).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    Wholesale Price: <span className="font-semibold text-foreground">Rs. {(Number(product.wholeprice_ex_gst) * (1 + (parseFloat(String(product.gst_percentage)) || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </span>
                 </div>
               )}
+              <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />
             </div>
 
             <div className="mb-6">
@@ -406,6 +408,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           lengthUnit={product.length_unit || null}
           onVariantChange={handleVariantChange}
         />
+
 
         {/* Product Specifications */}
         <div className="mt-6 pt-6 border-t border-border-default">

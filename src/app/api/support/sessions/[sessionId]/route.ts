@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser } from '@/lib/jwt'
 import { query, queryOne } from '@/lib/db'
 
 export async function PATCH(
@@ -7,7 +7,7 @@ export async function PATCH(
   { params }: { params: { sessionId: string } }
 ) {
   try {
-    const authUser = await authenticateUser(request)
+    const authUser = await authenticateAnyUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

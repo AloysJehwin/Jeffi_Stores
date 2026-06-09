@@ -9,35 +9,43 @@ interface Category {
   parent_category_id: string | null
 }
 
+interface PriceSnapshot {
+  mrp_ex_gst: number | null
+  mrp: number | null
+  price_ex_gst: number | null
+  base_price: number | null
+  wholeprice_ex_gst: number | null
+}
+
 interface PreviewVariant {
   id: string
   variant_name: string
-  current: Record<string, number | null>
-  projected: Record<string, number | null>
+  current: PriceSnapshot
+  projected: PriceSnapshot
 }
 
 interface PreviewProduct {
   id: string
   name: string
   has_variants: boolean
-  current: Record<string, number | null>
-  projected: Record<string, number | null>
+  current: PriceSnapshot
+  projected: PriceSnapshot
   variants: PreviewVariant[]
 }
 
 interface SnapshotVariant {
   id: string
   variant_name: string
-  before: Record<string, number | null>
-  after: Record<string, number | null>
+  before: PriceSnapshot
+  after: PriceSnapshot
 }
 
 interface SnapshotProduct {
   id: string
   name: string
   has_variants: boolean
-  before: Record<string, number | null>
-  after: Record<string, number | null>
+  before: PriceSnapshot
+  after: PriceSnapshot
   variants: SnapshotVariant[]
 }
 
@@ -55,16 +63,13 @@ interface InflationLog {
   rolled_back_by: string | null
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  base_price: 'Selling Price',
-  mrp: 'MRP',
-  price_ex_gst: 'Ex-GST Price',
-  wholeprice_ex_gst: 'Wholesale Price (ex-GST)',
-  weight_rate: 'Weight Rate',
-  length_rate: 'Length Rate',
-}
-
-const ALL_FIELDS = Object.keys(FIELD_LABELS)
+const PREVIEW_COLS: { key: keyof PriceSnapshot; label: string }[] = [
+  { key: 'mrp_ex_gst', label: 'MRP (Ex. GST)' },
+  { key: 'mrp', label: 'MRP (incl. GST)' },
+  { key: 'price_ex_gst', label: 'Selling Price (Ex. GST)' },
+  { key: 'base_price', label: 'Selling Price (incl. GST)' },
+  { key: 'wholeprice_ex_gst', label: 'Wholesale (Ex. GST)' },
+]
 
 function fmt(val: number | null): string {
   if (val == null) return '—'
@@ -74,7 +79,6 @@ function fmt(val: number | null): string {
 export default function InflationClient({ categories }: { categories: Category[] }) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [percentage, setPercentage] = useState('')
-  const [selectedFields, setSelectedFields] = useState<string[]>(['base_price', 'mrp'])
   const [productList, setProductList] = useState<{ id: string; name: string }[]>([])
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
   const [productListLoading, setProductListLoading] = useState(false)
@@ -166,13 +170,8 @@ export default function InflationClient({ categories }: { categories: Category[]
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
-  function toggleField(f: string) {
-    setSelectedFields(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f])
-    setPreview(null)
-  }
-
   async function handlePreview() {
-    if (!selectedCategory || !percentage || selectedFields.length === 0 || selectedProductIds.size === 0) return
+    if (!selectedCategory || !percentage || selectedProductIds.size === 0) return
     setPreviewLoading(true)
     setPreviewError(null)
     setPreview(null)
@@ -180,7 +179,6 @@ export default function InflationClient({ categories }: { categories: Category[]
       const params = new URLSearchParams({
         category_id: selectedCategory.id,
         percentage,
-        fields: selectedFields.join(','),
         product_ids: [...selectedProductIds].join(','),
       })
       const res = await fetch(`/api/admin/inflation?${params}`)
@@ -195,7 +193,7 @@ export default function InflationClient({ categories }: { categories: Category[]
   }
 
   async function handleApply() {
-    if (!selectedCategory || !percentage || selectedFields.length === 0 || !preview || selectedProductIds.size === 0) return
+    if (!selectedCategory || !percentage || !preview || selectedProductIds.size === 0) return
     setApplying(true)
     setApplyError(null)
     setApplySuccess(null)
@@ -207,7 +205,6 @@ export default function InflationClient({ categories }: { categories: Category[]
           category_id: selectedCategory.id,
           category_name: selectedCategory.name,
           percentage: parseFloat(percentage),
-          fields: selectedFields,
           product_ids: [...selectedProductIds],
         }),
       })
@@ -228,20 +225,20 @@ export default function InflationClient({ categories }: { categories: Category[]
   }
 
   const pct = parseFloat(percentage)
-  const canPreview = !!selectedCategory && !!percentage && pct > 0 && pct <= 100 && selectedFields.length > 0 && selectedProductIds.size > 0
+  const canPreview = !!selectedCategory && !!percentage && pct > 0 && pct <= 100 && selectedProductIds.size > 0
   const canApply = canPreview && !!preview && preview.length > 0
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Price Inflation</h1>
-        <p className="text-foreground-secondary mt-1">Bulk-increase product prices by percentage — select a main category to target all products within it, or a sub-category to target that sub-category only</p>
+        <p className="text-foreground-secondary mt-1">Bulk-increase MRP (ex-GST) by percentage — all derived prices (MRP incl. GST, selling price, wholesale) are automatically recalculated using each product&apos;s discount % and GST rate.</p>
       </div>
 
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 space-y-5">
         <h2 className="text-lg font-semibold text-foreground">Apply Inflation</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-4">
           <div>
             <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Category *</label>
             <AdminSelect
@@ -268,28 +265,8 @@ export default function InflationClient({ categories }: { categories: Category[]
               value={percentage}
               onChange={e => { setPercentage(e.target.value); setPreview(null) }}
               placeholder="e.g. 10 for +10%"
-              className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+              className="w-full px-4 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
             />
-          </div>
-        </div>
-
-        <div>
-          <p className="text-sm font-medium text-foreground-secondary mb-2">Apply to price fields *</p>
-          <div className="flex flex-wrap gap-2">
-            {ALL_FIELDS.map(f => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => toggleField(f)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  selectedFields.includes(f)
-                    ? 'bg-accent-500 border-accent-500 text-white'
-                    : 'bg-surface border-border-secondary text-foreground-secondary hover:border-accent-400'
-                }`}
-              >
-                {FIELD_LABELS[f]}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -359,15 +336,15 @@ export default function InflationClient({ categories }: { categories: Category[]
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
           <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center justify-between">
             <h2 className="text-base font-semibold text-foreground">Preview — {selectedCategory?.name}</h2>
-            <span className="text-xs text-foreground-muted bg-surface px-2.5 py-1 rounded-full border border-border-default">+{percentage}%</span>
+            <span className="text-xs text-foreground-muted bg-surface px-2.5 py-1 rounded-full border border-border-default">+{percentage}% on MRP (Ex. GST)</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface border-b border-border-default">
                 <tr>
                   <th className="text-left py-2.5 px-4 font-medium text-foreground-secondary">Product / Variant</th>
-                  {selectedFields.map(f => (
-                    <th key={f} className="text-right py-2.5 px-3 font-medium text-foreground-secondary whitespace-nowrap">{FIELD_LABELS[f]}</th>
+                  {PREVIEW_COLS.map(c => (
+                    <th key={c.key} className="text-right py-2.5 px-3 font-medium text-foreground-secondary whitespace-nowrap">{c.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -376,14 +353,14 @@ export default function InflationClient({ categories }: { categories: Category[]
                   <>
                     <tr key={p.id} className="bg-surface-elevated/50">
                       <td className="py-2.5 px-4 font-medium text-foreground">{p.name}</td>
-                      {selectedFields.map(f => (
-                        <td key={f} className="py-2.5 px-3 text-right">
+                      {PREVIEW_COLS.map(c => (
+                        <td key={c.key} className="py-2.5 px-3 text-right">
                           {p.has_variants && p.variants.length > 0 ? (
                             <span className="text-foreground-muted text-xs">see variants</span>
                           ) : (
                             <>
-                              <span className="text-foreground-muted line-through mr-1.5 text-xs">{fmt(p.current[f])}</span>
-                              <span className="text-green-600 dark:text-green-400 font-medium">{fmt(p.projected[f])}</span>
+                              <span className="text-foreground-muted line-through mr-1.5 text-xs">{fmt(p.current[c.key])}</span>
+                              <span className="text-green-600 dark:text-green-400 font-medium">{fmt(p.projected[c.key])}</span>
                             </>
                           )}
                         </td>
@@ -392,10 +369,10 @@ export default function InflationClient({ categories }: { categories: Category[]
                     {p.has_variants && p.variants.map(v => (
                       <tr key={v.id} className="bg-surface">
                         <td className="py-2 px-4 pl-8 text-foreground-secondary text-xs">{v.variant_name}</td>
-                        {selectedFields.map(f => (
-                          <td key={f} className="py-2 px-3 text-right text-xs">
-                            <span className="text-foreground-muted line-through mr-1.5">{fmt(v.current[f])}</span>
-                            <span className="text-green-600 dark:text-green-400 font-medium">{fmt(v.projected[f])}</span>
+                        {PREVIEW_COLS.map(c => (
+                          <td key={c.key} className="py-2 px-3 text-right text-xs">
+                            <span className="text-foreground-muted line-through mr-1.5">{fmt(v.current[c.key])}</span>
+                            <span className="text-green-600 dark:text-green-400 font-medium">{fmt(v.projected[c.key])}</span>
                           </td>
                         ))}
                       </tr>
@@ -430,7 +407,6 @@ export default function InflationClient({ categories }: { categories: Category[]
                 <tr>
                   <th className="text-left py-2.5 px-4 font-medium text-foreground-secondary">Category</th>
                   <th className="text-right py-2.5 px-3 font-medium text-foreground-secondary">%</th>
-                  <th className="text-left py-2.5 px-3 font-medium text-foreground-secondary">Fields</th>
                   <th className="text-right py-2.5 px-3 font-medium text-foreground-secondary">Products</th>
                   <th className="text-left py-2.5 px-3 font-medium text-foreground-secondary">Applied by</th>
                   <th className="text-left py-2.5 px-3 font-medium text-foreground-secondary">Date</th>
@@ -463,7 +439,6 @@ export default function InflationClient({ categories }: { categories: Category[]
                           {log.is_rollback ? '−' : '+'}{log.percentage}%
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-foreground-secondary text-xs">{log.applied_fields.map(f => FIELD_LABELS[f] || f).join(', ')}</td>
                       <td className="py-2.5 px-3 text-right text-foreground">{log.product_count}</td>
                       <td className="py-2.5 px-3 text-foreground-secondary">{log.applied_by}</td>
                       <td className="py-2.5 px-3 text-foreground-muted text-xs whitespace-nowrap">
@@ -510,14 +485,14 @@ export default function InflationClient({ categories }: { categories: Category[]
                     </tr>
                     {expandedLogId === log.id && log.snapshot && (
                       <tr key={`${log.id}-detail`}>
-                        <td colSpan={7} className="p-0 bg-surface border-b border-border-default">
+                        <td colSpan={6} className="p-0 bg-surface border-b border-border-default">
                           <div className="overflow-x-auto">
                             <table className="w-full text-xs">
                               <thead className="bg-surface-secondary border-b border-border-default">
                                 <tr>
                                   <th className="text-left py-2 px-6 font-medium text-foreground-secondary">Product / Variant</th>
-                                  {log.applied_fields.map(f => (
-                                    <th key={f} className="text-right py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap">{FIELD_LABELS[f] || f}</th>
+                                  {PREVIEW_COLS.map(c => (
+                                    <th key={c.key} className="text-right py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap">{c.label}</th>
                                   ))}
                                 </tr>
                               </thead>
@@ -526,14 +501,14 @@ export default function InflationClient({ categories }: { categories: Category[]
                                   <>
                                     <tr key={p.id} className="bg-surface">
                                       <td className="py-2 px-6 font-medium text-foreground">{p.name}</td>
-                                      {log.applied_fields.map(f => (
-                                        <td key={f} className="py-2 px-3 text-right">
+                                      {PREVIEW_COLS.map(c => (
+                                        <td key={c.key} className="py-2 px-3 text-right">
                                           {p.has_variants && p.variants.length > 0 ? (
                                             <span className="text-foreground-muted">see variants</span>
                                           ) : (
                                             <>
-                                              <span className="text-foreground-muted line-through mr-1.5">{fmt(p.before[f])}</span>
-                                              <span className="text-green-600 dark:text-green-400 font-medium">{fmt(p.after[f])}</span>
+                                              <span className="text-foreground-muted line-through mr-1.5">{fmt(p.before[c.key])}</span>
+                                              <span className="text-green-600 dark:text-green-400 font-medium">{fmt(p.after[c.key])}</span>
                                             </>
                                           )}
                                         </td>
@@ -542,10 +517,10 @@ export default function InflationClient({ categories }: { categories: Category[]
                                     {p.has_variants && p.variants.map(v => (
                                       <tr key={v.id} className="bg-surface-secondary/50">
                                         <td className="py-1.5 px-6 pl-10 text-foreground-secondary">{v.variant_name}</td>
-                                        {log.applied_fields.map(f => (
-                                          <td key={f} className="py-1.5 px-3 text-right">
-                                            <span className="text-foreground-muted line-through mr-1.5">{fmt(v.before[f])}</span>
-                                            <span className="text-green-600 dark:text-green-400 font-medium">{fmt(v.after[f])}</span>
+                                        {PREVIEW_COLS.map(c => (
+                                          <td key={c.key} className="py-1.5 px-3 text-right">
+                                            <span className="text-foreground-muted line-through mr-1.5">{fmt(v.before[c.key])}</span>
+                                            <span className="text-green-600 dark:text-green-400 font-medium">{fmt(v.after[c.key])}</span>
                                           </td>
                                         ))}
                                       </tr>

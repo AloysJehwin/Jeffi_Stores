@@ -2,6 +2,7 @@ import { ImageResponse } from 'next/og'
 import { NextRequest } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
+import { mrpDiscountPct } from '@/lib/pricing'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
@@ -56,9 +57,7 @@ export async function GET(
 
   const displayPrice  = salePrice ?? basePrice ?? 0
   const originalPrice = (salePrice && basePrice && basePrice > salePrice) ? basePrice : null
-  const discountPct   = originalPrice && originalPrice > displayPrice
-    ? Math.round(((originalPrice - displayPrice) / originalPrice) * 100)
-    : null
+  const discountPct   = mrpDiscountPct(originalPrice, displayPrice)
 
   const maxSlugLen   = 32
   const shortSlug    = product.slug.length > maxSlugLen ? product.slug.slice(0, maxSlugLen) + '…' : product.slug

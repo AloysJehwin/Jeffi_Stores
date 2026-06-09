@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
-import { authenticateUser, authenticateAdmin } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice } from '@/lib/invoice'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
@@ -101,6 +101,8 @@ export async function GET(
       shippingAmount: parseFloat(order.shipping_amount || '0'),
       status: order.status,
       paymentStatus: order.payment_status,
+      paymentMode: order.payment_mode || null,
+      razorpayQrImageUrl: order.razorpay_qr_image_url || null,
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       deliveredAt: order.delivered_at || null,

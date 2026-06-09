@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
 
 const TOKEN = process.env.DELHIVERY_API_KEY

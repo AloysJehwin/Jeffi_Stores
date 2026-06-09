@@ -402,6 +402,17 @@ jobs:
               add_sub_variant_id_to_order_items.sql
               add_user_avatar.sql
               add_user_search_history.sql
+              add_business_partner_tables.sql
+              add_requested_price_to_rfq_items.sql
+              add_sub_variant_to_rfq_items.sql
+              add_sale_id_to_invoices.sql
+              add_status_to_cash_sales.sql
+              add_sub_variant_id_to_inventory_transactions.sql
+              add_ui_blocks_to_agent_messages.sql
+              allow_same_email_multi_user_type.sql
+              add_discount_pct_to_products.sql
+              add_payment_mode_to_orders.sql
+              add_qr_fields_to_orders.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')

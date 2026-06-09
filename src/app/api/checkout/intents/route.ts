@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { resolveBuyNowItem, loadActiveCart } from '@/lib/order-commit'
 import { signIntent } from '@/lib/checkout-intent'
 import { parseBody, zUuid } from '@/lib/validate'

@@ -48,16 +48,13 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
           const hasVariants = product.has_variants
           const displayPrice = hasVariants && product.variant_min_price
             ? Number(product.variant_min_price)
-            : Number(product.price_ex_gst || product.base_price)
-          const inclPrice = hasVariants && product.variant_min_price
-            ? Number(product.variant_min_price)
             : Number(product.base_price)
           const effectiveStock = hasVariants
             ? Number(product.variant_stock_total ?? 0)
             : Number(product.stock_quantity ?? 0)
           const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
-          const mrpDiscount = mrp && mrp > inclPrice
-            ? Math.round(((mrp - inclPrice) / mrp) * 100)
+          const mrpDiscount = mrp && mrp > displayPrice
+            ? Math.round(((mrp - displayPrice) / mrp) * 100)
             : 0
 
           return (

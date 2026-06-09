@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { sendReturnStatusEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'

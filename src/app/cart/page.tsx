@@ -569,6 +569,7 @@ export default function CartPage() {
               >
                 Continue Shopping
               </Link>
+
             </div>
           </div>
           )}

@@ -2,9 +2,8 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import AccountSidebar, { navItems } from '@/components/visitor/AccountSidebar'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 
 interface Transaction {
@@ -66,6 +65,22 @@ export default function TransactionsPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterMethod, setFilterMethod] = useState<string>('all')
+
+  const availableMethods = useMemo(() => {
+    const set = new Set<string>()
+    transactions.forEach(t => set.add(getMethodLabel(t.paymentMethod, t.paymentGateway)))
+    return Array.from(set)
+  }, [transactions])
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter(t => {
+      if (filterStatus !== 'all' && t.status !== filterStatus) return false
+      if (filterMethod !== 'all' && getMethodLabel(t.paymentMethod, t.paymentGateway) !== filterMethod) return false
+      return true
+    })
+  }, [transactions, filterStatus, filterMethod])
 
   const authWasLoading = useRef(false)
   useEffect(() => {
@@ -112,22 +127,47 @@ export default function TransactionsPage() {
   if (!user) return null
 
   return (
-    <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
+    <div className="bg-surface min-h-screen">
 
       {/* Mobile header */}
       <AccountMobileHeader />
 
-      <div className="container mx-auto px-4 h-full">
-        <div className="hidden lg:block py-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Transactions</h1>
-        </div>
+      <div className="container mx-auto px-4 pt-4">
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:h-[calc(100%-5rem)]">
-          <div className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto pt-8 pb-8">
-            <AccountSidebar />
+        {/* Filters */}
+        {transactions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(['all', 'completed', 'pending', 'failed', 'refunded'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                    filterStatus === s
+                      ? 'bg-accent-500 text-white'
+                      : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                  }`}
+                >
+                  {s === 'all' ? 'All' : getStatusLabel(s)}
+                </button>
+              ))}
+            </div>
+            {availableMethods.length > 1 && (
+              <select
+                value={filterMethod}
+                onChange={e => setFilterMethod(e.target.value)}
+                className="text-xs px-3 py-1 rounded-full border border-border-default bg-surface-elevated text-foreground-secondary focus:outline-none focus:ring-1 focus:ring-accent-500"
+              >
+                <option value="all">All Methods</option>
+                {availableMethods.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            )}
           </div>
+        )}
 
-          <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:pt-8 lg:pb-8">
+        <div>
             {transactions.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg
@@ -156,7 +196,7 @@ export default function TransactionsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {transactions.map((txn) => (
+                {filteredTransactions.map((txn) => (
                   <div
                     key={txn.id}
                     className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5"
@@ -243,6 +283,5 @@ export default function TransactionsPage() {
           </div>
         </div>
       </div>
-    </div>
   )
 }

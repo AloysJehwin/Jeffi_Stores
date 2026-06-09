@@ -25,6 +25,7 @@ interface SearchBarProps {
   isOpen: boolean
   onOpen: () => void
   onClose: () => void
+  basePath?: string
 }
 
 function Highlight({ text, query }: { text: string; query: string }) {
@@ -43,7 +44,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   )
 }
 
-export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
+export default function SearchBar({ isOpen, onOpen, onClose, basePath = '/products' }: SearchBarProps) {
   const [query, setQuery] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -194,9 +195,9 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
       e.preventDefault()
       const catCount = categories.length
       if (activeIdx < catCount) {
-        router.push(`/products?category=${categories[activeIdx].slug}`)
+        router.push(`${basePath}?category=${categories[activeIdx].slug}`)
       } else {
-        router.push(`/products/${products[activeIdx - catCount].slug}`)
+        router.push(`${basePath}/${products[activeIdx - catCount].slug}`)
       }
       close()
     }
@@ -206,7 +207,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
     e.preventDefault()
     if (query.trim()) {
       saveSearchHistory(query.trim())
-      router.push(`/products?search=${encodeURIComponent(query)}`)
+      router.push(`${basePath}?search=${encodeURIComponent(query)}`)
       close()
     }
   }
@@ -308,7 +309,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
               {searchHistory.map(q => (
                 <Link
                   key={q}
-                  href={`/products?search=${encodeURIComponent(q)}`}
+                  href={`${basePath}?search=${encodeURIComponent(q)}`}
                   onClick={close}
                   className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-secondary transition-colors"
                 >
@@ -343,7 +344,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
                       {categories.map((cat, idx) => (
                         <Link
                           key={cat.id}
-                          href={`/products?category=${cat.slug}`}
+                          href={`${basePath}?category=${cat.slug}`}
                           onClick={() => { saveSearchHistory(typedQueryRef.current.trim()); close() }}
                           className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIdx === idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                         >
@@ -373,7 +374,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
                         return (
                           <Link
                             key={product.id}
-                            href={`/products/${product.slug}`}
+                            href={`${basePath}/${product.slug}`}
                             onClick={() => { saveSearchHistory(typedQueryRef.current.trim()); close() }}
                             className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${activeIdx === itemIdx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                           >
@@ -407,7 +408,7 @@ export default function SearchBar({ isOpen, onOpen, onClose }: SearchBarProps) {
 
                   <div className="border-t border-border-default p-3">
                     <Link
-                      href={`/products?search=${encodeURIComponent(query)}`}
+                      href={`${basePath}?search=${encodeURIComponent(query)}`}
                       onClick={() => { saveSearchHistory(query.trim()); close() }}
                       className="flex items-center justify-center gap-1.5 text-sm text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 font-medium"
                     >
