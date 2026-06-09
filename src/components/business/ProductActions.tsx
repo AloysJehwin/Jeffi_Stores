@@ -550,7 +550,7 @@ export default function ProductActions({
             {effectiveWholesalePrice && (
               <div className="mt-3 pt-3 border-t border-border-default">
                 <span className="text-sm text-foreground-secondary">
-                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {effectiveWholesalePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </span>
               </div>
             )}
