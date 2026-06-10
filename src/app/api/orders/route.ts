@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, queryCount } from '@/lib/db'
+import { queryMany, queryCount, queryOne } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 
 const PAGE_SIZE = 10
@@ -9,17 +9,47 @@ export async function GET(request: NextRequest) {
     const auth = await authenticateUser(request)
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const userId = auth.userId
+    const isBusiness = auth.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
 
     const { searchParams } = new URL(request.url)
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
     const limit = PAGE_SIZE
     const offset = (page - 1) * limit
 
+    let whereClause: string
+    let countClause: string
+    let queryParams: any[]
+    let countParams: any[]
+
+    if (isBusiness) {
+      // Include orders placed via the storefront (user_id) AND orders converted from business quotations (matched by email/phone)
+      const bizUser = await queryOne<{ email: string; phone: string | null }>(
+        'SELECT email, phone FROM users WHERE id = $1',
+        [userId]
+      )
+      const email = bizUser?.email || ''
+      const phone = bizUser?.phone || null
+
+      whereClause = `WHERE (o.user_id = $1 OR (o.source = 'business' AND (o.customer_email = $2 OR ($3::text IS NOT NULL AND o.customer_phone = $3))))`
+      countClause = `SELECT COUNT(*) FROM orders o WHERE (o.user_id = $1 OR (o.source = 'business' AND (o.customer_email = $2 OR ($3::text IS NOT NULL AND o.customer_phone = $3))))`
+      queryParams = [userId, email, phone, limit, offset]
+      countParams = [userId, email, phone]
+    } else {
+      whereClause = 'WHERE o.user_id = $1'
+      countClause = 'SELECT COUNT(*) FROM orders WHERE user_id = $1'
+      queryParams = [userId, limit, offset]
+      countParams = [userId]
+    }
+
+    const limitIdx = queryParams.length - 1
+    const offsetIdx = queryParams.length
+
     const [orders, total] = await Promise.all([
       queryMany(`
         SELECT
-          o.id, o.order_number, o.created_at, o.status, o.payment_status,
+          o.id, o.order_number, o.created_at, o.status, o.payment_status, o.payment_mode,
           o.total_amount, o.subtotal, o.shipping_address_id,
+          o.razorpay_qr_image_url,
           COALESCE(
             o.shipping_address_snapshot,
             (SELECT to_jsonb(a) FROM (
@@ -49,11 +79,11 @@ export async function GET(request: NextRequest) {
             '[]'::json
           ) AS order_items
         FROM orders o
-        WHERE o.user_id = $1
+        ${whereClause}
         ORDER BY o.created_at DESC
-        LIMIT $2 OFFSET $3
-      `, [userId, limit, offset]),
-      queryCount(`SELECT COUNT(*) FROM orders WHERE user_id = $1`, [userId]),
+        LIMIT $${limitIdx} OFFSET $${offsetIdx}
+      `, queryParams),
+      queryCount(countClause, countParams),
     ])
 
     return NextResponse.json({ orders, total, page, pageSize: PAGE_SIZE })
