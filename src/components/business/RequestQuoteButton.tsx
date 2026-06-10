@@ -296,11 +296,11 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                 </button>
               </div>
 
-              {/* Body — two-column layout */}
-              <div className="flex flex-1 min-h-0">
+              {/* Body — stacks on mobile, side-by-side on sm+ */}
+              <div className="flex flex-col sm:flex-row flex-1 min-h-0">
 
                 {/* LEFT — product info / item list */}
-                <div className={`flex flex-col border-r border-border-default shrink-0 ${multiItem ? 'w-64' : 'w-72'}`}>
+                <div className={`flex flex-col border-b sm:border-b-0 sm:border-r border-border-default sm:shrink-0 ${multiItem ? 'sm:w-64 max-h-40 sm:max-h-none' : 'sm:w-72 max-h-48 sm:max-h-none'}`}>
 
                   {multiItem ? (
                     /* Cart: scrollable item list */
