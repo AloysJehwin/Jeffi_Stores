@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { bp } from '@/lib/business-path'
+import { BusinessAccountMobileTabBar } from '@/components/business/AccountMobileHeader'
 // BusinessAccountNavBar is rendered by layout.tsx for all /business/account/* pages
 
 interface DashboardData {
@@ -329,6 +330,8 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
+
+      <BusinessAccountMobileTabBar />
 
       <div className="container mx-auto px-4">
         <div className="py-4 sm:py-6 space-y-4 max-w-3xl lg:max-w-none">

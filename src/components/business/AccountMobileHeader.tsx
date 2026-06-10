@@ -6,6 +6,35 @@ import { useAuth } from '@/contexts/AuthContext'
 import { navItems } from '@/components/business/AccountSidebar'
 import { bp } from '@/lib/business-path'
 
+export function BusinessAccountMobileTabBar() {
+  const pathname = usePathname()
+  return (
+    <div className="lg:hidden mx-4 mb-4">
+      <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
+        <div className="flex">
+          {navItems.map((item) => {
+            const isActive = item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
+            return (
+              <Link
+                key={item.href}
+                href={bp(item.href)}
+                className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors border-b-2 ${
+                  isActive
+                    ? 'text-accent-600 border-accent-500 dark:text-accent-400'
+                    : 'text-foreground-muted border-transparent'
+                }`}
+              >
+                <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
+                <span className="leading-tight text-center" style={{ fontSize: '10px' }}>{item.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function BusinessAccountMobileHeader() {
   const { user } = useAuth()
   const pathname = usePathname()
