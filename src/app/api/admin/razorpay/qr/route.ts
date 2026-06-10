@@ -33,13 +33,23 @@ export async function POST(request: NextRequest) {
     })
 
     // Generate a proper UPI deep-link QR so any UPI app (GPay, PhonePe, Paytm) opens natively.
-    // Razorpay's qr.image_url / qr.short_url encode an rzp.io payment page link — not a UPI string.
+    // Razorpay's qr.image_url / qr.short_url encode an rzp.io payment page — not a UPI string.
     const upiVpa = process.env.RAZORPAY_UPI_VPA
     const amountInRupees = (amountPaise / 100).toFixed(2)
-    let qrImageUrl: string = qr.image_url
+    let qrImageUrl: string
     if (upiVpa) {
       const upiString = `upi://pay?pa=${encodeURIComponent(upiVpa)}&am=${amountInRupees}&pn=${encodeURIComponent('Jeffi Stores')}&tn=${encodeURIComponent(description || 'Invoice Payment')}&cu=INR`
       qrImageUrl = await QRCode.toDataURL(upiString, { width: 300, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+    } else {
+      // Fallback: fetch Razorpay's branded image and inline as base64 data URI
+      try {
+        const imgRes = await fetch(qr.image_url)
+        const contentType = imgRes.headers.get('content-type') || 'image/png'
+        const buf = await imgRes.arrayBuffer()
+        qrImageUrl = `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`
+      } catch (_) {
+        qrImageUrl = qr.image_url
+      }
     }
 
     await query(
