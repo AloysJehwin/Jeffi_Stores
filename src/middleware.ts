@@ -87,7 +87,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Business portal auth — applies to /business/* paths (not subdomain, not API, not public pages)
-  if (pathname.startsWith('/business/')) {
+  // Skip on admin subdomain: /business/* there gets rewritten to /admin/business/* by the block below
+  if (!isAdminSubdomain && pathname.startsWith('/business/')) {
     const PUBLIC_BUSINESS = ['/business/signin', '/business/signup', '/business/pending']
     const isPublic = PUBLIC_BUSINESS.some(p => pathname.startsWith(p))
     if (!isPublic) {
