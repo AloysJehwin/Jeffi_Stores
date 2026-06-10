@@ -23,6 +23,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isFormsSubdomain = host.startsWith('forms.')
   const isDocumentSubdomain = host.startsWith('invoice.') || host.startsWith('quotation.') || host.startsWith('purchaseorder.')
   const isBusinessSubdomain = host.startsWith('business.')
+  const isAdminSubdomain = host.startsWith('admin.')
   return (
     <html lang="en" className="bg-surface" suppressHydrationWarning>
       <head>
@@ -39,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');`,
           }}
         />
-        <ConditionalLayout isFormsSubdomain={isFormsSubdomain} isDocumentSubdomain={isDocumentSubdomain} isBusinessSubdomain={isBusinessSubdomain}>{children}</ConditionalLayout>
+        <ConditionalLayout isFormsSubdomain={isFormsSubdomain} isDocumentSubdomain={isDocumentSubdomain} isBusinessSubdomain={isBusinessSubdomain} isAdminSubdomain={isAdminSubdomain}>{children}</ConditionalLayout>
       </body>
     </html>
   )
