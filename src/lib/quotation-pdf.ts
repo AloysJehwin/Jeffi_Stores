@@ -77,6 +77,10 @@ function fmt4(n: number): string {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
 }
 
+function fmt2(n: number): string {
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function fmtQty(n: number): string {
   if (Number.isInteger(n)) return n.toLocaleString('en-IN')
   return n.toLocaleString('en-IN', { minimumFractionDigits: 3, maximumFractionDigits: 3 })
@@ -291,11 +295,11 @@ export function generateQuotationPDF(
       { label: 'Sl\nNo.',             w: 20,  align: 'center' as const },
       { label: 'Description of Goods',w: 172, align: 'left'   as const },
       { label: 'HSN/SAC',             w: 44,  align: 'center' as const },
-      { label: 'Quantity',            w: 52,  align: 'right'  as const },
-      { label: 'Rate',                w: 58,  align: 'right'  as const },
-      { label: 'per',                 w: 28,  align: 'center' as const },
-      { label: 'Disc. %',             w: 36,  align: 'center' as const },
-      { label: 'Amount',              w: 58,  align: 'right'  as const },
+      { label: 'Quantity',            w: 50,  align: 'right'  as const },
+      { label: 'Rate',                w: 54,  align: 'right'  as const },
+      { label: 'per',                 w: 24,  align: 'center' as const },
+      { label: 'Disc. %',             w: 32,  align: 'center' as const },
+      { label: 'Amount',              w: 76,  align: 'right'  as const },
     ]
     const rawSum = colDefs.reduce((s, c) => s + c.w, 0)
     const sc2    = pw / rawSum
@@ -402,14 +406,14 @@ export function generateQuotationPDF(
 
     if (hasRound) {
       hline(doc, LM, R, y)
-      doc.font(FBI).fontSize(7).text('ROUND\nOFF', LM + slW + 2, y + 1, { width: labelAreaW, align: 'right', lineBreak: true })
+      doc.font(FBI).fontSize(8).text('Round Off', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right', lineBreak: false })
       doc.font(F).fontSize(7).text(fmt4(roundOff), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
       y += rowH
     }
 
     hline(doc, LM, R, y)
     doc.font(FB).fontSize(8).text('Total', LM + slW + 2, y + 5, { width: labelAreaW, align: 'right', lineBreak: false })
-    doc.font(FB).fontSize(8).text(`₹ ${fmt4(total)}`, amtX + 2, y + 5, { width: amtW - 4, align: 'right', lineBreak: false })
+    doc.font(FB).fontSize(8).text(`₹ ${fmt2(total)}`, amtX + 2, y + 5, { width: amtW - 4, align: 'right', lineBreak: false })
     y += 20
 
     closePageTable(y)
