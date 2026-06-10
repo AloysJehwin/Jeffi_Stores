@@ -25,9 +25,11 @@ const SORT_OPTIONS = [
 export default function MobileFilterSheet({
   categories,
   brands,
+  basePath = '/products',
 }: {
   categories: Category[]
   brands: Brand[]
+  basePath?: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -71,7 +73,7 @@ export default function MobileFilterSheet({
     if (pendingOrder)             params.set('order',    pendingOrder)
     const search = searchParams.get('search')
     if (search) params.set('search', search)
-    router.push(`/products${params.toString() ? `?${params.toString()}` : ''}`)
+    router.push(basePath + (params.toString() ? `?${params.toString()}` : ''))
     setOpen(false)
   }
 

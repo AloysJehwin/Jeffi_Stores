@@ -228,7 +228,7 @@ export default async function ProductsPage({
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Search
                   </label>
-                  <ProductsSearch defaultValue={searchParams.search} portalHeader="business" />
+                  <ProductsSearch defaultValue={searchParams.search} portalHeader="business" basePath="/business/products" />
                 </div>
 
                 {/* Categories Filter */}
@@ -414,7 +414,7 @@ export default async function ProductsPage({
                 <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of hardware and industrial tools</p>
               </div>
               <div className="lg:hidden shrink-0">
-                <MobileFilterSheet categories={allCats} brands={brands as any[]} />
+                <MobileFilterSheet categories={allCats} brands={brands as any[]} basePath="/business/products" />
               </div>
             </div>
             {/* Sort Bar */}
@@ -425,7 +425,7 @@ export default async function ProductsPage({
                   : '0 products found'
                 }
               </p>
-              <SortDropdown />
+              <SortDropdown basePath="/business/products" />
             </div>
 
             {/* Products Grid */}

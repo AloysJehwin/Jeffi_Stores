@@ -37,7 +37,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   )
 }
 
-export default function ProductsSearch({ defaultValue, portalHeader }: { defaultValue?: string; portalHeader?: string }) {
+export default function ProductsSearch({ defaultValue, portalHeader, basePath = '/products' }: { defaultValue?: string; portalHeader?: string; basePath?: string }) {
   const [query, setQuery] = useState(defaultValue || '')
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -119,7 +119,7 @@ export default function ProductsSearch({ defaultValue, portalHeader }: { default
     if (!open) {
       if (e.key === 'Enter') {
         e.preventDefault()
-        if (query.trim()) navigate(`/products?search=${encodeURIComponent(query.trim())}`, query.trim())
+        if (query.trim()) navigate(basePath + `?search=${encodeURIComponent(query.trim())}`, query.trim())
       }
       return
     }
@@ -133,19 +133,19 @@ export default function ProductsSearch({ defaultValue, portalHeader }: { default
       e.preventDefault()
       if (activeIdx >= 0) {
         if (activeIdx < categories.length) {
-          navigate(`/products?category=${categories[activeIdx].slug}`, query.trim())
+          navigate(basePath + `?category=${categories[activeIdx].slug}`, query.trim())
         } else {
-          navigate(`/products/${products[activeIdx - categories.length].slug}`, query.trim())
+          navigate(basePath + `/${products[activeIdx - categories.length].slug}`, query.trim())
         }
       } else if (query.trim()) {
-        navigate(`/products?search=${encodeURIComponent(query.trim())}`, query.trim())
+        navigate(basePath + `?search=${encodeURIComponent(query.trim())}`, query.trim())
       }
     }
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (query.trim()) navigate(`/products?search=${encodeURIComponent(query.trim())}`, query.trim())
+    if (query.trim()) navigate(basePath + `?search=${encodeURIComponent(query.trim())}`, query.trim())
   }
 
   const hasResults = categories.length > 0 || products.length > 0
@@ -189,8 +189,8 @@ export default function ProductsSearch({ defaultValue, portalHeader }: { default
                     {categories.map((cat, idx) => (
                       <Link
                         key={cat.id}
-                        href={`/products?category=${cat.slug}`}
-                        onClick={() => navigate(`/products?category=${cat.slug}`, query.trim())}
+                        href={basePath + `?category=${cat.slug}`}
+                        onClick={() => navigate(basePath + `?category=${cat.slug}`, query.trim())}
                         className={`flex items-center gap-2 px-3 py-2 transition-colors text-sm ${activeIdx === idx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                       >
                         <span className="flex-shrink-0 w-6 h-6 rounded bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center">
@@ -217,8 +217,8 @@ export default function ProductsSearch({ defaultValue, portalHeader }: { default
                       return (
                         <Link
                           key={product.id}
-                          href={`/products/${product.slug}`}
-                          onClick={() => navigate(`/products/${product.slug}`, query.trim())}
+                          href={basePath + `/${product.slug}`}
+                          onClick={() => navigate(basePath + `/${product.slug}`, query.trim())}
                           className={`flex items-center gap-2.5 px-3 py-2 transition-colors ${activeIdx === itemIdx ? 'bg-surface-secondary' : 'hover:bg-surface-secondary'}`}
                         >
                           <div className="w-9 h-9 bg-surface-secondary rounded flex-shrink-0 overflow-hidden border border-border-default">
@@ -248,8 +248,8 @@ export default function ProductsSearch({ defaultValue, portalHeader }: { default
 
                 <div className="border-t border-border-default p-2.5">
                   <Link
-                    href={`/products?search=${encodeURIComponent(query)}`}
-                    onClick={() => navigate(`/products?search=${encodeURIComponent(query)}`, query.trim())}
+                    href={basePath + `?search=${encodeURIComponent(query)}`}
+                    onClick={() => navigate(basePath + `?search=${encodeURIComponent(query)}`, query.trim())}
                     className="flex items-center justify-center gap-1.5 text-sm text-accent-600 dark:text-accent-400 hover:text-accent-700 dark:hover:text-accent-300 font-medium"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
