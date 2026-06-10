@@ -300,7 +300,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
               <div className="flex flex-col sm:flex-row flex-1 min-h-0">
 
                 {/* LEFT — product info / item list */}
-                <div className={`flex flex-col border-b sm:border-b-0 sm:border-r border-border-default sm:shrink-0 ${multiItem ? 'sm:w-64 max-h-40 sm:max-h-none' : 'sm:w-72 max-h-48 sm:max-h-none'}`}>
+                <div className={`flex flex-col border-b sm:border-b-0 sm:border-r border-border-default sm:shrink-0 ${multiItem ? 'sm:w-64 max-h-40 sm:max-h-none' : 'sm:w-72 max-h-44 sm:max-h-none'}`}>
 
                   {multiItem ? (
                     /* Cart: scrollable item list */
@@ -360,7 +360,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                     /* Single product: full product info panel */
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                       {/* Product image */}
-                      <div className="aspect-square w-full rounded-xl border border-border-default bg-surface overflow-hidden">
+                      <div className="h-28 sm:aspect-square sm:h-auto w-full rounded-xl border border-border-default bg-surface overflow-hidden">
                         {activeItem.imageUrl ? (
                           <img src={activeItem.imageUrl} alt={activeItem.description} className="w-full h-full object-contain p-3" />
                         ) : (
