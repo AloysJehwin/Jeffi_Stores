@@ -8,7 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   const rfq = await queryOne<any>(
     `SELECT r.id, r.rfq_number, r.status, r.notes, r.admin_note, r.created_at, r.converted_quotation_id,
-            q.view_token AS quotation_view_token, q.quote_number
+            q.view_token AS quotation_view_token, q.quote_number, q.converted_order_id
      FROM business_rfqs r
      LEFT JOIN quotations q ON q.id = r.converted_quotation_id
      WHERE r.id = $1 AND r.user_id = $2`,
@@ -22,7 +22,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     [params.id]
   )
 
-  return NextResponse.json({ rfq, items })
+  let order: any = null
+  if (rfq.converted_order_id) {
+    order = await queryOne<any>(
+      `SELECT id, order_number, payment_status, payment_mode, razorpay_qr_image_url, total_amount, invoice_number, status
+       FROM orders WHERE id = $1`,
+      [rfq.converted_order_id]
+    )
+  }
+
+  return NextResponse.json({ rfq, items, order: order || null })
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {

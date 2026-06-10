@@ -30,6 +30,18 @@ interface RFQ {
   converted_quotation_id: string | null
   quotation_view_token: string | null
   quote_number: string | null
+  converted_order_id: string | null
+}
+
+interface LinkedOrder {
+  id: string
+  order_number: string
+  payment_status: string
+  payment_mode: string | null
+  razorpay_qr_image_url: string | null
+  total_amount: number
+  invoice_number: string | null
+  status: string
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -51,6 +63,7 @@ const EDITABLE_STATUSES = ['pending', 'reviewed']
 export default function BusinessRFQDetail({ params }: { params: { id: string } }) {
   const [rfq, setRfq] = useState<RFQ | null>(null)
   const [items, setItems] = useState<RFQItem[]>([])
+  const [linkedOrder, setLinkedOrder] = useState<LinkedOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [editItems, setEditItems] = useState<RFQItemEdit[]>([])
@@ -66,6 +79,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
       .then(d => {
         setRfq(d.rfq)
         setItems(d.items || [])
+        setLinkedOrder(d.order || null)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -177,6 +191,67 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
         )}
       </div>
 
+      {/* Linked order / payment info */}
+      {linkedOrder && (
+        <div className="bg-surface-elevated border border-border-default rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-default flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Invoice / Order</p>
+              <p className="text-sm font-mono font-semibold text-foreground mt-0.5">
+                {linkedOrder.invoice_number || linkedOrder.order_number}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${linkedOrder.payment_status === 'paid' ? 'bg-green-400/20 text-green-600 dark:text-green-300' : 'bg-yellow-400/20 text-yellow-600 dark:text-yellow-300'}`}>
+                {linkedOrder.payment_status === 'paid' ? 'Paid' : 'Awaiting Payment'}
+              </span>
+              <Link
+                href={bp(`/business/account/orders/${linkedOrder.id}`)}
+                className="text-xs text-accent-500 hover:text-accent-600 font-semibold px-3 py-1 rounded-lg border border-accent-200 dark:border-accent-800 transition-colors"
+              >
+                View Order →
+              </Link>
+            </div>
+          </div>
+
+          {linkedOrder.payment_status !== 'paid' && linkedOrder.payment_mode === 'upi_qr' && (
+            <div className="p-5">
+              <p className="text-sm font-semibold text-foreground mb-3">Pay via UPI QR</p>
+              {linkedOrder.razorpay_qr_image_url ? (
+                <div className="flex flex-col items-center gap-3">
+                  <img
+                    src={linkedOrder.razorpay_qr_image_url}
+                    alt="UPI QR Code"
+                    className="max-w-[240px] w-full rounded-xl border border-border-default"
+                  />
+                  <p className="text-sm text-foreground-secondary text-center">
+                    Scan to pay ₹{Number(linkedOrder.total_amount).toLocaleString('en-IN')}
+                  </p>
+                  <p className="text-xs text-foreground-muted text-center">Payment status updates automatically once scanned.</p>
+                </div>
+              ) : (
+                <p className="text-sm text-foreground-secondary">A UPI QR code will be shared by our team shortly.</p>
+              )}
+            </div>
+          )}
+
+          {linkedOrder.payment_status !== 'paid' && linkedOrder.payment_mode === 'credit' && (
+            <div className="px-5 py-4">
+              <p className="text-sm text-foreground-secondary">This invoice is on credit terms. Our team will follow up with payment details.</p>
+            </div>
+          )}
+
+          {linkedOrder.payment_status === 'paid' && (
+            <div className="px-5 py-4 flex items-center gap-2 text-green-600 dark:text-green-400">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm font-medium">Payment received. Thank you!</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Save success banner */}
       {saved && (
         <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl p-3 text-sm text-green-700 dark:text-green-300 flex items-center gap-2">
@@ -271,6 +346,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                         onChange={e => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, requested_price: e.target.value === '' ? null : Number(e.target.value) } : it))}
                         className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
                       />
+                      <p className="text-[11px] text-foreground-muted mt-1">Maximum discount allowed: 30% off the listed price</p>
                     </div>
                     <div className="col-span-2 sm:col-span-1">
                       <label className="block text-xs font-medium text-foreground-muted mb-1">Item Notes</label>
