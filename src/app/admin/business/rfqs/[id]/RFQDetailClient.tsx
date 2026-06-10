@@ -148,6 +148,12 @@ export default function RFQDetailClient({ id }: { id: string }) {
     const p = resolveItemMrp(i)
     return sum + (p != null ? p * i.quantity : 0)
   }, 0)
+  // Only count selling price for items that actually have a requested price (for discount comparison)
+  const totalSellingForDiscountedItems = items.reduce((sum, i) => {
+    if (!i.requested_price) return sum
+    const p = resolveItemSellingPrice(i) ?? resolveItemMrp(i)
+    return sum + (p != null ? p * i.quantity : 0)
+  }, 0)
   // For header stat: prefer selling total, fallback to MRP total
   const totalCatalog = totalSelling > 0 ? totalSelling : totalMrp
 
@@ -288,10 +294,10 @@ export default function RFQDetailClient({ id }: { id: string }) {
             <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
               Requested Items <span className="ml-1 text-foreground-muted font-normal normal-case">({items.length})</span>
             </h2>
-            {totalRequested > 0 && totalCatalog > 0 && (
+            {totalRequested > 0 && totalSellingForDiscountedItems > 0 && (
               <span className="text-xs text-foreground-muted">
                 Discount requested: <span className="font-semibold text-accent-500">
-                  {Math.round(((totalCatalog - totalRequested) / totalCatalog) * 100)}% off our price
+                  {Math.round(((totalSellingForDiscountedItems - totalRequested) / totalSellingForDiscountedItems) * 100)}% off our price
                 </span>
               </span>
             )}
@@ -495,13 +501,13 @@ export default function RFQDetailClient({ id }: { id: string }) {
                   <p className="font-bold text-accent-500">₹{totalRequested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                 </div>
               )}
-              {totalCatalog > 0 && totalRequested > 0 && totalCatalog > totalRequested && (
+              {totalSellingForDiscountedItems > 0 && totalRequested > 0 && totalSellingForDiscountedItems > totalRequested && (
                 <div className="ml-auto">
                   <p className="text-xs text-foreground-muted mb-0.5">Discount Requested</p>
                   <p className="font-bold text-green-600 dark:text-green-400">
-                    ₹{(totalCatalog - totalRequested).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    ₹{(totalSellingForDiscountedItems - totalRequested).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     <span className="text-xs font-normal text-foreground-muted ml-1">
-                      ({Math.round(((totalCatalog - totalRequested) / totalCatalog) * 100)}%)
+                      ({Math.round(((totalSellingForDiscountedItems - totalRequested) / totalSellingForDiscountedItems) * 100)}%)
                     </span>
                   </p>
                 </div>
