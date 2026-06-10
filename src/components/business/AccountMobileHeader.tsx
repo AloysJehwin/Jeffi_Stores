@@ -9,7 +9,7 @@ import { bp } from '@/lib/business-path'
 export function BusinessAccountMobileTabBar() {
   const pathname = usePathname()
   return (
-    <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
+    <div className="lg:hidden mx-3 mt-3 mb-4">
       <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
         <div className="flex">
           {navItems.map((item) => {
