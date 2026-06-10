@@ -21,12 +21,19 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             p.name AS product_name,
             p.sku AS product_sku,
             p.base_price,
+            p.mrp AS product_mrp,
+            p.price_ex_gst AS product_price_ex_gst,
+            p.gst_percentage AS product_gst,
             pv.variant_name,
             pv.sku AS variant_sku,
             pv.price AS variant_price,
+            pv.mrp AS variant_mrp,
+            pv.price_ex_gst AS variant_price_ex_gst,
             psv.sub_variant_name,
             psv.sku AS sub_variant_sku,
             psv.price AS sub_variant_price,
+            psv.mrp AS sub_variant_mrp,
+            psv.price_ex_gst AS sub_variant_price_ex_gst,
             (SELECT pi.image_url FROM product_images pi
              WHERE pi.product_id = p.id
              ORDER BY pi.is_primary DESC, pi.display_order ASC
