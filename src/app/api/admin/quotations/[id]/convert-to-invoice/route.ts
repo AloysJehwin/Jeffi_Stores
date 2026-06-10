@@ -5,6 +5,7 @@ import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
 import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
+import { sendBusinessInvoiceGeneratedEmail } from '@/lib/email-business'
 import { lineItemExGst } from '@/lib/pricing'
 import { getRazorpayInstance } from '@/lib/razorpay'
 
@@ -88,6 +89,9 @@ export async function POST(
       totalSgst += sgst
       totalIgst += igst
 
+      const discountPct = parseFloat(item.discount_pct) || 0
+      const discountedRate = rate * (1 - discountPct / 100)
+
       return {
         product_id: item.product_id || null,
         product_name: item.description,
@@ -98,7 +102,7 @@ export async function POST(
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
-        unit_price: Math.round(rate * (1 + gstRate / 100) * 100) / 100,
+        unit_price: Math.round(discountedRate * (1 + gstRate / 100) * 100) / 100,
         total_price: Math.round(incGstLineTotal * 100) / 100,
         taxable_amount: Math.round(exGstLineTotal * 100) / 100,
         cgst_amount: Math.round(cgst * 100) / 100,
@@ -304,19 +308,27 @@ export async function POST(
           result.order_number,
           invoiceViewUrl
         ).catch(() => {})
+        sendBusinessInvoiceGeneratedEmail(
+          customerEmail,
+          customerName,
+          result.invoice_number,
+          result.order_number,
+          totalAmount,
+          invoiceViewUrl
+        ).catch(() => {})
       }
     }
 
     // Generate UPI QR after transaction so order ID is available
     let qrImageUrl: string | null = null
-    if (!result.saveAsDraft && paymentMode === 'upi_qr') {
+    if (paymentMode === 'upi_qr') {
       try {
         const rzp = getRazorpayInstance() as any
         const amountPaise = Math.round(totalAmount * 100)
         const closeBy = Math.floor(Date.now() / 1000) + 24 * 60 * 60
         const qr = await rzp.qrCode.create({
           type: 'upi_qr',
-          name: `Invoice ${result.invoice_number}`,
+          name: `Invoice ${result.invoice_number || result.order_number}`,
           usage: 'single_use',
           fixed_amount: true,
           payment_amount: amountPaise,

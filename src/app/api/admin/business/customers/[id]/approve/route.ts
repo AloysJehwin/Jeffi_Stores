@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { queryOne, query } from '@/lib/db'
+import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } from '@/lib/email-business'
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const admin = await requireAdminScope(request, 'business_customers')
@@ -17,16 +18,32 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   )
   if (!profile) return NextResponse.json({ error: 'Business profile not found' }, { status: 404 })
 
+  // Load user + company info for the email
+  const userInfo = await queryOne<{ email: string; first_name: string | null; last_name: string | null; company_name: string | null }>(
+    `SELECT u.email, u.first_name, u.last_name, bp.company_name
+     FROM users u JOIN business_profiles bp ON bp.user_id = u.id
+     WHERE u.id = $1`,
+    [params.id]
+  )
+
   if (action === 'approve') {
     await query(
       `UPDATE business_profiles SET approval_status='approved', approved_by=$1, approved_at=NOW(), rejection_note=NULL, updated_at=NOW() WHERE user_id=$2`,
       [admin.adminId, params.id]
     )
+    if (userInfo?.email) {
+      const name = [userInfo.first_name, userInfo.last_name].filter(Boolean).join(' ') || userInfo.email
+      sendBusinessAccountApprovedEmail(userInfo.email, name, userInfo.company_name || '').catch(() => {})
+    }
   } else {
     await query(
       `UPDATE business_profiles SET approval_status='rejected', approved_by=$1, approved_at=NOW(), rejection_note=$2, updated_at=NOW() WHERE user_id=$3`,
       [admin.adminId, rejectionNote || null, params.id]
     )
+    if (userInfo?.email) {
+      const name = [userInfo.first_name, userInfo.last_name].filter(Boolean).join(' ') || userInfo.email
+      sendBusinessAccountRejectedEmail(userInfo.email, name, userInfo.company_name || '', rejectionNote || null).catch(() => {})
+    }
   }
 
   return NextResponse.json({ success: true, action })
