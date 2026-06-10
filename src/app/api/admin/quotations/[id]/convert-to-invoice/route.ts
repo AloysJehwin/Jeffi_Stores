@@ -340,10 +340,20 @@ export async function POST(
         // Razorpay's qr.image_url / qr.short_url encode an rzp.io payment page — not a UPI string.
         const upiVpa = process.env.RAZORPAY_UPI_VPA
         const amountInRupees = (totalAmount).toFixed(2)
-        let fetchedImageUrl: string = qr.image_url
+        let fetchedImageUrl: string
         if (upiVpa) {
           const upiString = `upi://pay?pa=${encodeURIComponent(upiVpa)}&am=${amountInRupees}&pn=${encodeURIComponent('Jeffi Stores')}&tn=${encodeURIComponent(`Invoice ${result.invoice_number || result.order_number}`)}&cu=INR`
           fetchedImageUrl = await QRCode.toDataURL(upiString, { width: 300, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+        } else {
+          // Fallback: fetch Razorpay's branded image and inline as base64 data URI
+          try {
+            const imgRes = await fetch(qr.image_url)
+            const contentType = imgRes.headers.get('content-type') || 'image/png'
+            const buf = await imgRes.arrayBuffer()
+            fetchedImageUrl = `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`
+          } catch (_) {
+            fetchedImageUrl = qr.image_url
+          }
         }
         await query(
           `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, updated_at = NOW() WHERE id = $3`,
