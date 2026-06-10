@@ -8,6 +8,7 @@ import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { sendBusinessInvoiceGeneratedEmail } from '@/lib/email-business'
 import { lineItemExGst } from '@/lib/pricing'
 import { getRazorpayInstance } from '@/lib/razorpay'
+import QRCode from 'qrcode'
 
 export const dynamic = 'force-dynamic'
 
@@ -335,16 +336,14 @@ export async function POST(
           description: `Jeffi Stores Invoice ${result.invoice_number}`,
           close_by: closeBy,
         })
+        // Generate a bare QR code from the Razorpay short_url (payment link)
+        // qr.image_url is a full Razorpay-branded 9:16 image — not suitable for inline display
+        const paymentUrl = qr.short_url || qr.image_url
         let fetchedImageUrl = qr.image_url
         try {
-          const imgRes = await fetch(qr.image_url)
-          if (imgRes.ok) {
-            const contentType = imgRes.headers.get('content-type') || 'image/png'
-            const buf = await imgRes.arrayBuffer()
-            fetchedImageUrl = `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`
-          }
+          fetchedImageUrl = await QRCode.toDataURL(paymentUrl, { width: 300, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
         } catch (_) {
-          // keep redirect URL as fallback
+          // fallback to Razorpay image URL if QR generation fails
         }
         await query(
           `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, updated_at = NOW() WHERE id = $3`,

@@ -143,6 +143,8 @@ export default function QuotationsClient() {
   const [convertQrImageUrl, setConvertQrImageUrl] = useState<string | null>(null)
   const [convertQrTotal, setConvertQrTotal] = useState(0)
   const [convertResultOrderId, setConvertResultOrderId] = useState<string | null>(null)
+  const [convertSavedAsDraft, setConvertSavedAsDraft] = useState(false)
+  const [convertInsufficientItems, setConvertInsufficientItems] = useState<string[]>([])
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -307,7 +309,10 @@ export default function QuotationsClient() {
       setConvertedOrderId(data.orderId)
       setConvertResultOrderId(data.orderId)
       loadList()
-      if (data.qrImageUrl) {
+      if (data.savedAsDraft) {
+        setConvertSavedAsDraft(true)
+        setConvertInsufficientItems(data.insufficientItems || [])
+      } else if (data.qrImageUrl) {
         setConvertQrImageUrl(data.qrImageUrl)
       } else {
         setShowConvertModal(false)
@@ -701,6 +706,8 @@ export default function QuotationsClient() {
                               setConvertEnableDelivery(false)
                               setConvertQrImageUrl(null)
                               setConvertQrTotal(q.total_amount || 0)
+                              setConvertSavedAsDraft(false)
+                              setConvertInsufficientItems([])
                               setShowConvertModal(true)
                             }}
                             title="Convert to Invoice"
@@ -732,10 +739,53 @@ export default function QuotationsClient() {
         {selectedQuote && <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />}
 
         {showConvertModal && (
-          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && setShowConvertModal(false)}>
+          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))}>
             <div className="absolute inset-0 bg-black/50" />
             <div className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-md" onClick={e => e.stopPropagation()}>
-              {!convertQrImageUrl ? (
+              {convertSavedAsDraft ? (
+                <>
+                  <div className="flex items-center justify-between p-5 border-b border-border-default">
+                    <h2 className="text-base font-bold text-foreground">Saved as Draft</h2>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                      <svg className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">Some items are out of stock</p>
+                        <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">The invoice has been saved as a draft. It will be visible to the customer only after stock is updated and the invoice is finalised.</p>
+                      </div>
+                    </div>
+                    {convertInsufficientItems.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Items needing stock</p>
+                        <ul className="space-y-1">
+                          {convertInsufficientItems.map((name, i) => (
+                            <li key={i} className="text-sm text-foreground-secondary flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                              {name}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <p className="text-xs text-foreground-muted">Once stock is replenished, open the invoice and finalise it to make it visible and generate an invoice number.</p>
+                  </div>
+                  <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                    <button onClick={() => { setShowConvertModal(false); setConvertSavedAsDraft(false) }}
+                      className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                      Close
+                    </button>
+                    {convertResultOrderId && (
+                      <a href={ap(`/admin/invoices/${convertResultOrderId}`)}
+                        className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors">
+                        View Draft Invoice →
+                      </a>
+                    )}
+                  </div>
+                </>
+              ) : !convertQrImageUrl ? (
                 <>
                   <div className="flex items-center justify-between p-5 border-b border-border-default">
                     <h2 className="text-base font-bold text-foreground">Convert to Invoice</h2>
@@ -864,6 +914,8 @@ export default function QuotationsClient() {
                 setConvertPaymentMode('cash')
                 setConvertEnableDelivery(false)
                 setConvertQrImageUrl(null)
+                setConvertSavedAsDraft(false)
+                setConvertInsufficientItems([])
                 setConvertQrTotal(items.reduce((sum, i) => {
                   const qty = parseFloat(String(i.quantity)) || 0
                   const rate = parseFloat(String(i.unit_price)) || 0
@@ -1030,10 +1082,53 @@ export default function QuotationsClient() {
       </div>
 
       {showConvertModal && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && setShowConvertModal(false)}>
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))}>
         <div className="absolute inset-0 bg-black/50" />
         <div className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-md" onClick={e => e.stopPropagation()}>
-          {!convertQrImageUrl ? (
+          {convertSavedAsDraft ? (
+            <>
+              <div className="flex items-center justify-between p-5 border-b border-border-default">
+                <h2 className="text-base font-bold text-foreground">Saved as Draft</h2>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                  <svg className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">Some items are out of stock</p>
+                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">The invoice has been saved as a draft. It will be visible to the customer only after stock is updated and the invoice is finalised.</p>
+                  </div>
+                </div>
+                {convertInsufficientItems.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Items needing stock</p>
+                    <ul className="space-y-1">
+                      {convertInsufficientItems.map((name, i) => (
+                        <li key={i} className="text-sm text-foreground-secondary flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-xs text-foreground-muted">Once stock is replenished, open the invoice and finalise it to make it visible and generate an invoice number.</p>
+              </div>
+              <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                <button onClick={() => { setShowConvertModal(false); setConvertSavedAsDraft(false) }}
+                  className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                  Close
+                </button>
+                {convertResultOrderId && (
+                  <a href={ap(`/admin/invoices/${convertResultOrderId}`)}
+                    className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors">
+                    View Draft Invoice →
+                  </a>
+                )}
+              </div>
+            </>
+          ) : !convertQrImageUrl ? (
             <>
               <div className="flex items-center justify-between p-5 border-b border-border-default">
                 <h2 className="text-base font-bold text-foreground">Convert to Invoice</h2>
