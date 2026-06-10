@@ -92,7 +92,7 @@ export function AccountNavBar() {
   })()
 
   return (
-    <div className="sticky top-0 z-20 bg-surface shadow-sm pt-4">
+    <div className="hidden lg:block sticky top-0 z-20 bg-surface shadow-sm pt-4">
       <div className="container mx-auto px-4 py-2">
         <div className="bg-surface-elevated rounded-xl border border-border-default px-3 py-1.5 flex items-center gap-3">
           <span className="text-sm font-semibold text-foreground whitespace-nowrap pl-1 hidden sm:block">{activeLabel}</span>
