@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 
 interface AnalyticsData {
   product: { id: string; name: string; sku: string; slug: string; brandName: string | null; stock: number; basePrice: number }
@@ -438,7 +439,7 @@ function VariantTable({ rows }: { rows: { variantName: string | null; orders: nu
 function BuyerRow({ b, large }: { b: { orderNumber: string; createdAt: string; quantity: number; total: number; customerName: string }; large?: boolean }) {
   return (
     <Link
-      href={`/admin/orders?search=${b.orderNumber}`}
+      href={ap(`/admin/orders?search=${b.orderNumber}`)}
       className={`flex items-center justify-between text-sm ${large ? 'py-2.5' : 'py-1.5'} hover:bg-surface-secondary/50 px-2 -mx-2 rounded transition-colors`}
     >
       <div className="min-w-0 flex-1">

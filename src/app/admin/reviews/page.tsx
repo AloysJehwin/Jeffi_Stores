@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import { ap } from '@/lib/admin-path'
 
 interface Review {
   id: string
@@ -67,7 +68,7 @@ export default function AdminReviewsPage() {
     for (const [k, v] of Object.entries(patch)) {
       if (v) p.set(k, v); else p.delete(k)
     }
-    router.replace(`/admin/reviews?${p.toString()}`, { scroll: false })
+    router.replace(ap(`/admin/reviews?${p.toString()}`), { scroll: false })
   }
 
   useEffect(() => { fetchReviews() }, [filter])

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Star } from 'lucide-react'
+import { ap } from '@/lib/admin-path'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
@@ -263,7 +264,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-end gap-1 flex-nowrap whitespace-nowrap">
                   <Link
-                    href={`/admin/products/${product.id}`}
+                    href={ap(`/admin/products/${product.id}`)}
                     title="View Details"
                     className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                   >
@@ -272,7 +273,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                     </svg>
                   </Link>
                   <Link
-                    href={`/admin/products/edit/${product.id}`}
+                    href={ap(`/admin/products/edit/${product.id}`)}
                     title="Edit Product"
                     className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                   >

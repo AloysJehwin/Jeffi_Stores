@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import CrmMailerPanel from './CrmMailerPanel'
+import { ap } from '@/lib/admin-path'
 
 interface SegmentMeta {
   key: string
@@ -34,7 +35,7 @@ function fmtDate(iso: string) {
 function CustomerRow({ c, large }: { c: Customer; large?: boolean }) {
   return (
     <Link
-      href={`/admin/customers/${c.id}`}
+      href={ap(`/admin/customers/${c.id}`)}
       className={`flex items-center justify-between gap-3 ${large ? 'py-2.5' : 'py-2'} hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors`}
     >
       <div className="min-w-0 flex-1">
@@ -128,7 +129,7 @@ function SegmentModal({ segment, onClose }: ModalProps) {
             <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
               <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Send Mailer</h3>
               <Link
-                href={`/admin/customers?segment=${segment.key}`}
+                href={ap(`/admin/customers?segment=${segment.key}`)}
                 className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                 onClick={onClose}
               >

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import HoverCard from '@/components/ui/HoverCard'
 import OrderDetailModal from '@/components/admin/OrderDetailModal'
+import { ap } from '@/lib/admin-path'
 
 function statusBadgeClass(status: string) {
   if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
@@ -64,7 +65,7 @@ function CustomerPopover({ order }: { order: any }) {
         )}
         {order.users?.id && (
           <div className="pt-1 border-t border-border-default">
-            <Link href={`/admin/customers/${order.users.id}`} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+            <Link href={ap(`/admin/customers/${order.users.id}`)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
               View customer profile →
             </Link>
           </div>
@@ -98,7 +99,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
             <HoverCard
               trigger={
                 <a
-                  href={`/admin/orders/${order.id}`}
+                  href={ap(`/admin/orders/${order.id}`)}
                   className="font-mono font-semibold text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
                   onClick={e => e.stopPropagation()}
                 >
@@ -204,7 +205,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
                 </a>
               )}
               <Link
-                href={`/admin/orders/${order.id}`}
+                href={ap(`/admin/orders/${order.id}`)}
                 title="View Details"
                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
               >
