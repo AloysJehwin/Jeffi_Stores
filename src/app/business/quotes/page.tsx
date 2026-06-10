@@ -73,7 +73,7 @@ export default function MyQuotesPage() {
 
   return (
     <div className="bg-surface min-h-screen">
-      <div className="hidden lg:block"><BusinessAccountNavBar /></div>
+      <BusinessAccountNavBar />
       <BusinessAccountMobileHeader />
       <div className="container mx-auto px-4 pt-4 pb-8">
 
