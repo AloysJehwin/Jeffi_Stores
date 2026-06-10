@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import { Check } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ap } from '@/lib/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
@@ -100,7 +101,7 @@ export default function QuotationsClient() {
     } else {
       const params = new URLSearchParams(window.location.search)
       params.set('view', next)
-      router.push(`/admin/quotations?${params.toString()}`, { scroll: false })
+      router.push(ap(`/admin/quotations?${params.toString()}`), { scroll: false })
     }
   }
   const [quotations, setQuotations] = useState<Quotation[]>([])
@@ -119,7 +120,7 @@ export default function QuotationsClient() {
     for (const [k, v] of Object.entries(patch)) {
       if (v && v !== 'all') p.set(k, v); else p.delete(k)
     }
-    router.replace(`/admin/quotations?${p.toString()}`, { scroll: false })
+    router.replace(ap(`/admin/quotations?${p.toString()}`), { scroll: false })
   }
 
   function handleSort(col: string, dir: SortDir) {
@@ -311,7 +312,7 @@ export default function QuotationsClient() {
       } else {
         setShowConvertModal(false)
         showToast(`Invoice ${data.invoiceNumber} created`, 'success')
-        if (data.orderId) window.location.href = `/admin/invoices/${data.orderId}`
+        if (data.orderId) window.location.href = ap(`/admin/invoices/${data.orderId}`)
       }
     } catch {
       showToast('Failed to convert quotation', 'error')
@@ -622,7 +623,7 @@ export default function QuotationsClient() {
                       <HoverCard
                         trigger={
                           <a
-                            href={`/admin/quotations/${q.id}`}
+                            href={ap(`/admin/quotations/${q.id}`)}
                             className="text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
                           >
                             {q.quote_number}
@@ -708,7 +709,7 @@ export default function QuotationsClient() {
                           </button>
                         )}
                         {q.status === 'final' && q.converted_order_id && (
-                          <a href={`/admin/invoices/${q.converted_order_id}`} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
+                          <a href={ap(`/admin/invoices/${q.converted_order_id}`)} className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">
                             Invoiced ↗
                           </a>
                         )}
@@ -811,7 +812,7 @@ export default function QuotationsClient() {
                       Done
                     </button>
                     {convertResultOrderId && (
-                      <a href={`/admin/invoices/${convertResultOrderId}`}
+                      <a href={ap(`/admin/invoices/${convertResultOrderId}`)}
                         className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors">
                         View Invoice →
                       </a>
@@ -879,7 +880,7 @@ export default function QuotationsClient() {
             </button>
           )}
           {convertedOrderId && (
-            <a href={`/admin/invoices/${convertedOrderId}`}
+            <a href={ap(`/admin/invoices/${convertedOrderId}`)}
               className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap">
               View Invoice →
             </a>
@@ -1109,7 +1110,7 @@ export default function QuotationsClient() {
                   Done
                 </button>
                 {convertResultOrderId && (
-                  <a href={`/admin/invoices/${convertResultOrderId}`}
+                  <a href={ap(`/admin/invoices/${convertResultOrderId}`)}
                     className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors">
                     View Invoice →
                   </a>
@@ -1136,7 +1137,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
         <div className="flex items-start justify-between p-5 border-b border-border-default">
           <div className="min-w-0 pr-4">
             <h2 className="text-lg font-bold text-foreground leading-tight font-mono">
-              <a href={`/admin/quotations/${q.id}`} className="hover:text-accent-500 hover:underline transition-colors">
+              <a href={ap(`/admin/quotations/${q.id}`)} className="hover:text-accent-500 hover:underline transition-colors">
                 {q.quote_number}
               </a>
             </h2>
@@ -1210,7 +1211,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
           {q.converted_order_id && (
             <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
               <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Converted to Invoice</span>
-              <a href={`/admin/invoices/${q.converted_order_id}`} className="text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline">
+              <a href={ap(`/admin/invoices/${q.converted_order_id}`)} className="text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline">
                 View Invoice →
               </a>
             </div>
@@ -1229,7 +1230,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
               Download PDF
             </a>
             <a
-              href={`/admin/quotations/${q.id}`}
+              href={ap(`/admin/quotations/${q.id}`)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 text-white transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

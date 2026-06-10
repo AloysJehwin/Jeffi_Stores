@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
               (SELECT COUNT(*) FROM business_rfq_items ri WHERE ri.rfq_id = r.id)::int AS item_count,
               (SELECT SUM(ri.quantity * ri.requested_price) FROM business_rfq_items ri WHERE ri.rfq_id = r.id AND ri.requested_price IS NOT NULL) AS requested_total,
               q.quote_number, q.view_token AS quotation_view_token, q.total_amount AS quotation_total,
-              ord.id AS order_id, ord.invoice_number, ord.payment_status, ord.status AS order_status,
+              ord.id AS order_id, ord.view_token AS invoice_view_token, ord.invoice_number, ord.payment_status, ord.status AS order_status,
               ord.total_amount AS invoice_total
        FROM business_rfqs r
        LEFT JOIN quotations q ON q.id = r.converted_quotation_id

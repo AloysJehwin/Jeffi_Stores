@@ -132,7 +132,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
             {q.converted_order_id && (
               <div className="flex justify-between gap-4">
                 <span className="text-foreground-secondary">Converted</span>
-                <a href={`/admin/invoices/${q.converted_order_id}`} className="text-green-600 dark:text-green-400 text-xs font-medium hover:underline">
+                <a href={ap(`/admin/invoices/${q.converted_order_id}`)} className="text-green-600 dark:text-green-400 text-xs font-medium hover:underline">
                   View Invoice ↗
                 </a>
               </div>

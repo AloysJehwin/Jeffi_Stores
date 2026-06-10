@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 
 interface ReturnRequest {
   id: string
@@ -166,7 +167,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         <div>
           <p className="text-sm text-foreground-secondary mb-1">Replacement order</p>
           <Link
-            href={`/admin/orders/${returnRequest.replacement_order_id}`}
+            href={ap(`/admin/orders/${returnRequest.replacement_order_id}`)}
             className="text-sm font-medium text-accent-500 hover:text-accent-600 underline"
           >
             #{replacementOrderNumber}

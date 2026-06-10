@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ap } from '@/lib/admin-path'
 
 interface AdminOption {
   id: string
@@ -476,7 +477,7 @@ export default function AdminTasksClient() {
                         )}
 
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <Link href={`/admin/customers/${t.user_id}`}
+                          <Link href={ap(`/admin/customers/${t.user_id}`)}
                             className="text-[11px] text-accent-500 hover:text-accent-600 font-medium">
                             {customerName(t)}
                           </Link>

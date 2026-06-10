@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Package, ShoppingBag, User, AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { ap } from '@/lib/admin-path'
 
 const INR_FORMATTER = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -139,7 +140,7 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
             return (
               <Link
                 key={p.id}
-                href={`/admin/products/${p.id}`}
+                href={ap(`/admin/products/${p.id}`)}
                 className="flex gap-3 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
               >
                 <div className="w-12 h-12 rounded bg-surface-secondary flex items-center justify-center shrink-0 overflow-hidden">
@@ -169,7 +170,7 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
       return (
         <div className="space-y-1">
           {b.customers.map(c => (
-            <Link key={c.id} href={`/admin/customers/${c.id}`} className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors">
+            <Link key={c.id} href={ap(`/admin/customers/${c.id}`)} className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors">
               <User className="w-4 h-4 text-foreground-muted shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-foreground truncate">{c.name || c.email}</p>
@@ -195,7 +196,7 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
       return (
         <div className="space-y-1">
           {b.orders.map(o => (
-            <Link key={o.id} href={`/admin/orders/${o.id}`} className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors">
+            <Link key={o.id} href={ap(`/admin/orders/${o.id}`)} className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors">
               <ShoppingBag className="w-4 h-4 text-foreground-muted shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-foreground truncate">{o.order_number}{o.customer_name ? ` · ${o.customer_name}` : ''}</p>

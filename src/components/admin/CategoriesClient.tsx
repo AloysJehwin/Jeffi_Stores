@@ -25,6 +25,7 @@ import DeleteCategoryButton from './DeleteCategoryButton'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
+import { ap } from '@/lib/admin-path'
 
 interface Category {
   id: string
@@ -122,7 +123,7 @@ function ViewModal({ category, subCount, productCount, onClose }: {
           </div>
           <div className="flex gap-3 pt-1 border-t border-border-default">
             <Link
-              href={`/admin/categories/edit/${category.id}`}
+              href={ap(`/admin/categories/edit/${category.id}`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
               onClick={onClose}
             >
@@ -464,7 +465,7 @@ function SortableRow({
         >
           Policy
         </button>
-        <Link href={`/admin/categories/edit/${category.id}`} className="text-accent-500 hover:text-accent-600 mr-4">
+        <Link href={ap(`/admin/categories/edit/${category.id}`)} className="text-accent-500 hover:text-accent-600 mr-4">
           Edit
         </Link>
         <DeleteCategoryButton categoryId={category.id} categoryName={category.name} onDeleted={onDeleted} />
@@ -794,7 +795,7 @@ export default function CategoriesClient({
                   <span>Order: {sub.display_order}</span>
                 </div>
                 <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                  <Link href={`/admin/categories/edit/${sub.id}`} className="text-accent-500 font-medium">Edit</Link>
+                  <Link href={ap(`/admin/categories/edit/${sub.id}`)} className="text-accent-500 font-medium">Edit</Link>
                   <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                 </div>
               </div>
@@ -839,7 +840,7 @@ export default function CategoriesClient({
                     <span>Order: {cat.display_order}</span>
                   </div>
                   <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                    <Link href={`/admin/categories/edit/${cat.id}`} className="text-accent-500 font-medium">Edit</Link>
+                    <Link href={ap(`/admin/categories/edit/${cat.id}`)} className="text-accent-500 font-medium">Edit</Link>
                     <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} onDeleted={() => handleCategoryDeleted(cat.id)} />
                   </div>
                 </div>
@@ -866,7 +867,7 @@ export default function CategoriesClient({
                       <span>Order: {sub.display_order}</span>
                     </div>
                     <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                      <Link href={`/admin/categories/edit/${sub.id}`} className="text-accent-500 font-medium">Edit</Link>
+                      <Link href={ap(`/admin/categories/edit/${sub.id}`)} className="text-accent-500 font-medium">Edit</Link>
                       <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                     </div>
                   </div>
