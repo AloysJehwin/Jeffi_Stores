@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateBusiness } from '@/lib/jwt'
 import { queryMany, queryCount, query, queryOne } from '@/lib/db'
+import { sendRfqSubmittedEmail } from '@/lib/email-business'
 
 function buildRfqNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -81,6 +82,14 @@ export async function POST(request: NextRequest) {
       [rfq!.id, item.productId || null, item.variantId || null, item.subVariantId || null, item.description || '', item.quantity || 1, item.unit || 'Nos', item.requested_price ?? null, item.notes || null, idx]
     )
   }
+
+  const userProfile = await queryOne<{ first_name: string | null; last_name: string | null }>(
+    'SELECT first_name, last_name FROM users WHERE id = $1',
+    [user.userId]
+  )
+  const displayName = [userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(' ') || user.email
+
+  sendRfqSubmittedEmail(user.email, displayName, rfq!.rfq_number).catch(() => {})
 
   return NextResponse.json({ rfq }, { status: 201 })
 }

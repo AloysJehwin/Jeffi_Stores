@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { queryOne, queryMany, query } from '@/lib/db'
 import { stackDiscounts, applyDiscount, lineItemExGst } from '@/lib/pricing'
+import { sendRfqConvertedToQuotationEmail } from '@/lib/email-business'
 
 function buildQuoteNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -207,6 +208,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     `UPDATE business_rfqs SET status='converted', converted_quotation_id=$1, updated_at=NOW() WHERE id=$2`,
     [qt!.id, params.id]
   )
+
+  // Notify business user
+  if (rfq.email && qt?.view_token) {
+    const viewUrl = `https://quotation.jeffistores.in/${qt.view_token}`
+    sendRfqConvertedToQuotationEmail(
+      rfq.email,
+      rfq.company_name || `${rfq.first_name} ${rfq.last_name}`.trim() || rfq.email,
+      rfq.rfq_number,
+      qt.quote_number,
+      Number(total.toFixed(2)),
+      viewUrl,
+    ).catch(() => {})
+  }
 
   return NextResponse.json({ quotationId: qt!.id, quoteNumber: qt!.quote_number })
 }
