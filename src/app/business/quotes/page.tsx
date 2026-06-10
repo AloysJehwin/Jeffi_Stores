@@ -196,7 +196,7 @@ export default function MyQuotesPage() {
                           </svg>
                         </a>
                       )}
-                      {rfq.order_id && rfq.invoice_view_token && (
+                      {rfq.order_id && rfq.invoice_view_token && rfq.order_status !== 'draft' && (
                         <a
                           href={`https://invoice.jeffistores.in/${rfq.invoice_view_token}`}
                           target="_blank"
