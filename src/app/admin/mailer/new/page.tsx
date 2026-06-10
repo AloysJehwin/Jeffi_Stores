@@ -7,6 +7,8 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
+import { ap } from '@/lib/admin-path'
+
 const TEMPLATES = [
   { value: 'review_form_share', label: 'Review Form Share', description: 'Send customers a link to your review incentive form with a coupon reward' },
   { value: 'promotion', label: 'Promotion', description: 'Announce a sale, discount, or special offer' },
@@ -163,7 +165,7 @@ export default function NewCampaignPage() {
         })
       }
 
-      router.push('/admin/mailer')
+      router.push(ap('/admin/mailer'))
     } catch (err) {
       setError(String(err))
       setSubmitting(false)
@@ -173,7 +175,7 @@ export default function NewCampaignPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/mailer" className="text-foreground-muted hover:text-foreground transition-colors">
+        <Link href={ap('/admin/mailer')} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div>
@@ -260,7 +262,7 @@ export default function NewCampaignPage() {
                 )}
                 {reviewForms.length === 0 && (
                   <p className="text-xs text-amber-600">
-                    No review forms found. <Link href="/admin/review-forms/add" className="underline">Create one first.</Link>
+                    No review forms found. <Link href={ap('/admin/review-forms/add')} className="underline">Create one first.</Link>
                   </p>
                 )}
               </>

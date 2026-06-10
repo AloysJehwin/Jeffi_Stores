@@ -1,10 +1,12 @@
 import Link from 'next/link'
 import { Star, MessageSquare, FileText } from 'lucide-react'
+import { headers } from 'next/headers'
 import { queryMany, queryCount } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
+import { ap } from '@/lib/admin-path'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -39,6 +41,7 @@ async function getForms(filters: { search?: string; page?: number }) {
 }
 
 export default async function ReviewFormsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const host = (await headers()).get('host') ?? ''
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const { forms, total } = await getForms({ search: searchParams.search, page })
 
@@ -47,7 +50,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
     if (searchParams.search) params.set('search', searchParams.search)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
-    return `/admin/review-forms${qs ? `?${qs}` : ''}`
+    return ap(`/admin/review-forms${qs ? `?${qs}` : ''}`, host)
   }
 
   return (
@@ -57,7 +60,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Review Forms</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Shareable forms that reward customers for Google reviews</p>
         </div>
-        <Link href="/admin/review-forms/add" className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+        <Link href={ap('/admin/review-forms/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
           Create Form
         </Link>
       </div>
@@ -112,7 +115,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                     </td>
                     <td className="px-4 py-3 text-foreground-secondary">{f.coupon_code || <span className="text-foreground-muted">None</span>}</td>
                     <td className="px-4 py-3">
-                      <Link href={`/admin/review-forms/${f.id}/submissions`} className="text-accent-500 hover:underline font-medium">
+                      <Link href={ap(`/admin/review-forms/${f.id}/submissions`, host)} className="text-accent-500 hover:underline font-medium">
                         {f.submissions_count} view
                       </Link>
                     </td>
@@ -123,7 +126,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <Link href={`/admin/review-forms/edit/${f.id}`} className="text-accent-500 hover:underline text-sm">Edit</Link>
+                        <Link href={ap(`/admin/review-forms/edit/${f.id}`, host)} className="text-accent-500 hover:underline text-sm">Edit</Link>
                         <DeleteReviewFormButton id={f.id} title={f.title} />
                       </div>
                     </td>
@@ -152,8 +155,8 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                 <p className="text-xs text-foreground-muted">Coupon: {f.coupon_code || 'None'} · {f.submissions_count} submissions</p>
                 <div className="flex gap-3 pt-1">
                   <a href={formUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-foreground-muted hover:underline">Open ↗</a>
-                  <Link href={`/admin/review-forms/${f.id}/submissions`} className="text-xs text-accent-500 hover:underline">Submissions</Link>
-                  <Link href={`/admin/review-forms/edit/${f.id}`} className="text-xs text-accent-500 hover:underline">Edit</Link>
+                  <Link href={ap(`/admin/review-forms/${f.id}/submissions`, host)} className="text-xs text-accent-500 hover:underline">Submissions</Link>
+                  <Link href={ap(`/admin/review-forms/edit/${f.id}`, host)} className="text-xs text-accent-500 hover:underline">Edit</Link>
                   <DeleteReviewFormButton id={f.id} title={f.title} />
                 </div>
               </div>

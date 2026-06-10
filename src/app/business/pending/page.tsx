@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { bp } from '@/lib/business-path'
 
 export default function BusinessPendingPage() {
   return (
@@ -44,7 +45,7 @@ export default function BusinessPendingPage() {
             Browse Products
           </Link>
           <Link
-            href="/business/signin"
+            href={bp('/business/signin')}
             className="px-6 py-3 border border-border-default text-foreground-secondary rounded-lg hover:bg-surface-secondary transition-colors text-sm font-medium"
           >
             Sign In Again

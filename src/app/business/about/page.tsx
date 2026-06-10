@@ -1,6 +1,9 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
+import { bp } from '@/lib/business-path'
 
-export default function BusinessAboutPage() {
+export default async function BusinessAboutPage() {
+  const host = (await headers()).get('host') ?? ''
   return (
     <div className="bg-surface">
       <div className="bg-surface-elevated border-b border-border-default">
@@ -123,7 +126,7 @@ export default function BusinessAboutPage() {
           </div>
           <div className="mt-8 text-center">
             <Link
-              href="/business/categories"
+              href={bp('/business/categories', host)}
               className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
             >
               View All Categories
@@ -138,13 +141,13 @@ export default function BusinessAboutPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/business/support"
+              href={bp('/business/support', host)}
               className="bg-accent-500 hover:bg-accent-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
             >
               Contact Us
             </Link>
             <Link
-              href="/business/products"
+              href={bp('/business/products', host)}
               className="bg-surface-elevated text-primary-700 hover:bg-surface-secondary px-8 py-3 rounded-lg font-semibold transition-colors"
             >
               Browse Products

@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { ap } from '@/lib/admin-path'
 
 type Step = 'password' | 'verify' | 'enroll'
 
 export default function AdminLogin() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get('callbackUrl') || '/admin/dashboard'
+  const callbackUrl = searchParams.get('callbackUrl') || ap('/admin/dashboard')
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -96,7 +97,7 @@ export default function AdminLogin() {
         return
       }
 
-      window.location.href = '/admin/dashboard'
+      window.location.href = ap('/admin/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
       setLoading(false)

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ap } from '@/lib/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 
 type EligibleOrder = {
@@ -163,7 +164,7 @@ export default function DelhiveryPickupPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <Link href="/admin/orders" className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block">
+        <Link href={ap('/admin/orders')} className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block">
           ← Back to Orders
         </Link>
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Delhivery Pickup Request</h1>
@@ -232,7 +233,7 @@ export default function DelhiveryPickupPage() {
                           className="w-4 h-4 rounded border-border-default accent-accent-500" />
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/admin/orders/${order.id}`} className="font-mono text-accent-500 hover:underline">
+                        <Link href={ap(`/admin/orders/${order.id}`)} className="font-mono text-accent-500 hover:underline">
                           #{order.order_number || order.id.slice(0, 8)}
                         </Link>
                       </td>

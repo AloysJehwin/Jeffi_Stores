@@ -2,6 +2,7 @@ import { getDashboardStats, getDashboardMetrics } from '@/lib/queries'
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
+import { ap } from '@/lib/admin-path'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -94,6 +95,7 @@ function statusLabel(s: string) {
 export default async function AdminDashboard() {
   const headersList = headers()
   const username = headersList.get('x-username') || 'Admin'
+  const host = headersList.get('host') ?? ''
 
   const [stats, metrics] = await Promise.all([
     getDashboardStats(),
@@ -123,7 +125,7 @@ export default async function AdminDashboard() {
           <h1 className="text-2xl font-bold text-foreground">Welcome back, {username}</h1>
           <p className="text-sm text-foreground-muted mt-0.5">Here is what is happening this month.</p>
         </div>
-        <Link href="/admin/orders/new" className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white text-sm font-medium rounded-lg transition-colors">
+        <Link href={ap('/admin/orders/new', host)} className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white text-sm font-medium rounded-lg transition-colors">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
@@ -139,7 +141,7 @@ export default async function AdminDashboard() {
           value={`Rs ${metrics.revenue.thisMonth.toLocaleString('en-IN')}`}
           sub={`Last month: Rs ${metrics.revenue.lastMonth.toLocaleString('en-IN')}`}
           pct={metrics.revenue.pctChange}
-          href="/admin/financial"
+          href={ap('/admin/financial', host)}
           color="bg-emerald-100 dark:bg-emerald-900/30"
           icon={
             <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -152,7 +154,7 @@ export default async function AdminDashboard() {
           value={`Rs ${metrics.revenue.today.toLocaleString('en-IN')}`}
           sub={`Yesterday: Rs ${metrics.revenue.yesterday.toLocaleString('en-IN')}`}
           pct={metrics.revenue.todayPct}
-          href="/admin/financial"
+          href={ap('/admin/financial', host)}
           color="bg-blue-100 dark:bg-blue-900/30"
           icon={
             <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -165,7 +167,7 @@ export default async function AdminDashboard() {
           value={metrics.orders.thisMonth.toString()}
           sub={`Last month: ${metrics.orders.lastMonth}`}
           pct={metrics.orders.pctChange}
-          href="/admin/orders"
+          href={ap('/admin/orders', host)}
           color="bg-violet-100 dark:bg-violet-900/30"
           icon={
             <svg className="w-5 h-5 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -177,7 +179,7 @@ export default async function AdminDashboard() {
           label="Total Customers"
           value={stats.totalCustomers.toString()}
           sub={stats.newCustomersThisMonth > 0 ? `+${stats.newCustomersThisMonth} this month` : 'No new customers this month'}
-          href="/admin/customers"
+          href={ap('/admin/customers', host)}
           color="bg-orange-100 dark:bg-orange-900/30"
           icon={
             <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -200,12 +202,12 @@ export default async function AdminDashboard() {
               <div className="bg-purple-500 rounded-r-full transition-all" style={{ width: `${offlinePct}%` }} />
             </div>
             <div className="flex justify-between mt-2">
-              <Link href="/admin/orders?source=online" className="group">
+              <Link href={ap('/admin/orders?source=online', host)} className="group">
                 <p className="text-xs text-foreground-muted">Online</p>
                 <p className="text-base font-bold text-foreground group-hover:text-accent-500 transition-colors">Rs {metrics.revenue.online.toLocaleString('en-IN')}</p>
                 <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">{onlinePct}%</p>
               </Link>
-              <Link href="/admin/orders?source=offline" className="group text-right">
+              <Link href={ap('/admin/orders?source=offline', host)} className="group text-right">
                 <p className="text-xs text-foreground-muted">Offline</p>
                 <p className="text-base font-bold text-foreground group-hover:text-accent-500 transition-colors">Rs {metrics.revenue.offline.toLocaleString('en-IN')}</p>
                 <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">{offlinePct}%</p>
@@ -231,7 +233,7 @@ export default async function AdminDashboard() {
               return (
                 <Link
                   key={step.label}
-                  href={`/admin/orders?status=${step.status}`}
+                  href={ap(`/admin/orders?status=${step.status}`, host)}
                   className="flex items-center gap-3 group rounded-md px-1 -mx-1 hover:bg-surface-secondary transition-colors"
                 >
                   <span className="text-xs text-foreground-muted w-28 shrink-0 group-hover:text-foreground transition-colors">{step.label}</span>
@@ -244,7 +246,7 @@ export default async function AdminDashboard() {
             })}
           </div>
           <div className="pt-2 border-t border-border-default">
-            <Link href="/admin/orders" className="text-xs text-accent-500 font-medium hover:text-accent-600">
+            <Link href={ap('/admin/orders', host)} className="text-xs text-accent-500 font-medium hover:text-accent-600">
               View all orders →
             </Link>
           </div>
@@ -255,12 +257,12 @@ export default async function AdminDashboard() {
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Top Products</h2>
-            <Link href="/admin/products" className="text-xs text-accent-500 font-medium hover:text-accent-600">View all →</Link>
+            <Link href={ap('/admin/products', host)} className="text-xs text-accent-500 font-medium hover:text-accent-600">View all →</Link>
           </div>
           {metrics.topProducts.length > 0 ? (
             <div className="space-y-3">
               {metrics.topProducts.map((p, i) => (
-                <Link key={p.id} href={`/admin/products/edit/${p.id}`} className="flex items-center gap-3 group rounded-md px-1 -mx-1 hover:bg-surface-secondary transition-colors">
+                <Link key={p.id} href={ap(`/admin/products/edit/${p.id}`, host)} className="flex items-center gap-3 group rounded-md px-1 -mx-1 hover:bg-surface-secondary transition-colors">
                   <span className="text-xs font-bold text-foreground-muted w-4 shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-foreground truncate group-hover:text-accent-500 transition-colors">{p.name}</p>
@@ -286,7 +288,7 @@ export default async function AdminDashboard() {
         <div className="lg:col-span-2 bg-surface-elevated rounded-xl border border-border-default p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Recent Orders</h2>
-            <Link href="/admin/orders" className="text-xs text-accent-500 font-medium hover:text-accent-600">View all →</Link>
+            <Link href={ap('/admin/orders', host)} className="text-xs text-accent-500 font-medium hover:text-accent-600">View all →</Link>
           </div>
           {metrics.recentOrders.length > 0 ? (
             <>
@@ -305,7 +307,7 @@ export default async function AdminDashboard() {
                     {metrics.recentOrders.map((order: any) => (
                       <tr key={order.id} className="hover:bg-surface-secondary">
                         <td className="py-2.5 pr-3">
-                          <Link href={`/admin/orders/${order.id}`} className="text-xs font-medium text-accent-500 hover:text-accent-600">
+                          <Link href={ap(`/admin/orders/${order.id}`, host)} className="text-xs font-medium text-accent-500 hover:text-accent-600">
                             #{order.order_number || order.id.slice(0, 8)}
                           </Link>
                         </td>
@@ -334,7 +336,7 @@ export default async function AdminDashboard() {
                 {metrics.recentOrders.map((order: any) => (
                   <Link
                     key={order.id}
-                    href={`/admin/orders/${order.id}`}
+                    href={ap(`/admin/orders/${order.id}`, host)}
                     className="block p-3 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -359,10 +361,10 @@ export default async function AdminDashboard() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { href: '/admin/products/add', label: 'Add Product', color: 'text-indigo-600 dark:text-indigo-400', bg: 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /> },
-          { href: '/admin/categories', label: 'Categories', color: 'text-green-600 dark:text-green-400', bg: 'hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /> },
-          { href: '/admin/orders', label: 'All Orders', color: 'text-yellow-600 dark:text-yellow-400', bg: 'hover:bg-yellow-50 dark:hover:bg-yellow-900/20 hover:border-yellow-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /> },
-          { href: '/admin/orders/new', label: 'Offline Invoice', color: 'text-purple-600 dark:text-purple-400', bg: 'hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /> },
+          { href: ap('/admin/products/add', host), label: 'Add Product', color: 'text-indigo-600 dark:text-indigo-400', bg: 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /> },
+          { href: ap('/admin/categories', host), label: 'Categories', color: 'text-green-600 dark:text-green-400', bg: 'hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /> },
+          { href: ap('/admin/orders', host), label: 'All Orders', color: 'text-yellow-600 dark:text-yellow-400', bg: 'hover:bg-yellow-50 dark:hover:bg-yellow-900/20 hover:border-yellow-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /> },
+          { href: ap('/admin/orders/new', host), label: 'Offline Invoice', color: 'text-purple-600 dark:text-purple-400', bg: 'hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /> },
         ].map(action => (
           <Link
             key={action.href}

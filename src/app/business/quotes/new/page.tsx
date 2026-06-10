@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import CustomSelect from '@/components/visitor/CustomSelect'
+import { bp } from '@/lib/business-path'
 
 interface RFQItem {
   description: string
@@ -53,7 +54,7 @@ export default function NewRFQPage() {
     })
     const data = await res.json()
     if (res.ok) {
-      router.push('/business/quotes')
+      router.push(bp('/business/quotes'))
     } else {
       setError(data.error || 'Failed to submit RFQ')
       setSubmitting(false)
@@ -63,7 +64,7 @@ export default function NewRFQPage() {
   return (
     <div className="max-w-3xl space-y-5">
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <a href="/business/quotes" className="text-accent-500 hover:text-accent-600 transition-colors">My Quotes</a>
+        <a href={bp('/business/quotes')} className="text-accent-500 hover:text-accent-600 transition-colors">My Quotes</a>
         <span>/</span>
         <span className="text-foreground">New RFQ</span>
       </div>
@@ -171,7 +172,7 @@ export default function NewRFQPage() {
           {submitting && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           Submit RFQ
         </button>
-        <a href="/business/quotes"
+        <a href={bp('/business/quotes')}
           className="px-6 py-2.5 border border-border-default text-sm font-medium rounded-lg hover:bg-surface-secondary transition-colors">
           Cancel
         </a>

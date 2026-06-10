@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { getCrmDashboardData } from '@/lib/admin-crm'
 import HealthDistributionCard from './HealthDistributionCard'
@@ -11,11 +11,13 @@ import RecentNotesCard from './RecentNotesCard'
 import RecentTagsCard from './RecentTagsCard'
 import RecentSignupsCard from './RecentSignupsCard'
 import SegmentsCard from './SegmentsCard'
+import { ap } from '@/lib/admin-path'
 
 export const dynamic = 'force-dynamic'
 
 
 export default async function CrmDashboardPage() {
+  const host = (await headers()).get('host') ?? ''
   const cookieStore = cookies()
   const token = cookieStore.get('admin_token')?.value
   let adminId = ''
@@ -46,14 +48,14 @@ export default async function CrmDashboardPage() {
       {data.tasks && (data.tasks.open > 0 || data.tasks.mine > 0) && (
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <Link
-            href="/admin/tasks?scope=mine&status=open"
+            href={ap('/admin/tasks?scope=mine&status=open', host)}
             className="bg-surface-elevated rounded-xl border border-border-default p-4 hover:shadow-md hover:-translate-y-0.5 transition-all"
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">My Tasks</p>
             <p className="text-2xl font-bold text-foreground mt-1">{data.tasks.mine}</p>
           </Link>
           <Link
-            href="/admin/tasks?scope=all&status=overdue"
+            href={ap('/admin/tasks?scope=all&status=overdue', host)}
             className={`rounded-xl border p-4 hover:shadow-md hover:-translate-y-0.5 transition-all ${
               data.tasks.overdue > 0
                 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
@@ -68,7 +70,7 @@ export default async function CrmDashboardPage() {
             }`}>{data.tasks.overdue}</p>
           </Link>
           <Link
-            href="/admin/tasks?scope=all&status=open"
+            href={ap('/admin/tasks?scope=all&status=open', host)}
             className="bg-surface-elevated rounded-xl border border-border-default p-4 hover:shadow-md hover:-translate-y-0.5 transition-all"
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Open (all)</p>
@@ -109,7 +111,7 @@ export default async function CrmDashboardPage() {
               {data.topTags.map((t: any) => (
                 <Link
                   key={t.tag}
-                  href={`/admin/customers?tag=${encodeURIComponent(t.tag)}`}
+                  href={ap(`/admin/customers?tag=${encodeURIComponent(t.tag)}`, host)}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 rounded-full text-xs font-medium hover:bg-accent-200 dark:hover:bg-accent-900/50 transition-colors"
                 >
                   {t.tag}

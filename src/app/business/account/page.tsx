@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import { bp } from '@/lib/business-path'
 // BusinessAccountNavBar is rendered by layout.tsx for all /business/account/* pages
 
 interface DashboardData {
@@ -89,7 +90,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push('/business/signin?redirect=/account')
+      router.push(bp('/business/signin?redirect=/account'))
     }
     if (user) {
       setAvatarUrl(user.avatarUrl)
@@ -390,7 +391,7 @@ export default function AccountPage() {
                   {searchHistory.map(q => (
                     <Link
                       key={q}
-                      href={`/business/products?search=${encodeURIComponent(q)}`}
+                      href={bp(`/business/products?search=${encodeURIComponent(q)}`)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-border-secondary text-xs text-foreground-secondary hover:text-accent-600 hover:border-accent-300 dark:hover:text-accent-400 dark:hover:border-accent-700 transition-colors"
                     >
                       <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -525,7 +526,7 @@ export default function AccountPage() {
               <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-sm font-semibold text-foreground">Default Address</h2>
-                  <Link href="/business/account/addresses" className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium px-2.5 py-1 rounded-lg border border-accent-200 dark:border-accent-800 transition-colors">
+                  <Link href={bp('/business/account/addresses')} className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium px-2.5 py-1 rounded-lg border border-accent-200 dark:border-accent-800 transition-colors">
                     Manage
                   </Link>
                 </div>
@@ -541,7 +542,7 @@ export default function AccountPage() {
                 ) : (
                   <div className="flex flex-col items-center justify-center h-24 text-center">
                     <p className="text-xs text-foreground-muted mb-2">No default address saved</p>
-                    <Link href="/business/account/addresses" className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium underline underline-offset-2">
+                    <Link href={bp('/business/account/addresses')} className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium underline underline-offset-2">
                       Add an address
                     </Link>
                   </div>
@@ -553,21 +554,21 @@ export default function AccountPage() {
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold text-foreground">Recent Orders</h2>
-                <Link href="/business/account/orders" className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium">
+                <Link href={bp('/business/account/orders')} className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium">
                   View all
                 </Link>
               </div>
               {dashboard?.recentOrders.length === 0 || !dashboard ? (
                 <div className="text-center py-6">
                   <p className="text-sm text-foreground-muted mb-3">No orders yet</p>
-                  <Link href="/business/products" className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium underline underline-offset-2">
+                  <Link href={bp('/business/products')} className="text-xs text-accent-600 hover:text-accent-700 dark:text-accent-400 font-medium underline underline-offset-2">
                     Start shopping
                   </Link>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {dashboard.recentOrders.map(order => (
-                    <Link key={order.id} href={`/business/account/orders/${order.id}`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface transition-colors group border border-transparent hover:border-border-default">
+                    <Link key={order.id} href={bp(`/business/account/orders/${order.id}`)} className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface transition-colors group border border-transparent hover:border-border-default">
                       <div className="flex -space-x-2 flex-shrink-0">
                         {order.items.slice(0, 3).map((item, i) => (
                           <div key={i} className="w-10 h-10 rounded-lg border-2 border-surface-elevated overflow-hidden bg-surface flex items-center justify-center flex-shrink-0">

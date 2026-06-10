@@ -1,7 +1,8 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { ap } from '@/lib/admin-path'
 import LabelsClient from '@/components/admin/LabelsClient'
 import { LABEL_SIZES } from '@/lib/label-pdf'
 import { getAllCategories } from '@/lib/queries'
@@ -13,17 +14,18 @@ export const metadata = {
 export default async function LabelsPage() {
   const cookieStore = cookies()
   const token = cookieStore.get('admin_token')
-  if (!token) redirect('/admin/login')
+  const host = (await headers()).get('host') ?? ''
+  if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null
   try {
     session = await verifyToken(token.value)
   } catch {
-    redirect('/admin/login')
+    redirect(ap('/admin/login', host))
   }
 
   if (!hasScope(session?.role || '', session?.scopes || [], 'labels')) {
-    redirect('/admin/dashboard')
+    redirect(ap('/admin/dashboard', host))
   }
 
   const categories = await getAllCategories() || []

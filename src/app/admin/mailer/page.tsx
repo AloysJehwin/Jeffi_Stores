@@ -1,9 +1,11 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { queryMany, queryCount } from '@/lib/db'
 import Pagination from '@/components/admin/Pagination'
 import DeleteCampaignButton from '@/components/admin/DeleteCampaignButton'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AdminFilters from '@/components/admin/AdminFilters'
+import { ap } from '@/lib/admin-path'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -40,6 +42,7 @@ interface Campaign {
 }
 
 export default async function MailerPage({ searchParams }: { searchParams: { page?: string; search?: string } }) {
+  const host = (await headers()).get('host') ?? ''
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const search = searchParams.search?.trim() || ''
   const offset = (page - 1) * PAGE_SIZE
@@ -78,7 +81,7 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
     if (search) qs.set('search', search)
     if (p > 1) qs.set('page', String(p))
     const s = qs.toString()
-    return `/admin/mailer${s ? `?${s}` : ''}`
+    return ap(`/admin/mailer${s ? `?${s}` : ''}`, host)
   }
 
   if (migrationPending) {
@@ -110,7 +113,7 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Mailer</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Create and send email campaigns to your customers</p>
         </div>
-        <Link href="/admin/mailer/new" className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+        <Link href={ap('/admin/mailer/new', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
           New Campaign
         </Link>
       </div>
@@ -131,7 +134,7 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
               {campaigns.map(c => (
                 <tr key={c.id} className="hover:bg-surface-secondary/50 transition-colors">
                   <td className="px-4 py-3">
-                    <Link href={`/admin/mailer/${c.id}`} className="font-medium text-foreground hover:text-accent-500 transition-colors">{c.title}</Link>
+                    <Link href={ap(`/admin/mailer/${c.id}`, host)} className="font-medium text-foreground hover:text-accent-500 transition-colors">{c.title}</Link>
                     <p className="text-xs text-foreground-muted truncate max-w-[200px]">{c.subject}</p>
                   </td>
                   <td className="px-4 py-3 text-foreground-secondary">{TEMPLATE_LABELS[c.template_key] || c.template_key}</td>
@@ -154,14 +157,14 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
                       {(c.status === 'draft' || c.status === 'scheduled') && (
                         <DispatchCampaignButton id={c.id} />
                       )}
-                      <Link href={`/admin/mailer/${c.id}`} className="text-accent-500 hover:underline text-sm">View</Link>
+                      <Link href={ap(`/admin/mailer/${c.id}`, host)} className="text-accent-500 hover:underline text-sm">View</Link>
                       {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
                     </div>
                   </td>
                 </tr>
               ))}
               {campaigns.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-foreground-muted">No campaigns yet. <Link href="/admin/mailer/new" className="text-accent-500 hover:underline">Create your first one.</Link></td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-foreground-muted">No campaigns yet. <Link href={ap('/admin/mailer/new', host)} className="text-accent-500 hover:underline">Create your first one.</Link></td></tr>
               )}
             </tbody>
           </table>
@@ -171,7 +174,7 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
           {campaigns.map(c => (
             <div key={c.id} className="p-4 space-y-2">
               <div className="flex items-start justify-between gap-2">
-                <Link href={`/admin/mailer/${c.id}`} className="font-medium text-foreground">{c.title}</Link>
+                <Link href={ap(`/admin/mailer/${c.id}`, host)} className="font-medium text-foreground">{c.title}</Link>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}>
                   {c.status}
                 </span>
@@ -180,7 +183,7 @@ export default async function MailerPage({ searchParams }: { searchParams: { pag
               {c.recipient_count != null && <p className="text-xs text-foreground-muted">{c.recipient_count} recipients</p>}
               <div className="flex gap-3 pt-1">
                 {(c.status === 'draft' || c.status === 'scheduled') && <DispatchCampaignButton id={c.id} />}
-                <Link href={`/admin/mailer/${c.id}`} className="text-xs text-accent-500 hover:underline">View</Link>
+                <Link href={ap(`/admin/mailer/${c.id}`, host)} className="text-xs text-accent-500 hover:underline">View</Link>
                 {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
               </div>
             </div>

@@ -1,4 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
+import { headers } from 'next/headers'
+import { ap } from '@/lib/admin-path'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
@@ -419,7 +421,9 @@ async function updateProduct(productId: string, formData: FormData) {
 
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
-    redirect('/admin/products')
+    const { headers: getHeaders } = await import('next/headers')
+    const host = (await getHeaders()).get('host') ?? ''
+    redirect(ap('/admin/products', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error(err?.message || 'Failed to update product')
@@ -427,6 +431,7 @@ async function updateProduct(productId: string, formData: FormData) {
 }
 
 export default async function EditProductPage({ params }: { params: { id: string } }) {
+  const host = (await headers()).get('host') ?? ''
   const product = await getProduct(params.id).catch(() => null)
 
   if (!product) {
@@ -439,7 +444,7 @@ export default async function EditProductPage({ params }: { params: { id: string
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href="/admin/products" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a href={ap('/admin/products', host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
           Products
         </a>

@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { BusinessAccountNavBar } from '@/components/business/AccountSidebar'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
+import { bp } from '@/lib/business-path'
 
 interface RFQ {
   id: string
@@ -47,7 +48,7 @@ export default function MyQuotesPage() {
 
   useEffect(() => {
     if (!isLoading && (!user || !user.isBusiness || user.approvalStatus !== 'approved')) {
-      router.push('/business/account')
+      router.push(bp('/business/account'))
     }
   }, [user, isLoading])
 
@@ -102,7 +103,7 @@ export default function MyQuotesPage() {
               </svg>
               <p className="text-foreground-secondary font-medium">No quote requests yet</p>
               <p className="text-sm text-foreground-muted mt-1">Use the &ldquo;Request Quote&rdquo; button on any product page or cart to get started.</p>
-              <Link href="/business/products" className="mt-4 inline-block text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700">
+              <Link href={bp('/business/products')} className="mt-4 inline-block text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700">
                 Browse Products
               </Link>
             </div>

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Star, Sparkles, CheckCircle, XCircle, Loader2, X } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
+import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -286,7 +287,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
     return (
       <div className="p-6 space-y-3">
         <p className="text-foreground-secondary">Product not found.</p>
-        <Link href="/admin/products" className="text-accent-500 hover:underline text-sm">← Back to Products</Link>
+        <Link href={ap('/admin/products')} className="text-accent-500 hover:underline text-sm">← Back to Products</Link>
       </div>
     )
   }
@@ -323,14 +324,14 @@ export default function ProductDetailClient({ id }: { id: string }) {
     <div className="p-4 sm:p-6 space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href="/admin/products" className="text-accent-500 hover:text-accent-600 transition-colors">Products</Link>
+        <Link href={ap('/admin/products')} className="text-accent-500 hover:text-accent-600 transition-colors">Products</Link>
         <span>/</span>
         <span className="text-foreground truncate">{p.name}</span>
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link href="/admin/products" className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors">
+          <Link href={ap('/admin/products')} className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
@@ -355,10 +356,10 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <Sparkles className="w-4 h-4 text-accent-500" />
             AI
           </button>
-          <Link href={`/admin/products/${p.id}/analytics`} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
+          <Link href={ap(`/admin/products/${p.id}/analytics`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Analytics
           </Link>
-          <Link href={`/admin/products/edit/${p.id}`} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
+          <Link href={ap(`/admin/products/edit/${p.id}`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
             Edit
           </Link>
         </div>

@@ -10,6 +10,7 @@ import {
   Clock, CheckCircle2, XCircle, RefreshCw, Play, Mail, ChevronDown, ChevronUp, Users, User,
 } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ap } from '@/lib/admin-path'
 
 interface AuditEvent {
   id: string
@@ -112,7 +113,7 @@ export default function AdminAuditClient() {
 
   function setPageTab(next: PageTab) {
     setPageTabState(next)
-    router.push(`/admin/audit?tab=${next}`, { scroll: false })
+    router.push(ap(`/admin/audit?tab=${next}`), { scroll: false })
   }
 
   const [cronJobs, setCronJobs] = useState<CronJob[]>([])

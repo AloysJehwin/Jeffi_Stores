@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
+import { ap } from '@/lib/admin-path'
 import { queryMany, queryCount } from '@/lib/db'
 import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
 import AdminFilters from '@/components/admin/AdminFilters'
@@ -38,6 +40,7 @@ async function getFilteredBrands(filters: { is_active?: string; search?: string;
 }
 
 export default async function BrandsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const host = (await headers()).get('host') ?? ''
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
 
   const [{ brands, total }, allStats] = await Promise.all([
@@ -55,7 +58,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
     if (searchParams.search) params.set('search', searchParams.search)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
-    return `/admin/brands${qs ? `?${qs}` : ''}`
+    return ap(`/admin/brands${qs ? `?${qs}` : ''}`, host)
   }
 
   return (
@@ -66,7 +69,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
           <p className="text-foreground-secondary mt-1 text-sm">Manage product brands</p>
         </div>
         <Link
-          href="/admin/brands/add"
+          href={ap('/admin/brands/add', host)}
           className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
         >
           Add New Brand
@@ -132,7 +135,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
                 </div>
               )}
               <div className="flex items-center justify-end gap-3 text-sm">
-                <Link href={`/admin/brands/edit/${brand.id}`} className="text-accent-500 font-medium">
+                <Link href={ap(`/admin/brands/edit/${brand.id}`, host)} className="text-accent-500 font-medium">
                   Edit
                 </Link>
                 <DeleteBrandButton brandId={brand.id} brandName={brand.name} />

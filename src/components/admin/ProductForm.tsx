@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 import { Star, Check, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
@@ -2055,7 +2056,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       {/* Form Actions */}
       <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
         <Link
-          href="/admin/products"
+          href={ap('/admin/products')}
           className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors text-center"
         >
           Cancel

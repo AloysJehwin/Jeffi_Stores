@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getCustomerById } from '@/lib/queries'
+import { ap } from '@/lib/admin-path'
 import CustomerActionButton from '@/components/admin/CustomerActionButton'
 import CustomerMailerPanel from '@/components/admin/CustomerMailerPanel'
 import AdminSupportChat from '@/components/admin/AdminSupportChat'
@@ -83,6 +85,7 @@ export default async function CustomerDetailPage({
   params: { id: string }
   searchParams: { chat?: string }
 }) {
+  const host = (await headers()).get('host') ?? ''
   let customer: any
   try {
     customer = await getCustomerById(params.id)
@@ -108,7 +111,7 @@ export default async function CustomerDetailPage({
     <div className="p-4 sm:p-6 max-w-full space-y-5">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href="/admin/customers" className="text-accent-500 hover:text-accent-600 transition-colors">
+        <Link href={ap('/admin/customers', host)} className="text-accent-500 hover:text-accent-600 transition-colors">
           Customers
         </Link>
         <span>/</span>
@@ -353,7 +356,7 @@ export default async function CustomerDetailPage({
                 )}
                 <div className="pt-2 border-t border-border-default">
                   <Link
-                    href={`/admin/business/customers/${customer.id}`}
+                    href={ap(`/admin/business/customers/${customer.id}`, host)}
                     className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                   >
                     Manage in Business Customers →
@@ -377,7 +380,7 @@ export default async function CustomerDetailPage({
               <h2 className="font-semibold text-foreground text-base">Orders</h2>
               {Number(customer.total_orders) > 10 && (
                 <Link
-                  href={`/admin/orders?customer=${customer.id}`}
+                  href={ap(`/admin/orders?customer=${customer.id}`, host)}
                   className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                 >
                   View all {Number(customer.total_orders)} →
@@ -421,7 +424,7 @@ export default async function CustomerDetailPage({
                         </td>
                         <td className="px-5 py-3.5 text-right text-sm">
                           <Link
-                            href={`/admin/orders/${order.id}`}
+                            href={ap(`/admin/orders/${order.id}`, host)}
                             className="text-accent-500 hover:text-accent-600 font-medium text-xs"
                           >
                             View →

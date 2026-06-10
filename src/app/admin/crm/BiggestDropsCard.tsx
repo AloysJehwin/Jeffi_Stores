@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useState } from 'react'
 import Link from 'next/link'
 import CrmMailerPanel from './CrmMailerPanel'
+import { ap } from '@/lib/admin-path'
 
 interface DropEntry {
   id: string
@@ -17,7 +18,7 @@ interface DropEntry {
 function Row({ c, large }: { c: DropEntry; large?: boolean }) {
   return (
     <Link
-      href={`/admin/customers/${c.id}`}
+      href={ap(`/admin/customers/${c.id}`)}
       className={`flex items-center justify-between text-sm ${large ? 'py-2.5' : 'py-1'} hover:bg-surface-secondary/50 px-2 -mx-2 rounded transition-colors`}
     >
       <div className="min-w-0 flex-1">
@@ -104,7 +105,7 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
                 <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
                   <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Send Mailer</h3>
                   <Link
-                    href="/admin/customers?segment=at_risk"
+                    href={ap('/admin/customers?segment=at_risk')}
                     className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                     onClick={() => setOpen(false)}
                   >

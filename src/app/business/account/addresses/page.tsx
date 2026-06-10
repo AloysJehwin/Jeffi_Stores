@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
+import { bp } from '@/lib/business-path'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import CustomSelect from '@/components/visitor/CustomSelect'
 
@@ -59,7 +60,7 @@ export default function AddressesPage() {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push('/business/signin?redirect=/account/addresses')
+      router.push(bp('/business/signin?redirect=/account/addresses'))
     }
     if (user) {
       fetchAddresses()

@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
+import { ap } from '@/lib/admin-path'
 
 
 interface Order {
@@ -59,7 +60,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
     for (const [k, v] of Object.entries(patch)) {
       if (v) p.set(k, v); else p.delete(k)
     }
-    router.replace(`/admin/packing-slips?${p.toString()}`, { scroll: false })
+    router.replace(`${ap('/admin/packing-slips')}?${p.toString()}`, { scroll: false })
   }
 
   useEffect(() => {

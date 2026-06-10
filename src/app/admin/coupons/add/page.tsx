@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
+import { ap } from '@/lib/admin-path'
 import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/db'
 import Link from 'next/link'
@@ -31,14 +33,17 @@ async function createCoupon(formData: FormData) {
     throw new Error('Failed to create coupon — code may already exist')
   }
   revalidatePath('/admin/coupons')
-  redirect('/admin/coupons')
+  const { headers: getHeaders } = await import('next/headers')
+  const host = (await getHeaders()).get('host') ?? ''
+  redirect(ap('/admin/coupons', host))
 }
 
-export default function AddCouponPage() {
+export default async function AddCouponPage() {
+  const host = (await headers()).get('host') ?? ''
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/coupons" className="text-foreground-muted hover:text-foreground transition-colors">
+        <Link href={ap('/admin/coupons', host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div>
