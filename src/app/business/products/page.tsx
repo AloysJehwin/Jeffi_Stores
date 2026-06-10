@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { queryMany, queryOne } from '@/lib/db'
 import { mrpDiscountPct } from '@/lib/pricing'
 import SortDropdown from '@/components/visitor/SortDropdown'
@@ -7,6 +8,7 @@ import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/business/ProductCard'
+import { bp } from '@/lib/business-path'
 
 const PAGE_SIZE = 21
 
@@ -182,7 +184,7 @@ async function getBrands() {
   `)
 }
 
-function buildPageUrl(searchParams: Record<string, string | undefined>, page: number) {
+function buildPageUrl(searchParams: Record<string, string | undefined>, page: number, host: string) {
   const params = new URLSearchParams()
   if (searchParams.category) params.set('category', searchParams.category)
   if (searchParams.brand)    params.set('brand',    searchParams.brand)
@@ -191,7 +193,7 @@ function buildPageUrl(searchParams: Record<string, string | undefined>, page: nu
   if (searchParams.order)    params.set('order',    searchParams.order)
   if (page > 1) params.set('page', String(page))
   const qs = params.toString()
-  return `/business/products${qs ? `?${qs}` : ''}`
+  return bp('/business/products', host) + (qs ? `?${qs}` : '')
 }
 
 export default async function ProductsPage({
@@ -199,6 +201,7 @@ export default async function ProductsPage({
 }: {
   searchParams: { [key: string]: string | undefined }
 }) {
+  const host = (await headers()).get('host') ?? ''
   const { products, total, page, totalPages } = await getProducts(searchParams)
   const categories = await getCategories()
   const brands = await getBrands()
@@ -251,13 +254,13 @@ export default async function ProductsPage({
                         if (searchParams.sort) p.set('sort', searchParams.sort)
                         if (searchParams.order) p.set('order', searchParams.order)
                         if (searchParams.search) p.set('search', searchParams.search)
-                        return `/business/products${p.toString() ? `?${p.toString()}` : ''}`
+                        return bp('/business/products', host) + (p.toString() ? `?${p.toString()}` : '')
                       }
 
                       return (
                         <>
                           <Link
-                            href="/business/products"
+                            href={bp('/business/products', host)}
                             className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                               activeCats.length === 0
                                 ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
@@ -339,7 +342,7 @@ export default async function ProductsPage({
                         if (searchParams.sort) p.set('sort', searchParams.sort)
                         if (searchParams.order) p.set('order', searchParams.order)
                         if (searchParams.search) p.set('search', searchParams.search)
-                        return `/business/products${p.toString() ? `?${p.toString()}` : ''}`
+                        return bp('/business/products', host) + (p.toString() ? `?${p.toString()}` : '')
                       }
 
                       const clearBrandsUrl = (() => {
@@ -348,7 +351,7 @@ export default async function ProductsPage({
                         if (searchParams.sort) p.set('sort', searchParams.sort)
                         if (searchParams.order) p.set('order', searchParams.order)
                         if (searchParams.search) p.set('search', searchParams.search)
-                        return `/business/products${p.toString() ? `?${p.toString()}` : ''}`
+                        return bp('/business/products', host) + (p.toString() ? `?${p.toString()}` : '')
                       })()
 
                       return (
@@ -393,7 +396,7 @@ export default async function ProductsPage({
                 {/* Clear Filters */}
                 {(searchParams.category || searchParams.brand || searchParams.search) && (
                   <Link
-                    href="/business/products"
+                    href={bp('/business/products', host)}
                     className="block text-center w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors"
                   >
                     Clear All Filters
@@ -466,7 +469,7 @@ export default async function ProductsPage({
                 <Pagination
                   page={page}
                   totalPages={totalPages}
-                  buildHref={(p) => buildPageUrl(searchParams, p)}
+                  buildHref={(p) => buildPageUrl(searchParams, p, host)}
                 />
               </>
             ) : (
@@ -479,7 +482,7 @@ export default async function ProductsPage({
                   We couldn&apos;t find any products matching your filters. Try adjusting your search criteria.
                 </p>
                 <Link
-                  href="/business/products"
+                  href={bp('/business/products', host)}
                   className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
                 >
                   View All Products

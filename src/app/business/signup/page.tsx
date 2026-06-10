@@ -5,14 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 import AdminSelect from '@/components/admin/AdminSelect'
-
-// On business.jeffistores.in pages live at /signin, /signup, /pending — no /business prefix needed
-function bp(path: string) {
-  if (typeof window !== 'undefined' && window.location.hostname.startsWith('business.')) {
-    return path.replace(/^\/business/, '') || '/'
-  }
-  return path
-}
+import { bp } from '@/lib/business-path'
 
 export default function BusinessSignUpWrapper() {
   return (

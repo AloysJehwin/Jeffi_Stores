@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import { applyDiscount } from '@/lib/pricing'
+import { bp } from '@/lib/business-path'
 
 interface SubVariantOption {
   id: string
@@ -242,7 +243,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
       }
       setOpen(false)
       showToast(`Quote request ${data.rfq?.rfq_number} submitted! Our team will get back to you.`, 'success')
-      router.push('/business/quotes')
+      router.push(bp('/business/quotes'))
     } catch {
       showToast('Failed to submit quote request', 'error')
     } finally {

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
+import { bp } from '@/lib/business-path'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
@@ -133,7 +134,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
 
   useEffect(() => {
     if (!authLoading && !user && authWasLoading.current) {
-      router.push('/business/signin?redirect=/business/account/orders')
+      router.push(bp('/business/signin?redirect=/account/orders'))
       return
     }
     if (user) fetchOrder()
@@ -323,7 +324,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <h3 className="text-xl font-semibold text-foreground mb-2">Order Not Found</h3>
                 <p className="text-foreground-secondary mb-6">{error || 'Unable to load order details'}</p>
-                <Link href="/business/account/orders" className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors">
+                <Link href={bp('/business/account/orders')} className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors">
                   View All Orders
                 </Link>
               </div>
@@ -343,7 +344,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
 
         <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
             {/* Back */}
-            <Link href="/business/account/orders" className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm">
+            <Link href={bp('/business/account/orders')} className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm">
               <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
@@ -358,7 +359,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
                   {order.originalOrderId && order.originalOrderNumber && (
                     <p className="text-sm text-blue-600 dark:text-blue-400 mt-0.5">
                       Replacement for{' '}
-                      <Link href={`/business/account/orders/${order.originalOrderId}`} className="underline hover:text-blue-800 dark:hover:text-blue-300">
+                      <Link href={bp(`/business/account/orders/${order.originalOrderId}`)} className="underline hover:text-blue-800 dark:hover:text-blue-300">
                         #{order.originalOrderNumber}
                       </Link>
                     </p>
@@ -496,7 +497,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
                       </div>
                       <div className="flex-1 min-w-0">
                         {item.products?.slug ? (
-                          <Link href={`/business/products/${item.products.slug}`} className="font-medium text-foreground hover:text-accent-600 dark:hover:text-accent-400 block">
+                          <Link href={bp(`/business/products/${item.products.slug}`)} className="font-medium text-foreground hover:text-accent-600 dark:hover:text-accent-400 block">
                             {item.productName}
                           </Link>
                         ) : (
@@ -683,10 +684,10 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/business/account/orders" className="flex-1 bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors text-center">
+              <Link href={bp('/business/account/orders')} className="flex-1 bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors text-center">
                 View All Orders
               </Link>
-              <Link href="/business/products" className="flex-1 bg-surface-elevated text-foreground-secondary px-6 py-3 rounded-lg border-2 border-border-secondary hover:bg-surface-secondary transition-colors text-center font-semibold">
+              <Link href={bp('/business/products')} className="flex-1 bg-surface-elevated text-foreground-secondary px-6 py-3 rounded-lg border-2 border-border-secondary hover:bg-surface-secondary transition-colors text-center font-semibold">
                 Continue Shopping
               </Link>
             </div>

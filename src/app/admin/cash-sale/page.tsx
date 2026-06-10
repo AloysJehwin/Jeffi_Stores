@@ -1,21 +1,23 @@
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { ap } from '@/lib/admin-path'
 import CashSaleClient from './CashSaleClient'
 
 export const metadata = { title: 'Cash Sale — Jeffi Admin' }
 
 export default async function CashSalePage() {
+  const host = (await headers()).get('host') ?? ''
   const cookieStore = cookies()
   const token = cookieStore.get('admin_token')
-  if (!token) redirect('/admin/login')
+  if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null
-  try { session = await verifyToken(token.value) } catch { redirect('/admin/login') }
+  try { session = await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
 
   if (!hasScope(session?.role || '', session?.scopes || [], 'invoices')) {
-    redirect('/admin/dashboard')
+    redirect(ap('/admin/dashboard', host))
   }
 
   return (

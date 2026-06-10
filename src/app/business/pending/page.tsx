@@ -1,13 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-
-function bp(path: string) {
-  if (typeof window !== 'undefined' && window.location.hostname.startsWith('business.')) {
-    return path.replace(/^\/business/, '') || '/'
-  }
-  return path
-}
+import { bp } from '@/lib/business-path'
 
 export default function BusinessPendingPage() {
   return (

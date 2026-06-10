@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
+import { ap } from '@/lib/admin-path'
 import { queryMany, queryCount } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
@@ -60,6 +62,7 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
 }
 
 export default async function CouponsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const host = (await headers()).get('host') ?? ''
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const sort = searchParams.sort
   const dir = searchParams.dir as 'asc' | 'desc' | undefined
@@ -84,7 +87,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
-    return `/admin/coupons${qs ? `?${qs}` : ''}`
+    return ap(`/admin/coupons${qs ? `?${qs}` : ''}`, host)
   }
 
   return (
@@ -94,7 +97,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Coupons</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage discount coupons</p>
         </div>
-        <Link href="/admin/coupons/add" className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+        <Link href={ap('/admin/coupons/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
           Add New Coupon
         </Link>
       </div>
@@ -176,7 +179,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
                 {c.valid_until && ` · Expires ${new Date(c.valid_until).toLocaleDateString('en-IN')}`}
               </div>
               <div className="flex gap-3 pt-1">
-                <Link href={`/admin/coupons/edit/${c.id}`} className="text-sm text-accent-500 hover:underline">Edit</Link>
+                <Link href={ap(`/admin/coupons/edit/${c.id}`, host)} className="text-sm text-accent-500 hover:underline">Edit</Link>
                 <DeleteCouponButton id={c.id} code={c.code} />
               </div>
             </div>

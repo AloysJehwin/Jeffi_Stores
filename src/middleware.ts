@@ -127,11 +127,17 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(NextResponse.next())
   }
 
-  if (isAdminSubdomain && !isAdminPath && !isAdminApiPath) {
-    if (pathname.startsWith('/api/')) {
+  if (isAdminSubdomain) {
+    if (isAdminApiPath) {
+      // Admin API auth is handled below — fall through
+    } else if (pathname.startsWith('/api/')) {
       return addSecurityHeaders(NextResponse.next())
+    } else if (!isAdminPath) {
+      // Rewrite subdomain root paths to /admin/* (same pattern as business subdomain)
+      // e.g. admin.jeffistores.in/dashboard → served from /admin/dashboard
+      const slug = pathname === '/' ? '' : pathname
+      return addSecurityHeaders(NextResponse.rewrite(new URL(`/admin${slug}`, request.url)))
     }
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url))
   }
 
   if (isAdminApiPath) {

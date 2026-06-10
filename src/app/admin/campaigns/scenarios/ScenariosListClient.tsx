@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { ap } from '@/lib/admin-path'
 
 interface ScenarioCampaign {
   scenario_kind: string
@@ -119,20 +120,20 @@ export default function ScenariosListClient() {
       <div className="flex items-center justify-between gap-2 border-b border-border-default">
         <div className="flex items-center gap-2">
           <Link
-            href="/admin/campaigns"
+            href={ap('/admin/campaigns')}
             className="px-4 py-2 text-sm font-semibold text-foreground-muted hover:text-foreground border-b-2 border-transparent transition-colors"
           >
             Campaigns
           </Link>
           <Link
-            href="/admin/campaigns/scenarios"
+            href={ap('/admin/campaigns/scenarios')}
             className="px-4 py-2 text-sm font-semibold text-accent-600 dark:text-accent-400 border-b-2 border-accent-500"
           >
             Scenarios
           </Link>
         </div>
         <Link
-          href="/admin/campaigns/scenarios/new"
+          href={ap('/admin/campaigns/scenarios/new')}
           className="mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
         >
           + New scenario
@@ -192,13 +193,13 @@ export default function ScenariosListClient() {
                     </button>
                   )}
                   <Link
-                    href={`/admin/campaigns/new?scenario=${s.kind}`}
+                    href={ap(`/admin/campaigns/new?scenario=${s.kind}`)}
                     className="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95"
                   >
                     + New campaign
                   </Link>
                   <Link
-                    href={`/admin/campaigns/scenarios/${s.kind}`}
+                    href={ap(`/admin/campaigns/scenarios/${s.kind}`)}
                     className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-semibold transition-all"
                   >
                     Configure
@@ -258,7 +259,7 @@ export default function ScenariosListClient() {
                     {s.campaigns.map(c => (
                       <Link
                         key={c.kind}
-                        href={`/admin/campaigns/${c.kind}`}
+                        href={ap(`/admin/campaigns/${c.kind}`)}
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                           c.enabled
                             ? 'bg-green-50 hover:bg-green-100 text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/40 dark:text-green-300'

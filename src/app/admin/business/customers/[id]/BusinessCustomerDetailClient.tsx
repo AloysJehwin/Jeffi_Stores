@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ap } from '@/lib/admin-path'
 
 interface Customer {
   id: string
@@ -162,7 +163,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href="/admin/business/customers" className="text-accent-500 hover:text-accent-600 transition-colors">
+        <Link href={ap('/admin/business/customers')} className="text-accent-500 hover:text-accent-600 transition-colors">
           Business Customers
         </Link>
         <span>/</span>

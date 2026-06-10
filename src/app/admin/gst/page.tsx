@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from '@/components/ui/DatePicker'
+import { ap } from '@/lib/admin-path'
 
 type Tab = 'gstr1' | 'gstr3b' | 'irn' | 'itc'
 
@@ -79,7 +80,7 @@ export default function GSTPage() {
 
   function handleTabChange(id: Tab) {
     setTab(id)
-    router.push(`/admin/gst?tab=${id}`, { scroll: false })
+    router.push(ap(`/admin/gst?tab=${id}`), { scroll: false })
   }
   const [preset, setPreset] = useState('this_month')
   const initial = getPresetRange('this_month')

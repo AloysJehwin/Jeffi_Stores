@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
 import LineItemsSection, { newLineItem, type LineItem } from '@/components/admin/LineItemsSection'
+import { ap } from '@/lib/admin-path'
 
 function fmt(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -92,7 +93,7 @@ export default function NewOfflineOrderPage() {
               </a>
             )}
             <a
-              href={`/admin/orders/${success.orderId}`}
+              href={ap(`/admin/orders/${success.orderId}`)}
               className="px-4 py-2 bg-surface border border-border-default rounded text-sm font-medium text-foreground"
             >
               View Order
@@ -118,7 +119,7 @@ export default function NewOfflineOrderPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href="/admin/orders" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a href={ap('/admin/orders')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
           Orders
         </a>

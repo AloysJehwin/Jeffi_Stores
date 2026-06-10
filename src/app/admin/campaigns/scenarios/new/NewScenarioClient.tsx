@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import { ap } from '@/lib/admin-path'
 
 interface Validation {
   ok: boolean
@@ -132,7 +133,7 @@ export default function NewScenarioClient() {
         return
       }
       showToast(`Scenario "${data.kind}" created (paused). Enable it from the list to activate.`, 'success')
-      router.push('/admin/campaigns/scenarios')
+      router.push(ap('/admin/campaigns/scenarios'))
     } finally {
       setSaving(false)
     }
@@ -144,7 +145,7 @@ export default function NewScenarioClient() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm">
-        <Link href="/admin/campaigns/scenarios" className="text-foreground-muted hover:text-foreground transition-colors">Scenarios</Link>
+        <Link href={ap('/admin/campaigns/scenarios')} className="text-foreground-muted hover:text-foreground transition-colors">Scenarios</Link>
         <span className="text-foreground-muted">/</span>
         <span className="text-foreground font-medium">New scenario</span>
       </div>
@@ -199,7 +200,7 @@ export default function NewScenarioClient() {
             >
               {generating ? 'Generating…' : 'Generate SQL with AI'}
             </button>
-            <Link href="/admin/campaigns/scenarios" className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors">Cancel</Link>
+            <Link href={ap('/admin/campaigns/scenarios')} className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors">Cancel</Link>
           </div>
         </div>
       )}

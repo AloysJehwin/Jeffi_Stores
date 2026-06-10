@@ -4,6 +4,7 @@ import AdminUserActions from '@/components/admin/AdminUserActions'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES } from '@/lib/scopes'
 import { redirect } from 'next/navigation'
+import { ap } from '@/lib/admin-path'
 
 async function getAdminInfo(adminId: string) {
   return queryOne(
@@ -61,9 +62,10 @@ function certStatus(admin: any): string {
 export default async function TeamPage() {
   const headersList = headers()
   const adminId = headersList.get('x-user-id') || ''
+  const host = headersList.get('host') ?? ''
 
   const adminInfo = await getAdminInfo(adminId)
-  if (adminInfo?.role !== 'super_admin') redirect('/admin/settings')
+  if (adminInfo?.role !== 'super_admin') redirect(ap('/admin/settings', host))
 
   const allAdmins = await getAllAdmins()
 

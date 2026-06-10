@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 
 interface SignupEntry {
   id: string
@@ -23,7 +24,7 @@ function timeAgo(iso: string) {
 function SignupRow({ s }: { s: SignupEntry }) {
   return (
     <Link
-      href={`/admin/customers/${s.id}`}
+      href={ap(`/admin/customers/${s.id}`)}
       className="flex items-center justify-between gap-3 py-2 hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
     >
       <div className="min-w-0 flex-1">
@@ -55,7 +56,7 @@ export default function RecentSignupsCard({ items }: { items: SignupEntry[] }) {
               </button>
             )}
             {!hasMore && (
-              <Link href="/admin/customers?segment=lead" className="text-xs text-accent-500 hover:text-accent-600 font-medium">
+              <Link href={ap('/admin/customers?segment=lead')} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
                 View leads →
               </Link>
             )}
@@ -107,7 +108,7 @@ export default function RecentSignupsCard({ items }: { items: SignupEntry[] }) {
             </div>
             <div className="pt-4 shrink-0 border-t border-border-default mt-2">
               <Link
-                href="/admin/customers?segment=lead"
+                href={ap('/admin/customers?segment=lead')}
                 className="block text-center text-xs text-accent-500 hover:text-accent-600 font-medium"
                 onClick={() => setOpen(false)}
               >

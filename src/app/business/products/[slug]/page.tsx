@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { cache } from 'react'
 import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import { mrpDiscountPct } from '@/lib/pricing'
+import { bp } from '@/lib/business-path'
 import ProductDetailClient from '@/components/business/ProductDetailClient'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ProductCard from '@/components/business/ProductCard'
@@ -285,6 +287,8 @@ export default async function ProductDetailPage({
     notFound()
   }
 
+  const host = (await headers()).get('host') ?? ''
+
   const relatedProducts = await getRelatedProducts(product.id, product.category_id, product.name)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
   const jsonLd = buildProductJsonLd(product, baseUrl)
@@ -324,18 +328,18 @@ export default async function ProductDetailPage({
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center gap-2 text-sm">
-            <Link href="/business" className="text-foreground-muted hover:text-accent-500 whitespace-nowrap">
+            <Link href={bp('/business', host)} className="text-foreground-muted hover:text-accent-500 whitespace-nowrap">
               Home
             </Link>
             <span className="text-foreground-muted">/</span>
-            <Link href="/business/products" className="text-foreground-muted hover:text-accent-500 whitespace-nowrap">
+            <Link href={bp('/business/products', host)} className="text-foreground-muted hover:text-accent-500 whitespace-nowrap">
               Products
             </Link>
             {product.categories && (
               <>
                 <span className="text-foreground-muted">/</span>
                 <Link
-                  href={`/business/categories/${product.categories.slug}`}
+                  href={bp('/business/categories/' + product.categories.slug, host)}
                   className="text-foreground-muted hover:text-accent-500 whitespace-nowrap hidden sm:inline"
                 >
                   {product.categories.name}
@@ -371,7 +375,7 @@ export default async function ProductDetailPage({
         <ProductReviews productId={product.id} productName={product.name} />
 
         {/* Recently Viewed */}
-        <RecentlyViewed excludeId={product.id} basePath="/business/products" />
+        <RecentlyViewed excludeId={product.id} basePath={bp('/business/products', host)} />
 
         {/* Related Products */}
         {relatedProducts.length >= 4 && (
