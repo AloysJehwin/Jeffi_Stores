@@ -133,9 +133,36 @@ export async function middleware(request: NextRequest) {
     } else if (pathname.startsWith('/api/')) {
       return addSecurityHeaders(NextResponse.next())
     } else if (!isAdminPath) {
+      // /business/* paths on the admin subdomain should not be rewritten — pass through
+      if (pathname.startsWith('/business/') || pathname === '/business') {
+        return addSecurityHeaders(NextResponse.next())
+      }
       // Rewrite subdomain root paths to /admin/* (same pattern as business subdomain)
       // e.g. admin.jeffistores.in/dashboard → served from /admin/dashboard
       const slug = pathname === '/' ? '' : pathname
+
+      // Auth check before rewrite so server components receive x-user-id etc.
+      const isAdminLogin = pathname === '/login'
+      if (!isAdminLogin) {
+        const token = request.cookies.get('admin_token')?.value
+        if (!token) {
+          return NextResponse.redirect(new URL('/login', request.url))
+        }
+        const payload = await verifyToken(token)
+        if (!payload) {
+          const res = NextResponse.redirect(new URL('/login', request.url))
+          res.cookies.delete('admin_token')
+          return res
+        }
+        const rewriteUrl = new URL(`/admin${slug}`, request.url)
+        const response = NextResponse.rewrite(rewriteUrl)
+        response.headers.set('x-pathname', `/admin${slug}`)
+        response.headers.set('x-user-id', payload.adminId)
+        response.headers.set('x-username', payload.username)
+        response.headers.set('x-user-role', payload.role)
+        response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
+        return addSecurityHeaders(response)
+      }
       return addSecurityHeaders(NextResponse.rewrite(new URL(`/admin${slug}`, request.url)))
     }
   }

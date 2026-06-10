@@ -72,7 +72,11 @@ export function openGoogleOAuthPopup({
     }, 3 * 60 * 1000)
 
     const onMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
+      // Accept postMessage from the main origin (callback page) even when on business subdomain
+      const expectedOrigin = window.location.hostname.startsWith('business.')
+        ? window.location.origin.replace(/^(https?:\/\/)business\./, '$1')
+        : window.location.origin
+      if (event.origin !== expectedOrigin && event.origin !== window.location.origin) return
       const data = event.data
       if (!data || data.source !== 'jeffi-google-oauth') return
       if (data.error) {
