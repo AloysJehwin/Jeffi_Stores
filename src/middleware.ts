@@ -133,6 +133,12 @@ export async function middleware(request: NextRequest) {
     } else if (pathname.startsWith('/api/')) {
       return addSecurityHeaders(NextResponse.next())
     } else if (!isAdminPath) {
+      // B2B portal pages have no admin equivalent — redirect to the business subdomain
+      const BUSINESS_ONLY = ['/business/signin', '/business/signup', '/business/pending']
+      if (BUSINESS_ONLY.some(p => pathname.startsWith(p))) {
+        const businessOrigin = hostname.replace(/^admin\./, 'business.')
+        return NextResponse.redirect(new URL(pathname, `${request.nextUrl.protocol}//${businessOrigin}`))
+      }
       // Rewrite subdomain root paths to /admin/* (same pattern as business subdomain)
       // e.g. admin.jeffistores.in/dashboard → served from /admin/dashboard
       const slug = pathname === '/' ? '' : pathname
