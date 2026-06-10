@@ -137,12 +137,23 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                 </svg>
               </button>
             </div>
-            {qrImageUrl ? (
+            {qrLoading ? (
+              <div className="w-52 h-52 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : qrImageUrl ? (
               <img src={qrImageUrl} alt="UPI QR Code" className="w-52 h-52 object-contain rounded-lg" />
             ) : (
               <p className="text-sm text-foreground-secondary">No QR available.</p>
             )}
             <p className="text-xs text-foreground-secondary text-center">Scan with any UPI app to pay</p>
+            <button
+              onClick={generateQr}
+              disabled={qrLoading}
+              className="text-xs text-foreground-secondary hover:text-foreground underline underline-offset-2 transition-colors disabled:opacity-50"
+            >
+              {qrLoading ? 'Regenerating…' : 'Regenerate QR'}
+            </button>
           </div>
         </div>
       )}
@@ -175,7 +186,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {o.status === 'draft' && (
+          {o.status === 'draft' && o.source !== 'business' && (
             <a
               href={ap(`/admin/invoices?view=edit&edit=${o.id}`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
@@ -186,7 +197,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           )}
           {showQrSection && (
             <button
-              onClick={qrImageUrl ? () => setQrModalOpen(true) : generateQr}
+              onClick={() => qrImageUrl ? setQrModalOpen(true) : generateQr()}
               disabled={qrLoading}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
             >
