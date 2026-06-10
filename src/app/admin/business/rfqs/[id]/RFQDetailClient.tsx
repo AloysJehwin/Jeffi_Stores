@@ -59,12 +59,20 @@ const STATUS_LABEL: Record<string, string> = {
   rejected: 'Rejected',
 }
 
-function resolveItemPrice(item: RFQItem): number | null {
-  // Prefer MRP (incl-GST retail price) as the "catalog" reference, fall back to base_price
+function resolveItemMrp(item: RFQItem): number | null {
   const mrp = item.sub_variant_mrp ?? item.variant_mrp ?? item.product_mrp ?? null
-  if (mrp != null) return Number(mrp)
+  return mrp != null ? Number(mrp) : null
+}
+
+function resolveItemSellingPrice(item: RFQItem): number | null {
+  // The regular B2B/online selling price (incl. GST), lower than MRP
   const raw = item.sub_variant_price ?? item.variant_price ?? item.base_price ?? null
   return raw != null ? Number(raw) : null
+}
+
+function resolveItemPrice(item: RFQItem): number | null {
+  // For summary totals: prefer MRP, fall back to selling price
+  return resolveItemMrp(item) ?? resolveItemSellingPrice(item)
 }
 
 function resolveItemSku(item: RFQItem): string | null {
@@ -132,10 +140,16 @@ export default function RFQDetailClient({ id }: { id: string }) {
   }
 
   const totalRequested = items.reduce((sum, i) => sum + (i.requested_price ? Number(i.requested_price) * i.quantity : 0), 0)
-  const totalCatalog = items.reduce((sum, i) => {
-    const p = resolveItemPrice(i)
+  const totalSelling = items.reduce((sum, i) => {
+    const p = resolveItemSellingPrice(i)
     return sum + (p != null ? p * i.quantity : 0)
   }, 0)
+  const totalMrp = items.reduce((sum, i) => {
+    const p = resolveItemMrp(i)
+    return sum + (p != null ? p * i.quantity : 0)
+  }, 0)
+  // For header stat: prefer selling total, fallback to MRP total
+  const totalCatalog = totalSelling > 0 ? totalSelling : totalMrp
 
   if (loading) return (
     <div className="p-6 flex items-center justify-center py-24">
@@ -234,7 +248,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Items', value: String(items.length) },
-            { label: 'Catalog Value', value: totalCatalog > 0 ? `₹${totalCatalog.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—' },
+            { label: 'Our Price Total', value: totalCatalog > 0 ? `₹${totalCatalog.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—' },
             { label: 'Requested Value', value: totalRequested > 0 ? `₹${totalRequested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—' },
             { label: 'GST Number', value: rfq.gst_number || '—' },
           ].map(({ label, value }) => (
@@ -277,7 +291,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
             {totalRequested > 0 && totalCatalog > 0 && (
               <span className="text-xs text-foreground-muted">
                 Discount requested: <span className="font-semibold text-accent-500">
-                  {Math.round(((totalCatalog - totalRequested) / totalCatalog) * 100)}%
+                  {Math.round(((totalCatalog - totalRequested) / totalCatalog) * 100)}% off our price
                 </span>
               </span>
             )}
@@ -290,17 +304,22 @@ export default function RFQDetailClient({ id }: { id: string }) {
           ) : (
             <div className="space-y-3">
               {items.map((item, i) => {
+                const mrpPrice = resolveItemMrp(item)
+                const sellingPrice = resolveItemSellingPrice(item)
                 const catalogPrice = resolveItemPrice(item)
                 const sku = resolveItemSku(item)
-                const discount = (item.requested_price != null && catalogPrice != null && catalogPrice > 0)
-                  ? Math.round(((catalogPrice - Number(item.requested_price)) / catalogPrice) * 100)
+                // Discount is calculated against selling price (what they'd normally pay), or MRP if no selling price
+                const baseForDiscount = sellingPrice ?? mrpPrice ?? null
+                const discount = (item.requested_price != null && baseForDiscount != null && baseForDiscount > 0)
+                  ? Math.round(((baseForDiscount - Number(item.requested_price)) / baseForDiscount) * 100)
                   : null
                 const itemCatalogTotal = catalogPrice != null ? catalogPrice * item.quantity : null
+                const itemSellingTotal = sellingPrice != null ? sellingPrice * item.quantity : null
                 const itemRequestedTotal = item.requested_price != null ? Number(item.requested_price) * item.quantity : null
 
                 const hasDiscount = discount != null && discount > 0
-                const savingPerUnit = (hasDiscount && catalogPrice != null && item.requested_price != null)
-                  ? catalogPrice - Number(item.requested_price)
+                const savingPerUnit = (hasDiscount && baseForDiscount != null && item.requested_price != null)
+                  ? baseForDiscount - Number(item.requested_price)
                   : null
 
                 return (
@@ -378,16 +397,27 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           </div>
 
                           {/* Price column */}
-                          <div className="shrink-0 text-right space-y-1 min-w-[120px]">
-                            {catalogPrice != null && (
+                          <div className="shrink-0 text-right space-y-2 min-w-[130px]">
+                            {/* MRP */}
+                            {mrpPrice != null && (
                               <div>
                                 <p className="text-[10px] text-foreground-muted uppercase tracking-wide">MRP</p>
-                                <p className="text-sm font-medium text-foreground-secondary">
-                                  ₹{catalogPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                <p className="text-sm text-foreground-muted line-through decoration-foreground-muted/50">
+                                  ₹{mrpPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            )}
+                            {/* Selling price (what customer normally pays) */}
+                            {sellingPrice != null && (
+                              <div>
+                                <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Our Price</p>
+                                <p className="text-sm font-medium text-foreground">
+                                  ₹{sellingPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                   <span className="text-foreground-muted text-[10px] ml-0.5">/unit</span>
                                 </p>
                               </div>
                             )}
+                            {/* Requested price */}
                             {item.requested_price != null ? (
                               <div>
                                 <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Requested</p>
@@ -397,7 +427,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                 </p>
                                 {discount != null && discount <= 0 && (
                                   <span className="inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 mt-0.5">
-                                    At/above catalog
+                                    At/above price
                                   </span>
                                 )}
                               </div>
@@ -411,13 +441,13 @@ export default function RFQDetailClient({ id }: { id: string }) {
                         </div>
 
                         {/* Line totals */}
-                        {(itemCatalogTotal != null || itemRequestedTotal != null) && (
-                          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border-default">
-                            {itemCatalogTotal != null && (
+                        {(itemCatalogTotal != null || itemSellingTotal != null || itemRequestedTotal != null) && (
+                          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border-default flex-wrap">
+                            {itemSellingTotal != null && (
                               <div className="text-xs text-foreground-muted">
-                                MRP total:&nbsp;
+                                Price total:&nbsp;
                                 <span className="text-foreground font-medium">
-                                  ₹{itemCatalogTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{itemSellingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </span>
                               </div>
                             )}
@@ -429,9 +459,9 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                 </span>
                               </div>
                             )}
-                            {itemCatalogTotal != null && itemRequestedTotal != null && itemCatalogTotal > itemRequestedTotal && (
+                            {itemSellingTotal != null && itemRequestedTotal != null && itemSellingTotal > itemRequestedTotal && (
                               <div className="ml-auto text-xs text-green-600 dark:text-green-400 font-medium">
-                                Saves ₹{(itemCatalogTotal - itemRequestedTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                Saves ₹{(itemSellingTotal - itemRequestedTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </div>
                             )}
                           </div>
@@ -445,23 +475,29 @@ export default function RFQDetailClient({ id }: { id: string }) {
           )}
 
           {/* Summary row */}
-          {(totalCatalog > 0 || totalRequested > 0) && (
+          {(totalMrp > 0 || totalSelling > 0 || totalRequested > 0) && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4 flex flex-wrap items-center gap-6">
-              {totalCatalog > 0 && (
+              {totalMrp > 0 && (
                 <div>
-                  <p className="text-xs text-foreground-muted mb-0.5">Total Catalog Value</p>
-                  <p className="font-semibold text-foreground">₹{totalCatalog.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-foreground-muted mb-0.5">Total MRP</p>
+                  <p className="font-medium text-foreground-secondary line-through decoration-foreground-muted/50">₹{totalMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                </div>
+              )}
+              {totalSelling > 0 && (
+                <div>
+                  <p className="text-xs text-foreground-muted mb-0.5">Total Our Price</p>
+                  <p className="font-semibold text-foreground">₹{totalSelling.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                 </div>
               )}
               {totalRequested > 0 && (
                 <div>
-                  <p className="text-xs text-foreground-muted mb-0.5">Total Requested Value</p>
+                  <p className="text-xs text-foreground-muted mb-0.5">Total Requested</p>
                   <p className="font-bold text-accent-500">₹{totalRequested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
                 </div>
               )}
               {totalCatalog > 0 && totalRequested > 0 && totalCatalog > totalRequested && (
                 <div className="ml-auto">
-                  <p className="text-xs text-foreground-muted mb-0.5">Total Discount Requested</p>
+                  <p className="text-xs text-foreground-muted mb-0.5">Discount Requested</p>
                   <p className="font-bold text-green-600 dark:text-green-400">
                     ₹{(totalCatalog - totalRequested).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     <span className="text-xs font-normal text-foreground-muted ml-1">
