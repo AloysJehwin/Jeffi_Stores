@@ -1,4 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
+import { headers } from 'next/headers'
+import { ap } from '@/lib/admin-path'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories } from '@/lib/queries'
 import { query, queryOne } from '@/lib/db'
@@ -48,7 +50,9 @@ async function updateCategory(categoryId: string, formData: FormData) {
   revalidatePath('/admin/products/add')
   revalidatePath('/admin/products/edit/[id]', 'page')
 
-  redirect('/admin/categories')
+  const { headers: getHeaders } = await import('next/headers')
+  const host = (await getHeaders()).get('host') ?? ''
+  redirect(ap('/admin/categories', host))
 }
 
 export default async function EditCategoryPage({ params }: { params: { id: string } }) {
@@ -58,12 +62,13 @@ export default async function EditCategoryPage({ params }: { params: { id: strin
     notFound()
   }
 
+  const host = (await headers()).get('host') ?? ''
   const categories = await getAllCategories()
 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href="/admin/categories" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a href={ap('/admin/categories', host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
           Categories
         </a>

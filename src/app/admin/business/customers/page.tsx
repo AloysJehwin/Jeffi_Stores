@@ -1,11 +1,12 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { redirect } from 'next/navigation'
 import { queryMany } from '@/lib/db'
+import { ap } from '@/lib/admin-path'
 
 const PAGE_SIZE = 25
 
@@ -83,9 +84,10 @@ export default async function BusinessCustomersPage({
 }) {
   const cookieStore = cookies()
   const token = cookieStore.get('admin_token')
-  if (!token) redirect('/admin/login')
+  const host = (await headers()).get('host') ?? ''
+  if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
-  if (!session || !hasScope(session.role, session.scopes || [], 'business_customers')) redirect('/admin/dashboard')
+  if (!session || !hasScope(session.role, session.scopes || [], 'business_customers')) redirect(ap('/admin/dashboard', host))
 
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const { customers, total } = await getBusinessCustomers({
@@ -102,7 +104,7 @@ export default async function BusinessCustomersPage({
     Object.entries(extra).forEach(([k, v]) => params.set(k, v))
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
-    return `/admin/business/customers${qs ? `?${qs}` : ''}`
+    return ap(`/admin/business/customers${qs ? `?${qs}` : ''}`, host)
   }
 
   const pendingCount = (await queryMany<{ count: string }>(`SELECT COUNT(*) AS count FROM business_profiles WHERE approval_status='pending'`, []))[0]?.count || '0'
@@ -204,7 +206,7 @@ export default async function BusinessCustomersPage({
                 </td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`/admin/business/customers/${c.user_id}`}
+                    href={ap(`/admin/business/customers/${c.user_id}`, host)}
                     className="text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
                   >
                     View →

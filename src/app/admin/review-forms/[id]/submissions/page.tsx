@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Star } from 'lucide-react'
+import { ap } from '@/lib/admin-path'
 
 interface CustomField {
   id: string
@@ -88,7 +89,7 @@ export default function SubmissionsPage({ params }: { params: { id: string } }) 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/review-forms" className="text-foreground-muted hover:text-foreground transition-colors">
+        <Link href={ap('/admin/review-forms')} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div>

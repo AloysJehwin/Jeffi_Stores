@@ -7,6 +7,7 @@ import SearchBar from '@/components/visitor/SearchBar'
 import ThemeToggle from '@/components/ThemeToggle'
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { bp } from '@/lib/business-path'
 
 export default function BusinessHeader() {
   const { cartCount } = useCart()
@@ -56,7 +57,7 @@ export default function BusinessHeader() {
           <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20 gap-3">
 
             {/* Logo */}
-            <Link href="/business" className="flex items-center shrink-0">
+            <Link href={bp('/business')} className="flex items-center shrink-0">
               <div className="flex items-center gap-2 sm:gap-3">
                 <img src="/images/logo.png" alt="Jeffi Stores Logo" className="h-8 sm:h-10 lg:h-12 w-auto" />
                 <div>
@@ -76,9 +77,9 @@ export default function BusinessHeader() {
               {NAV.map(({ href, label }) => (
                 <Link
                   key={href}
-                  href={href}
+                  href={bp(href)}
                   className={`font-medium transition-colors ${
-                    pathname.startsWith(href) ? 'text-accent-500' : 'text-foreground-secondary hover:text-accent-500'
+                    pathname.startsWith(bp(href)) ? 'text-accent-500' : 'text-foreground-secondary hover:text-accent-500'
                   }`}
                 >
                   {label}
@@ -91,7 +92,7 @@ export default function BusinessHeader() {
               <SearchBar isOpen={searchOpen} onOpen={() => setSearchOpen(true)} onClose={() => setSearchOpen(false)} basePath="/business/products" />
 
               {/* Cart */}
-              <Link href="/business/cart" className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group">
+              <Link href={bp('/business/cart')} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group">
                 <svg className="w-6 h-6 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
@@ -117,9 +118,9 @@ export default function BusinessHeader() {
                 </button>
                 {userMenuOpen && (
                   <div className="absolute right-0 top-full mt-2 w-48 bg-surface-elevated border border-border-default rounded-xl shadow-lg py-1 z-50">
-                    <Link href="/business/account" className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors">My Profile</Link>
-                    <Link href="/business/account/orders" className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors">My Orders</Link>
-                    <Link href="/business/quotes" className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors">My Quotes</Link>
+                    <Link href={bp('/business/account')} className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors">My Profile</Link>
+                    <Link href={bp('/business/account/orders')} className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors">My Orders</Link>
+                    <Link href={bp('/business/quotes')} className="block px-4 py-2.5 text-sm text-foreground hover:bg-surface-secondary transition-colors">My Quotes</Link>
                     <div className="border-t border-border-default my-1" />
                     <button onClick={logout} className="block w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-surface-secondary transition-colors">
                       Sign Out
@@ -159,7 +160,7 @@ export default function BusinessHeader() {
             className={`fixed top-0 left-0 bottom-0 z-50 w-4/5 max-w-xs bg-surface-elevated shadow-xl flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
           >
             <div className="flex items-center justify-between p-4 border-b border-border-default">
-              <Link href="/business" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
+              <Link href={bp('/business')} className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
                 <img src="/images/logo.png" alt="Jeffi Stores" className="h-10 w-auto" />
                 <div>
                   <span className="font-bold text-secondary-500 dark:text-primary-400">Jeffi Stores</span>
@@ -178,9 +179,9 @@ export default function BusinessHeader() {
               {NAV.map(({ href, label }) => (
                 <Link
                   key={href}
-                  href={href}
+                  href={bp(href)}
                   className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    pathname.startsWith(href) ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400' : 'text-foreground-secondary hover:bg-surface-secondary'
+                    pathname.startsWith(bp(href)) ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400' : 'text-foreground-secondary hover:bg-surface-secondary'
                   }`}
                 >
                   {label}
@@ -193,7 +194,7 @@ export default function BusinessHeader() {
             {/* Cart */}
             <div className="flex flex-col p-4 gap-1">
               <Link
-                href="/business/cart"
+                href={bp('/business/cart')}
                 className="flex items-center justify-between px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -227,13 +228,13 @@ export default function BusinessHeader() {
                   </div>
                 </div>
               )}
-              <Link href="/business/account" className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
+              <Link href={bp('/business/account')} className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
                 My Profile
               </Link>
-              <Link href="/business/account/orders" className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
+              <Link href={bp('/business/account/orders')} className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
                 My Orders
               </Link>
-              <Link href="/business/quotes" className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
+              <Link href={bp('/business/quotes')} className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors text-sm">
                 My Quotes
               </Link>
               <button

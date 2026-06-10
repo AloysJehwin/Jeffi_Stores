@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
+import { ap } from '@/lib/admin-path'
 import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/db'
 import BrandForm from '@/components/admin/BrandForm'
@@ -29,7 +31,9 @@ async function createBrand(formData: FormData) {
     revalidatePath('/admin/products/add')
     revalidatePath('/admin/products/edit/[id]', 'page')
 
-    redirect('/admin/brands')
+    const { headers: getHeaders } = await import('next/headers')
+    const host = (await getHeaders()).get('host') ?? ''
+    redirect(ap('/admin/brands', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error('Failed to create brand')
@@ -37,10 +41,11 @@ async function createBrand(formData: FormData) {
 }
 
 export default async function AddBrandPage() {
+  const host = (await headers()).get('host') ?? ''
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href="/admin/brands" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a href={ap('/admin/brands', host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
           Brands
         </a>

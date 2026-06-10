@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
+import { ap } from '@/lib/admin-path'
 
 interface CouponOption {
   id: string
@@ -144,7 +145,7 @@ export default function NewCampaignClient() {
       const data = await res.json()
       if (res.ok) {
         showToast('Campaign created', 'success')
-        router.push(`/admin/campaigns/${data.kind}`)
+        router.push(ap(`/admin/campaigns/${data.kind}`))
       } else {
         showToast(data.error || 'Failed to create', 'error')
       }
@@ -318,7 +319,7 @@ export default function NewCampaignClient() {
             </button>
             <button
               type="button"
-              onClick={() => router.push('/admin/campaigns')}
+              onClick={() => router.push(ap('/admin/campaigns'))}
               className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors"
             >
               Cancel

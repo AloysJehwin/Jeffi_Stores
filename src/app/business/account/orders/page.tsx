@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { bp } from '@/lib/business-path'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import AccountSearch from '@/components/visitor/AccountSearch'
 
@@ -109,7 +110,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push('/business/signin?redirect=/account/orders')
+      router.push(bp('/business/signin?redirect=/account/orders'))
     }
     if (user) {
       fetchOrders(page)
@@ -198,7 +199,7 @@ export default function OrdersPage() {
                 <h3 className="text-xl font-semibold text-foreground mb-2">No orders yet</h3>
                 <p className="text-foreground-secondary mb-6">You haven&apos;t placed any orders yet.</p>
                 <Link
-                  href="/business/products"
+                  href={bp('/business/products')}
                   className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
                 >
                   Start Shopping
@@ -270,7 +271,7 @@ export default function OrdersPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <Link
-                                  href={`/business/products/${item.products?.slug}`}
+                                  href={bp(`/business/products/${item.products?.slug}`)}
                                   className="font-medium text-foreground hover:text-accent-600 dark:hover:text-accent-400 mb-1 block"
                                 >
                                   {item.product_name}
@@ -302,7 +303,7 @@ export default function OrdersPage() {
                       {/* View Details */}
                       <div className="mt-4 pt-4 border-t border-border-default flex items-center justify-between">
                         <Link
-                          href={`/business/account/orders/${order.id}`}
+                          href={bp(`/business/account/orders/${order.id}`)}
                           className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm"
                         >
                           View Order Details

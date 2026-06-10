@@ -8,6 +8,7 @@ import type { LucideIcon } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from '@/components/forms/FormsPreview'
 import Toggle from '@/components/ui/Toggle'
+import { ap } from '@/lib/admin-path'
 
 interface Coupon {
   id: string
@@ -124,7 +125,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
         return
       }
 
-      router.push('/admin/review-forms')
+      router.push(ap('/admin/review-forms'))
       router.refresh()
     } finally {
       setSubmitting(false)
@@ -190,7 +191,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
         />
         {coupons.length === 0 && (
           <p className="text-xs text-amber-600">
-            No active coupons found. <Link href="/admin/coupons/add" className="underline">Create one first.</Link>
+            No active coupons found. <Link href={ap('/admin/coupons/add')} className="underline">Create one first.</Link>
           </p>
         )}
 
@@ -243,7 +244,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
         {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <Link href="/admin/review-forms" className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
+          <Link href={ap('/admin/review-forms')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
             Cancel
           </Link>
           <button type="submit" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">

@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { getOrder, getReturnRequest } from '@/lib/queries'
+import { ap } from '@/lib/admin-path'
 import UpdateOrderStatus from '@/components/admin/UpdateOrderStatus'
 import CancelReview from '@/components/admin/CancelReview'
 import ReturnReview from '@/components/admin/ReturnReview'
@@ -17,6 +19,7 @@ export const revalidate = 0
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
 
 export default async function OrderDetailsPage({ params }: { params: { id: string } }) {
+  const host = (await headers()).get('host') ?? ''
   const order = await getOrder(params.id).catch(() => null)
 
   if (!order) {
@@ -33,7 +36,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
     <div className="p-4 sm:p-6">
       <div className="mb-6">
         <Link
-          href="/admin/orders"
+          href={ap('/admin/orders', host)}
           className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block"
         >
           ← Back to Orders
@@ -46,7 +49,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             {order.original_order_id && order.original_order_number && (
               <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
                 Replacement for{' '}
-                <Link href={`/admin/orders/${order.original_order_id}`} className="underline hover:text-blue-800 dark:hover:text-blue-300">
+                <Link href={ap(`/admin/orders/${order.original_order_id}`, host)} className="underline hover:text-blue-800 dark:hover:text-blue-300">
                   #{order.original_order_number}
                 </Link>
               </p>

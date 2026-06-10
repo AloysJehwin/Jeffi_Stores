@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
+import { ap } from '@/lib/admin-path'
+
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
 }
@@ -49,7 +51,7 @@ export default function PayableDetailClient({ id }: { id: string }) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Expense not found.</p>
-        <Link href="/admin/financial?tab=payables" className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Payables</Link>
+        <Link href={ap('/admin/financial?tab=payables')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Payables</Link>
       </div>
     )
   }
@@ -62,7 +64,7 @@ export default function PayableDetailClient({ id }: { id: string }) {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href="/admin/financial" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a href={ap('/admin/financial')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
           Financial
         </a>
@@ -71,7 +73,7 @@ export default function PayableDetailClient({ id }: { id: string }) {
       </div>
 
       <div className="flex items-center gap-2">
-        <Link href="/admin/financial" className="text-foreground-secondary hover:text-foreground transition-colors">
+        <Link href={ap('/admin/financial')} className="text-foreground-secondary hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -180,7 +182,7 @@ export default function PayableDetailClient({ id }: { id: string }) {
                 </div>
               )}
               <Link
-                href={`/admin/inventory?po=${e.po_number}`}
+                href={ap(`/admin/inventory?po=${e.po_number}`)}
                 className="inline-block mt-1 text-xs text-accent-500 hover:underline"
               >
                 View in Inventory →

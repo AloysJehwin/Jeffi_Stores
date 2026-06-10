@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
+import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
@@ -41,7 +42,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
     setTabState(next)
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', next)
-    router.replace(`/admin/suppliers/${id}?${params.toString()}`, { scroll: false })
+    router.replace(ap(`/admin/suppliers/${id}?${params.toString()}`), { scroll: false })
   }
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
       <div className="p-6">
         <p className="text-foreground-secondary">Supplier not found.</p>
         {data?.error && <p className="text-red-500 text-xs mt-1 font-mono">{data.error}</p>}
-        <Link href="/admin/inventory?tab=suppliers" className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Suppliers</Link>
+        <Link href={ap('/admin/inventory?tab=suppliers')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Suppliers</Link>
       </div>
     )
   }
@@ -76,7 +77,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href="/admin/inventory?tab=suppliers" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a href={ap('/admin/inventory?tab=suppliers')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
           Suppliers
         </a>
@@ -87,7 +88,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link href="/admin/inventory" className="text-foreground-secondary hover:text-foreground transition-colors">
+          <Link href={ap('/admin/inventory')} className="text-foreground-secondary hover:text-foreground transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -98,7 +99,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
           )}
         </div>
         <Link
-          href={`/admin/inventory?tab=suppliers`}
+          href={ap(`/admin/inventory?tab=suppliers`)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
         >
           All Suppliers
@@ -243,7 +244,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                     {pos.map((po: any) => (
                       <tr key={po.id} className="hover:bg-surface-secondary/40 transition-colors">
                         <td className="px-4 py-3">
-                          <Link href={`/admin/inventory?po=${po.po_number}`} className="font-mono font-medium text-accent-500 hover:underline">
+                          <Link href={ap(`/admin/inventory?po=${po.po_number}`)} className="font-mono font-medium text-accent-500 hover:underline">
                             {po.po_number}
                           </Link>
                         </td>
@@ -285,7 +286,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                     {expenses.map((e: any) => (
                       <tr key={e.id} className="hover:bg-surface-secondary/40 transition-colors">
                         <td className="px-4 py-3">
-                          <Link href={`/admin/financial/payables/${e.id}`} className="font-mono font-medium text-accent-500 hover:underline">
+                          <Link href={ap(`/admin/financial/payables/${e.id}`)} className="font-mono font-medium text-accent-500 hover:underline">
                             {e.expense_number}
                           </Link>
                         </td>

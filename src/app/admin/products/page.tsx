@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
+import { ap } from '@/lib/admin-path'
 import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
@@ -14,6 +16,7 @@ import MerchantSyncStatus from '@/components/admin/MerchantSyncStatus'
 const PAGE_SIZE = 25
 
 export default async function ProductsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const host = (await headers()).get('host') ?? ''
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const sort = searchParams.sort
   const dir = searchParams.dir as 'asc' | 'desc' | undefined
@@ -60,7 +63,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
-    return `/admin/products${qs ? `?${qs}` : ''}`
+    return ap(`/admin/products${qs ? `?${qs}` : ''}`, host)
   }
 
   return (
@@ -71,7 +74,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
           <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
         </div>
         <Link
-          href="/admin/products/add"
+          href={ap('/admin/products/add', host)}
           className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
         >
           Add New Product
@@ -181,7 +184,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                   <span>{product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}</span>
                   <div className="flex items-center gap-3">
                     <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
-                    <Link href={`/admin/products/edit/${product.id}`} className="text-accent-500 font-medium">Edit</Link>
+                    <Link href={ap(`/admin/products/edit/${product.id}`, host)} className="text-accent-500 font-medium">Edit</Link>
                     <DownloadAdButton productId={product.id} productName={product.name} />
                     <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
                   </div>

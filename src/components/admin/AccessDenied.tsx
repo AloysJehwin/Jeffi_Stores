@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
+import { ap } from '@/lib/admin-path'
 
 interface Props {
   scopeKey: string
@@ -39,7 +40,7 @@ export default function AccessDenied({ scopeKey, scopeLabel }: Props) {
           An access request has been sent to the super admin. Contact them to have this scope added to your account.
         </p>
         <a
-          href="/admin/dashboard"
+          href={ap('/admin/dashboard')}
           className="mt-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           Back to Dashboard

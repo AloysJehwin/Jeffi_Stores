@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
+import { ap } from '@/lib/admin-path'
 
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -138,7 +139,7 @@ export default function NewPOPage() {
       })
       const json = await res.json()
       if (!res.ok) { setError(json.error || 'Failed to create PO'); setSaving(false); return }
-      router.push('/admin/inventory?tab=po')
+      router.push(ap('/admin/inventory?tab=po'))
     } catch {
       setError('Failed to create purchase order')
       setSaving(false)
@@ -155,7 +156,7 @@ export default function NewPOPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/inventory?tab=po" className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors">
+        <Link href={ap('/admin/inventory?tab=po')} className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
@@ -351,7 +352,7 @@ export default function NewPOPage() {
           <button type="submit" disabled={saving || !form.supplier_id} className={btnPrimary}>
             {saving ? 'Creating...' : 'Create PO'}
           </button>
-          <Link href="/admin/inventory?tab=po" className={btnSecondary}>
+          <Link href={ap('/admin/inventory?tab=po')} className={btnSecondary}>
             Cancel
           </Link>
         </div>

@@ -1,4 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
+import { headers } from 'next/headers'
+import { ap } from '@/lib/admin-path'
 import { revalidatePath } from 'next/cache'
 import { query, queryOne, queryMany, queryCount } from '@/lib/db'
 import Link from 'next/link'
@@ -33,6 +35,8 @@ function toDatetimeLocal(val: string | null) {
 export default async function EditCouponPage({ params, searchParams }: { params: { id: string }; searchParams: { [key: string]: string | undefined } }) {
   const coupon = await queryOne<Coupon>('SELECT * FROM coupons WHERE id = $1', [params.id])
   if (!coupon) notFound()
+
+  const host = (await headers()).get('host') ?? ''
 
   const USERS_PAGE_SIZE = 10
   const usersPage = Math.max(1, parseInt(searchParams.usersPage || '1', 10))
@@ -130,13 +134,15 @@ export default async function EditCouponPage({ params, searchParams }: { params:
       throw new Error('Failed to update coupon')
     }
     revalidatePath('/admin/coupons')
-    redirect('/admin/coupons')
+    const { headers: getHeaders } = await import('next/headers')
+    const host = (await getHeaders()).get('host') ?? ''
+    redirect(ap('/admin/coupons', host))
   }
 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/coupons" className="text-foreground-muted hover:text-foreground transition-colors">
+        <Link href={ap('/admin/coupons', host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div>
@@ -234,7 +240,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
               buildUrl={(p) => {
                 const sp = new URLSearchParams()
                 if (p > 1) sp.set('usersPage', String(p))
-                return `/admin/coupons/edit/${params.id}${sp.toString() ? `?${sp.toString()}` : ''}`
+                return ap(`/admin/coupons/edit/${params.id}${sp.toString() ? `?${sp.toString()}` : ''}`, host)
               }}
             />
           </div>

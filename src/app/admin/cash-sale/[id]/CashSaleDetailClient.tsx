@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -42,7 +43,7 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Sale not found.</p>
-        <Link href="/admin/invoices" className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Invoices</Link>
+        <Link href={ap('/admin/invoices')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Invoices</Link>
       </div>
     )
   }
@@ -54,7 +55,7 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link href="/admin/invoices" className="text-foreground-secondary hover:text-foreground transition-colors">
+          <Link href={ap('/admin/invoices')} className="text-foreground-secondary hover:text-foreground transition-colors">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>

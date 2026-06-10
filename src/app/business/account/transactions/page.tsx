@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
+import { bp } from '@/lib/business-path'
 
 interface Transaction {
   id: string
@@ -89,7 +90,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     if (!authLoading && !user && authWasLoading.current) {
-      router.push('/business/signin?redirect=/account/transactions')
+      router.push(bp('/business/signin?redirect=/account/transactions'))
       return
     }
     if (user) {
@@ -188,7 +189,7 @@ export default function TransactionsPage() {
                   Your payment transactions will appear here once you place an order.
                 </p>
                 <Link
-                  href="/business/products"
+                  href={bp('/business/products')}
                   className="inline-block px-6 py-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors"
                 >
                   Browse Products
@@ -218,7 +219,7 @@ export default function TransactionsPage() {
                             {txn.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
                           </span>
                           <Link
-                            href={`/business/account/orders/${txn.orderId}`}
+                            href={bp(`/business/account/orders/${txn.orderId}`)}
                             className="text-sm text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium"
                           >
                             Order #{txn.orderNumber}

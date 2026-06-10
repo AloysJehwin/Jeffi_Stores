@@ -8,6 +8,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { mrpDiscountPct } from '@/lib/pricing'
+import { bp } from '@/lib/business-path'
 
 const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 
@@ -70,18 +71,18 @@ function CheckoutPage() {
 
   useEffect(() => {
     if (!authLoading && !user && authWasLoading.current) {
-      router.push('/business/signin?redirect=/checkout')
+      router.push(bp('/business/signin?redirect=/checkout'))
       return
     }
 
     if (!intentToken && !isBuyNow && !cartLoading && cartCount === 0 && !razorpayOpen.current) {
-      router.push('/business/cart')
+      router.push(bp('/business/cart'))
       return
     }
 
     const addressId = searchParams.get('addressId')
     if (!addressId) {
-      router.push('/business/checkout/review')
+      router.push(bp('/business/checkout/review'))
       return
     }
 
@@ -91,7 +92,7 @@ function CheckoutPage() {
       fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
         .then(async r => {
           const d = await r.json()
-          if (!r.ok) { router.push('/business'); return }
+          if (!r.ok) { router.push(bp('/business')); return }
           if (d.mode === 'cart') {
             setIntentMode('cart')
             return
@@ -122,7 +123,7 @@ function CheckoutPage() {
             })
             .catch(() => {})
         })
-        .catch(() => router.push('/business'))
+        .catch(() => router.push(bp('/business')))
       return
     }
 
@@ -136,7 +137,7 @@ function CheckoutPage() {
       const productName = searchParams.get('productName') || ''
       const variantName = searchParams.get('variantName')
 
-      if (!productId || !price) { router.push('/business'); return }
+      if (!productId || !price) { router.push(bp('/business')); return }
 
       setBuyNowItem({
         productId,
@@ -193,7 +194,7 @@ function CheckoutPage() {
     try {
       const response = await fetch('/api/user/addresses', { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       if (response.status === 401) {
-        router.push('/business/signin?redirect=/checkout')
+        router.push(bp('/business/signin?redirect=/checkout'))
         return
       }
       if (response.ok) {
@@ -202,13 +203,13 @@ function CheckoutPage() {
         if (selectedAddr) {
           setAddress(selectedAddr)
         } else {
-          router.push('/business/checkout/review')
+          router.push(bp('/business/checkout/review'))
         }
       } else {
-        router.push('/business/checkout/review')
+        router.push(bp('/business/checkout/review'))
       }
     } catch {
-      router.push('/business/checkout/review')
+      router.push(bp('/business/checkout/review'))
     } finally {
       setIsLoadingAddress(false)
     }
@@ -232,7 +233,7 @@ function CheckoutPage() {
 
       clearCart()
       showToast('Payment successful!', 'success')
-      window.location.href = `/business/account/orders/${data.order.id}`
+      window.location.href = bp(`/business/account/orders/${data.order.id}`)
     } catch (err: any) {
       setError(err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.')
       setIsSubmitting(false)
@@ -299,7 +300,7 @@ function CheckoutPage() {
             body: JSON.stringify({ errorDescription: response.error.description }),
             keepalive: true,
           }).catch(() => {})
-          window.location.href = `/business/account/orders/${payload.orderId}`
+          window.location.href = bp(`/business/account/orders/${payload.orderId}`)
         } else {
           setError(response.error?.description || 'Payment failed. Please try again.')
           setIsSubmitting(false)
@@ -315,7 +316,7 @@ function CheckoutPage() {
           headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
           body: JSON.stringify({ errorDescription: err.message }),
         }).catch(() => {})
-        window.location.href = `/business/account/orders/${payload.orderId}`
+        window.location.href = bp(`/business/account/orders/${payload.orderId}`)
       } else {
         setError(err?.message || 'Failed to start payment')
         setIsSubmitting(false)
@@ -446,7 +447,7 @@ function CheckoutPage() {
       }
 
       if (!isBuyNow) clearCart()
-      router.push(`/business/account/orders/${data.order.id}`)
+      router.push(bp(`/business/account/orders/${data.order.id}`))
     } catch (err: any) {
       setError(err.message)
       setIsSubmitting(false)
@@ -487,7 +488,7 @@ function CheckoutPage() {
             {existingOrder && (
               <div className="flex flex-wrap gap-3 mt-3">
                 <Link
-                  href={`/business/account/orders/${existingOrder.id}`}
+                  href={bp(`/business/account/orders/${existingOrder.id}`)}
                   className="inline-flex items-center px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors"
                 >
                   Go to Order #{existingOrder.orderNumber}
@@ -644,7 +645,7 @@ function CheckoutPage() {
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-8">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-bold text-foreground">Delivery Address</h2>
-                  <Link href="/business/checkout/review" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 text-sm font-medium">
+                  <Link href={bp('/business/checkout/review')} className="text-accent-600 dark:text-accent-400 hover:text-accent-700 text-sm font-medium">
                     Change
                   </Link>
                 </div>
@@ -837,7 +838,7 @@ function CheckoutPage() {
                   )}
                 </button>
 
-                <Link href="/business/checkout/review" className="block w-full text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4">
+                <Link href={bp('/business/checkout/review')} className="block w-full text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4">
                   ← Back to Review
                 </Link>
               </div>

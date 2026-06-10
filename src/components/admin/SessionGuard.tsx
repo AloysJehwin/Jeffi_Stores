@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
+import { ap } from '@/lib/admin-path'
 
 // How often to poll the server for the real expiry time (ms)
 const POLL_INTERVAL_MS = 15_000
@@ -19,7 +20,7 @@ export default function SessionGuard() {
   const loggedOutRef = useRef(false)
 
   // Don't run on the login page
-  const isLoginPage = pathname === '/admin/login'
+  const isLoginPage = pathname === ap('/admin/login')
 
   const clearTimers = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -33,7 +34,7 @@ export default function SessionGuard() {
     setShowModal(false)
     try { await fetch('/api/admin/logout', { method: 'POST' }) } catch {}
     // Hard reload — forces server layout to re-evaluate with cleared cookie
-    window.location.href = '/admin/login'
+    window.location.href = ap('/admin/login')
   }, [])
 
   const startTicker = useCallback(() => {
