@@ -145,8 +145,11 @@ export default function RFQDetailClient({ id }: { id: string }) {
     return sum + (p != null ? p * i.quantity : 0)
   }, 0)
   const totalMrp = items.reduce((sum, i) => {
-    const p = resolveItemMrp(i)
-    return sum + (p != null ? p * i.quantity : 0)
+    const mrp = resolveItemMrp(i)
+    const sell = resolveItemSellingPrice(i)
+    // Only include MRP in total when it's genuinely higher than selling price
+    if (mrp == null || (sell != null && mrp < sell)) return sum
+    return sum + mrp * i.quantity
   }, 0)
   // Only count selling price for items that actually have a requested price (for discount comparison)
   const totalSellingForDiscountedItems = items.reduce((sum, i) => {
@@ -404,8 +407,8 @@ export default function RFQDetailClient({ id }: { id: string }) {
 
                           {/* Price column */}
                           <div className="shrink-0 text-right space-y-2 min-w-[130px]">
-                            {/* MRP */}
-                            {mrpPrice != null && (
+                            {/* MRP — only show if higher than selling price (guards bad data) */}
+                            {mrpPrice != null && (sellingPrice == null || mrpPrice >= sellingPrice) && (
                               <div>
                                 <p className="text-[10px] text-foreground-muted uppercase tracking-wide">MRP</p>
                                 <p className="text-sm text-foreground-muted line-through decoration-foreground-muted/50">
