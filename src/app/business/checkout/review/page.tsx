@@ -339,7 +339,7 @@ function CheckoutReviewPage() {
       if (buyNowItem.buyUnit) params.set('buyUnit', buyNowItem.buyUnit)
       params.set('price', String(buyNowItem.price))
     }
-    router.push(`/business/checkout?${params.toString()}`)
+    router.push(bp(`/business/checkout?${params.toString()}`))
   }
 
   if (authLoading || cartLoading) {

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import Tooltip from '@/components/ui/Tooltip'
 import HoverCard from '@/components/ui/HoverCard'
+import { ap } from '@/lib/admin-path'
 
 function CustomerDetailModal({ customer, onClose }: { customer: any; onClose: () => void }) {
   if (typeof document === 'undefined') return null
@@ -30,7 +31,7 @@ function CustomerDetailModal({ customer, onClose }: { customer: any; onClose: ()
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
-              href={`/admin/customers/${customer.id}`}
+              href={ap(`/admin/customers/${customer.id}`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
             >
               Full Profile
@@ -126,7 +127,7 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
             <HoverCard
               trigger={
                 <Link
-                  href={`/admin/customers/${customer.id}`}
+                  href={ap(`/admin/customers/${customer.id}`)}
                   className="text-sm font-medium text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2 whitespace-nowrap"
                 >
                   {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || '—'}
@@ -257,7 +258,7 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
           <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-end gap-1">
               <Link
-                href={`/admin/customers/${customer.id}`}
+                href={ap(`/admin/customers/${customer.id}`)}
                 title="View Customer"
                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
               >

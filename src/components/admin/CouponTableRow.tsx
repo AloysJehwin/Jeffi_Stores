@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import HoverCard from '@/components/ui/HoverCard'
 import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
+import { ap } from '@/lib/admin-path'
 
 interface CouponRow {
   id: string
@@ -98,7 +99,7 @@ export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
               </div>
               <div className="flex gap-3 pt-1 border-t border-border-default">
                 <Link
-                  href={`/admin/coupons/edit/${c.id}`}
+                  href={ap(`/admin/coupons/edit/${c.id}`)}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
                   onClick={() => setOpen(false)}
                 >
@@ -188,7 +189,7 @@ export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
         </td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3">
-            <Link href={`/admin/coupons/edit/${c.id}`} className="text-accent-500 hover:underline text-sm">Edit</Link>
+            <Link href={ap(`/admin/coupons/edit/${c.id}`)} className="text-accent-500 hover:underline text-sm">Edit</Link>
             <DeleteCouponButton id={c.id} code={c.code} />
           </div>
         </td>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 
 interface Transaction {
   id: string
@@ -108,7 +109,7 @@ export default function ProductStockMovements({ productId }: { productId: string
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap">
                         {tx.reference_type === 'order' && tx.reference_id ? (
-                          <Link href={`/admin/orders/${tx.reference_id}`} className="text-accent-500 hover:text-accent-600 hover:underline underline-offset-2 font-medium">
+                          <Link href={ap(`/admin/orders/${tx.reference_id}`)} className="text-accent-500 hover:text-accent-600 hover:underline underline-offset-2 font-medium">
                             Order
                           </Link>
                         ) : tx.reference_type ? (

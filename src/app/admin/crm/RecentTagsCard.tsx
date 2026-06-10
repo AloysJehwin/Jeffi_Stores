@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 
 interface TagEntry {
   userId: string
@@ -23,7 +24,7 @@ function timeAgo(iso: string) {
 function TagRow({ t }: { t: TagEntry }) {
   return (
     <Link
-      href={`/admin/customers/${t.userId}`}
+      href={ap(`/admin/customers/${t.userId}`)}
       className="flex items-center justify-between gap-3 py-2 hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
     >
       <div className="min-w-0 flex-1">

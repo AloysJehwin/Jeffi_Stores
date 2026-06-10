@@ -10,6 +10,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import LineItemsSection, { newLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 import HoverCard from '@/components/ui/HoverCard'
+import { ap } from '@/lib/admin-path'
 
 interface CashSale {
   id: string
@@ -104,7 +105,7 @@ export default function CashSaleClient() {
     for (const [k, v] of Object.entries(patch)) {
       if (v) p.set(k, v); else p.delete(k)
     }
-    router.replace(`/admin/cash-sale?${p.toString()}`, { scroll: false })
+    router.replace(ap(`/admin/cash-sale?${p.toString()}`), { scroll: false })
   }
 
   const [paymentMode, setPaymentMode] = useState('cash')
@@ -589,7 +590,7 @@ export default function CashSaleClient() {
                           trigger={
                             sale.invoice_number ? (
                               <a
-                                href={`/admin/cash-sale/${sale.id}`}
+                                href={ap(`/admin/cash-sale/${sale.id}`)}
                                 className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
                               >
                                 {sale.invoice_number}
@@ -656,7 +657,7 @@ export default function CashSaleClient() {
                             </svg>
                           </a>
                           <a
-                            href={`/admin/cash-sale/${sale.id}`}
+                            href={ap(`/admin/cash-sale/${sale.id}`)}
                             title="View Detail"
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                           >
@@ -712,7 +713,7 @@ export default function CashSaleClient() {
                     <div onClick={e => e.stopPropagation()}>
                       {sale.invoice_number ? (
                         <a
-                          href={`/admin/cash-sale/${sale.id}`}
+                          href={ap(`/admin/cash-sale/${sale.id}`)}
                           className="font-mono font-semibold text-sm text-accent-500 hover:underline"
                         >
                           {sale.invoice_number}
@@ -750,7 +751,7 @@ export default function CashSaleClient() {
                       PDF
                     </a>
                     <a
-                      href={`/admin/cash-sale/${sale.id}`}
+                      href={ap(`/admin/cash-sale/${sale.id}`)}
                       className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                     >
                       View Detail
@@ -944,7 +945,7 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
               Receipt PDF
             </a>
             <a
-              href={`/admin/orders/${sale.id}`}
+              href={ap(`/admin/orders/${sale.id}`)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

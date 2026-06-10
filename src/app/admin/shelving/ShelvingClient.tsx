@@ -9,6 +9,7 @@ import {
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { ap } from '@/lib/admin-path'
 
 type Tab = 'locations' | 'labels'
 type Panel = 'warehouse' | 'location' | 'stock'
@@ -43,7 +44,7 @@ export default function ShelvingClient() {
     setTabState(next)
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', next)
-    router.push(`/admin/shelving?${params.toString()}`, { scroll: false })
+    router.push(ap(`/admin/shelving?${params.toString()}`), { scroll: false })
   }
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [locations, setLocations] = useState<ShelfLocation[]>([])

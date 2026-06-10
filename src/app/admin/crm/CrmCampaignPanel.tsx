@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { ap } from '@/lib/admin-path'
 
 interface CampaignForm {
   delay_hours: number
@@ -112,7 +113,7 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
       if (runRes.ok) {
         showToast('Campaign triggered successfully.', 'success')
         onClose()
-        router.push(`/admin/campaigns/${selectedKind}`)
+        router.push(ap(`/admin/campaigns/${selectedKind}`))
       } else {
         showToast('Failed to run campaign. Check Campaigns page.', 'error')
       }

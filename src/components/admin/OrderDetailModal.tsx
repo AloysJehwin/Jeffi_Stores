@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 
 interface Props {
   order: any | null
@@ -95,7 +96,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
-              href={`/admin/orders/${order.id}`}
+              href={ap(`/admin/orders/${order.id}`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
             >
               Full Details
@@ -141,7 +142,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                 <p className="text-xs text-foreground-secondary mt-0.5">{o.users?.phone || o.billing_address?.phone}</p>
               )}
               {o.users?.id && (
-                <Link href={`/admin/customers/${o.users.id}`} className="text-xs text-accent-500 hover:underline mt-1 inline-block">
+                <Link href={ap(`/admin/customers/${o.users.id}`)} className="text-xs text-accent-500 hover:underline mt-1 inline-block">
                   View customer →
                 </Link>
               )}

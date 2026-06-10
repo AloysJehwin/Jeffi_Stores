@@ -21,6 +21,8 @@ interface RFQ {
   admin_note: string | null
   created_at: string
   converted_quotation_id: string | null
+  quotation_view_token: string | null
+  quote_number: string | null
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -80,11 +82,13 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
               Submitted {new Date(rfq.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
             </p>
           </div>
-          {rfq.status === 'converted' && rfq.converted_quotation_id && (
-            <Link href={`/quotation/${rfq.converted_quotation_id}`}
+          {rfq.status === 'converted' && rfq.quotation_view_token && (
+            <a href={`https://quotation.jeffistores.in/${rfq.quotation_view_token}`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="px-4 py-2 border border-accent-500 text-accent-400 text-sm font-semibold rounded-lg hover:bg-accent-900/20 transition-colors shrink-0">
               View Quotation →
-            </Link>
+            </a>
           )}
         </div>
 

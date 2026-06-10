@@ -5,6 +5,7 @@ import Pagination from '@/components/admin/Pagination'
 import CustomersTableRows from '@/components/admin/CustomersTableRows'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
+import { ap } from '@/lib/admin-path'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -129,7 +130,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
             return (
             <Link
               key={customer.id}
-              href={`/admin/customers/${customer.id}`}
+              href={ap(`/admin/customers/${customer.id}`)}
               className="relative block bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 pl-5 active:bg-surface-secondary transition-colors overflow-hidden"
             >
               <div className={`absolute left-0 top-0 bottom-0 w-1 ${barColor}`} aria-hidden />

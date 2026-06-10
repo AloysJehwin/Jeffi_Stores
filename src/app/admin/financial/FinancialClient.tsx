@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ap } from '@/lib/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 
 type Tab = 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow'
@@ -215,14 +216,14 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
                       <tr key={r.order_id} className="hover:bg-surface-secondary/40 transition-colors">
                         <td className="px-4 py-3">
                           {r.user_id
-                            ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>
-                            : <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
+                            ? <Link href={ap(`/admin/customers/${r.user_id}`)} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>
+                            : <Link href={ap(`/admin/orders/${r.order_id}`)} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
                           {r.customer_phone && <div className="text-xs text-foreground-secondary">+91 {r.customer_phone}</div>}
                         </td>
                         <td className="px-4 py-3 text-foreground-secondary">
                           {r.invoice_number
-                            ? <Link href={`/admin/invoices/${r.order_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.invoice_number || r.order_number}</Link>
-                            : <Link href={`/admin/orders/${r.order_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.order_number}</Link>}
+                            ? <Link href={ap(`/admin/invoices/${r.order_id}`)} className="hover:text-accent-500 hover:underline font-mono">{r.invoice_number || r.order_number}</Link>
+                            : <Link href={ap(`/admin/orders/${r.order_id}`)} className="hover:text-accent-500 hover:underline font-mono">{r.order_number}</Link>}
                           {r.invoice_number && (
                             <a href={`/api/orders/${r.order_id}/invoice`} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs text-accent-500 hover:underline">PDF</a>
                           )}
@@ -252,8 +253,8 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         {r.user_id
-                          ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>
-                          : <Link href={`/admin/orders/${r.order_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
+                          ? <Link href={ap(`/admin/customers/${r.user_id}`)} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>
+                          : <Link href={ap(`/admin/orders/${r.order_id}`)} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.customer_name}</Link>}
                         {r.customer_phone && <p className="text-xs text-foreground-secondary mt-0.5">+91 {r.customer_phone}</p>}
                       </div>
                       <p className="font-semibold text-foreground text-sm shrink-0">{formatINR(parseFloat(r.total_amount))}</p>
@@ -261,8 +262,8 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
                     <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
                       <div className="flex items-center gap-1.5">
                         {r.invoice_number
-                          ? <Link href={`/admin/invoices/${r.order_id}`} className="font-mono hover:text-accent-500 hover:underline">{r.invoice_number || r.order_number}</Link>
-                          : <Link href={`/admin/orders/${r.order_id}`} className="font-mono hover:text-accent-500 hover:underline">{r.order_number}</Link>}
+                          ? <Link href={ap(`/admin/invoices/${r.order_id}`)} className="font-mono hover:text-accent-500 hover:underline">{r.invoice_number || r.order_number}</Link>
+                          : <Link href={ap(`/admin/orders/${r.order_id}`)} className="font-mono hover:text-accent-500 hover:underline">{r.order_number}</Link>}
                         {r.invoice_number && (
                           <a href={`/api/orders/${r.order_id}/invoice`} target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline">PDF</a>
                         )}
@@ -490,12 +491,12 @@ function PayablesTab({ initialData }: { initialData: any }) {
                         <tr key={r.id} className="hover:bg-surface-secondary/40 transition-colors">
                           <td className="px-4 py-3">
                             {r.supplier_id
-                              ? <Link href={`/admin/suppliers/${r.supplier_id}`} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.supplier_name}</Link>
+                              ? <Link href={ap(`/admin/suppliers/${r.supplier_id}`)} className="font-medium text-foreground hover:text-accent-500 hover:underline">{r.supplier_name}</Link>
                               : <span className="font-medium text-foreground">{r.supplier_name}</span>}
                             {r.description && <div className="text-xs text-foreground-secondary">{r.description}</div>}
                           </td>
                           <td className="px-4 py-3 text-foreground-secondary">
-                            <Link href={`/admin/financial/payables/${r.id}`} className="font-mono hover:text-accent-500 hover:underline">{r.expense_number}</Link>
+                            <Link href={ap(`/admin/financial/payables/${r.id}`)} className="font-mono hover:text-accent-500 hover:underline">{r.expense_number}</Link>
                           </td>
                           <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(r.expense_date)}</td>
                           <td className="px-4 py-3 whitespace-nowrap">
@@ -532,7 +533,7 @@ function PayablesTab({ initialData }: { initialData: any }) {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           {r.supplier_id
-                            ? <Link href={`/admin/suppliers/${r.supplier_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.supplier_name}</Link>
+                            ? <Link href={ap(`/admin/suppliers/${r.supplier_id}`)} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.supplier_name}</Link>
                             : <span className="font-medium text-foreground text-sm">{r.supplier_name}</span>}
                           {r.description && <p className="text-xs text-foreground-secondary mt-0.5">{r.description}</p>}
                         </div>
@@ -544,7 +545,7 @@ function PayablesTab({ initialData }: { initialData: any }) {
                         </div>
                       </div>
                       <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
-                        <Link href={`/admin/financial/payables/${r.id}`} className="font-mono hover:text-accent-500 hover:underline">{r.expense_number}</Link>
+                        <Link href={ap(`/admin/financial/payables/${r.id}`)} className="font-mono hover:text-accent-500 hover:underline">{r.expense_number}</Link>
                         <span>{formatDate(r.expense_date)}</span>
                       </div>
                       {r.due_date && (
@@ -1036,20 +1037,20 @@ function TransactionsTab({ initialData }: { initialData: any }) {
                             ? r.source === 'cash_sale'
                               ? <span>{r.party}</span>
                               : r.user_id
-                                ? <Link href={`/admin/customers/${r.user_id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>
-                                : <Link href={`/admin/orders/${r.id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>
+                                ? <Link href={ap(`/admin/customers/${r.user_id}`)} className="hover:text-accent-500 hover:underline">{r.party}</Link>
+                                : <Link href={ap(`/admin/orders/${r.id}`)} className="hover:text-accent-500 hover:underline">{r.party}</Link>
                             : r.supplier_id
-                              ? <Link href={`/admin/suppliers/${r.supplier_id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>
-                              : <Link href={`/admin/financial/payables/${r.expense_id}`} className="hover:text-accent-500 hover:underline">{r.party}</Link>}
+                              ? <Link href={ap(`/admin/suppliers/${r.supplier_id}`)} className="hover:text-accent-500 hover:underline">{r.party}</Link>
+                              : <Link href={ap(`/admin/financial/payables/${r.expense_id}`)} className="hover:text-accent-500 hover:underline">{r.party}</Link>}
                         </td>
                         <td className="px-4 py-3 text-foreground-secondary">
                           {r.direction === 'inflow'
                             ? r.source === 'cash_sale'
                               ? <a href={`/api/admin/cash-sale/${r.id}/receipt`} target="_blank" rel="noopener noreferrer" className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</a>
                               : r.invoice_number
-                                ? <Link href={`/admin/invoices/${r.id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
-                                : <Link href={`/admin/orders/${r.id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
-                            : <Link href={`/admin/financial/payables/${r.expense_id}`} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>}
+                                ? <Link href={ap(`/admin/invoices/${r.id}`)} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
+                                : <Link href={ap(`/admin/orders/${r.id}`)} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>
+                            : <Link href={ap(`/admin/financial/payables/${r.expense_id}`)} className="hover:text-accent-500 hover:underline font-mono">{r.txn_ref}</Link>}
                         </td>
                         <td className="px-4 py-3 text-foreground-secondary capitalize">{r.method?.replace('_', ' ')}</td>
                         <td className={`px-4 py-3 text-right font-semibold ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1082,19 +1083,19 @@ function TransactionsTab({ initialData }: { initialData: any }) {
                           ? r.source === 'cash_sale'
                             ? <span className="font-medium text-foreground text-sm">{r.party}</span>
                             : r.user_id
-                              ? <Link href={`/admin/customers/${r.user_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
-                              : <Link href={`/admin/orders/${r.id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
+                              ? <Link href={ap(`/admin/customers/${r.user_id}`)} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
+                              : <Link href={ap(`/admin/orders/${r.id}`)} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
                           : r.supplier_id
-                            ? <Link href={`/admin/suppliers/${r.supplier_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
-                            : <Link href={`/admin/financial/payables/${r.expense_id}`} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>}
+                            ? <Link href={ap(`/admin/suppliers/${r.supplier_id}`)} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>
+                            : <Link href={ap(`/admin/financial/payables/${r.expense_id}`)} className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline">{r.party}</Link>}
                         {r.txn_ref && (
                           r.direction === 'inflow'
                             ? r.source === 'cash_sale'
                               ? <a href={`/api/admin/cash-sale/${r.id}/receipt`} target="_blank" rel="noopener noreferrer" className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</a>
                               : r.invoice_number
-                                ? <Link href={`/admin/invoices/${r.id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
-                                : <Link href={`/admin/orders/${r.id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
-                            : <Link href={`/admin/financial/payables/${r.expense_id}`} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
+                                ? <Link href={ap(`/admin/invoices/${r.id}`)} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
+                                : <Link href={ap(`/admin/orders/${r.id}`)} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
+                            : <Link href={ap(`/admin/financial/payables/${r.expense_id}`)} className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block">{r.txn_ref}</Link>
                         )}
                       </div>
                       <p className={`font-semibold text-sm shrink-0 ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1181,7 +1182,7 @@ export default function FinancialClient() {
 
   function handleTabChange(key: Tab) {
     setTab(key)
-    router.push(`/admin/financial?tab=${key}`, { scroll: false })
+    router.push(ap(`/admin/financial?tab=${key}`), { scroll: false })
   }
 
   return (

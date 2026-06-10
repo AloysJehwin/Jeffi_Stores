@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { AlertTriangle, Check } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ap } from '@/lib/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
 import HoverCard from '@/components/ui/HoverCard'
@@ -109,7 +110,7 @@ export default function InvoicesClient() {
     } else {
       const params = new URLSearchParams(window.location.search)
       params.set('view', next)
-      router.push(`/admin/invoices?${params.toString()}`, { scroll: false })
+      router.push(ap(`/admin/invoices?${params.toString()}`), { scroll: false })
     }
   }
 
@@ -135,7 +136,7 @@ export default function InvoicesClient() {
     for (const [k, v] of Object.entries(patch)) {
       if (v) p.set(k, v); else p.delete(k)
     }
-    router.replace(`/admin/invoices?${p.toString()}`, { scroll: false })
+    router.replace(ap(`/admin/invoices?${p.toString()}`), { scroll: false })
   }
 
   function handleSort(col: string, dir: SortDir) {
@@ -896,7 +897,7 @@ export default function InvoicesClient() {
                         <HoverCard
                           trigger={
                             <a
-                              href={inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`}
+                              href={ap(inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`)}
                               className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
                             >
                               {inv.invoice_number}
@@ -991,7 +992,7 @@ export default function InvoicesClient() {
                                 </svg>
                               </a>
                               <a
-                                href={`/admin/cash-sale/${inv.id}`}
+                                href={ap(`/admin/cash-sale/${inv.id}`)}
                                 title="View Sale"
                                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                               >
@@ -1014,7 +1015,7 @@ export default function InvoicesClient() {
                             </svg>
                           </a>
                           <a
-                            href={`/admin/invoices/${inv.id}`}
+                            href={ap(`/admin/invoices/${inv.id}`)}
                             title="View Invoice"
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                           >
@@ -1102,7 +1103,7 @@ export default function InvoicesClient() {
                   <div className="flex items-start justify-between gap-2">
                     <div onClick={e => e.stopPropagation()}>
                       <a
-                        href={inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`}
+                        href={ap(inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`)}
                         className="font-mono font-semibold text-sm text-accent-500 hover:underline"
                       >
                         {inv.invoice_number}
@@ -1157,7 +1158,7 @@ export default function InvoicesClient() {
                           Receipt PDF
                         </a>
                         <a
-                          href={`/admin/cash-sale/${inv.id}`}
+                          href={ap(`/admin/cash-sale/${inv.id}`)}
                           className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                         >
                           View Sale
@@ -1174,7 +1175,7 @@ export default function InvoicesClient() {
                       PDF
                     </a>
                     <a
-                      href={`/admin/invoices/${inv.id}`}
+                      href={ap(`/admin/invoices/${inv.id}`)}
                       className="text-xs text-accent-500 hover:text-accent-600 font-medium"
                     >
                       View Invoice

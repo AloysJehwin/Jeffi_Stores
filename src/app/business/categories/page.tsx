@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { queryMany } from '@/lib/db'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 
@@ -22,6 +23,8 @@ async function getCategoryProductCounts() {
 }
 
 export default async function BusinessCategoriesPage() {
+  const host = (await headers()).get('host') ?? ''
+  const isSubdomain = host.startsWith('business.')
   const categories = await getAllCategories()
   const productCounts = await getCategoryProductCounts()
 
@@ -54,7 +57,7 @@ export default async function BusinessCategoriesPage() {
                 key={category.id}
                 className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow"
               >
-                <Link href={`/business/categories/${category.slug}`} className="block p-4 sm:p-6 group">
+                <Link href={isSubdomain ? `/categories/${category.slug}` : `/business/categories/${category.slug}`} className="block p-4 sm:p-6 group">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 bg-accent-100 rounded-lg flex items-center justify-center group-hover:bg-accent-200 transition-colors">
