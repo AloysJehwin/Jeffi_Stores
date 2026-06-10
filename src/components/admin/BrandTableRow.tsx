@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import HoverCard from '@/components/ui/HoverCard'
 import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
+import { ap } from '@/lib/admin-path'
 
 interface Brand {
   id: string
@@ -87,7 +88,7 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
               </div>
               <div className="flex gap-3 pt-1 border-t border-border-default">
                 <Link
-                  href={`/admin/brands/edit/${brand.id}`}
+                  href={ap(`/admin/brands/edit/${brand.id}`)}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
                   onClick={() => setOpen(false)}
                 >
@@ -164,7 +165,7 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
           </span>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
-          <Link href={`/admin/brands/edit/${brand.id}`} className="text-accent-500 hover:text-accent-600 mr-4">
+          <Link href={ap(`/admin/brands/edit/${brand.id}`)} className="text-accent-500 hover:text-accent-600 mr-4">
             Edit
           </Link>
           <DeleteBrandButton brandId={brand.id} brandName={brand.name} />

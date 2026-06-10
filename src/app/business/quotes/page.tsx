@@ -21,6 +21,7 @@ interface RFQ {
   requested_total: string | null
   created_at: string
   order_id: string | null
+  invoice_view_token: string | null
   invoice_number: string | null
   payment_status: string | null
   order_status: string | null
@@ -190,7 +191,7 @@ export default function MyQuotesPage() {
                       {/* View Quotation link (always show when quotation exists) */}
                       {rfq.status === 'converted' && rfq.quotation_view_token && (
                         <a
-                          href={`https://quotation.jeffistores.in/q/${rfq.quotation_view_token}`}
+                          href={`https://quotation.jeffistores.in/${rfq.quotation_view_token}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-xs font-medium transition-colors"
@@ -204,9 +205,9 @@ export default function MyQuotesPage() {
                       )}
 
                       {/* View Invoice link (primary CTA when invoice exists) */}
-                      {rfq.order_id && (
+                      {rfq.order_id && rfq.invoice_view_token && (
                         <a
-                          href={`https://invoice.jeffistores.in/invoice/${rfq.order_id}`}
+                          href={`https://invoice.jeffistores.in/${rfq.invoice_view_token}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors"

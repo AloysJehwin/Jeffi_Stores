@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 
 interface NoteEntry {
   userId: string
@@ -26,7 +27,7 @@ function NoteRow({ n }: { n: NoteEntry }) {
     <div className="border-l-2 border-accent-500 pl-3 py-1">
       <p className="text-sm text-foreground whitespace-pre-wrap break-words line-clamp-3">{n.body}</p>
       <p className="text-[10px] text-foreground-muted mt-1">
-        <Link href={`/admin/customers/${n.userId}`} className="text-accent-600 dark:text-accent-400 hover:underline">
+        <Link href={ap(`/admin/customers/${n.userId}`)} className="text-accent-600 dark:text-accent-400 hover:underline">
           {n.customerName}
         </Link>
         {' · '}{n.adminName}{' · '}{timeAgo(n.createdAt)}
