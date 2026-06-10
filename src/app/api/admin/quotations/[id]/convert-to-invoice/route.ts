@@ -178,7 +178,7 @@ export async function POST(
           cgst_amount, sgst_amount, igst_amount, total_amount,
           needs_delivery, notes
         ) VALUES (
-          $1, $2, $3, $4, 'offline',
+          $1, $2, $3, $4, 'business',
           $5, $6, $7, $8, $9, $10,
           $11, $12, $13, $14, $15, $16, $17,
           $18, $19
@@ -336,14 +336,14 @@ export async function POST(
           description: `Jeffi Stores Invoice ${result.invoice_number}`,
           close_by: closeBy,
         })
-        // Generate a bare QR code from the Razorpay short_url (payment link)
-        // qr.image_url is a full Razorpay-branded 9:16 image — not suitable for inline display
-        const paymentUrl = qr.short_url || qr.image_url
-        let fetchedImageUrl = qr.image_url
-        try {
-          fetchedImageUrl = await QRCode.toDataURL(paymentUrl, { width: 300, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
-        } catch (_) {
-          // fallback to Razorpay image URL if QR generation fails
+        // Generate a proper UPI deep-link QR so any UPI app opens natively.
+        // Razorpay's qr.image_url / qr.short_url encode an rzp.io payment page — not a UPI string.
+        const upiVpa = process.env.RAZORPAY_UPI_VPA
+        const amountInRupees = (totalAmount).toFixed(2)
+        let fetchedImageUrl: string = qr.image_url
+        if (upiVpa) {
+          const upiString = `upi://pay?pa=${encodeURIComponent(upiVpa)}&am=${amountInRupees}&pn=${encodeURIComponent('Jeffi Stores')}&tn=${encodeURIComponent(`Invoice ${result.invoice_number || result.order_number}`)}&cu=INR`
+          fetchedImageUrl = await QRCode.toDataURL(upiString, { width: 300, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
         }
         await query(
           `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, updated_at = NOW() WHERE id = $3`,

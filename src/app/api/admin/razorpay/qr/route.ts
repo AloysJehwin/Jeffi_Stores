@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne } from '@/lib/db'
 import { getRazorpayInstance } from '@/lib/razorpay'
+import QRCode from 'qrcode'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,17 +32,14 @@ export async function POST(request: NextRequest) {
       close_by: closeBy,
     })
 
-    // Fetch the actual QR PNG from Razorpay's short URL and store as base64 data URL
-    let qrImageUrl = qr.image_url
-    try {
-      const imgRes = await fetch(qr.image_url)
-      if (imgRes.ok) {
-        const contentType = imgRes.headers.get('content-type') || 'image/png'
-        const buf = await imgRes.arrayBuffer()
-        qrImageUrl = `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`
-      }
-    } catch (_) {
-      // keep redirect URL as fallback
+    // Generate a proper UPI deep-link QR so any UPI app (GPay, PhonePe, Paytm) opens natively.
+    // Razorpay's qr.image_url / qr.short_url encode an rzp.io payment page link — not a UPI string.
+    const upiVpa = process.env.RAZORPAY_UPI_VPA
+    const amountInRupees = (amountPaise / 100).toFixed(2)
+    let qrImageUrl: string = qr.image_url
+    if (upiVpa) {
+      const upiString = `upi://pay?pa=${encodeURIComponent(upiVpa)}&am=${amountInRupees}&pn=${encodeURIComponent('Jeffi Stores')}&tn=${encodeURIComponent(description || 'Invoice Payment')}&cu=INR`
+      qrImageUrl = await QRCode.toDataURL(upiString, { width: 300, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
     }
 
     await query(
