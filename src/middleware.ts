@@ -133,6 +133,10 @@ export async function middleware(request: NextRequest) {
     } else if (pathname.startsWith('/api/')) {
       return addSecurityHeaders(NextResponse.next())
     } else if (!isAdminPath) {
+      // /business/* paths on the admin subdomain should not be rewritten — pass through
+      if (pathname.startsWith('/business/') || pathname === '/business') {
+        return addSecurityHeaders(NextResponse.next())
+      }
       // Rewrite subdomain root paths to /admin/* (same pattern as business subdomain)
       // e.g. admin.jeffistores.in/dashboard → served from /admin/dashboard
       const slug = pathname === '/' ? '' : pathname
