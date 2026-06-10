@@ -96,9 +96,9 @@ export default function MyQuotesPage() {
           </div>
         )}
 
-        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+        <div>
           {rfqs.length === 0 ? (
-            <div className="p-12 text-center">
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
               <svg className="w-16 h-16 mx-auto text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
               </svg>
@@ -109,7 +109,7 @@ export default function MyQuotesPage() {
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-border-default">
+            <div className="space-y-3">
               {filteredRfqs.map(rfq => {
                 const displayTotal = rfq.quotation_total
                   ? Number(rfq.quotation_total)
@@ -125,7 +125,7 @@ export default function MyQuotesPage() {
                 }
 
                 return (
-                  <div key={rfq.id} className="p-4 sm:p-5">
+                  <div key={rfq.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5">
                     {/* Top row: RFQ number + status + amount */}
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="min-w-0">

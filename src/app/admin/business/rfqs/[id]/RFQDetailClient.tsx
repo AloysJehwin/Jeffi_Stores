@@ -290,8 +290,30 @@ export default function RFQDetailClient({ id }: { id: string }) {
                 const itemCatalogTotal = catalogPrice != null ? catalogPrice * item.quantity : null
                 const itemRequestedTotal = item.requested_price != null ? Number(item.requested_price) * item.quantity : null
 
+                const hasDiscount = discount != null && discount > 0
+                const savingPerUnit = (hasDiscount && catalogPrice != null && item.requested_price != null)
+                  ? catalogPrice - Number(item.requested_price)
+                  : null
+
                 return (
-                  <div key={item.id} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+                  <div key={item.id} className={`bg-surface-elevated rounded-xl border overflow-hidden ${hasDiscount ? 'border-green-400/40 dark:border-green-600/40' : 'border-border-default'}`}>
+                    {/* Discount banner — only when discount is requested */}
+                    {hasDiscount && (
+                      <div className="flex items-center gap-2 px-4 py-1.5 bg-green-50 dark:bg-green-900/20 border-b border-green-200/60 dark:border-green-700/40">
+                        <svg className="w-3 h-3 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        <span className="text-xs font-semibold text-green-700 dark:text-green-400">
+                          Discount requested: {discount}% off
+                          {savingPerUnit != null && savingPerUnit > 0 && (
+                            <span className="font-normal text-green-600 dark:text-green-500 ml-1">
+                              (saves ₹{savingPerUnit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}/unit)
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex gap-0">
                       {/* Position number */}
                       <div className="flex items-center justify-center w-10 shrink-0 bg-surface-secondary border-r border-border-default">
@@ -365,11 +387,6 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                   ₹{Number(item.requested_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                   <span className="text-foreground-muted font-normal text-[10px] ml-0.5">/unit</span>
                                 </p>
-                                {discount != null && discount > 0 && (
-                                  <span className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 mt-0.5">
-                                    {discount}% off
-                                  </span>
-                                )}
                                 {discount != null && discount <= 0 && (
                                   <span className="inline-block text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 mt-0.5">
                                     At/above catalog
