@@ -272,7 +272,7 @@ export default function AccountPage() {
     <div className="bg-surface min-h-screen">
 
       {/* Hero header — mobile only */}
-      <div className="bg-gradient-to-br from-accent-600 to-accent-500 dark:from-accent-700 dark:to-accent-600 px-4 pt-8 pb-6 lg:hidden">
+      <div className="bg-gradient-to-br from-accent-600 to-accent-500 dark:from-accent-700 dark:to-accent-600 px-4 pt-8 pb-16 lg:hidden">
         <div className="flex items-center gap-4">
           <button
             onClick={() => fileInputRef.current?.click()}
