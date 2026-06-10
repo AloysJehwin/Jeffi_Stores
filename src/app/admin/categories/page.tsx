@@ -1,4 +1,6 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
+import { ap } from '@/lib/admin-path'
 import { getFilteredCategories } from '@/lib/queries'
 import { queryMany } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
@@ -6,6 +8,7 @@ import CategoriesClient from '@/components/admin/CategoriesClient'
 import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
 
 export default async function CategoriesPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const host = (await headers()).get('host') ?? ''
   const [categories, productCountRows, misassignedRows] = await Promise.all([
     getFilteredCategories({
       is_active: searchParams.is_active,
@@ -39,7 +42,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
           <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
         </div>
         <Link
-          href="/admin/categories/add"
+          href={ap('/admin/categories/add', host)}
           className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
         >
           Add New Category

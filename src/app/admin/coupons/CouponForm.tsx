@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 import AdminSelect from '@/components/admin/AdminSelect'
 import Toggle from '@/components/ui/Toggle'
 import DateTimePicker from '@/components/ui/DateTimePicker'
@@ -182,7 +183,7 @@ export default function CouponForm({ action, submitLabel, defaultValues: d = {} 
       </div>
 
       <div className="flex gap-3 pt-2 sticky bottom-0 bg-surface/90 backdrop-blur py-3 -mx-4 sm:-mx-6 px-4 sm:px-6 border-t border-border-default">
-        <Link href="/admin/coupons" className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
+        <Link href={ap('/admin/coupons')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
           Cancel
         </Link>
         <button type="submit" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">

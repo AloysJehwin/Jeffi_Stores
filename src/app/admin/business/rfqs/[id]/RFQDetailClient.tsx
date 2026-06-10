@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 
 interface RFQItem {
   id: string
@@ -169,7 +170,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href="/admin/business/rfqs" className="text-accent-500 hover:text-accent-600 transition-colors">Business RFQs</Link>
+        <Link href={ap('/admin/business/rfqs')} className="text-accent-500 hover:text-accent-600 transition-colors">Business RFQs</Link>
         <span>/</span>
         <span className="text-foreground font-mono">{rfq.rfq_number}</span>
       </div>
@@ -213,7 +214,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
               </button>
             )}
             {rfq.status === 'converted' && rfq.converted_quotation_id && (
-              <Link href={`/admin/quotations/${rfq.converted_quotation_id}`}
+              <Link href={ap(`/admin/quotations/${rfq.converted_quotation_id}`)}
                 className="px-5 py-2 border-2 border-accent-500 text-accent-400 text-sm font-semibold rounded-lg hover:bg-accent-900/20 transition-colors">
                 View Quotation →
               </Link>
@@ -468,7 +469,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
               ))}
             </dl>
             <div className="mt-4 pt-4 border-t border-border-default">
-              <Link href={`/admin/business/customers/${rfq.user_id}`}
+              <Link href={ap(`/admin/business/customers/${rfq.user_id}`)}
                 className="text-xs text-accent-500 hover:text-accent-600 font-medium">
                 View customer profile →
               </Link>
@@ -495,7 +496,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
           {rfq.status === 'converted' && rfq.converted_quotation_id && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
               <p className="text-sm text-green-700 dark:text-green-400 font-medium mb-2">Converted to quotation</p>
-              <Link href={`/admin/quotations/${rfq.converted_quotation_id}`}
+              <Link href={ap(`/admin/quotations/${rfq.converted_quotation_id}`)}
                 className="text-sm font-semibold text-accent-600 dark:text-accent-400 hover:underline">
                 Open Quotation →
               </Link>

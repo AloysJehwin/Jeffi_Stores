@@ -9,6 +9,7 @@ import { useState } from 'react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 import { mrpDiscountPct, applyDiscount } from '@/lib/pricing'
+import { bp } from '@/lib/business-path'
 
 interface AppliedCoupon {
   couponId: string
@@ -46,7 +47,7 @@ export default function CartPage() {
       }
       const params = new URLSearchParams({ intent: data.intent })
       if (appliedCoupon) params.set('couponCode', appliedCoupon.code)
-      router.push(`/business/checkout/review?${params.toString()}`)
+      router.push(bp(`/business/checkout/review?${params.toString()}`))
     } catch {
       showToast('Could not reach the server. Please try again.', 'error')
       setProceedingToCheckout(false)
@@ -109,7 +110,7 @@ export default function CartPage() {
           <h2 className="text-2xl font-bold text-foreground mb-2">Your cart is empty</h2>
           <p className="text-foreground-secondary mb-6">Start shopping to add items to your cart</p>
           <Link
-            href="/business/products"
+            href={bp('/business/products')}
             className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
           >
             Browse Products
@@ -169,7 +170,7 @@ export default function CartPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
                 <p className="text-foreground-secondary mb-4">Your cart is empty.</p>
-                <p className="text-sm text-foreground-muted">Move an item from below or <Link href="/business/products" className="text-accent-600 hover:text-accent-700 font-medium">browse products</Link>.</p>
+                <p className="text-sm text-foreground-muted">Move an item from below or <Link href={bp('/business/products')} className="text-accent-600 hover:text-accent-700 font-medium">browse products</Link>.</p>
               </div>
             ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
@@ -198,7 +199,7 @@ export default function CartPage() {
                   <div key={item.id} className="p-4 sm:p-6 border-b border-border-default last:border-b-0">
                     <div className="flex gap-4 sm:gap-6">
                       {/* Product Image */}
-                      <Link href={`/business/products/${item.products.slug}`} className="flex-shrink-0">
+                      <Link href={bp(`/business/products/${item.products.slug}`)} className="flex-shrink-0">
                         <div className="w-24 h-24 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
                           {primaryImage ? (
                             <img
@@ -218,7 +219,7 @@ export default function CartPage() {
 
                       {/* Product Details */}
                       <div className="flex-1">
-                        <Link href={`/business/products/${item.products.slug}`} className="text-base sm:text-lg font-semibold text-foreground hover:text-accent-600 transition-colors">
+                        <Link href={bp(`/business/products/${item.products.slug}`)} className="text-base sm:text-lg font-semibold text-foreground hover:text-accent-600 transition-colors">
                           {item.products.name}
                         </Link>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -418,7 +419,7 @@ export default function CartPage() {
                     const isUpdating = updatingItems.has(item.id)
                     return (
                       <div key={item.id} className="p-4 sm:p-6 flex gap-4">
-                        <Link href={`/business/products/${item.products.slug}`} className="shrink-0">
+                        <Link href={bp(`/business/products/${item.products.slug}`)} className="shrink-0">
                           <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
                             {primaryImage ? (
                               <img
@@ -436,7 +437,7 @@ export default function CartPage() {
                           </div>
                         </Link>
                         <div className="flex-1 min-w-0">
-                          <Link href={`/business/products/${item.products.slug}`} className="text-base font-semibold text-foreground hover:text-accent-600 transition-colors line-clamp-1">
+                          <Link href={bp(`/business/products/${item.products.slug}`)} className="text-base font-semibold text-foreground hover:text-accent-600 transition-colors line-clamp-1">
                             {item.products.name}
                           </Link>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -583,7 +584,7 @@ export default function CartPage() {
               ) : (
                 <div className="space-y-3">
                   <Link
-                    href="/business/signin?redirect=/checkout"
+                    href={bp('/business/signin?redirect=/checkout')}
                     className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                   >
                     Login to Checkout
@@ -592,13 +593,13 @@ export default function CartPage() {
                     </svg>
                   </Link>
                   <p className="text-sm text-foreground-secondary text-center">
-                    New customer? <Link href="/business/signup" className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">Create an account</Link>
+                    New customer? <Link href={bp('/business/signup')} className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium">Create an account</Link>
                   </p>
                 </div>
               )}
 
               <Link
-                href="/business/products"
+                href={bp('/business/products')}
                 className="block w-full text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4"
               >
                 Continue Shopping

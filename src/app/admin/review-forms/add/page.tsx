@@ -1,18 +1,21 @@
 import { queryMany } from '@/lib/db'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import ReviewFormForm from '../ReviewFormForm'
+import { ap } from '@/lib/admin-path'
 
 export const dynamic = 'force-dynamic'
 
 interface Coupon { id: string; code: string; description: string | null }
 
 export default async function AddReviewFormPage() {
+  const host = (await headers()).get('host') ?? ''
   const coupons = await queryMany<Coupon>('SELECT id, code, description FROM coupons WHERE is_active = true ORDER BY code')
 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/review-forms" className="text-foreground-muted hover:text-foreground transition-colors">
+        <Link href={ap('/admin/review-forms', host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div>

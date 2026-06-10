@@ -6,6 +6,7 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
+import { bp } from '@/lib/business-path'
 
 interface ProductCardProps {
   id: string
@@ -64,7 +65,7 @@ export default function ProductCard({
   const handleShare = useCallback(async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const url = `${window.location.origin}/business/products/${slug}`
+    const url = `${window.location.origin}${bp(`/business/products/${slug}`)}`
     const shareData = { title: name, text: `Check out ${name}`, url }
     if (navigator.share) {
       try { await navigator.share(shareData) } catch {}
@@ -77,7 +78,7 @@ export default function ProductCard({
   return (
     <>
       <Link
-        href={`/business/products/${slug}`}
+        href={bp(`/business/products/${slug}`)}
         className="group"
         onTouchStart={(e) => startLongPress(e)}
         onTouchEnd={cancelLongPress}
@@ -246,7 +247,7 @@ export default function ProductCard({
             </div>
 
             <Link
-              href={`/business/products/${slug}`}
+              href={bp(`/business/products/${slug}`)}
               onClick={() => setShowQuickView(false)}
               className="block w-full text-center bg-accent-500 hover:bg-accent-600 text-white font-semibold py-3 rounded-xl transition-colors"
             >

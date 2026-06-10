@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { queryOne, queryMany, queryCount } from '@/lib/db'
 import Pagination from '@/components/admin/Pagination'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
+import { ap } from '@/lib/admin-path'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -52,6 +54,7 @@ export default async function CampaignDetailPage({
   params: { id: string }
   searchParams: { logPage?: string }
 }) {
+  const host = (await headers()).get('host') ?? ''
   const campaign = await queryOne<Campaign>('SELECT * FROM email_campaigns WHERE id = $1', [params.id])
   if (!campaign) notFound()
 
@@ -66,7 +69,7 @@ export default async function CampaignDetailPage({
     queryCount('SELECT COUNT(*) FROM email_campaign_logs WHERE campaign_id = $1', [params.id]),
   ])
 
-  const buildUrl = (p: number) => `/admin/mailer/${params.id}${p > 1 ? `?logPage=${p}` : ''}`
+  const buildUrl = (p: number) => ap(`/admin/mailer/${params.id}${p > 1 ? `?logPage=${p}` : ''}`, host)
 
   const sentCount = logs.filter(l => l.status === 'sent').length
   const failedCount = logs.filter(l => l.status === 'failed').length
@@ -74,7 +77,7 @@ export default async function CampaignDetailPage({
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/mailer" className="text-foreground-muted hover:text-foreground transition-colors">
+        <Link href={ap('/admin/mailer', host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div className="flex-1 min-w-0">

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { navItems } from '@/components/business/AccountSidebar'
+import { bp } from '@/lib/business-path'
 
 export default function BusinessAccountMobileHeader() {
   const { user } = useAuth()
@@ -18,7 +19,7 @@ export default function BusinessAccountMobileHeader() {
       <div className="lg:hidden bg-accent-500 pt-8 pb-16 px-4">
         <h1 className="text-lg font-semibold text-white/80 mb-4">My Account</h1>
         <div className="flex items-center gap-4">
-          <Link href="/business/account" className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0 block">
+          <Link href={bp('/business/account')} className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0 block">
             {user.avatarUrl ? (
               <img src={user.avatarUrl} alt={user.firstName} className="w-full h-full object-cover" />
             ) : (
@@ -38,11 +39,11 @@ export default function BusinessAccountMobileHeader() {
         <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
           <div className="flex">
             {navItems.map((item) => {
-              const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+              const isActive = item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={bp(item.href)}
                   className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors border-b-2 ${
                     isActive
                       ? 'text-accent-600 border-accent-500 dark:text-accent-400'

@@ -1,10 +1,12 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { getFilteredOrders } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import OrdersTableRows from '@/components/admin/OrdersTableRows'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
+import { ap } from '@/lib/admin-path'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -12,6 +14,7 @@ export const revalidate = 0
 const PAGE_SIZE = 25
 
 export default async function OrdersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const host = (await headers()).get('host') ?? ''
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const sort = searchParams.sort
   const dir = searchParams.dir as 'asc' | 'desc' | undefined
@@ -48,7 +51,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
-    return `/admin/orders${qs ? `?${qs}` : ''}`
+    return ap(`/admin/orders${qs ? `?${qs}` : ''}`, host)
   }
 
   return (
@@ -59,7 +62,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
           <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
         </div>
         <Link
-          href="/admin/orders/new"
+          href={ap('/admin/orders/new', host)}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,7 +146,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
               key={order.id}
               className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4"
             >
-              <Link href={`/admin/orders/${order.id}`} className="block">
+              <Link href={ap(`/admin/orders/${order.id}`, host)} className="block">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-foreground">

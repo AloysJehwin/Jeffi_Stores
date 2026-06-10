@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
 import { mrpDiscountPct } from '@/lib/pricing'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { bp } from '@/lib/business-path'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/business/ProductCard'
@@ -69,6 +71,8 @@ export default async function BusinessCategoryDetailPage({
     notFound()
   }
 
+  const host = (await headers()).get('host') ?? ''
+
   const pageParam = typeof searchParams.page === 'string' ? searchParams.page : '1'
   const page = Math.max(1, parseInt(pageParam, 10) || 1)
 
@@ -84,11 +88,11 @@ export default async function BusinessCategoryDetailPage({
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4">
           <nav className="flex items-center gap-2 text-sm mb-4">
-            <Link href="/business" className="text-foreground-muted hover:text-accent-500">
+            <Link href={bp('/business', host)} className="text-foreground-muted hover:text-accent-500">
               Home
             </Link>
             <span className="text-foreground-muted">/</span>
-            <Link href="/business/categories" className="text-foreground-muted hover:text-accent-500">
+            <Link href={bp('/business/categories', host)} className="text-foreground-muted hover:text-accent-500">
               Categories
             </Link>
             <span className="text-foreground-muted">/</span>
@@ -112,7 +116,7 @@ export default async function BusinessCategoryDetailPage({
               {subcategories.map((subcategory) => (
                 <Link
                   key={subcategory.id}
-                  href={`/business/categories/${subcategory.slug}`}
+                  href={bp('/business/categories/' + subcategory.slug, host)}
                   className="bg-surface-elevated rounded-xl shadow-sm border border-border-default p-2 sm:p-3 hover:shadow-md hover:border-accent-500 transition-all group h-full"
                 >
                   <div className="flex flex-col items-center text-center gap-1.5">
@@ -175,7 +179,7 @@ export default async function BusinessCategoryDetailPage({
             <Pagination
               page={page}
               totalPages={totalPages}
-              buildHref={(p) => p > 1 ? `/business/categories/${params.slug}?page=${p}` : `/business/categories/${params.slug}`}
+              buildHref={(p) => p > 1 ? bp(`/business/categories/${params.slug}?page=${p}`, host) : bp(`/business/categories/${params.slug}`, host)}
             />
             </>
           ) : (
@@ -188,7 +192,7 @@ export default async function BusinessCategoryDetailPage({
                 We&apos;re working on adding products to this category. Check back soon!
               </p>
               <Link
-                href="/business/products"
+                href={bp('/business/products', host)}
                 className="inline-block bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
               >
                 Browse All Products

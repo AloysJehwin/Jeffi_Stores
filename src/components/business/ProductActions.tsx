@@ -5,6 +5,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { bp } from '@/lib/business-path'
 
 interface VariantImage {
   id: string
@@ -348,7 +349,7 @@ export default function ProductActions({
         setIsBuyingNow(false)
         return
       }
-      router.push(`/business/checkout/review?intent=${encodeURIComponent(data.intent)}`)
+      router.push(bp(`/business/checkout/review?intent=${encodeURIComponent(data.intent)}`))
     } catch {
       showToast('Could not reach the server. Please try again.', 'error')
       setIsBuyingNow(false)

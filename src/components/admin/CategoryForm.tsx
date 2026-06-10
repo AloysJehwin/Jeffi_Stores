@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
+import { ap } from '@/lib/admin-path'
 import AdminSelect from './AdminSelect'
 import * as Icons from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'
@@ -458,7 +459,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
 
       <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex justify-end gap-4">
         <Link
-          href="/admin/categories"
+          href={ap('/admin/categories')}
           className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
         >
           Cancel

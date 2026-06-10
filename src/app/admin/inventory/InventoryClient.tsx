@@ -11,6 +11,7 @@ import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/So
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
+import { ap } from '@/lib/admin-path'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -171,7 +172,7 @@ function SuppliersTab() {
         </div>
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>
-          <Link href="/admin/suppliers/new" className={btnPrimary}>
+          <Link href={ap('/admin/suppliers/new')} className={btnPrimary}>
             + Add Supplier
           </Link>
         </div>
@@ -206,7 +207,7 @@ function SuppliersTab() {
                 {sortedSuppliers.map(s => (
                   <tr key={s.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground">
-                      <Link href={`/admin/suppliers/${s.id}`} className="hover:text-accent-500 hover:underline">{s.name}</Link>
+                      <Link href={ap(`/admin/suppliers/${s.id}`)} className="hover:text-accent-500 hover:underline">{s.name}</Link>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{s.gstin || '—'}</td>
                     <td className="px-4 py-3 text-foreground-secondary hidden sm:table-cell">{s.contact_name || '—'}</td>
@@ -220,7 +221,7 @@ function SuppliersTab() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">
-                        <Link href={`/admin/suppliers/${s.id}/edit`} className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium">Edit</Link>
+                        <Link href={ap(`/admin/suppliers/${s.id}/edit`)} className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium">Edit</Link>
                         <button className="text-xs text-foreground-secondary hover:text-foreground hover:underline" onClick={() => toggleActive(s)}>
                           {s.is_active ? 'Deactivate' : 'Activate'}
                         </button>
@@ -574,7 +575,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
         </div>
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>
-          <Link href="/admin/inventory/po/new" className={btnPrimary}>
+          <Link href={ap('/admin/inventory/po/new')} className={btnPrimary}>
             + Create PO
           </Link>
         </div>
@@ -610,7 +611,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                   <tr key={po.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-foreground-secondary font-medium">{po.po_number}</td>
                     <td className="px-4 py-3 font-medium text-foreground">
-                      <Link href={`/admin/suppliers/${po.supplier_id}`} className="hover:text-accent-500 hover:underline">{po.supplier_name}</Link>
+                      <Link href={ap(`/admin/suppliers/${po.supplier_id}`)} className="hover:text-accent-500 hover:underline">{po.supplier_name}</Link>
                     </td>
                     <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap hidden sm:table-cell">{formatDate(po.order_date)}</td>
                     <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap hidden md:table-cell">{po.expected_date ? formatDate(po.expected_date) : '—'}</td>
@@ -714,7 +715,7 @@ function StockTab() {
     for (const [k, v] of Object.entries(patch)) {
       if (v) p.set(k, v); else p.delete(k)
     }
-    router.replace(`/admin/inventory?${p.toString()}`, { scroll: false })
+    router.replace(`${ap('/admin/inventory')}?${p.toString()}`, { scroll: false })
   }
   const [ledgerSortCol, setLedgerSortCol] = useState<string | undefined>(undefined)
   const [ledgerSortDir, setLedgerSortDir] = useState<SortDir | undefined>(undefined)
@@ -894,15 +895,15 @@ function StockTab() {
                       const txType = group.txs[0].transaction_type
 
                       const refLink = group.refType === 'order' ? (
-                        <Link href={`/admin/invoices/${group.refId}`} className="font-mono text-accent-500 hover:underline underline-offset-2">
+                        <Link href={ap(`/admin/invoices/${group.refId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
                           {group.refLabel || group.refId.slice(0, 8) + '…'}
                         </Link>
                       ) : group.refType === 'cash_sale' ? (
-                        <Link href={`/admin/cash-sale/${group.refId}`} className="font-mono text-accent-500 hover:underline underline-offset-2">
+                        <Link href={ap(`/admin/cash-sale/${group.refId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
                           {group.refLabel || group.refId.slice(0, 8) + '…'}
                         </Link>
                       ) : group.refType === 'grn' ? (
-                        <Link href={`/admin/financial?tab=grn`} className="font-mono text-accent-500 hover:underline underline-offset-2">
+                        <Link href={ap(`/admin/financial?tab=grn`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
                           {group.refLabel || group.refId.slice(0, 8) + '…'}
                         </Link>
                       ) : (
@@ -919,7 +920,7 @@ function StockTab() {
                             <td className="px-4 py-3 text-foreground">
                               <HoverCard
                                 trigger={
-                                  <Link href={`/admin/products/${tx.product_id}`} className="font-medium hover:text-accent-500 hover:underline underline-offset-2">
+                                  <Link href={ap(`/admin/products/${tx.product_id}`)} className="font-medium hover:text-accent-500 hover:underline underline-offset-2">
                                     {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
                                   </Link>
                                 }
@@ -1006,7 +1007,7 @@ function StockTab() {
                                 {new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                               </td>
                               <td className="px-4 py-2.5 pl-8 text-foreground">
-                                <Link href={`/admin/products/${tx.product_id}`} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2">
+                                <Link href={ap(`/admin/products/${tx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2">
                                   {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
                                 </Link>
                                 {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
@@ -1139,7 +1140,7 @@ function StockTab() {
                             <td className="px-4 py-3 font-medium text-foreground">
                               <HoverCard
                                 trigger={
-                                  <Link href={`/admin/products/${p.id}`} className="hover:text-accent-500 hover:underline underline-offset-2">
+                                  <Link href={ap(`/admin/products/${p.id}`)} className="hover:text-accent-500 hover:underline underline-offset-2">
                                     {p.name}
                                   </Link>
                                 }
@@ -1225,7 +1226,7 @@ function StockTab() {
                                 ) : (
                                   <>
                                     <Link
-                                      href={`/admin/products/${p.id}`}
+                                      href={ap(`/admin/products/${p.id}`)}
                                       title="View Product"
                                       className="p-1.5 rounded-lg hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
                                     >
@@ -1275,7 +1276,7 @@ export default function InventoryClient() {
     setTab(key)
     const params = new URLSearchParams()
     params.set('tab', key)
-    router.push(`/admin/inventory?${params.toString()}`, { scroll: false })
+    router.push(`${ap('/admin/inventory')}?${params.toString()}`, { scroll: false })
   }
 
   return (

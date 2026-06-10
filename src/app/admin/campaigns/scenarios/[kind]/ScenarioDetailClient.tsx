@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
+import { ap } from '@/lib/admin-path'
 
 interface ParamDef {
   type: 'integer' | 'number' | 'boolean'
@@ -111,7 +112,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 text-sm">
-        <Link href="/admin/campaigns/scenarios" className="text-foreground-muted hover:text-foreground transition-colors">Scenarios</Link>
+        <Link href={ap('/admin/campaigns/scenarios')} className="text-foreground-muted hover:text-foreground transition-colors">Scenarios</Link>
         <span className="text-foreground-muted">/</span>
         <span className="text-foreground font-medium">{scenario.name}</span>
       </div>
@@ -126,7 +127,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
             <p className="text-sm text-foreground-secondary mt-1">{scenario.description}</p>
           </div>
           <Link
-            href={`/admin/campaigns/new?scenario=${scenario.kind}`}
+            href={ap(`/admin/campaigns/new?scenario=${scenario.kind}`)}
             className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 shrink-0"
           >
             + New campaign
@@ -162,7 +163,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
           <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center">
             <p className="text-sm text-foreground-muted mb-4">No campaigns are using this scenario yet.</p>
             <Link
-              href={`/admin/campaigns/new?scenario=${scenario.kind}`}
+              href={ap(`/admin/campaigns/new?scenario=${scenario.kind}`)}
               className="inline-block px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
             >
               Create the first one
@@ -194,7 +195,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                       {c.description && <p className="text-xs text-foreground-muted mt-1">{c.description}</p>}
                     </div>
                     <Link
-                      href={`/admin/campaigns/${c.kind}`}
+                      href={ap(`/admin/campaigns/${c.kind}`)}
                       className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-semibold transition-all"
                     >
                       Edit template

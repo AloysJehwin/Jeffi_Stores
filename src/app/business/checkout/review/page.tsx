@@ -10,6 +10,7 @@ import AddressFormModal from '@/components/visitor/AddressFormModal'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { mrpDiscountPct } from '@/lib/pricing'
+import { bp } from '@/lib/business-path'
 
 export default function CheckoutReviewPageWrapper() {
   return (
@@ -101,9 +102,9 @@ function CheckoutReviewPage() {
   useEffect(() => {
     if (!authLoading && !user && authWasLoading.current) {
       const currentUrl = intentToken
-        ? `/business/checkout/review?intent=${encodeURIComponent(intentToken)}`
-        : '/business/checkout/review'
-      router.push(`/business/signin?redirect=${encodeURIComponent(currentUrl)}`)
+        ? bp(`/business/checkout/review?intent=${encodeURIComponent(intentToken)}`)
+        : bp('/business/checkout/review')
+      router.push(bp(`/business/signin?redirect=${encodeURIComponent(currentUrl)}`))
       return
     }
 
@@ -114,7 +115,7 @@ function CheckoutReviewPage() {
         .then(async r => {
           const d = await r.json()
           if (!r.ok) {
-            router.push('/business')
+            router.push(bp('/business'))
             return
           }
           if (d.mode === 'cart') {
@@ -147,7 +148,7 @@ function CheckoutReviewPage() {
             })
             .catch(() => {})
         })
-        .catch(() => router.push('/business'))
+        .catch(() => router.push(bp('/business')))
       return
     }
 
@@ -161,7 +162,7 @@ function CheckoutReviewPage() {
       const productName = searchParams.get('productName') || ''
       const variantName = searchParams.get('variantName')
 
-      if (!productId || !price) { router.push('/business'); return }
+      if (!productId || !price) { router.push(bp('/business')); return }
 
       setBuyNowItem({
         productId,
@@ -190,7 +191,7 @@ function CheckoutReviewPage() {
         })
         .catch(() => {})
     } else if (!intentToken && !cartLoading && cartCount === 0) {
-      router.replace('/business/cart')
+      router.replace(bp('/business/cart'))
     }
   }, [cartCount, user, authLoading, cartLoading, router, isBuyNow, intentToken])
 
@@ -587,7 +588,7 @@ function CheckoutReviewPage() {
               </div>
 
               {!isBuyNow && (
-                <Link href="/business/cart" className="block text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4">
+                <Link href={bp('/business/cart')} className="block text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4">
                   ← Modify Cart
                 </Link>
               )}
@@ -753,7 +754,7 @@ function CheckoutReviewPage() {
                   ← Go Back
                 </button>
               ) : (
-                <Link href="/business/cart" className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
+                <Link href={bp('/business/cart')} className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">
                   ← Back to Cart
                 </Link>
               )}

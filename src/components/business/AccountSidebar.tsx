@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { bp } from '@/lib/business-path'
 
 export const navItems = [
   {
@@ -62,7 +63,7 @@ export function BusinessAccountNavBar() {
 
   const activeLabel = (() => {
     const match = navItems.slice().reverse().find(item =>
-      item.exact ? pathname === item.href : pathname.startsWith(item.href)
+      item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
     )
     return match?.label ?? 'My Account'
   })()
@@ -76,12 +77,12 @@ export function BusinessAccountNavBar() {
           <nav className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
             {navItems.map((item) => {
               const isActive = item.exact
-                ? pathname === item.href
-                : pathname.startsWith(item.href)
+                ? pathname === bp(item.href)
+                : pathname.startsWith(bp(item.href))
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={bp(item.href)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
                     isActive
                       ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400'
@@ -108,13 +109,13 @@ export default function BusinessAccountSidebar() {
       <nav className="space-y-2">
         {navItems.map((item) => {
           const isActive = item.exact
-            ? pathname === item.href
-            : pathname.startsWith(item.href)
+            ? pathname === bp(item.href)
+            : pathname.startsWith(bp(item.href))
 
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={bp(item.href)}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                 isActive
                   ? 'bg-accent-50 text-accent-700 font-medium dark:bg-accent-900/30 dark:text-accent-400'

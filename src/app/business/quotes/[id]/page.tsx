@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { bp } from '@/lib/business-path'
 
 interface RFQItem {
   id: string
@@ -61,7 +62,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
   return (
     <div className="max-w-3xl space-y-5">
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href="/business/quotes" className="text-accent-500 hover:text-accent-600 transition-colors">My Quotes</Link>
+        <Link href={bp('/business/quotes')} className="text-accent-500 hover:text-accent-600 transition-colors">My Quotes</Link>
         <span>/</span>
         <span className="text-foreground font-mono">{rfq.rfq_number}</span>
       </div>

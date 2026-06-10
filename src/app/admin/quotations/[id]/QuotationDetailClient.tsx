@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, Pencil } from 'lucide-react'
+import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -44,7 +45,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Quotation not found.</p>
-        <Link href="/admin/quotations" className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Quotations</Link>
+        <Link href={ap('/admin/quotations')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Quotations</Link>
       </div>
     )
   }
@@ -56,7 +57,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
     <div className="p-4 sm:p-6 space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
-        <a href="/admin/quotations" className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a href={ap('/admin/quotations')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
           Quotations
         </a>
@@ -75,7 +76,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
         <div className="flex items-center gap-2">
           {q.status === 'draft' && (
             <a
-              href={`/admin/quotations?view=editor&edit=${q.id}`}
+              href={ap(`/admin/quotations?view=editor&edit=${q.id}`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
             >
               <Pencil className="w-4 h-4" />
@@ -95,14 +96,14 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           </a>
           {q.converted_order_id && (
             <a
-              href={`/admin/invoices/${q.converted_order_id}`}
+              href={ap(`/admin/invoices/${q.converted_order_id}`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
             >
               View Invoice →
             </a>
           )}
           <Link
-            href="/admin/quotations"
+            href={ap('/admin/quotations')}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
           >
             ← All Quotations

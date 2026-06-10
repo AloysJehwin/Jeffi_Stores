@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { ap } from '@/lib/admin-path'
 
 interface CampaignRow {
   kind: string
@@ -99,20 +100,20 @@ export default function CampaignsListClient() {
       <div className="flex items-center justify-between gap-2 border-b border-border-default">
         <div className="flex items-center gap-2">
           <Link
-            href="/admin/campaigns"
+            href={ap('/admin/campaigns')}
             className="px-4 py-2 text-sm font-semibold text-accent-600 dark:text-accent-400 border-b-2 border-accent-500"
           >
             Campaigns
           </Link>
           <Link
-            href="/admin/campaigns/scenarios"
+            href={ap('/admin/campaigns/scenarios')}
             className="px-4 py-2 text-sm font-semibold text-foreground-muted hover:text-foreground border-b-2 border-transparent transition-colors"
           >
             Scenarios
           </Link>
         </div>
         <Link
-          href="/admin/campaigns/new"
+          href={ap('/admin/campaigns/new')}
           className="mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
         >
           + New Campaign
@@ -124,7 +125,7 @@ export default function CampaignsListClient() {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
-                <Link href={`/admin/campaigns/${c.kind}`} className="font-semibold text-foreground hover:text-accent-500 transition-colors">
+                <Link href={ap(`/admin/campaigns/${c.kind}`)} className="font-semibold text-foreground hover:text-accent-500 transition-colors">
                   {c.name}
                 </Link>
                 <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
@@ -167,7 +168,7 @@ export default function CampaignsListClient() {
                 Run now
               </button>
               <Link
-                href={`/admin/campaigns/${c.kind}`}
+                href={ap(`/admin/campaigns/${c.kind}`)}
                 className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-semibold transition-all"
               >
                 View / Edit

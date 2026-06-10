@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
+import { ap } from '@/lib/admin-path'
 
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -75,7 +76,7 @@ export default function EditSupplierPage() {
       })
       const json = await res.json()
       if (!res.ok) { setError(json.error || 'Failed to update supplier'); setSaving(false); return }
-      router.push('/admin/inventory?tab=suppliers')
+      router.push(ap('/admin/inventory?tab=suppliers'))
     } catch {
       setError('Failed to update supplier')
       setSaving(false)
@@ -93,7 +94,7 @@ export default function EditSupplierPage() {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/inventory?tab=suppliers" className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors">
+        <Link href={ap('/admin/inventory?tab=suppliers')} className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
@@ -190,7 +191,7 @@ export default function EditSupplierPage() {
           <button type="submit" disabled={saving || !form.name.trim()} className={btnPrimary}>
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
-          <Link href="/admin/inventory?tab=suppliers" className={btnSecondary}>
+          <Link href={ap('/admin/inventory?tab=suppliers')} className={btnSecondary}>
             Cancel
           </Link>
         </div>

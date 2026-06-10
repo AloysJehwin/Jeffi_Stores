@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import { ap } from '@/lib/admin-path'
 
 interface NavLink {
   href: string
@@ -13,9 +14,10 @@ interface NavLink {
 
 function isMobileNavActive(link: NavLink, currentPath: string | null): boolean {
   if (!currentPath) return false
-  if (currentPath === link.href) return true
+  const href = ap(link.href)
+  if (currentPath === href) return true
   if (link.exactMatch || link.href === '/admin/dashboard') return false
-  return currentPath.startsWith(link.href + '/')
+  return currentPath.startsWith(href + '/')
 }
 
 interface AdminMobileNavProps {
@@ -94,9 +96,9 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
           <nav className="flex flex-col p-3 gap-1 flex-1 overflow-y-auto">
             {scanLink && (
               <a
-                href={scanLink.href}
+                href={ap(scanLink.href)}
                 className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-colors mb-1 ${
-                  pathname === scanLink.href
+                  pathname === ap(scanLink.href)
                     ? 'bg-secondary-400/40 text-white'
                     : 'bg-white/10 text-white hover:bg-white/20'
                 }`}
@@ -111,7 +113,7 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
             {ungrouped.map(link => (
               <a
                 key={link.href}
-                href={link.href}
+                href={ap(link.href)}
                 className={`px-4 py-3 rounded-lg font-medium transition-colors ${
                   isMobileNavActive(link, pathname)
                     ? 'bg-primary-500/20 text-primary-400'
@@ -158,7 +160,7 @@ function MobileNavGroup({ groupName, links, pathname }: { groupName: string; lin
           {links.map(link => (
             <a
               key={link.href}
-              href={link.href}
+              href={ap(link.href)}
               className={`px-4 py-2.5 rounded-lg font-medium transition-colors ${
                 isMobileNavActive(link, pathname)
                   ? 'bg-primary-500/20 text-primary-400'

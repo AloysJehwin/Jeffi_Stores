@@ -1,6 +1,7 @@
 import SupportChat from '@/components/visitor/SupportChat'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
+import { bp } from '@/lib/business-path'
 
 export const metadata = {
   title: 'Support | Jeffi Stores Business',
@@ -20,6 +21,7 @@ async function getAuthUser() {
 
 export default async function BusinessSupportPage() {
   const user = await getAuthUser()
+  const host = (await headers()).get('host') ?? ''
 
   return (
     <div className="bg-surface min-h-screen">
@@ -78,12 +80,12 @@ export default async function BusinessSupportPage() {
             <h2 className="font-bold text-foreground text-sm mb-3">Quick Links</h2>
             <div className="divide-y divide-border-default">
               {[
-                { label: 'My Orders', href: '/business/orders' },
-                { label: 'My Quotes', href: '/business/quotes' },
-                { label: 'My Account', href: '/business/account' },
-                { label: 'Browse Products', href: '/business/products' },
-                { label: 'All Categories', href: '/business/categories' },
-                { label: 'About Us', href: '/business/about' },
+              { label: 'My Orders', href: bp('/business/orders', host) },
+                { label: 'My Quotes', href: bp('/business/quotes', host) },
+                { label: 'My Account', href: bp('/business/account', host) },
+                { label: 'Browse Products', href: bp('/business/products', host) },
+                { label: 'All Categories', href: bp('/business/categories', host) },
+                { label: 'About Us', href: bp('/business/about', host) },
               ].map((link) => (
                 <a
                   key={link.href}
@@ -147,7 +149,7 @@ export default async function BusinessSupportPage() {
             </div>
             <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Support Chat</h2>
             <p className="text-foreground-secondary text-sm mb-6 max-w-sm mx-auto">Log in to chat with our support team and get help with your orders and account.</p>
-            <a href="/business/signin" className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-8 py-2.5 rounded-lg font-semibold text-sm transition-colors">
+            <a href={bp('/business/signin', host)} className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-8 py-2.5 rounded-lg font-semibold text-sm transition-colors">
               Sign In
             </a>
           </div>

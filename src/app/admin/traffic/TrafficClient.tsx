@@ -9,6 +9,7 @@ import {
   BarChart2, Search, AlertCircle, ShoppingCart, Eye, Package,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { ap } from '@/lib/admin-path'
 
 const FUNNEL_LABELS: Record<string, string> = {
   home: 'Homepage', categories: 'Categories', category: 'Category Page',
@@ -280,7 +281,7 @@ export default function TrafficClient() {
     setTabState(next)
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', next)
-    router.push(`/admin/traffic?${params.toString()}`, { scroll: false })
+    router.push(`${ap('/admin/traffic')}?${params.toString()}`, { scroll: false })
   }
 
   useEffect(() => {
@@ -687,7 +688,7 @@ export default function TrafficClient() {
                               <tr key={p.productId} className="hover:bg-surface-secondary/50">
                                 <td className="py-2 px-2 text-xs font-bold text-foreground-muted w-6">{rank}</td>
                                 <td className="py-2 px-2 max-w-[180px]">
-                                  <a href={`/admin/products/${p.productId}/analytics`} className="text-foreground hover:text-accent-600 truncate block text-xs font-medium">
+                                  <a href={ap(`/admin/products/${p.productId}/analytics`)} className="text-foreground hover:text-accent-600 truncate block text-xs font-medium">
                                     {p.name}
                                   </a>
                                   <div className="mt-1 h-1 bg-surface-secondary rounded-full">
@@ -752,7 +753,7 @@ export default function TrafficClient() {
                               <tr key={p.productId} className="hover:bg-surface-secondary/50">
                                 <td className="py-2 px-2 text-xs font-bold text-foreground-muted w-6">{rank}</td>
                                 <td className="py-2 px-2 max-w-[240px]">
-                                  <a href={`/admin/products/${p.productId}/analytics`} className="text-foreground hover:text-accent-600 truncate block text-xs font-medium">
+                                  <a href={ap(`/admin/products/${p.productId}/analytics`)} className="text-foreground hover:text-accent-600 truncate block text-xs font-medium">
                                     {p.name}
                                   </a>
                                 </td>

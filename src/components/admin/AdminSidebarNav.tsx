@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { ap } from '@/lib/admin-path'
 
 interface NavLink {
   href: string
@@ -200,9 +201,10 @@ interface Props {
 
 function isNavActive(link: NavLink, currentPath: string | null): boolean {
   if (!currentPath) return false
-  if (currentPath === link.href) return true
+  const href = ap(link.href)
+  if (currentPath === href) return true
   if (link.exactMatch || link.href === '/admin/dashboard') return false
-  return currentPath.startsWith(link.href + '/')
+  return currentPath.startsWith(href + '/')
 }
 
 
@@ -239,7 +241,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
             return (
               <a
                 key={link.href}
-                href={link.href}
+                href={ap(link.href)}
                 title={link.label}
                 className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${
                   isActive ? 'bg-white/20 text-white' : 'text-gray-400 hover:bg-white/10 hover:text-white'
@@ -260,7 +262,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
                 return (
                   <a
                     key={link.href}
-                    href={link.href}
+                    href={ap(link.href)}
                     title={link.label}
                     className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${
                       isActive ? 'bg-white/20 text-white' : 'text-gray-400 hover:bg-white/10 hover:text-white'
@@ -296,7 +298,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
         {ungrouped.map(link => (
           <a
             key={link.href}
-            href={link.href}
+            href={ap(link.href)}
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               isNavActive(link, pathname)
                 ? 'bg-white/20 text-white'
@@ -347,7 +349,7 @@ function SidebarGroup({ groupName, links, pathname }: { groupName: string; links
           {links.map(link => (
             <a
               key={link.href}
-              href={link.href}
+              href={ap(link.href)}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isNavActive(link, pathname)
                   ? 'bg-white/20 text-white'
