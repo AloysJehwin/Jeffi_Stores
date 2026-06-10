@@ -15,12 +15,17 @@ interface RFQItem {
   product_sku: string | null
   product_image_url: string | null
   base_price: number | null
+  product_mrp: number | null
+  product_price_ex_gst: number | null
+  product_gst: number | null
   variant_name: string | null
   variant_sku: string | null
   variant_price: number | null
+  variant_mrp: number | null
   sub_variant_name: string | null
   sub_variant_sku: string | null
   sub_variant_price: number | null
+  sub_variant_mrp: number | null
 }
 
 interface RFQ {
@@ -55,6 +60,9 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 function resolveItemPrice(item: RFQItem): number | null {
+  // Prefer MRP (incl-GST retail price) as the "catalog" reference, fall back to base_price
+  const mrp = item.sub_variant_mrp ?? item.variant_mrp ?? item.product_mrp ?? null
+  if (mrp != null) return Number(mrp)
   const raw = item.sub_variant_price ?? item.variant_price ?? item.base_price ?? null
   return raw != null ? Number(raw) : null
 }
@@ -373,7 +381,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           <div className="shrink-0 text-right space-y-1 min-w-[120px]">
                             {catalogPrice != null && (
                               <div>
-                                <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Catalog</p>
+                                <p className="text-[10px] text-foreground-muted uppercase tracking-wide">MRP</p>
                                 <p className="text-sm font-medium text-foreground-secondary">
                                   ₹{catalogPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                   <span className="text-foreground-muted text-[10px] ml-0.5">/unit</span>
@@ -407,7 +415,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border-default">
                             {itemCatalogTotal != null && (
                               <div className="text-xs text-foreground-muted">
-                                Catalog total:&nbsp;
+                                MRP total:&nbsp;
                                 <span className="text-foreground font-medium">
                                   ₹{itemCatalogTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </span>
