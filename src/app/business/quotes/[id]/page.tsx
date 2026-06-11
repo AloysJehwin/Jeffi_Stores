@@ -306,6 +306,14 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
               )}
             </div>
           </div>
+          {rfq.status === 'converted' && rfq.quotation_view_token && (
+            <a href={`https://quotation.jeffistores.in/${rfq.quotation_view_token}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 border border-accent-500 text-accent-400 text-sm font-semibold rounded-lg hover:bg-accent-900/20 transition-colors shrink-0">
+              View Quotation →
+            </a>
+          )}
 
           {rfq.admin_note && (
             <div className={`mt-4 rounded-lg p-3 text-sm ${rfq.status === 'rejected' ? 'bg-red-900/30 border border-red-800 text-red-300' : 'bg-blue-900/30 border border-blue-800 text-blue-300'}`}>
