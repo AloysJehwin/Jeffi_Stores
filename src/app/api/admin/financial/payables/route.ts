@@ -17,12 +17,14 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get('from') || ''
     const to = searchParams.get('to') || ''
     const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1', 10)
 
     const result = await getPayables({
       status: status || undefined,
       from: from || undefined,
       to: to || undefined,
       search: search || undefined,
+      page,
     })
 
     return NextResponse.json(result)

@@ -73,6 +73,7 @@ const SOURCE_COLORS: Record<string, string> = {
   online: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   offline: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
   cash_sale: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  business: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
 }
 
 export default function InvoicesClient() {
@@ -805,12 +806,22 @@ export default function InvoicesClient() {
                         <td className="px-4 py-3 text-xs text-foreground-secondary whitespace-nowrap">{fmtDate(draft.created_at)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
+                            {draft.source !== 'business' && (
                             <button
                               onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
                               className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
                             >
                               Edit
                             </button>
+                            )}
+                            {draft.source === 'business' && (
+                            <a
+                              href={ap(`/admin/invoices/${draft.id}`)}
+                              className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
+                            >
+                              View
+                            </a>
+                            )}
                             <button
                               onClick={() => finalizeDraft(draft.id)}
                               disabled={finalizingId === draft.id}
@@ -843,12 +854,22 @@ export default function InvoicesClient() {
                       <p className="text-xs text-foreground-secondary">+91 {draft.customer_phone}</p>
                     )}
                     <div className="flex gap-4 pt-1">
+                      {draft.source !== 'business' && (
                       <button
                         onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
                         className="text-xs text-foreground-secondary hover:text-foreground font-medium"
                       >
                         Edit
                       </button>
+                      )}
+                      {draft.source === 'business' && (
+                      <a
+                        href={ap(`/admin/invoices/${draft.id}`)}
+                        className="text-xs text-foreground-secondary hover:text-foreground font-medium"
+                      >
+                        View
+                      </a>
+                      )}
                       <button
                         onClick={() => finalizeDraft(draft.id)}
                         disabled={finalizingId === draft.id}
@@ -920,7 +941,7 @@ export default function InvoicesClient() {
                               <span className="text-foreground-muted">Payment</span>
                               <span className={`font-medium ${inv.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : inv.payment_status === 'unpaid' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}>{inv.payment_status}</span>
                               <span className="text-foreground-muted">Source</span>
-                              <span className="text-foreground">{inv.source === 'online' ? 'Online' : 'Offline'}</span>
+                              <span className="text-foreground">{inv.source === 'online' ? 'Online' : inv.source === 'business' ? 'Business' : 'Offline'}</span>
                             </div>
                           </div>
                         </HoverCard>
@@ -958,7 +979,7 @@ export default function InvoicesClient() {
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
-                            {inv.source === 'online' ? 'Online' : 'Offline'}
+                            {inv.source === 'online' ? 'Online' : inv.source === 'business' ? 'Business' : 'Offline'}
                           </span>
                           {inv.status === 'cancelled' && (
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
@@ -1133,7 +1154,7 @@ export default function InvoicesClient() {
                       {inv.payment_status}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
-                      {inv.source === 'online' ? 'Online' : 'Offline'}
+                      {inv.source === 'online' ? 'Online' : inv.source === 'business' ? 'Business' : 'Offline'}
                     </span>
                     {inv.status === 'cancelled' && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
@@ -1288,7 +1309,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
               {inv.payment_status}
             </span>
             <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${SOURCE_COLORS[inv.source] || ''}`}>
-              {inv.source === 'online' ? 'Online' : 'Offline'}
+              {inv.source === 'online' ? 'Online' : inv.source === 'business' ? 'Business' : 'Offline'}
             </span>
             {inv.irn && (
               <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full inline-flex items-center gap-1 ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}>

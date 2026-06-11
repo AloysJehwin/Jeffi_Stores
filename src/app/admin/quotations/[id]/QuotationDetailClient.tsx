@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, Pencil } from 'lucide-react'
 import { ap } from '@/lib/admin-path'
@@ -25,6 +25,10 @@ const STATUS_COLORS: Record<string, string> = {
 export default function QuotationDetailClient({ id }: { id: string }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [finalizing, setFinalizing] = useState(false)
+  const [finalizeError, setFinalizeError] = useState('')
+  const [showConfirm, setShowConfirm] = useState(false)
+  const confirmRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetch(`/api/admin/quotations/${id}`)
@@ -32,6 +36,36 @@ export default function QuotationDetailClient({ id }: { id: string }) {
       .then(j => { setData(j); setLoading(false) })
       .catch(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setShowConfirm(false) }
+    function onOutside(e: MouseEvent) {
+      if (confirmRef.current && !confirmRef.current.contains(e.target as Node)) setShowConfirm(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onOutside)
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onOutside) }
+  }, [])
+
+  async function finalize() {
+    setShowConfirm(false)
+    setFinalizing(true)
+    setFinalizeError('')
+    try {
+      const res = await fetch(`/api/admin/quotations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'final' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to finalize')
+      setData((prev: any) => ({ ...prev, quotation: json.quotation }))
+    } catch (e: any) {
+      setFinalizeError(e.message || 'Failed to finalize')
+    } finally {
+      setFinalizing(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -53,8 +87,43 @@ export default function QuotationDetailClient({ id }: { id: string }) {
   const q = data.quotation
   const items: any[] = data.items || []
 
+  // Recompute totals from items when stored values are zero (e.g. legacy RFQ-converted quotations)
+  const computedSubtotal = items.reduce((s, i) => s + parseFloat(i.amount || '0'), 0)
+  const computedCgst = items.reduce((s, i) => s + parseFloat(i.amount || '0') * parseFloat(i.gst_rate || '0') / 200, 0)
+  const computedSgst = computedCgst
+  const storedSubtotal = parseFloat(q.subtotal || '0')
+  const subtotal = storedSubtotal > 0 ? storedSubtotal : computedSubtotal
+  const cgstAmount = storedSubtotal > 0 ? parseFloat(q.cgst_amount || '0') : computedCgst
+  const sgstAmount = storedSubtotal > 0 ? parseFloat(q.sgst_amount || '0') : computedSgst
+  const totalAmount = storedSubtotal > 0 ? parseFloat(q.total_amount || '0') : (computedSubtotal + computedCgst + computedSgst)
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      {/* Finalize confirmation modal */}
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div ref={confirmRef} className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default p-6 flex flex-col gap-4 max-w-sm w-full">
+            <h2 className="text-base font-semibold text-foreground">Finalize Quotation?</h2>
+            <p className="text-sm text-foreground-secondary">
+              This will mark the quotation as <span className="font-medium text-foreground">Final</span> and send a confirmation email to the customer if an email address is on record. This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="px-4 py-2 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={finalize}
+                className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+              >
+                Yes, Finalize
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
         <a href={ap('/admin/quotations')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
@@ -74,7 +143,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {q.status === 'draft' && (
+          {q.status === 'draft' && !q.from_rfq && (
             <a
               href={ap(`/admin/quotations?view=editor&edit=${q.id}`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
@@ -82,6 +151,15 @@ export default function QuotationDetailClient({ id }: { id: string }) {
               <Pencil className="w-4 h-4" />
               Edit
             </a>
+          )}
+          {q.status === 'draft' && q.from_rfq && (
+            <button
+              onClick={() => setShowConfirm(true)}
+              disabled={finalizing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-60"
+            >
+              {finalizing ? 'Finalizing…' : 'Finalize Quotation'}
+            </button>
           )}
           <a
             href={`/api/admin/quotations/${q.id}/pdf`}
@@ -112,6 +190,11 @@ export default function QuotationDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Info Cards */}
+      {finalizeError && (
+        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+          {finalizeError}
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Quotation Details */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
@@ -256,23 +339,23 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           <div className="ml-auto max-w-xs space-y-1.5 text-sm">
             <div className="flex justify-between gap-8">
               <span className="text-foreground-secondary">Subtotal</span>
-              <span className="text-foreground">{formatINR(parseFloat(q.subtotal || '0'))}</span>
+              <span className="text-foreground">{formatINR(subtotal)}</span>
             </div>
-            {parseFloat(q.cgst_amount || '0') > 0 && (
+            {cgstAmount > 0 && (
               <div className="flex justify-between gap-8">
                 <span className="text-foreground-secondary">CGST</span>
-                <span className="text-foreground">{formatINR(parseFloat(q.cgst_amount))}</span>
+                <span className="text-foreground">{formatINR(cgstAmount)}</span>
               </div>
             )}
-            {parseFloat(q.sgst_amount || '0') > 0 && (
+            {sgstAmount > 0 && (
               <div className="flex justify-between gap-8">
                 <span className="text-foreground-secondary">SGST</span>
-                <span className="text-foreground">{formatINR(parseFloat(q.sgst_amount))}</span>
+                <span className="text-foreground">{formatINR(sgstAmount)}</span>
               </div>
             )}
             <div className="flex justify-between gap-8 pt-1.5 border-t border-border-default">
               <span className="font-semibold text-foreground">Total</span>
-              <span className="font-bold text-foreground text-base">{formatINR(parseFloat(q.total_amount || '0'))}</span>
+              <span className="font-bold text-foreground text-base">{formatINR(totalAmount)}</span>
             </div>
           </div>
         </div>

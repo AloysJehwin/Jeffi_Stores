@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Check } from 'lucide-react'
+import { Check, ExternalLink } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
@@ -46,6 +46,7 @@ interface Quotation {
   total_amount: number
   converted_order_id: string | null
   view_token: string | null
+  from_rfq: boolean | null
   created_at: string
 }
 
@@ -143,6 +144,9 @@ export default function QuotationsClient() {
   const [convertQrImageUrl, setConvertQrImageUrl] = useState<string | null>(null)
   const [convertQrTotal, setConvertQrTotal] = useState(0)
   const [convertResultOrderId, setConvertResultOrderId] = useState<string | null>(null)
+  const [convertSavedAsDraft, setConvertSavedAsDraft] = useState(false)
+  const [convertInsufficientItems, setConvertInsufficientItems] = useState<string[]>([])
+  const [convertHasStockIssue, setConvertHasStockIssue] = useState(false)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -307,7 +311,10 @@ export default function QuotationsClient() {
       setConvertedOrderId(data.orderId)
       setConvertResultOrderId(data.orderId)
       loadList()
-      if (data.qrImageUrl) {
+      if (data.savedAsDraft) {
+        setConvertSavedAsDraft(true)
+        setConvertInsufficientItems(data.insufficientItems || [])
+      } else if (data.qrImageUrl) {
         setConvertQrImageUrl(data.qrImageUrl)
       } else {
         setShowConvertModal(false)
@@ -660,7 +667,7 @@ export default function QuotationsClient() {
                     </td>
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
-                        {q.status === 'draft' && (
+                        {q.status === 'draft' && !q.from_rfq && (
                           <button onClick={() => openEdit(q.id)} title="Edit"
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -668,6 +675,10 @@ export default function QuotationsClient() {
                             </svg>
                           </button>
                         )}
+                        <a href={ap(`/admin/quotations/${q.id}`)} title="View Detail"
+                          className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
                         <a href={`/api/admin/quotations/${q.id}/pdf`} target="_blank" rel="noopener noreferrer" title="Download PDF"
                           className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -695,13 +706,30 @@ export default function QuotationsClient() {
                         )}
                         {q.status === 'final' && !q.converted_order_id && (
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               setConvertPendingQuoteId(q.id)
                               setConvertPaymentMode('cash')
                               setConvertEnableDelivery(false)
                               setConvertQrImageUrl(null)
                               setConvertQrTotal(q.total_amount || 0)
+                              setConvertSavedAsDraft(false)
+                              setConvertInsufficientItems([])
+                              setConvertHasStockIssue(false)
                               setShowConvertModal(true)
+                              // Fetch items to check stock availability
+                              try {
+                                const res = await fetch(`/api/admin/quotations/${q.id}`)
+                                const data = await res.json()
+                                const qItems: any[] = data.items || []
+                                const stockIssue = qItems.some(item =>
+                                  item.product_id && item.inventory_quantity !== null && item.inventory_quantity !== undefined &&
+                                  parseFloat(item.inventory_quantity) < parseFloat(item.quantity)
+                                )
+                                setConvertHasStockIssue(stockIssue)
+                                if (stockIssue) setConvertPaymentMode('credit')
+                              } catch (_) {
+                                // stock check is best-effort
+                              }
                             }}
                             title="Convert to Invoice"
                             className="px-2 py-1 rounded text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap">
@@ -732,10 +760,53 @@ export default function QuotationsClient() {
         {selectedQuote && <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />}
 
         {showConvertModal && (
-          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && setShowConvertModal(false)}>
+          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))}>
             <div className="absolute inset-0 bg-black/50" />
             <div className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-md" onClick={e => e.stopPropagation()}>
-              {!convertQrImageUrl ? (
+              {convertSavedAsDraft ? (
+                <>
+                  <div className="flex items-center justify-between p-5 border-b border-border-default">
+                    <h2 className="text-base font-bold text-foreground">Saved as Draft</h2>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                      <svg className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">Some items are out of stock</p>
+                        <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">The invoice has been saved as a draft. It will be visible to the customer only after stock is updated and the invoice is finalised.</p>
+                      </div>
+                    </div>
+                    {convertInsufficientItems.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Items needing stock</p>
+                        <ul className="space-y-1">
+                          {convertInsufficientItems.map((name, i) => (
+                            <li key={i} className="text-sm text-foreground-secondary flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                              {name}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <p className="text-xs text-foreground-muted">Once stock is replenished, open the invoice and finalise it to make it visible and generate an invoice number.</p>
+                  </div>
+                  <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                    <button onClick={() => { setShowConvertModal(false); setConvertSavedAsDraft(false) }}
+                      className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                      Close
+                    </button>
+                    {convertResultOrderId && (
+                      <a href={ap(`/admin/invoices/${convertResultOrderId}`)}
+                        className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors">
+                        View Draft Invoice →
+                      </a>
+                    )}
+                  </div>
+                </>
+              ) : !convertQrImageUrl ? (
                 <>
                   <div className="flex items-center justify-between p-5 border-b border-border-default">
                     <h2 className="text-base font-bold text-foreground">Convert to Invoice</h2>
@@ -749,13 +820,21 @@ export default function QuotationsClient() {
                   <div className="p-5 space-y-5">
                     <div>
                       <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Payment Mode</p>
+                      {convertHasStockIssue && (
+                        <div className="mb-3 flex items-start gap-2 p-2.5 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                          <svg className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
+                          </svg>
+                          <p className="text-xs text-orange-700 dark:text-orange-300">Some items may have insufficient stock — cash and bank transfer options are hidden until stock is confirmed.</p>
+                        </div>
+                      )}
                       <div className="space-y-2">
                         {[
                           { value: 'cash', label: 'Cash', desc: 'Paid immediately — marks order as paid' },
                           { value: 'bank_transfer', label: 'Bank Transfer', desc: 'Paid via bank — marks order as paid' },
                           { value: 'credit', label: 'Credit', desc: 'Deferred payment — order stays unpaid' },
                           { value: 'upi_qr', label: 'UPI QR', desc: 'Generate a one-time Razorpay QR code' },
-                        ].map(opt => (
+                        ].filter(opt => !convertHasStockIssue || (opt.value !== 'cash' && opt.value !== 'bank_transfer')).map(opt => (
                           <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${convertPaymentMode === opt.value ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20' : 'border-border-default hover:bg-surface-secondary'}`}>
                             <input type="radio" name="paymentMode" value={opt.value}
                               checked={convertPaymentMode === opt.value}
@@ -801,7 +880,7 @@ export default function QuotationsClient() {
                     <h2 className="text-base font-bold text-foreground">UPI QR Code</h2>
                   </div>
                   <div className="p-5 flex flex-col items-center gap-4">
-                    <img src={convertQrImageUrl} alt="UPI QR Code" className="max-w-[240px] w-full rounded-lg border border-border-default" />
+                    <img src={convertQrImageUrl!} alt="UPI QR Code" className="max-w-[240px] w-full rounded-lg border border-border-default" />
                     <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
                     <p className="text-xs text-foreground-secondary text-center">Payment status will update automatically once scanned.</p>
                   </div>
@@ -864,6 +943,14 @@ export default function QuotationsClient() {
                 setConvertPaymentMode('cash')
                 setConvertEnableDelivery(false)
                 setConvertQrImageUrl(null)
+                setConvertSavedAsDraft(false)
+                setConvertInsufficientItems([])
+                const stockIssue = items.some(item =>
+                  item.product_id && item.inventory_quantity !== null && item.inventory_quantity !== undefined &&
+                  parseFloat(String(item.inventory_quantity)) < parseFloat(String(item.quantity))
+                )
+                setConvertHasStockIssue(stockIssue)
+                if (stockIssue) setConvertPaymentMode('credit')
                 setConvertQrTotal(items.reduce((sum, i) => {
                   const qty = parseFloat(String(i.quantity)) || 0
                   const rate = parseFloat(String(i.unit_price)) || 0
@@ -1030,10 +1117,53 @@ export default function QuotationsClient() {
       </div>
 
       {showConvertModal && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && setShowConvertModal(false)}>
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={() => !convertingInvoice && (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))}>
         <div className="absolute inset-0 bg-black/50" />
         <div className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-md" onClick={e => e.stopPropagation()}>
-          {!convertQrImageUrl ? (
+          {convertSavedAsDraft ? (
+            <>
+              <div className="flex items-center justify-between p-5 border-b border-border-default">
+                <h2 className="text-base font-bold text-foreground">Saved as Draft</h2>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                  <svg className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-orange-700 dark:text-orange-300">Some items are out of stock</p>
+                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">The invoice has been saved as a draft. It will be visible to the customer only after stock is updated and the invoice is finalised.</p>
+                  </div>
+                </div>
+                {convertInsufficientItems.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Items needing stock</p>
+                    <ul className="space-y-1">
+                      {convertInsufficientItems.map((name, i) => (
+                        <li key={i} className="text-sm text-foreground-secondary flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-xs text-foreground-muted">Once stock is replenished, open the invoice and finalise it to make it visible and generate an invoice number.</p>
+              </div>
+              <div className="flex gap-2 justify-end p-5 border-t border-border-default">
+                <button onClick={() => { setShowConvertModal(false); setConvertSavedAsDraft(false) }}
+                  className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors">
+                  Close
+                </button>
+                {convertResultOrderId && (
+                  <a href={ap(`/admin/invoices/${convertResultOrderId}`)}
+                    className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors">
+                    View Draft Invoice →
+                  </a>
+                )}
+              </div>
+            </>
+          ) : !convertQrImageUrl ? (
             <>
               <div className="flex items-center justify-between p-5 border-b border-border-default">
                 <h2 className="text-base font-bold text-foreground">Convert to Invoice</h2>
@@ -1047,13 +1177,21 @@ export default function QuotationsClient() {
               <div className="p-5 space-y-5">
                 <div>
                   <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Payment Mode</p>
+                  {convertHasStockIssue && (
+                    <div className="mb-3 flex items-start gap-2 p-2.5 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800">
+                      <svg className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z" />
+                      </svg>
+                      <p className="text-xs text-orange-700 dark:text-orange-300">Some items may have insufficient stock — cash and bank transfer options are hidden until stock is confirmed.</p>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {[
                       { value: 'cash', label: 'Cash', desc: 'Paid immediately — marks order as paid' },
                       { value: 'bank_transfer', label: 'Bank Transfer', desc: 'Paid via bank — marks order as paid' },
                       { value: 'credit', label: 'Credit', desc: 'Deferred payment — order stays unpaid' },
                       { value: 'upi_qr', label: 'UPI QR', desc: 'Generate a one-time Razorpay QR code' },
-                    ].map(opt => (
+                    ].filter(opt => !convertHasStockIssue || (opt.value !== 'cash' && opt.value !== 'bank_transfer')).map(opt => (
                       <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${convertPaymentMode === opt.value ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20' : 'border-border-default hover:bg-surface-secondary'}`}>
                         <input type="radio" name="paymentMode" value={opt.value}
                           checked={convertPaymentMode === opt.value}

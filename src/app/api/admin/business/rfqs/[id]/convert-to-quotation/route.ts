@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { queryOne, queryMany, query } from '@/lib/db'
 import { stackDiscounts, applyDiscount, lineItemExGst } from '@/lib/pricing'
+import { sendRfqConvertedToQuotationEmail } from '@/lib/email-business'
 
 function buildQuoteNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -71,6 +72,26 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   )
   if (items.length === 0) return NextResponse.json({ error: 'RFQ has no items' }, { status: 400 })
 
+  // If the customer accepted a counter offer, use those negotiated prices
+  const acceptedOfferRow = await queryOne<{ counter_items: any }>(
+    `SELECT counter_items FROM rfq_messages
+     WHERE rfq_id = $1 AND sender = 'admin' AND counter_items IS NOT NULL
+     ORDER BY created_at DESC LIMIT 1`,
+    [params.id]
+  )
+  // Map rfq_item_id → offered_price (incl-GST, same format as requested_price)
+  const negotiatedPriceMap: Record<string, number> = {}
+  if (acceptedOfferRow?.counter_items) {
+    const ci = Array.isArray(acceptedOfferRow.counter_items)
+      ? acceptedOfferRow.counter_items
+      : JSON.parse(acceptedOfferRow.counter_items)
+    for (const entry of ci) {
+      if (entry.rfq_item_id && entry.offered_price != null) {
+        negotiatedPriceMap[entry.rfq_item_id] = Number(entry.offered_price)
+      }
+    }
+  }
+
   // Build quote number
   const now = new Date()
   const month = now.getMonth()
@@ -96,37 +117,53 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const lineItems = items.map((item: any) => {
     const gstRate = Number(item.product_gst ?? 18)
 
-    // If the customer submitted a requested_price (incl. GST), use it as-is converted to ex-GST.
-    // Otherwise fall back to catalog price (already ex-GST), then apply the business discount.
     let baseRateExGst: number
     let discountPct: number
 
-    // Always use MRP as the rate anchor (incl. GST → ex-GST)
-    const mrpInclGst = item.sv_mrp
+    // MRP ex-GST — rate anchor for the quotation.
+    // Some products (e.g. Unbrako) store ex-GST values in the MRP column.
+    // Detect: if mrp == price_ex_gst for the same level, the column is already ex-GST.
+    const rawMrp = item.sv_mrp
       ? Number(item.sv_mrp)
       : item.variant_mrp
         ? Number(item.variant_mrp)
         : item.product_mrp
           ? Number(item.product_mrp)
           : 0
-    baseRateExGst = mrpInclGst > 0 ? mrpInclGst / (1 + gstRate / 100) : 0
+    const rawPriceExGst = item.sv_price
+      ? Number(item.sv_price)
+      : item.variant_price
+        ? Number(item.variant_price)
+        : item.product_price
+          ? Number(item.product_price)
+          : 0
+    // If mrp equals price_ex_gst (within 1 rupee), it's already ex-GST — use as-is
+    const mrpIsAlreadyExGst = rawMrp > 0 && rawPriceExGst > 0 && Math.abs(rawMrp - rawPriceExGst) < 1
+    baseRateExGst = rawMrp > 0
+      ? (mrpIsAlreadyExGst ? rawMrp : rawMrp / (1 + gstRate / 100))
+      : 0
 
-    if (item.requested_price) {
-      // Customer specified their target price (incl. GST) — back-calculate the effective discount % vs MRP
-      const requestedExGst = Number(item.requested_price) / (1 + gstRate / 100)
-      discountPct = baseRateExGst > 0
-        ? Math.round(Math.max(0, (1 - requestedExGst / baseRateExGst) * 100) * 100) / 100
-        : 0
-      // If we have no MRP, fall back to storing requested price as the rate directly
-      if (baseRateExGst === 0) {
-        baseRateExGst = requestedExGst
+    // Business price ex-GST: product discount + B2B category discount stacked
+    const productDisc = Number(item.sv_discount_pct ?? item.variant_discount_pct ?? item.product_discount_pct ?? 0)
+    const b2bDisc = item.product_category_id ? (discountMap[item.product_category_id] ?? 0) : 0
+    const businessDiscPct = stackDiscounts(productDisc, b2bDisc)
+    const businessPriceExGst = baseRateExGst > 0 ? applyDiscount(baseRateExGst, businessDiscPct) : 0
+
+    // Use negotiated price if customer accepted a counter offer, else fall back to requested price
+    const effectivePriceInclGst = negotiatedPriceMap[item.id] ?? (item.requested_price ? Number(item.requested_price) : null)
+
+    if (effectivePriceInclGst != null) {
+      // Price is incl-GST — convert to ex-GST for quotation line item calculation.
+      const effectiveExGst = effectivePriceInclGst / (1 + gstRate / 100)
+
+      if (baseRateExGst > 0 && effectiveExGst < baseRateExGst) {
+        discountPct = Math.round((1 - effectiveExGst / baseRateExGst) * 100 * 100) / 100
+      } else {
+        baseRateExGst = effectiveExGst
         discountPct = 0
       }
     } else {
-      // Stack product discount and B2B category discount multiplicatively
-      const productDisc = Number(item.sv_discount_pct ?? item.variant_discount_pct ?? item.product_discount_pct ?? 0)
-      const b2bDisc = item.product_category_id ? (discountMap[item.product_category_id] ?? 0) : 0
-      discountPct = stackDiscounts(productDisc, b2bDisc)
+      discountPct = businessDiscPct
     }
 
     const qty = Number(item.quantity)
@@ -207,6 +244,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     `UPDATE business_rfqs SET status='converted', converted_quotation_id=$1, updated_at=NOW() WHERE id=$2`,
     [qt!.id, params.id]
   )
+
+  // Notify business user
+  if (rfq.email && qt?.view_token) {
+    const viewUrl = `https://quotation.jeffistores.in/${qt.view_token}`
+    sendRfqConvertedToQuotationEmail(
+      rfq.email,
+      rfq.company_name || `${rfq.first_name} ${rfq.last_name}`.trim() || rfq.email,
+      rfq.rfq_number,
+      qt.quote_number,
+      Number(total.toFixed(2)),
+      viewUrl,
+    ).catch(() => {})
+  }
 
   return NextResponse.json({ quotationId: qt!.id, quoteNumber: qt!.quote_number })
 }

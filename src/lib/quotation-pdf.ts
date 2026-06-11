@@ -194,7 +194,10 @@ export function generateQuotationPDF(
     doc.text('Invoice No.',    metaX + 2,              topY + 2, { width: c3w - 4 })
     doc.text('e-Way Bill No.', metaX + c3w + 2,        topY + 2, { width: c3bw - 4 })
     doc.text('Dated',          metaX + c3w + c3bw + 2, topY + 2, { width: c3cw - 4 })
-    doc.font(FB).fontSize(7.5).text(data.quote_number, metaX + 2, topY + 11, { width: c3w - 4 })
+
+    let qnSize = 7.5
+    while (qnSize > 5.5 && doc.font(FB).fontSize(qnSize).widthOfString(data.quote_number) > c3w - 4) qnSize -= 0.5
+    doc.font(FB).fontSize(qnSize).text(data.quote_number, metaX + 2, topY + 11, { width: c3w - 4, lineBreak: false, ellipsis: true })
     doc.font(FB).fontSize(9).text(formatDate(data.quote_date), metaX + c3w + c3bw + 2, topY + 10, { width: c3cw - 4 })
 
     let my = topY + metaRowH
@@ -395,19 +398,19 @@ export function generateQuotationPDF(
 
     const labelAreaW = amtX - (LM + slW) - 10  // extra right padding to clear the divider line
     hline(doc, LM, R, y)
-    doc.font(FBI).fontSize(8).text('CGST', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right', lineBreak: false })
-    doc.font(F).fontSize(7).text(fmt4(cgst), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
+    doc.font(FBI).fontSize(7.5).text('CGST', LM + slW + 2, y + 4, { width: labelAreaW, align: 'right', lineBreak: false })
+    doc.font(F).fontSize(7).text(fmt4(cgst), amtX + 2, y + 4, { width: amtW - 4, align: 'right' })
     y += rowH
 
     hline(doc, LM, R, y)
-    doc.font(FBI).fontSize(8).text('SGST', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right', lineBreak: false })
-    doc.font(F).fontSize(7).text(fmt4(sgst), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
+    doc.font(FBI).fontSize(7.5).text('SGST', LM + slW + 2, y + 4, { width: labelAreaW, align: 'right', lineBreak: false })
+    doc.font(F).fontSize(7).text(fmt4(sgst), amtX + 2, y + 4, { width: amtW - 4, align: 'right' })
     y += rowH
 
     if (hasRound) {
       hline(doc, LM, R, y)
-      doc.font(FBI).fontSize(8).text('Round Off', LM + slW + 2, y + 3, { width: labelAreaW, align: 'right', lineBreak: false })
-      doc.font(F).fontSize(7).text(fmt4(roundOff), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
+      doc.font(FBI).fontSize(7.5).text('Round Off', LM + slW + 2, y + 4, { width: labelAreaW, align: 'right', lineBreak: false })
+      doc.font(F).fontSize(7).text(fmt4(roundOff), amtX + 2, y + 4, { width: amtW - 4, align: 'right' })
       y += rowH
     }
 

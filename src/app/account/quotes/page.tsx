@@ -28,6 +28,11 @@ export default function MyQuotesPage() {
   const router = useRouter()
   const [rfqs, setRfqs] = useState<RFQ[]>([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const PAGE_SIZE = 20
+
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   useEffect(() => {
     if (!isLoading && (!user || !user.isBusiness || user.approvalStatus !== 'approved')) {
@@ -37,11 +42,12 @@ export default function MyQuotesPage() {
 
   useEffect(() => {
     if (!user?.isBusiness) return
-    fetch('/api/business/rfqs', { credentials: 'include' })
+    setLoading(true)
+    fetch(`/api/business/rfqs?page=${page}`, { credentials: 'include' })
       .then(r => r.json())
-      .then(d => { setRfqs(d.rfqs || []); setLoading(false) })
+      .then(d => { setRfqs(d.rfqs || []); setTotal(d.total || 0); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [user])
+  }, [user, page])
 
   if (isLoading || loading) {
     return (
@@ -99,6 +105,30 @@ export default function MyQuotesPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-6 py-4 border-t border-border-default">
+                  <p className="text-sm text-foreground-secondary">
+                    Page {page} of {totalPages} · {total} total
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

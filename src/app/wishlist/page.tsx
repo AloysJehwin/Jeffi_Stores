@@ -6,6 +6,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { AccountNavBar } from '@/components/visitor/AccountSidebar'
+import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import { AccountSearchProvider } from '@/contexts/AccountSearchContext'
 import FeaturedProducts from '@/components/visitor/FeaturedProducts'
 
@@ -128,6 +129,7 @@ function WishlistInner() {
     return (
       <div className="bg-surface min-h-screen">
         <div className="hidden lg:block"><AccountNavBar /></div>
+        <AccountMobileHeader />
         <div className="container mx-auto px-4 py-4 sm:py-6">
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
             <svg className="w-16 h-16 text-foreground-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -150,6 +152,7 @@ function WishlistInner() {
   return (
     <div className="bg-surface min-h-screen">
       <div className="hidden lg:block"><AccountNavBar /></div>
+      <AccountMobileHeader />
       <div className="container mx-auto px-4 py-4 sm:py-6">
 
         {/* Stock filter */}

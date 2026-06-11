@@ -487,17 +487,6 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       <MobileAccountHeader />
       <div className="container mx-auto px-4">
         <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
-            {/* Back link */}
-            <Link
-              href="/account/orders"
-              className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm"
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back to My Orders
-            </Link>
-
             {/* Order Header */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
