@@ -650,7 +650,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                       <div>
                         <p className="text-sm font-semibold text-teal-700 dark:text-teal-400">Offer accepted</p>
                         <p className="text-xs text-teal-600/80 dark:text-teal-500 mt-0.5">
-                          Our team is preparing your quotation. You'll be notified once it's ready.
+                          Our team is preparing your quotation. You&apos;ll be notified once it&apos;s ready.
                         </p>
                       </div>
                     </div>

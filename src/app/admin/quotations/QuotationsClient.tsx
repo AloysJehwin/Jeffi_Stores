@@ -46,6 +46,7 @@ interface Quotation {
   total_amount: number
   converted_order_id: string | null
   view_token: string | null
+  from_rfq: boolean | null
   created_at: string
 }
 
