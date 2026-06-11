@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
@@ -52,8 +53,8 @@ interface Props {
   label?: string
 }
 
-const UNITS = ['Nos', 'Pcs', 'Kg', 'g', 'L', 'mL', 'Box', 'Set', 'Pair', 'Roll', 'Sheet', 'Bag']
-const UNIT_OPTIONS = UNITS.map(u => ({ value: u, label: u }))
+
+const MAX_DISCOUNT_PCT = 30
 
 function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
   currentPrice: number
@@ -65,6 +66,8 @@ function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
   const derived = target ?? (pct != null && pct > 0 && pct < 100 ? applyDiscount(currentPrice, pct) : null)
   const effectivePct = derived != null ? Math.round(((currentPrice - derived) / currentPrice) * 100) : null
   const saving = derived != null ? currentPrice - derived : null
+  const minAllowed = applyDiscount(currentPrice, MAX_DISCOUNT_PCT)
+  const overLimit = derived != null && derived < minAllowed
 
   return (
     <div className="rounded-xl border border-accent-200 dark:border-accent-800 bg-accent-50/50 dark:bg-accent-900/20 overflow-hidden">
@@ -75,18 +78,25 @@ function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
         </div>
         <div className="px-2 text-center">
           <p className="text-[9px] uppercase tracking-wide text-foreground-muted mb-0.5">Your Target</p>
-          <p className={`text-xs font-bold ${derived != null ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted'}`}>
+          <p className={`text-xs font-bold ${overLimit ? 'text-red-500' : derived != null ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted'}`}>
             {derived != null ? `₹${derived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
           </p>
         </div>
         <div className="pl-2 text-center">
           <p className="text-[9px] uppercase tracking-wide text-foreground-muted mb-0.5">Discount</p>
-          <p className={`text-xs font-bold ${effectivePct != null && effectivePct > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}`}>
+          <p className={`text-xs font-bold ${overLimit ? 'text-red-500' : effectivePct != null && effectivePct > 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}`}>
             {effectivePct != null && effectivePct > 0 ? `${effectivePct}% off` : '—'}
           </p>
         </div>
       </div>
-      {saving != null && saving > 0 && (
+      {overLimit && (
+        <div className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-center">
+          <p className="text-[10px] font-medium text-red-600 dark:text-red-400">
+            Maximum discount is {MAX_DISCOUNT_PCT}% — minimum target price is ₹{minAllowed.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </p>
+        </div>
+      )}
+      {!overLimit && saving != null && saving > 0 && (
         <div className="px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border-t border-green-100 dark:border-green-900/40 text-center">
           <p className="text-[10px] font-medium text-green-700 dark:text-green-400">
             Potential saving of ₹{saving.toLocaleString('en-IN', { minimumFractionDigits: 2 })} per unit if approved
@@ -177,8 +187,11 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
   function updateField(i: number, key: keyof FieldState, value: string | number) {
     setFields(prev => prev.map((f, idx) => {
       if (idx !== i) return f
+      if (key === 'discount_pct' && value !== '') {
+        const capped = Math.min(parseFloat(String(value)), MAX_DISCOUNT_PCT)
+        return { ...f, discount_pct: String(capped), requested_price: '' }
+      }
       if (key === 'requested_price' && value !== '') return { ...f, requested_price: String(value), discount_pct: '' }
-      if (key === 'discount_pct' && value !== '') return { ...f, discount_pct: String(value), requested_price: '' }
       return { ...f, [key]: value }
     }))
   }
@@ -217,6 +230,11 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
             requested_price = parseFloat(f.requested_price)
           } else if (f.discount_pct && resolved.currentPrice) {
             requested_price = applyDiscount(resolved.currentPrice, parseFloat(f.discount_pct))
+          }
+          // enforce 30% cap — silently clamp; PriceBreakdown already warns the user
+          if (requested_price != null && resolved.currentPrice != null && resolved.currentPrice > 0) {
+            const minAllowed = applyDiscount(resolved.currentPrice, MAX_DISCOUNT_PCT)
+            if (requested_price < minAllowed) requested_price = minAllowed
           }
           return {
             productId: item.productId,
@@ -271,7 +289,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
         {label}
       </button>
 
-      {open && (
+      {open && createPortal(
         <>
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={() => !loading && setOpen(false)} />
 
@@ -485,28 +503,18 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                       </div>
                     )}
 
-                    {/* Quantity + Unit */}
-                    <div className="grid grid-cols-[1fr_1fr] gap-3">
-                      <div className="min-w-0">
-                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
-                          Quantity <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={activeField.quantity}
-                          onChange={e => updateField(activeIdx, 'quantity', e.target.value)}
-                          className="w-full px-3 py-[10px] text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <label className="block text-xs font-medium text-foreground-secondary mb-1">Unit</label>
-                        <CustomSelect
-                          value={activeField.unit}
-                          options={UNIT_OPTIONS}
-                          onChange={v => updateField(activeIdx, 'unit', v)}
-                        />
-                      </div>
+                    {/* Quantity */}
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                        Quantity <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={activeField.quantity}
+                        onChange={e => updateField(activeIdx, 'quantity', e.target.value)}
+                        className="w-full px-3 py-[10px] text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                      />
                     </div>
 
                     {/* Target price */}
@@ -536,7 +544,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                             <input
                               type="number"
                               min={0}
-                              max={99}
+                              max={MAX_DISCOUNT_PCT}
                               step={0.1}
                               value={activeField.discount_pct}
                               onChange={e => updateField(activeIdx, 'discount_pct', e.target.value)}
@@ -610,8 +618,8 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                   <div className="px-5 py-4 border-t border-border-default shrink-0 flex gap-3">
                     <button
                       onClick={handleSubmit}
-                      disabled={loading}
-                      className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60"
+                      disabled={loading || !fields.some(itemHasInput)}
+                      className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                       {loading ? 'Submitting…' : `Submit Quote${multiItem ? ` (${items.length} items)` : ''}`}
@@ -628,7 +636,8 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
               </div>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   )

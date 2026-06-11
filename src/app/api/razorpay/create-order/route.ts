@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const isBusiness = authUser.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
 
     const body = await request.json()
     const parsed = parseBody(CreateRazorpayOrderSchema, body)
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (typeof body.orderId === 'string' && body.orderId) {
-      return await handleLegacyOrderId(body.orderId, authUser.userId)
+      return await handleLegacyOrderId(body.orderId, authUser.userId, isBusiness)
     }
 
     return NextResponse.json({ error: 'draftToken or orderId is required' }, { status: 400 })
@@ -96,11 +97,29 @@ async function handleDraftToken(token: string, userId: string) {
   })
 }
 
-async function handleLegacyOrderId(orderId: string, userId: string) {
-  const order = await queryOne(
-    'SELECT id, order_number, user_id, total_amount, payment_status FROM orders WHERE id = $1 AND user_id = $2',
-    [orderId, userId]
-  )
+async function handleLegacyOrderId(orderId: string, userId: string, isBusiness: boolean = false) {
+  let order: any
+  if (isBusiness) {
+    const bizUser = await queryOne<{ email: string; phone: string | null }>(
+      'SELECT email, phone FROM users WHERE id = $1',
+      [userId]
+    )
+    const email = bizUser?.email || ''
+    const phone = bizUser?.phone || null
+    order = await queryOne(
+      `SELECT id, order_number, user_id, total_amount, payment_status FROM orders
+       WHERE id = $1 AND (
+         user_id = $2 OR
+         (source = 'business' AND (customer_email = $3 OR ($4::text IS NOT NULL AND customer_phone = $4)))
+       )`,
+      [orderId, userId, email, phone]
+    )
+  } else {
+    order = await queryOne(
+      'SELECT id, order_number, user_id, total_amount, payment_status FROM orders WHERE id = $1 AND user_id = $2',
+      [orderId, userId]
+    )
+  }
 
   if (!order) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })

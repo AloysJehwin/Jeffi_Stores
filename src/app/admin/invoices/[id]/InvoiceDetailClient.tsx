@@ -31,6 +31,8 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   const [qrLoading, setQrLoading] = useState(false)
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null)
   const [qrModalOpen, setQrModalOpen] = useState(false)
+  const [finalizing, setFinalizing] = useState(false)
+  const [finalizeError, setFinalizeError] = useState<string | null>(null)
   const qrModalRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -98,6 +100,24 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
       else alert(json.error || 'Failed to generate QR')
     } finally {
       setQrLoading(false)
+    }
+  }
+
+  async function finalizeInvoice() {
+    setFinalizing(true)
+    setFinalizeError(null)
+    try {
+      const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const json = await res.json()
+      if (!res.ok) { setFinalizeError(json.error || 'Failed to finalize'); return }
+      await loadData()
+    } catch {
+      setFinalizeError('Failed to finalize invoice')
+    } finally {
+      setFinalizing(false)
     }
   }
 
@@ -195,6 +215,15 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               Edit
             </a>
           )}
+          {o.status === 'draft' && o.source === 'business' && (
+            <button
+              onClick={finalizeInvoice}
+              disabled={finalizing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors disabled:opacity-50"
+            >
+              {finalizing ? 'Finalizing…' : 'Finalize Invoice'}
+            </button>
+          )}
           {showQrSection && (
             <button
               onClick={() => qrImageUrl ? setQrModalOpen(true) : generateQr()}
@@ -226,6 +255,11 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Info Cards */}
+      {finalizeError && (
+        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+          {finalizeError}
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Invoice Details */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">

@@ -30,13 +30,13 @@ export async function GET(request: NextRequest) {
       const email = bizUser?.email || ''
       const phone = bizUser?.phone || null
 
-      whereClause = `WHERE (o.user_id = $1 OR (o.source = 'business' AND (o.customer_email = $2 OR ($3::text IS NOT NULL AND o.customer_phone = $3))))`
-      countClause = `SELECT COUNT(*) FROM orders o WHERE (o.user_id = $1 OR (o.source = 'business' AND (o.customer_email = $2 OR ($3::text IS NOT NULL AND o.customer_phone = $3))))`
+      whereClause = `WHERE (o.user_id = $1 OR (o.source = 'business' AND (o.customer_email = $2 OR ($3::text IS NOT NULL AND o.customer_phone = $3)))) AND o.status != 'draft'`
+      countClause = `SELECT COUNT(*) FROM orders o WHERE (o.user_id = $1 OR (o.source = 'business' AND (o.customer_email = $2 OR ($3::text IS NOT NULL AND o.customer_phone = $3)))) AND o.status != 'draft'`
       queryParams = [userId, email, phone, limit, offset]
       countParams = [userId, email, phone]
     } else {
-      whereClause = 'WHERE o.user_id = $1'
-      countClause = 'SELECT COUNT(*) FROM orders WHERE user_id = $1'
+      whereClause = `WHERE o.user_id = $1 AND o.status != 'draft'`
+      countClause = `SELECT COUNT(*) FROM orders WHERE user_id = $1 AND status != 'draft'`
       queryParams = [userId, limit, offset]
       countParams = [userId]
     }

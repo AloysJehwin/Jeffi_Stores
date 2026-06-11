@@ -29,10 +29,11 @@ interface RFQ {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  reviewed: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  converted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  pending:     'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  reviewed:    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  negotiating: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  converted:   'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  rejected:    'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 }
 
 export default function MyQuotesPage() {
@@ -41,11 +42,16 @@ export default function MyQuotesPage() {
   const [rfqs, setRfqs] = useState<RFQ[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const PAGE_SIZE = 20
 
   const filteredRfqs = useMemo(() =>
     filterStatus === 'all' ? rfqs : rfqs.filter(r => r.status === filterStatus),
     [rfqs, filterStatus]
   )
+
+  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   useEffect(() => {
     if (!isLoading && (!user || !user.isBusiness || user.approvalStatus !== 'approved')) {
@@ -55,11 +61,12 @@ export default function MyQuotesPage() {
 
   useEffect(() => {
     if (!user?.isBusiness) return
-    fetch('/api/business/rfqs', { credentials: 'include' })
+    setLoading(true)
+    fetch(`/api/business/rfqs?page=${page}`, { credentials: 'include' })
       .then(r => r.json())
-      .then(d => { setRfqs(d.rfqs || []); setLoading(false) })
+      .then(d => { setRfqs(d.rfqs || []); setTotal(d.total || 0); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [user])
+  }, [user, page])
 
   if (isLoading || loading) {
     return (
@@ -80,7 +87,7 @@ export default function MyQuotesPage() {
         {/* Status filter */}
         {rfqs.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap mb-4">
-            {(['all', 'pending', 'reviewed', 'converted', 'rejected'] as const).map(s => (
+            {(['all', 'pending', 'reviewed', 'negotiating', 'converted', 'rejected'] as const).map(s => (
               <button
                 key={s}
                 onClick={() => setFilterStatus(s)}
@@ -110,6 +117,9 @@ export default function MyQuotesPage() {
             </div>
           ) : (
             <div className="space-y-3">
+              {filterStatus !== 'all' && filteredRfqs.length === 0 && (
+                <p className="text-sm text-foreground-secondary text-center py-8">No quotes with this status on this page.</p>
+              )}
               {filteredRfqs.map(rfq => {
                 const displayTotal = rfq.quotation_total
                   ? Number(rfq.quotation_total)
@@ -120,6 +130,7 @@ export default function MyQuotesPage() {
                 const statusMsg: Record<string, string> = {
                   pending: 'Awaiting review by our team',
                   reviewed: 'Under review — quotation being prepared',
+                  negotiating: 'Negotiating — check messages for updates',
                   converted: 'Quotation issued',
                   rejected: 'Not accepted — contact support for details',
                 }
@@ -182,6 +193,12 @@ export default function MyQuotesPage() {
 
                     {/* Action buttons — full width on mobile */}
                     <div className="flex flex-col sm:flex-row gap-2">
+                      <Link
+                        href={bp(`/business/quotes/${rfq.id}`)}
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-xs font-medium transition-colors"
+                      >
+                        View Details →
+                      </Link>
                       {rfq.status === 'converted' && rfq.quotation_view_token && (
                         <a
                           href={`https://quotation.jeffistores.in/${rfq.quotation_view_token}`}
@@ -238,6 +255,30 @@ export default function MyQuotesPage() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-border-default">
+              <p className="text-sm text-foreground-secondary">
+                Page {page} of {totalPages} · {total} total
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>

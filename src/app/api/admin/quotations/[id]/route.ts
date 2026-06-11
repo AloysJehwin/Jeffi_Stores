@@ -20,7 +20,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const qt = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [params.id])
+    const qt = await queryOne<any>(
+      `SELECT q.*, EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = q.id) AS from_rfq
+       FROM quotations q WHERE q.id = $1`,
+      [params.id]
+    )
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const items = await queryMany(`
@@ -75,6 +79,10 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           ]
         )
       }
+    } else if (Number(existing.total_amount) === 0) {
+      // Stored totals are zero (e.g. legacy RFQ-converted quotation) — recompute from existing items
+      const existingItems = await queryMany<any>(`SELECT * FROM quotation_items WHERE quotation_id = $1`, [params.id])
+      if (existingItems?.length) totals = calcTotals(existingItems)
     }
 
     const setClauses: string[] = ['updated_at = NOW()']

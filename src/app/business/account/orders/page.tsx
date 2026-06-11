@@ -207,149 +207,174 @@ export default function OrdersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredOrders.map((order) => (
+                {filteredOrders.map((order) => {
+                  const firstItem = order.order_items[0]
+                  const firstItemImage = firstItem?.products?.product_images?.find(img => img.is_primary) || firstItem?.products?.product_images?.[0]
+                  const extraItems = order.order_items.length - 1
+                  const orderDate = new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+
+                  return (
                   <div key={order.id} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-                    {/* Order Header */}
-                    <div className="bg-surface border-b border-border-default px-4 sm:px-6 py-4">
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-                          <div>
-                            <p className="text-xs text-foreground-muted mb-1">Order Number</p>
-                            <p className="font-mono text-sm font-medium text-foreground">
-                              {order.order_number}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-foreground-muted mb-1">Order Date</p>
-                            <p className="text-sm text-foreground">
-                              {new Date(order.created_at).toLocaleDateString('en-IN', {
-                                day: 'numeric',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-foreground-muted mb-1">Total</p>
-                            <p className="text-sm font-semibold text-foreground">
-                              ₹{order.total_amount.toLocaleString('en-IN')}
-                            </p>
-                          </div>
+
+                    {/* Mobile card — compact header + first item only */}
+                    <div className="sm:hidden">
+                      <div className="bg-surface border-b border-border-default px-4 py-3">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <p className="font-mono text-sm font-semibold text-foreground truncate">{order.order_number}</p>
+                          <span className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                            {getStatusLabel(order.status)}
+                          </span>
                         </div>
-                        <div>
-                          <span
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}
+                        <div className="flex items-center gap-3 text-xs text-foreground-secondary">
+                          <span>{orderDate}</span>
+                          <span className="w-px h-3 bg-border-default" />
+                          <span className="font-semibold text-foreground">₹{order.total_amount.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                      <div className="px-4 py-3">
+                        {firstItem && (
+                          <div className="flex gap-3 items-center">
+                            <div className="w-12 h-12 flex-shrink-0 bg-surface rounded-lg overflow-hidden border border-border-default">
+                              {firstItemImage ? (
+                                <img src={firstItemImage.thumbnail_url} alt={firstItem.product_name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{firstItem.product_name}</p>
+                              <p className="text-xs text-foreground-secondary mt-0.5">
+                                Qty: {firstItem.buy_mode === 'weight' || firstItem.buy_mode === 'length' ? `${Number(firstItem.quantity).toFixed(3)} ${firstItem.buy_unit ?? ''}` : Math.round(Number(firstItem.quantity))}
+                                {extraItems > 0 && <span className="ml-1.5 text-foreground-muted">+{extraItems} more item{extraItems > 1 ? 's' : ''}</span>}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <div className="mt-3 pt-3 border-t border-border-default flex items-center justify-between gap-2">
+                          <Link
+                            href={bp(`/business/account/orders/${order.id}`)}
+                            className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm"
                           >
+                            View Details
+                            <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </Link>
+                          {(order.status === 'pending' || order.status === 'confirmed') && (
+                            confirmCancelId === order.id ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-red-700 dark:text-red-400">Cancel?</span>
+                                <button type="button" onClick={() => handleCancelOrder(order.id)} disabled={cancellingOrderId === order.id} className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center">
+                                  {cancellingOrderId === order.id ? <><div className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1" />Submitting</> : 'Yes'}
+                                </button>
+                                <button type="button" onClick={() => setConfirmCancelId(null)} className="px-2.5 py-1 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded text-xs font-medium transition-colors">No</button>
+                              </div>
+                            ) : (
+                              <button type="button" onClick={() => setConfirmCancelId(order.id)} className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs font-medium">
+                                Request Cancellation
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desktop card — full layout */}
+                    <div className="hidden sm:block">
+                      <div className="bg-surface border-b border-border-default px-6 py-4">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                          <div className="flex flex-wrap items-center gap-6">
+                            <div>
+                              <p className="text-xs text-foreground-muted mb-1">Order Number</p>
+                              <p className="font-mono text-sm font-medium text-foreground">{order.order_number}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-foreground-muted mb-1">Order Date</p>
+                              <p className="text-sm text-foreground">{orderDate}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-foreground-muted mb-1">Total</p>
+                              <p className="text-sm font-semibold text-foreground">₹{order.total_amount.toLocaleString('en-IN')}</p>
+                            </div>
+                          </div>
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                             {getStatusLabel(order.status)}
                           </span>
                         </div>
                       </div>
-                    </div>
-
-                    {/* Order Items */}
-                    <div className="p-4 sm:p-6">
-                      <div className="space-y-4">
-                        {order.order_items.map((item) => {
-                          const primaryImage = item.products?.product_images?.find(img => img.is_primary) || item.products?.product_images?.[0]
-
-                          return (
-                            <div key={item.id} className="flex gap-4">
-                              <div className="relative w-20 h-20 flex-shrink-0 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
-                                {primaryImage ? (
-                                  <img
-                                    src={primaryImage.thumbnail_url}
-                                    alt={item.product_name}
-                                    className="w-full h-full object-cover rounded-lg"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                  </div>
-                                )}
+                      <div className="p-6">
+                        <div className="space-y-4">
+                          {order.order_items.map((item) => {
+                            const primaryImage = item.products?.product_images?.find(img => img.is_primary) || item.products?.product_images?.[0]
+                            return (
+                              <div key={item.id} className="flex gap-4">
+                                <div className="relative w-20 h-20 flex-shrink-0 bg-surface-elevated rounded-lg overflow-hidden border border-border-default">
+                                  {primaryImage ? (
+                                    <img src={primaryImage.thumbnail_url} alt={item.product_name} className="w-full h-full object-cover rounded-lg" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <Link href={bp(`/business/products/${item.products?.slug}`)} className="font-medium text-foreground hover:text-accent-600 dark:hover:text-accent-400 mb-1 block">
+                                    {item.product_name}
+                                  </Link>
+                                  <p className="text-sm text-foreground-secondary">Quantity: {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</p>
+                                  <p className="text-sm font-semibold text-foreground mt-1">
+                                    ₹{item.unit_price.toLocaleString('en-IN')} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))} = ₹{item.total_price.toLocaleString('en-IN')}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <Link
-                                  href={bp(`/business/products/${item.products?.slug}`)}
-                                  className="font-medium text-foreground hover:text-accent-600 dark:hover:text-accent-400 mb-1 block"
-                                >
-                                  {item.product_name}
-                                </Link>
-                                <p className="text-sm text-foreground-secondary">Quantity: {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</p>
-                                <p className="text-sm font-semibold text-foreground mt-1">
-                                  ₹{item.unit_price.toLocaleString('en-IN')} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))} = ₹{item.total_price.toLocaleString('en-IN')}
-                                </p>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-
-                      {/* Shipping Address */}
-                      {order.addresses && (
-                        <div className="mt-6 pt-6 border-t border-border-default">
-                          <h4 className="text-sm font-semibold text-foreground mb-2">Shipping Address</h4>
-                          <div className="text-sm text-foreground-secondary">
-                            <p>{order.addresses.address_line1}</p>
-                            {order.addresses.address_line2 && <p>{order.addresses.address_line2}</p>}
-                            <p>
-                              {order.addresses.city}, {order.addresses.state} {order.addresses.postal_code}
-                            </p>
-                          </div>
+                            )
+                          })}
                         </div>
-                      )}
-
-                      {/* View Details */}
-                      <div className="mt-4 pt-4 border-t border-border-default flex items-center justify-between">
-                        <Link
-                          href={bp(`/business/account/orders/${order.id}`)}
-                          className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm"
-                        >
-                          View Order Details
-                          <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </Link>
-                        {(order.status === 'pending' || order.status === 'confirmed') && (
-                          confirmCancelId === order.id ? (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-red-700 dark:text-red-400">Request cancellation?</span>
-                              <button
-                                type="button"
-                                onClick={() => handleCancelOrder(order.id)}
-                                disabled={cancellingOrderId === order.id}
-                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center"
-                              >
-                                {cancellingOrderId === order.id ? (
-                                  <>
-                                    <div className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1"></div>
-                                    Submitting
-                                  </>
-                                ) : 'Yes'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmCancelId(null)}
-                                className="px-3 py-1 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded text-xs font-medium transition-colors"
-                              >
-                                No
-                              </button>
+                        {order.addresses && (
+                          <div className="mt-6 pt-6 border-t border-border-default">
+                            <h4 className="text-sm font-semibold text-foreground mb-2">Shipping Address</h4>
+                            <div className="text-sm text-foreground-secondary">
+                              <p>{order.addresses.address_line1}</p>
+                              {order.addresses.address_line2 && <p>{order.addresses.address_line2}</p>}
+                              <p>{order.addresses.city}, {order.addresses.state} {order.addresses.postal_code}</p>
                             </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setConfirmCancelId(order.id)}
-                              className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium"
-                            >
-                              Request Cancellation
-                            </button>
-                          )
+                          </div>
                         )}
+                        <div className="mt-4 pt-4 border-t border-border-default flex items-center justify-between">
+                          <Link href={bp(`/business/account/orders/${order.id}`)} className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm">
+                            View Order Details
+                            <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </Link>
+                          {(order.status === 'pending' || order.status === 'confirmed') && (
+                            confirmCancelId === order.id ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-red-700 dark:text-red-400">Request cancellation?</span>
+                                <button type="button" onClick={() => handleCancelOrder(order.id)} disabled={cancellingOrderId === order.id} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center">
+                                  {cancellingOrderId === order.id ? <><div className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1" />Submitting</> : 'Yes'}
+                                </button>
+                                <button type="button" onClick={() => setConfirmCancelId(null)} className="px-3 py-1 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded text-xs font-medium transition-colors">No</button>
+                              </div>
+                            ) : (
+                              <button type="button" onClick={() => setConfirmCancelId(order.id)} className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium">
+                                Request Cancellation
+                              </button>
+                            )
+                          )}
+                        </div>
                       </div>
                     </div>
+
                   </div>
-                ))}
+                  )
+                })}
 
                 {total > pageSize && (
                   <div className="flex items-center justify-between gap-2 pt-4">
