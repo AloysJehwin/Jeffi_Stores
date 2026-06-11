@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   let order: any = null
   if (rfq.converted_order_id) {
     order = await queryOne<any>(
-      `SELECT id, order_number, payment_status, payment_mode, razorpay_qr_image_url, total_amount, invoice_number, status
+      `SELECT id, order_number, payment_status, payment_mode, razorpay_qr_image_url, total_amount, invoice_number, status, view_token
        FROM orders WHERE id = $1 AND status != 'draft'`,
       [rfq.converted_order_id]
     )
