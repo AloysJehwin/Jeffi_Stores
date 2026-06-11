@@ -14,9 +14,9 @@ export async function GET(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const rows = await queryMany(
-      `SELECT o.id, o.order_number, o.customer_name, o.customer_phone, o.total_amount, o.created_at, o.updated_at
+      `SELECT o.id, o.order_number, o.customer_name, o.customer_phone, o.total_amount, o.source, o.created_at, o.updated_at
        FROM orders o
-       WHERE o.status = 'draft' AND o.source = 'offline'
+       WHERE o.status = 'draft' AND o.source != 'cash_sale'
        ORDER BY o.updated_at DESC
        LIMIT 100`
     )

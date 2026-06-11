@@ -7,10 +7,15 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   if (admin instanceof NextResponse) return admin
 
   const rfq = await queryOne<any>(
-    `SELECT r.*, u.first_name, u.last_name, u.email, u.phone, bp.company_name, bp.gst_number
+    `SELECT r.*, u.first_name, u.last_name, u.email, u.phone, bp.company_name, bp.gst_number,
+            q.quote_number, q.converted_order_id AS order_id,
+            o.invoice_number, o.view_token AS invoice_view_token, o.status AS order_status,
+            o.total_amount AS invoice_total, o.payment_status AS invoice_payment_status
      FROM business_rfqs r
      JOIN users u ON u.id = r.user_id AND u.user_type = 'business'
      LEFT JOIN business_profiles bp ON bp.user_id = r.user_id
+     LEFT JOIN quotations q ON q.id = r.converted_quotation_id
+     LEFT JOIN orders o ON o.id = q.converted_order_id
      WHERE r.id = $1`,
     [params.id]
   )
@@ -23,6 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             p.base_price,
             p.mrp AS product_mrp,
             p.price_ex_gst AS product_price_ex_gst,
+            p.category_id AS product_category_id,
             p.gst_percentage AS product_gst,
             pv.variant_name,
             pv.sku AS variant_sku,
@@ -47,7 +53,16 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     [params.id]
   )
 
-  return NextResponse.json({ rfq, items })
+  const discountRows = await queryMany<{ category_id: string; discount_pct: string }>(
+    `SELECT category_id, discount_pct FROM business_discounts WHERE user_id = $1`,
+    [rfq.user_id]
+  )
+  const discountMap: Record<string, number> = {}
+  for (const row of discountRows) {
+    discountMap[row.category_id] = Number(row.discount_pct)
+  }
+
+  return NextResponse.json({ rfq, items, discountMap })
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {

@@ -89,7 +89,12 @@ export async function getReceivablesAging(filters: {
   to?: string
   customerPhone?: string
   search?: string
-}): Promise<{ rows: ReceivableRow[]; summary: ReceivablesSummary }> {
+  page?: number
+  pageSize?: number
+}): Promise<{ rows: ReceivableRow[]; summary: ReceivablesSummary; total: number }> {
+  const PAGE_SIZE = filters.pageSize ?? 50
+  const offset = ((filters.page ?? 1) - 1) * PAGE_SIZE
+
   const conditions: string[] = ["o.payment_status IN ('unpaid', 'partial')", "o.status NOT IN ('draft', 'cancelled', 'cancel_rejected', 'returned')"]
   const params: any[] = []
   let i = 1
@@ -106,30 +111,41 @@ export async function getReceivablesAging(filters: {
 
   const where = conditions.join(' AND ')
 
-  const rows = await queryMany<ReceivableRow>(`
-    SELECT
-      o.id AS order_id,
-      o.order_number,
-      o.invoice_number,
-      o.customer_name,
-      o.customer_phone,
-      COALESCE(o.invoice_date, o.created_at)::date AS invoice_date,
-      o.total_amount,
-      o.payment_status,
-      o.user_id,
-      COALESCE(cp.credit_limit, 0) AS credit_limit,
-      EXTRACT(DAY FROM NOW() - COALESCE(o.invoice_date, o.created_at))::int AS days_outstanding,
-      CASE
-        WHEN EXTRACT(DAY FROM NOW() - COALESCE(o.invoice_date, o.created_at)) <= 30 THEN '0-30'
-        WHEN EXTRACT(DAY FROM NOW() - COALESCE(o.invoice_date, o.created_at)) <= 60 THEN '31-60'
-        ELSE '60+'
-      END AS aging_bucket
-    FROM orders o
-    LEFT JOIN users u ON u.id = o.user_id
-    LEFT JOIN customer_profiles cp ON cp.user_id = o.user_id
-    WHERE ${where}
-    ORDER BY days_outstanding DESC
-  `, params)
+  const [countRow, rows] = await Promise.all([
+    queryOne<{ count: string }>(`
+      SELECT COUNT(*)::text AS count
+      FROM orders o
+      LEFT JOIN users u ON u.id = o.user_id
+      WHERE ${where}
+    `, params),
+    queryMany<ReceivableRow>(`
+      SELECT
+        o.id AS order_id,
+        o.order_number,
+        o.invoice_number,
+        o.customer_name,
+        o.customer_phone,
+        COALESCE(o.invoice_date, o.created_at)::date AS invoice_date,
+        o.total_amount,
+        o.payment_status,
+        o.user_id,
+        COALESCE(cp.credit_limit, 0) AS credit_limit,
+        EXTRACT(DAY FROM NOW() - COALESCE(o.invoice_date, o.created_at))::int AS days_outstanding,
+        CASE
+          WHEN EXTRACT(DAY FROM NOW() - COALESCE(o.invoice_date, o.created_at)) <= 30 THEN '0-30'
+          WHEN EXTRACT(DAY FROM NOW() - COALESCE(o.invoice_date, o.created_at)) <= 60 THEN '31-60'
+          ELSE '60+'
+        END AS aging_bucket
+      FROM orders o
+      LEFT JOIN users u ON u.id = o.user_id
+      LEFT JOIN customer_profiles cp ON cp.user_id = o.user_id
+      WHERE ${where}
+      ORDER BY days_outstanding DESC
+      LIMIT ${PAGE_SIZE} OFFSET ${offset}
+    `, params),
+  ])
+
+  const total = parseInt(countRow?.count ?? '0', 10)
 
   const summary: ReceivablesSummary = {
     total: 0,
@@ -145,7 +161,7 @@ export async function getReceivablesAging(filters: {
     else summary.bucket_60plus += amt
   }
 
-  return { rows: rows || [], summary }
+  return { rows: rows || [], summary, total }
 }
 
 export async function getPayables(filters: {
@@ -153,7 +169,12 @@ export async function getPayables(filters: {
   from?: string
   to?: string
   search?: string
-}): Promise<{ rows: PayableRow[]; summary: PayablesSummary }> {
+  page?: number
+  pageSize?: number
+}): Promise<{ rows: PayableRow[]; summary: PayablesSummary; total: number }> {
+  const PAGE_SIZE = filters.pageSize ?? 50
+  const offset = ((filters.page ?? 1) - 1) * PAGE_SIZE
+
   const conditions: string[] = ['1=1']
   const params: any[] = []
   let i = 1
@@ -173,24 +194,36 @@ export async function getPayables(filters: {
     i = sc.nextIdx
   }
 
-  const rows = await queryMany<PayableRow>(`
-    SELECT
-      e.id, e.expense_number, e.supplier_name, e.supplier_gstin,
-      e.description, e.amount, e.tax_amount, e.total_amount,
-      e.expense_date::text, e.due_date::text, e.status, e.po_id,
-      CASE WHEN e.due_date < CURRENT_DATE THEN EXTRACT(DAY FROM NOW() - e.due_date)::int ELSE NULL END AS days_overdue,
-      COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0) AS paid_amount,
-      s.bank_name AS supplier_bank_name,
-      s.account_number AS supplier_account_number,
-      s.ifsc AS supplier_ifsc,
-      s.upi_id AS supplier_upi_id,
-      s.id AS supplier_id
-    FROM expenses e
-    LEFT JOIN purchase_orders po ON po.id = e.po_id
-    LEFT JOIN suppliers s ON s.id = po.supplier_id
-    WHERE ${conditions.join(' AND ')}
-    ORDER BY e.due_date ASC NULLS LAST, e.expense_date DESC
-  `, params)
+  const [countRow, rows] = await Promise.all([
+    queryOne<{ count: string }>(`
+      SELECT COUNT(*)::text AS count
+      FROM expenses e
+      LEFT JOIN purchase_orders po ON po.id = e.po_id
+      LEFT JOIN suppliers s ON s.id = po.supplier_id
+      WHERE ${conditions.join(' AND ')}
+    `, params),
+    queryMany<PayableRow>(`
+      SELECT
+        e.id, e.expense_number, e.supplier_name, e.supplier_gstin,
+        e.description, e.amount, e.tax_amount, e.total_amount,
+        e.expense_date::text, e.due_date::text, e.status, e.po_id,
+        CASE WHEN e.due_date < CURRENT_DATE THEN EXTRACT(DAY FROM NOW() - e.due_date)::int ELSE NULL END AS days_overdue,
+        COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id), 0) AS paid_amount,
+        s.bank_name AS supplier_bank_name,
+        s.account_number AS supplier_account_number,
+        s.ifsc AS supplier_ifsc,
+        s.upi_id AS supplier_upi_id,
+        s.id AS supplier_id
+      FROM expenses e
+      LEFT JOIN purchase_orders po ON po.id = e.po_id
+      LEFT JOIN suppliers s ON s.id = po.supplier_id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY e.due_date ASC NULLS LAST, e.expense_date DESC
+      LIMIT ${PAGE_SIZE} OFFSET ${offset}
+    `, params),
+  ])
+
+  const total = parseInt(countRow?.count ?? '0', 10)
 
   const now = new Date()
   const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
@@ -205,7 +238,7 @@ export async function getPayables(filters: {
     }
   }
 
-  return { rows: rows || [], summary }
+  return { rows: rows || [], summary, total }
 }
 
 export async function getPLReport(from: string, to: string): Promise<{ monthly: PLMonth[]; totals: PLTotals }> {

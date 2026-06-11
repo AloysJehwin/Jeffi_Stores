@@ -77,8 +77,16 @@ export async function GET(request: NextRequest) {
       `SELECT id, quote_number, quote_date, status, consignee_name, consignee_addr1, consignee_addr2,
               consignee_city, consignee_state, consignee_gstin, consignee_phone, consignee_pincode,
               consignee_email, buyer_same, buyer_name, buyer_addr1, buyer_addr2, buyer_city, buyer_state,
-              buyer_gstin, subtotal, cgst_amount, sgst_amount, total_amount, converted_order_id,
-              view_token, created_at
+              buyer_gstin,
+              CASE WHEN COALESCE(subtotal, 0) = 0
+                THEN COALESCE((SELECT SUM(amount) FROM quotation_items WHERE quotation_id = quotations.id), 0)
+                ELSE subtotal END AS subtotal,
+              CASE WHEN COALESCE(total_amount, 0) = 0
+                THEN COALESCE((SELECT SUM(amount * (1 + gst_rate / 100)) FROM quotation_items WHERE quotation_id = quotations.id), 0)
+                ELSE total_amount END AS total_amount,
+              cgst_amount, sgst_amount, converted_order_id,
+              view_token, created_at,
+              EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = quotations.id) AS from_rfq
        FROM quotations ${where} ORDER BY created_at DESC LIMIT $${i}`,
       params
     )

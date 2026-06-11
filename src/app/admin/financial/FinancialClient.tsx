@@ -116,18 +116,26 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
   const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
   const [markingPaid, setMarkingPaid] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 50
 
-  const load = useCallback(async () => {
+  useEffect(() => { if (initialData !== null) { setData(initialData); setPage(1) } }, [initialData])
+
+  const load = useCallback(async (p = page) => {
     setLoading(true)
     const params = new URLSearchParams()
     if (from) params.set('from', from)
     if (to) params.set('to', to)
     if (search) params.set('search', search)
+    params.set('page', String(p))
     const res = await fetch(`/api/admin/financial/receivables?${params}`)
     const json = await res.json()
     setData(json?.error ? null : json)
+    setPage(p)
     setLoading(false)
-  }, [from, to, search])
+  }, [from, to, search, page])
+
+  const handleRefresh = () => { setPage(1); load(1) }
 
   const markPaid = async (orderId: string) => {
     setMarkingPaid(orderId)
@@ -136,7 +144,7 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ payment_status: 'paid' }),
     })
-    await load()
+    await load(page)
     setMarkingPaid(null)
   }
 
@@ -153,6 +161,8 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
     a.download = `receivables-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
   }
+
+  const totalPages = data?.total ? Math.ceil(data.total / PAGE_SIZE) : 1
 
   return (
     <div className="space-y-5">
@@ -172,12 +182,12 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
               type="receivables"
               value={search}
               onChange={setSearch}
-              onEnter={load}
+              onEnter={handleRefresh}
               placeholder="Name, invoice #..."
             />
           </div>
           <div className="flex gap-2 pb-0.5">
-            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Refresh'}</button>
+            <button className={btnPrimary} onClick={handleRefresh}>{loading ? 'Loading…' : 'Refresh'}</button>
             {data?.rows?.length > 0 && <button className={btnSecondary} onClick={exportCSV}>Export CSV</button>}
           </div>
         </div>
@@ -284,6 +294,24 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
                   </div>
                 ))}
               </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <p className="text-sm text-foreground-secondary">Page {page} of {totalPages} · {data.total} total</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => load(page - 1)}
+                      disabled={page === 1 || loading}
+                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >Previous</button>
+                    <button
+                      onClick={() => load(page + 1)}
+                      disabled={page === totalPages || loading}
+                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >Next</button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </>
@@ -309,18 +337,28 @@ function PayablesTab({ initialData }: { initialData: any }) {
   const [rzpForm, setRzpForm] = useState({ mode: 'IMPS', amount: '', notes: '' })
   const [paying, setPaying] = useState(false)
   const [payoutResult, setPayoutResult] = useState<any>(null)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 50
 
-  const load = useCallback(async () => {
+  useEffect(() => { if (initialData !== null) { setData(initialData); setPage(1) } }, [initialData])
+
+  const load = useCallback(async (p = page) => {
     setLoading(true)
     const params = new URLSearchParams()
     if (from) params.set('from', from)
     if (to) params.set('to', to)
     if (search) params.set('search', search)
+    params.set('page', String(p))
     const res = await fetch(`/api/admin/financial/payables?${params}`)
     const json = await res.json()
     setData(json?.error ? null : json)
+    setPage(p)
     setLoading(false)
-  }, [from, to, search])
+  }, [from, to, search, page])
+
+  const handleRefresh = () => { setPage(1); load(1) }
+
+  const totalPages = data?.total ? Math.ceil(data.total / PAGE_SIZE) : 1
 
   const submitBill = async () => {
     if (!addForm.supplier_name || !addForm.amount || !addForm.expense_date) return
@@ -401,12 +439,12 @@ function PayablesTab({ initialData }: { initialData: any }) {
               type="payables"
               value={search}
               onChange={setSearch}
-              onEnter={load}
+              onEnter={handleRefresh}
               placeholder="Supplier name, bill #..."
             />
           </div>
           <div className="flex gap-2 pb-0.5">
-            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Refresh'}</button>
+            <button className={btnPrimary} onClick={handleRefresh}>{loading ? 'Loading…' : 'Refresh'}</button>
             <button className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>+ Add Bill</button>
           </div>
         </div>
@@ -566,6 +604,24 @@ function PayablesTab({ initialData }: { initialData: any }) {
                   )
                 })}
               </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <p className="text-sm text-foreground-secondary">Page {page} of {totalPages} · {data.total} total</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => load(page - 1)}
+                      disabled={page === 1 || loading}
+                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >Previous</button>
+                    <button
+                      onClick={() => load(page + 1)}
+                      disabled={page === totalPages || loading}
+                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >Next</button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </>
@@ -689,6 +745,8 @@ function PLTab({ initialData }: { initialData: any }) {
   const [to, setTo] = useState(fyEnd)
   const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => { if (initialData !== null) setData(initialData) }, [initialData])
 
   const load = async () => {
     setLoading(true)
@@ -826,6 +884,8 @@ function CashflowTab({ initialData }: { initialData: any }) {
   const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => { if (initialData !== null) setData(initialData) }, [initialData])
+
   const load = async () => {
     setLoading(true)
     const res = await fetch(`/api/admin/financial/cashflow?from=${from}&to=${to}`)
@@ -941,19 +1001,29 @@ function TransactionsTab({ initialData }: { initialData: any }) {
   const [type, setType] = useState('all')
   const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 50
 
-  const load = useCallback(async () => {
+  useEffect(() => { if (initialData !== null) { setData(initialData); setPage(1) } }, [initialData])
+
+  const load = useCallback(async (p = page) => {
     setLoading(true)
     const params = new URLSearchParams()
     if (from) params.set('from', from)
     if (to) params.set('to', to)
     if (search) params.set('search', search)
     if (type !== 'all') params.set('type', type)
+    params.set('page', String(p))
     const res = await fetch(`/api/admin/financial/transactions?${params}`)
     const json = await res.json()
     setData(json?.error ? null : json)
+    setPage(p)
     setLoading(false)
-  }, [from, to, search, type])
+  }, [from, to, search, type, page])
+
+  const handleRefresh = () => { setPage(1); load(1) }
+
+  const totalPages = data?.total ? Math.ceil(data.total / PAGE_SIZE) : 1
 
   const exportCSV = () => {
     if (!data?.rows?.length) return
@@ -986,10 +1056,10 @@ function TransactionsTab({ initialData }: { initialData: any }) {
           </div>
           <div className="flex-1 min-w-[180px]">
             <label className={labelCls}>Search party / ref</label>
-            <input className={inputCls} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && load()} placeholder="Supplier, customer, ref..." />
+            <input className={inputCls} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRefresh()} placeholder="Supplier, customer, ref..." />
           </div>
           <div className="flex gap-2 pb-0.5">
-            <button className={btnPrimary} onClick={load}>{loading ? 'Loading…' : 'Refresh'}</button>
+            <button className={btnPrimary} onClick={handleRefresh}>{loading ? 'Loading…' : 'Refresh'}</button>
             {data?.rows?.length > 0 && <button className={btnSecondary} onClick={exportCSV}>Export CSV</button>}
           </div>
         </div>
@@ -1124,6 +1194,24 @@ function TransactionsTab({ initialData }: { initialData: any }) {
                   </div>
                 ))}
               </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                  <p className="text-sm text-foreground-secondary">Page {page} of {totalPages} · {data.total} total</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => load(page - 1)}
+                      disabled={page === 1 || loading}
+                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >Previous</button>
+                    <button
+                      onClick={() => load(page + 1)}
+                      disabled={page === totalPages || loading}
+                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >Next</button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </>

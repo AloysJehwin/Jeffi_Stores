@@ -317,9 +317,6 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
       <div className="bg-surface min-h-screen">
         <BusinessAccountMobileHeader />
         <div className="container mx-auto px-4">
-          <div className="hidden lg:block py-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Order Details</h1>
-          </div>
           <div className="py-4">
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <h3 className="text-xl font-semibold text-foreground mb-2">Order Not Found</h3>
@@ -338,19 +335,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     <div className="bg-surface min-h-screen">
       <BusinessAccountMobileHeader />
       <div className="container mx-auto px-4">
-        <div className="hidden lg:block py-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Order Details</h1>
-        </div>
-
         <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
-            {/* Back */}
-            <Link href={bp('/business/account/orders')} className="inline-flex items-center text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 font-medium text-sm">
-              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back to My Orders
-            </Link>
-
             {/* Order Header */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -594,24 +579,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
               </div>
             )}
 
-            {order.paymentStatus === 'unpaid' && order.paymentMode === 'upi_qr' && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-                <h3 className="text-base font-semibold text-foreground mb-3">Pay via UPI QR</h3>
-                {order.razorpayQrImageUrl ? (
-                  <div className="flex flex-col items-center gap-3">
-                    <img src={order.razorpayQrImageUrl} alt="UPI QR Code" className="max-w-[240px] w-full rounded-lg border border-border-default" />
-                    <p className="text-sm text-foreground-secondary text-center">
-                      Scan to pay {order.totalAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-                    </p>
-                    <p className="text-xs text-foreground-muted text-center">Payment status updates automatically once scanned.</p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-foreground-secondary">Your order is awaiting payment. Our team will share a QR code shortly, or please contact us for payment details.</p>
-                )}
-              </div>
-            )}
-
-            {order.paymentStatus === 'unpaid' && order.paymentMode !== 'upi_qr' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
+            {order.paymentStatus === 'unpaid' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex gap-3 flex-1">
@@ -638,7 +606,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
               </div>
             )}
 
-            {order.paymentStatus === 'unpaid' && order.paymentMode !== 'upi_qr' && !isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
+            {order.paymentStatus === 'unpaid' && !isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex gap-3">
                   <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

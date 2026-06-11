@@ -49,7 +49,7 @@ export async function GET(
           orig.order_number AS original_order_number
         FROM orders o
         LEFT JOIN orders orig ON orig.id = o.original_order_id
-        WHERE o.id = $1 AND (
+        WHERE o.id = $1 AND o.status != 'draft' AND (
           o.user_id = $2 OR
           (o.source = 'business' AND (o.customer_email = $3 OR ($4::text IS NOT NULL AND o.customer_phone = $4)))
         )
@@ -67,7 +67,7 @@ export async function GET(
           orig.order_number AS original_order_number
         FROM orders o
         LEFT JOIN orders orig ON orig.id = o.original_order_id
-        WHERE o.id = $1 AND o.user_id = $2
+        WHERE o.id = $1 AND o.status != 'draft' AND o.user_id = $2
       `, [orderId, authUser.userId])
     }
 

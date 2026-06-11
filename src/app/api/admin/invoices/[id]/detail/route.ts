@@ -31,7 +31,7 @@ export async function GET(
       FROM orders o
       LEFT JOIN addresses a ON o.shipping_address_id = a.id
       LEFT JOIN invoices inv ON inv.order_id = o.id
-      WHERE o.id = $1 AND o.invoice_number IS NOT NULL`,
+      WHERE o.id = $1`,
       [params.id]
     )
 

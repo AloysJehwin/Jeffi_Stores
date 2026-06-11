@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const isBusiness = authUser.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
 
     const body = await request.json()
     const parsed = parseBody(VerifySchema, body)
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
       return await markLegacyOrderPaid({
         userId: authUser.userId,
         orderId,
+        isBusiness,
         razorpay_order_id,
         razorpay_payment_id,
         razorpay_signature,
@@ -219,14 +221,32 @@ async function commitDraft(args: {
 async function markLegacyOrderPaid(args: {
   userId: string
   orderId: string
+  isBusiness?: boolean
   razorpay_order_id: string
   razorpay_payment_id: string
   razorpay_signature: string
 }) {
-  const order = await queryOne<any>(
-    'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
-    [args.orderId, args.userId]
-  )
+  let order: any
+  if (args.isBusiness) {
+    const bizUser = await queryOne<{ email: string; phone: string | null }>(
+      'SELECT email, phone FROM users WHERE id = $1',
+      [args.userId]
+    )
+    const email = bizUser?.email || ''
+    const phone = bizUser?.phone || null
+    order = await queryOne<any>(
+      `SELECT * FROM orders WHERE id = $1 AND (
+        user_id = $2 OR
+        (source = 'business' AND (customer_email = $3 OR ($4::text IS NOT NULL AND customer_phone = $4)))
+      )`,
+      [args.orderId, args.userId, email, phone]
+    )
+  } else {
+    order = await queryOne<any>(
+      'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
+      [args.orderId, args.userId]
+    )
+  }
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   if (order.payment_status === 'paid') {
     return NextResponse.json({
