@@ -58,6 +58,7 @@ interface LinkedOrder {
   total_amount: number
   invoice_number: string | null
   status: string
+  view_token: string | null
 }
 
 interface RFQMessage {
@@ -306,15 +307,6 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
               )}
             </div>
           </div>
-          {rfq.status === 'converted' && rfq.quotation_view_token && (
-            <a href={`https://quotation.jeffistores.in/${rfq.quotation_view_token}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 border border-accent-500 text-accent-400 text-sm font-semibold rounded-lg hover:bg-accent-900/20 transition-colors shrink-0">
-              View Quotation →
-            </a>
-          )}
-
           {rfq.admin_note && (
             <div className={`mt-4 rounded-lg p-3 text-sm ${rfq.status === 'rejected' ? 'bg-red-900/30 border border-red-800 text-red-300' : 'bg-blue-900/30 border border-blue-800 text-blue-300'}`}>
               <p className="font-semibold mb-1">{rfq.status === 'rejected' ? 'Reason for rejection:' : 'Note from our team:'}</p>
@@ -810,6 +802,12 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                       {linkedOrder.payment_status === 'paid' ? 'Paid' : 'Awaiting Payment'}
                     </span>
                   </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-foreground-muted">Total</span>
+                    <span className="text-sm font-bold text-foreground">
+                      ₹{Number(linkedOrder.total_amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </span>
+                  </div>
                   {linkedOrder.payment_status === 'paid' && (
                     <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                       <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -824,6 +822,16 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                   >
                     View Order →
                   </Link>
+                  {linkedOrder.view_token && (
+                    <a
+                      href={`https://invoice.jeffistores.in/${linkedOrder.view_token}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full text-center text-xs bg-accent-500 hover:bg-accent-600 text-white font-semibold px-3 py-2 rounded-lg transition-colors"
+                    >
+                      View Invoice →
+                    </a>
+                  )}
                 </div>
               </div>
             )}
