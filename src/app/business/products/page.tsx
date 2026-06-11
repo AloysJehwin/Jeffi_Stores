@@ -12,6 +12,19 @@ import { bp } from '@/lib/business-path'
 
 const PAGE_SIZE = 21
 
+async function getCategoryIds(catVal: string): Promise<string[]> {
+  const rows = await queryMany<{ id: string }>(
+    `WITH RECURSIVE cat_tree AS (
+       SELECT id FROM categories WHERE id::text = $1 OR slug = $1
+       UNION ALL
+       SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id
+     )
+     SELECT id FROM cat_tree`,
+    [catVal]
+  )
+  return rows.map(r => r.id)
+}
+
 async function getProducts(searchParams: any) {
   const conditions: string[] = ['p.is_active = true']
   const params: any[] = []
@@ -20,16 +33,15 @@ async function getProducts(searchParams: any) {
   if (searchParams.category) {
     const catVals = String(searchParams.category).split(',').filter(Boolean)
     if (catVals.length === 1) {
-      conditions.push(`p.category_id IN (
-        WITH RECURSIVE cat_tree AS (
-          SELECT id FROM categories WHERE id::text = $${paramIndex} OR slug = $${paramIndex}
-          UNION ALL
-          SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id
-        )
-        SELECT id FROM cat_tree
-      )`)
-      params.push(catVals[0])
-      paramIndex++
+      const catIds = await getCategoryIds(catVals[0])
+      if (catIds.length === 0) {
+        conditions.push('false')
+      } else {
+        const placeholders = catIds.map((_, i) => `$${paramIndex + i}`).join(', ')
+        conditions.push(`p.category_id IN (${placeholders})`)
+        params.push(...catIds)
+        paramIndex += catIds.length
+      }
     } else {
       const parts = catVals.map(() => {
         const p = paramIndex++
@@ -228,7 +240,7 @@ export default async function ProductsPage({
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Search
                   </label>
-                  <ProductsSearch defaultValue={searchParams.search} portalHeader="business" basePath="/business/products" />
+                  <ProductsSearch defaultValue={searchParams.search} portalHeader="business" basePath={bp('/business/products', host)} />
                 </div>
 
                 {/* Categories Filter */}
@@ -414,7 +426,7 @@ export default async function ProductsPage({
                 <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of hardware and industrial tools</p>
               </div>
               <div className="lg:hidden shrink-0">
-                <MobileFilterSheet categories={allCats} brands={brands as any[]} basePath="/business/products" />
+                <MobileFilterSheet categories={allCats} brands={brands as any[]} basePath={bp('/business/products', host)} />
               </div>
             </div>
             {/* Sort Bar */}
@@ -425,7 +437,7 @@ export default async function ProductsPage({
                   : '0 products found'
                 }
               </p>
-              <SortDropdown basePath="/business/products" />
+              <SortDropdown basePath={bp('/business/products', host)} />
             </div>
 
             {/* Products Grid */}
