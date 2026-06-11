@@ -27,21 +27,49 @@ export async function GET(
     }
 
     const orderId = params.id
+    const isBusiness = authUser.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
 
-    const order = await queryOne(`
-      SELECT o.*,
-        COALESCE(
-          o.shipping_address_snapshot,
-          (SELECT to_jsonb(a) FROM (
-            SELECT full_name, address_line1, address_line2, landmark, city, state, postal_code, phone
-            FROM addresses WHERE id = o.shipping_address_id
-          ) a)
-        ) AS shipping_address,
-        orig.order_number AS original_order_number
-      FROM orders o
-      LEFT JOIN orders orig ON orig.id = o.original_order_id
-      WHERE o.id = $1 AND o.user_id = $2
-    `, [orderId, authUser.userId])
+    let order: any
+    if (isBusiness) {
+      const bizUser = await queryOne<{ email: string; phone: string | null }>(
+        'SELECT email, phone FROM users WHERE id = $1',
+        [authUser.userId]
+      )
+      const email = bizUser?.email || ''
+      const phone = bizUser?.phone || null
+      order = await queryOne(`
+        SELECT o.*,
+          COALESCE(
+            o.shipping_address_snapshot,
+            (SELECT to_jsonb(a) FROM (
+              SELECT full_name, address_line1, address_line2, landmark, city, state, postal_code, phone
+              FROM addresses WHERE id = o.shipping_address_id
+            ) a)
+          ) AS shipping_address,
+          orig.order_number AS original_order_number
+        FROM orders o
+        LEFT JOIN orders orig ON orig.id = o.original_order_id
+        WHERE o.id = $1 AND o.status != 'draft' AND (
+          o.user_id = $2 OR
+          (o.source = 'business' AND (o.customer_email = $3 OR ($4::text IS NOT NULL AND o.customer_phone = $4)))
+        )
+      `, [orderId, authUser.userId, email, phone])
+    } else {
+      order = await queryOne(`
+        SELECT o.*,
+          COALESCE(
+            o.shipping_address_snapshot,
+            (SELECT to_jsonb(a) FROM (
+              SELECT full_name, address_line1, address_line2, landmark, city, state, postal_code, phone
+              FROM addresses WHERE id = o.shipping_address_id
+            ) a)
+          ) AS shipping_address,
+          orig.order_number AS original_order_number
+        FROM orders o
+        LEFT JOIN orders orig ON orig.id = o.original_order_id
+        WHERE o.id = $1 AND o.status != 'draft' AND o.user_id = $2
+      `, [orderId, authUser.userId])
+    }
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })

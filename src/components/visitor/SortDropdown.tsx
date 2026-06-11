@@ -10,7 +10,7 @@ const SORT_OPTIONS = [
   { value: 'base_price&order=desc', label: 'Price: High to Low' },
 ]
 
-export default function SortDropdown() {
+export default function SortDropdown({ basePath = '/products' }: { basePath?: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isOpen, setIsOpen] = useState(false)
@@ -44,7 +44,7 @@ export default function SortDropdown() {
       params.delete('order')
     }
 
-    router.replace(`/products?${params.toString()}`)
+    router.replace(basePath + `?${params.toString()}`)
     setIsOpen(false)
   }, [searchParams, router])
 

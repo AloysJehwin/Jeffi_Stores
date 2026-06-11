@@ -3,8 +3,31 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne } from '@/lib/db'
 import { getRazorpayInstance } from '@/lib/razorpay'
+import sharp from 'sharp'
 
 export const dynamic = 'force-dynamic'
+
+// Razorpay QR poster is 674×1644. The QR code square sits at these proportional bounds.
+const RZP_QR_LEFT_RATIO  = 136 / 674
+const RZP_QR_TOP_RATIO   = 648 / 1644
+const RZP_QR_SIZE_RATIO  = 399 / 674
+
+async function cropRazorpayQr(imageUrl: string): Promise<string> {
+  const imgRes = await fetch(imageUrl)
+  const buf = Buffer.from(await imgRes.arrayBuffer())
+  const meta = await sharp(buf).metadata()
+  const w = meta.width!
+  const h = meta.height!
+  const left  = Math.round(w * RZP_QR_LEFT_RATIO)
+  const top   = Math.round(h * RZP_QR_TOP_RATIO)
+  const size  = Math.round(w * RZP_QR_SIZE_RATIO)
+  const cropped = await sharp(buf)
+    .extract({ left, top, width: size, height: size })
+    .resize(300, 300)
+    .png()
+    .toBuffer()
+  return `data:image/png;base64,${cropped.toString('base64')}`
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +42,7 @@ export async function POST(request: NextRequest) {
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
     const rzp = getRazorpayInstance() as any
-    const closeBy = Math.floor(Date.now() / 1000) + 24 * 60 * 60 // 24 hours
+    const closeBy = Math.floor(Date.now() / 1000) + 24 * 60 * 60
 
     const qr = await rzp.qrCode.create({
       type: 'upi_qr',
@@ -31,18 +54,7 @@ export async function POST(request: NextRequest) {
       close_by: closeBy,
     })
 
-    // Fetch the actual QR PNG from Razorpay's short URL and store as base64 data URL
-    let qrImageUrl = qr.image_url
-    try {
-      const imgRes = await fetch(qr.image_url)
-      if (imgRes.ok) {
-        const contentType = imgRes.headers.get('content-type') || 'image/png'
-        const buf = await imgRes.arrayBuffer()
-        qrImageUrl = `data:${contentType};base64,${Buffer.from(buf).toString('base64')}`
-      }
-    } catch (_) {
-      // keep redirect URL as fallback
-    }
+    const qrImageUrl = await cropRazorpayQr(qr.image_url)
 
     await query(
       `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, updated_at = NOW() WHERE id = $3`,

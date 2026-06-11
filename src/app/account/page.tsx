@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import { AccountMobileTabBar } from '@/components/visitor/AccountMobileHeader'
 // AccountNavBar is rendered by layout.tsx for all /account/* pages
 
 interface DashboardData {
@@ -326,6 +327,8 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
+
+      <AccountMobileTabBar />
 
       <div className="container mx-auto px-4">
 

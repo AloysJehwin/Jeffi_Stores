@@ -73,6 +73,11 @@ const businessNavItem = {
 
 export { navItems }
 
+const accountBackLinkMap: Array<{ pattern: RegExp; label: string; href: string }> = [
+  { pattern: /^\/account\/orders\/.+/, label: 'My Orders', href: '/account/orders' },
+  { pattern: /^\/account\/quotes\/.+/, label: 'My Quotes', href: '/account/quotes' },
+]
+
 export function AccountNavBar() {
   const pathname = usePathname()
   const { user } = useAuth()
@@ -91,8 +96,10 @@ export function AccountNavBar() {
     return match?.label ?? 'My Account'
   })()
 
+  const backLink = accountBackLinkMap.find(b => b.pattern.test(pathname))
+
   return (
-    <div className="sticky top-0 z-20 bg-surface shadow-sm pt-4">
+    <div className="hidden lg:block sticky top-0 z-20 bg-surface shadow-sm pt-4">
       <div className="container mx-auto px-4 py-2">
         <div className="bg-surface-elevated rounded-xl border border-border-default px-3 py-1.5 flex items-center gap-3">
           <span className="text-sm font-semibold text-foreground whitespace-nowrap pl-1 hidden sm:block">{activeLabel}</span>
@@ -118,7 +125,18 @@ export function AccountNavBar() {
               )
             })}
           </nav>
-          {suggestions.length > 0 || placeholder !== 'Search…' ? (
+          {backLink && (
+            <Link
+              href={backLink.href}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-accent-600 hover:text-accent-700 dark:text-accent-400 dark:hover:text-accent-300 hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors whitespace-nowrap"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              {backLink.label}
+            </Link>
+          )}
+          {(suggestions.length > 0 || placeholder !== 'Search…') && !backLink ? (
             <div className="hidden sm:block w-52 flex-shrink-0">
               <AccountSearch
                 placeholder={placeholder}

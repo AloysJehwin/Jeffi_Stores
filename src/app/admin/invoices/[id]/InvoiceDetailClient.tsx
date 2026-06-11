@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, ChevronLeft, Pencil } from 'lucide-react'
+import { Check, ChevronLeft, Pencil, QrCode } from 'lucide-react'
 import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
@@ -30,6 +30,10 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   const [loading, setLoading] = useState(true)
   const [qrLoading, setQrLoading] = useState(false)
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null)
+  const [qrModalOpen, setQrModalOpen] = useState(false)
+  const [finalizing, setFinalizing] = useState(false)
+  const [finalizeError, setFinalizeError] = useState<string | null>(null)
+  const qrModalRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   function loadData() {
@@ -48,6 +52,16 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   useEffect(() => {
     loadData()
   }, [id, router])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setQrModalOpen(false) }
+    function onClickOutside(e: MouseEvent) {
+      if (qrModalRef.current && !qrModalRef.current.contains(e.target as Node)) setQrModalOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onClickOutside)
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onClickOutside) }
+  }, [])
 
   // Poll every 4s while QR is shown and payment is unpaid
   useEffect(() => {
@@ -79,10 +93,31 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         }),
       })
       const json = await res.json()
-      if (res.ok && json.qrImageUrl) setQrImageUrl(json.qrImageUrl)
+      if (res.ok && json.qrImageUrl) {
+        setQrImageUrl(json.qrImageUrl)
+        setQrModalOpen(true)
+      }
       else alert(json.error || 'Failed to generate QR')
     } finally {
       setQrLoading(false)
+    }
+  }
+
+  async function finalizeInvoice() {
+    setFinalizing(true)
+    setFinalizeError(null)
+    try {
+      const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const json = await res.json()
+      if (!res.ok) { setFinalizeError(json.error || 'Failed to finalize'); return }
+      await loadData()
+    } catch {
+      setFinalizeError('Failed to finalize invoice')
+    } finally {
+      setFinalizing(false)
     }
   }
 
@@ -110,6 +145,38 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      {/* QR Modal */}
+      {qrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div ref={qrModalRef} className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default p-6 flex flex-col items-center gap-4 max-w-xs w-full">
+            <div className="flex items-center justify-between w-full">
+              <p className="text-sm font-semibold text-foreground">UPI QR — {formatINR(parseFloat(o.total_amount))}</p>
+              <button onClick={() => setQrModalOpen(false)} className="text-foreground-muted hover:text-foreground transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {qrLoading ? (
+              <div className="w-52 h-52 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : qrImageUrl ? (
+              <img src={qrImageUrl} alt="UPI QR Code" className="w-52 h-52 object-contain rounded-lg" />
+            ) : (
+              <p className="text-sm text-foreground-secondary">No QR available.</p>
+            )}
+            <p className="text-xs text-foreground-secondary text-center">Scan with any UPI app to pay</p>
+            <button
+              onClick={generateQr}
+              disabled={qrLoading}
+              className="text-xs text-foreground-secondary hover:text-foreground underline underline-offset-2 transition-colors disabled:opacity-50"
+            >
+              {qrLoading ? 'Regenerating…' : 'Regenerate QR'}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 mb-6 text-sm">
         <a href={ap('/admin/invoices')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
@@ -139,7 +206,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {o.status === 'draft' && (
+          {o.status === 'draft' && o.source !== 'business' && (
             <a
               href={ap(`/admin/invoices?view=edit&edit=${o.id}`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
@@ -147,6 +214,25 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               <Pencil className="w-4 h-4" />
               Edit
             </a>
+          )}
+          {o.status === 'draft' && o.source === 'business' && (
+            <button
+              onClick={finalizeInvoice}
+              disabled={finalizing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors disabled:opacity-50"
+            >
+              {finalizing ? 'Finalizing…' : 'Finalize Invoice'}
+            </button>
+          )}
+          {showQrSection && (
+            <button
+              onClick={() => qrImageUrl ? setQrModalOpen(true) : generateQr()}
+              disabled={qrLoading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
+            >
+              <QrCode className="w-4 h-4" />
+              {qrLoading ? 'Generating…' : 'QR'}
+            </button>
           )}
           <a
             href={`/api/orders/${o.id}/invoice`}
@@ -169,6 +255,11 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
       </div>
 
       {/* Info Cards */}
+      {finalizeError && (
+        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+          {finalizeError}
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Invoice Details */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
@@ -359,29 +450,6 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           </div>
         </div>
       </div>
-
-      {showQrSection && (
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">UPI QR Payment</p>
-          {qrImageUrl ? (
-            <div className="flex flex-col items-center gap-3">
-              <img src={qrImageUrl} alt="UPI QR Code" className="max-w-[240px] w-full rounded-lg border border-border-default" />
-              <p className="text-xs text-foreground-secondary text-center">Scan to pay {formatINR(parseFloat(o.total_amount))} — payment status updates automatically once scanned.</p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <p className="text-sm text-foreground-secondary flex-1">No QR generated yet.</p>
-              <button
-                onClick={generateQr}
-                disabled={qrLoading}
-                className="px-3 py-1.5 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 transition-colors"
-              >
-                {qrLoading ? 'Generating…' : 'Generate UPI QR'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {o.notes && (
         <div className="bg-surface-elevated rounded-xl border border-border-default p-4">

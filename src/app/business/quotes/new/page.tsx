@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import CustomSelect from '@/components/visitor/CustomSelect'
 import { bp } from '@/lib/business-path'
 
 interface RFQItem {
@@ -12,9 +11,6 @@ interface RFQItem {
   requested_price: string
   notes: string
 }
-
-const UNITS = ['Nos', 'Pcs', 'Kg', 'g', 'L', 'mL', 'Box', 'Set', 'Pair', 'Roll', 'Sheet', 'Bag']
-const UNIT_OPTIONS = UNITS.map(u => ({ value: u, label: u }))
 
 const emptyItem = (): RFQItem => ({ description: '', quantity: 1, unit: 'Nos', requested_price: '', notes: '' })
 
@@ -119,15 +115,7 @@ export default function NewRFQPage() {
                     className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Unit</label>
-                  <CustomSelect
-                    value={item.unit}
-                    options={UNIT_OPTIONS}
-                    onChange={v => updateItem(i, 'unit', v)}
-                  />
-                </div>
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Target Price (₹) <span className="text-foreground-muted font-normal">optional</span></label>
                   <input
                     type="number"
@@ -138,6 +126,7 @@ export default function NewRFQPage() {
                     placeholder="Your target price per unit"
                     className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
                   />
+                  <p className="text-[11px] text-foreground-muted mt-1">Maximum discount allowed: 30% off the listed price</p>
                 </div>
               </div>
               <div>

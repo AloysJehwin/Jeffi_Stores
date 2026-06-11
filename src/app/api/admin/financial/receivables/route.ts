@@ -16,12 +16,14 @@ export async function GET(request: NextRequest) {
     const to = searchParams.get('to') || ''
     const customerPhone = searchParams.get('customerPhone') || ''
     const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1', 10)
 
     const result = await getReceivablesAging({
       from: from || undefined,
       to: to || undefined,
       customerPhone: customerPhone || undefined,
       search: search || undefined,
+      page,
     })
 
     return NextResponse.json(result)

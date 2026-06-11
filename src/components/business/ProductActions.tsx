@@ -497,35 +497,39 @@ export default function ProductActions({
           <div className="bg-surface rounded-lg p-6">
             {businessDiscountPct > 0 ? (
               <>
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="text-sm text-foreground-secondary w-36 shrink-0">Regular price</span>
-                  <span className="text-lg text-foreground-muted line-through">
-                    Rs. {rawEffectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                  {effectiveMrp && effectiveMrp > rawEffectivePrice && (
-                    <span className="text-sm text-foreground-muted line-through">
-                      MRP Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="text-sm text-foreground-secondary shrink-0">Regular price</span>
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <span className="text-base text-foreground-muted line-through tabular-nums">
+                      Rs.&nbsp;{rawEffectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                  )}
+                    {effectiveMrp && effectiveMrp > rawEffectivePrice && (
+                      <span className="text-sm text-foreground-muted line-through tabular-nums">
+                        MRP Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-sm font-semibold text-accent-600 dark:text-accent-400 w-36 shrink-0">Your business price</span>
-                  <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                    Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap">
-                    ✦ {businessDiscountPct}% extra off
-                  </span>
+                <div className="mb-3">
+                  <p className="text-sm font-semibold text-accent-600 dark:text-accent-400 mb-1">Your business price</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                      Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap shrink-0">
+                      ✦ {businessDiscountPct}% off
+                    </span>
+                  </div>
                 </div>
               </>
             ) : (
-              <div className="flex items-baseline gap-3 mb-2">
-                <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                  Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              <div className="flex items-baseline gap-3 mb-2 flex-wrap">
+                <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                  Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
                 {effectiveMrp && effectiveMrp > effectivePrice && (
-                  <span className="text-xl text-foreground-muted line-through">
-                    Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <span className="text-lg text-foreground-muted line-through tabular-nums">
+                    Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 )}
               </div>
