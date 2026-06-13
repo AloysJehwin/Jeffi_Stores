@@ -856,7 +856,7 @@ export default function QuotationsClient() {
                           className="mt-0.5 accent-secondary-500" />
                         <div>
                           <p className="text-sm font-medium text-foreground">Enable delivery tracking</p>
-                          <p className="text-xs text-foreground-secondary">Order will be set to Processing state — Delhivery shipment can be created from the order view</p>
+                          <p className="text-xs text-foreground-secondary">A Delhivery shipment can be created from the order view once enabled</p>
                         </div>
                       </label>
                     </div>
@@ -1213,7 +1213,7 @@ export default function QuotationsClient() {
                       className="mt-0.5 accent-secondary-500" />
                     <div>
                       <p className="text-sm font-medium text-foreground">Enable delivery tracking</p>
-                      <p className="text-xs text-foreground-secondary">Order will be set to Processing state — Delhivery shipment can be created from the order view</p>
+                      <p className="text-xs text-foreground-secondary">A Delhivery shipment can be created from the order view once enabled</p>
                     </div>
                   </label>
                 </div>
