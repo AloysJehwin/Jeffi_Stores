@@ -89,12 +89,16 @@ export default function ModelViewer({
   if (errored) {
     return poster ? (
       <img src={poster} alt={alt} className={className} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-    ) : null
+    ) : (
+      <div className={className} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+        Model failed to load
+      </div>
+    )
   }
 
   if (!ready) {
     return (
-      <div className={className} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className={className} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed rgba(255,255,255,0.15)' }}>
         {poster ? (
           <img src={poster} alt={alt} style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.5 }} />
         ) : (
