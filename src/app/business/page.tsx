@@ -64,7 +64,7 @@ export default async function BusinessLandingPage() {
               </div>
 
               <div className="flex md:order-2 justify-center md:justify-end mt-4 md:mt-0">
-                <div className="w-80 sm:w-96 md:w-full max-w-xl lg:max-w-2xl aspect-square">
+                <div className="w-80 sm:w-96 md:w-full max-w-xl lg:max-w-2xl" style={{ height: 'min(70vh, 500px)' }}>
                   <ModelViewer
                     src="/models/business-hero.glb"
                     alt="Tablet with business dashboard"
