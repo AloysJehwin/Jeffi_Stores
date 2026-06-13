@@ -68,7 +68,7 @@ export default async function BusinessLandingPage() {
                   <ModelViewer
                     src="/models/business-hero.glb"
                     alt="Tablet with business dashboard"
-                    autoRotate
+                    autoRotate={false}
                     cameraOrbit="35deg 75deg 105%"
                     exposure={1.1}
                   />
