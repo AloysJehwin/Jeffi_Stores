@@ -8,6 +8,8 @@ import { CartProvider } from '@/contexts/CartContext'
 
 const AUTH_PAGES = ['/business/signin', '/business/signup', '/business/pending']
 const AUTH_PAGES_SUBDOMAIN = ['/signin', '/signup', '/pending']
+const PUBLIC_LANDING_APEX = '/business'
+const PUBLIC_LANDING_SUBDOMAIN = '/'
 
 export default function BusinessLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -20,15 +22,17 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   const pendingPath = isSubdomain ? '/pending' : '/business/pending'
 
   const isAuthPage = AUTH_PAGES.some(p => pathname.startsWith(p)) || AUTH_PAGES_SUBDOMAIN.some(p => pathname.startsWith(p))
+  const isPublicLanding = pathname === PUBLIC_LANDING_APEX || pathname === PUBLIC_LANDING_SUBDOMAIN
+  const isPublic = isAuthPage || isPublicLanding
 
   useEffect(() => {
-    if (isLoading || isAuthPage) return
+    if (isLoading || isPublic) return
     if (!user || !user.isBusiness) { router.replace(signinPath); return }
     if (user.approvalStatus === 'pending') { router.replace(pendingPath); return }
     if (user.approvalStatus === 'rejected') { router.replace(`${signinPath}?rejected=1`); return }
-  }, [user, isLoading, isAuthPage, router, signinPath, pendingPath])
+  }, [user, isLoading, isPublic, router, signinPath, pendingPath])
 
-  if (isAuthPage) return <>{children}</>
+  if (isPublic) return <>{children}</>
 
   if (isLoading || !user?.isBusiness || user.approvalStatus !== 'approved') return null
 
