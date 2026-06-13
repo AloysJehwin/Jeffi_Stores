@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, query } from '@/lib/db'
+import { queryMany, query, queryOne } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 
@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get('filter') || 'pending'
     const q = searchParams.get('q')?.trim() || ''
+    const pageSize = Math.min(parseInt(searchParams.get('pageSize') || '25', 10), 200)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const offset = (page - 1) * pageSize
 
     const conditions: string[] = []
     const params: unknown[] = []
@@ -33,6 +36,16 @@ export async function GET(request: NextRequest) {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
+    const countRow = await queryOne<{ total: string }>(
+      `SELECT COUNT(*)::text AS total
+       FROM product_reviews pr
+       LEFT JOIN users u ON pr.user_id = u.id
+       LEFT JOIN products p ON pr.product_id = p.id
+       ${where}`,
+      params
+    )
+    const total = parseInt(countRow?.total || '0', 10)
+
     const sql = `
       SELECT
         pr.*,
@@ -43,11 +56,12 @@ export async function GET(request: NextRequest) {
       LEFT JOIN products p ON pr.product_id = p.id
       ${where}
       ORDER BY pr.created_at DESC
+      LIMIT $${i} OFFSET $${i + 1}
     `
 
-    const reviews = await queryMany(sql, params)
+    const reviews = await queryMany(sql, [...params, pageSize, offset])
 
-    return NextResponse.json({ reviews: reviews || [] })
+    return NextResponse.json({ reviews: reviews || [], total, page, pageSize })
   } catch {
     return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 })
   }
