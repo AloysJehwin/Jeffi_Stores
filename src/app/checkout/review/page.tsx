@@ -38,11 +38,7 @@ function CheckoutReviewPage() {
   const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(null)
   const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
 
-  const authWasLoading = useRef(false)
   const intentFetched = useRef(false)
-  useEffect(() => {
-    if (authLoading) authWasLoading.current = true
-  }, [authLoading])
 
   const [selectedAddress, setSelectedAddress] = useState<any>(null)
   const [addresses, setAddresses] = useState<any[]>([])
@@ -98,7 +94,7 @@ function CheckoutReviewPage() {
   }, [user])
 
   useEffect(() => {
-    if (!authLoading && !user && authWasLoading.current) {
+    if (!authLoading && !user) {
       const currentUrl = intentToken
         ? `/checkout/review?intent=${encodeURIComponent(intentToken)}`
         : '/checkout/review'

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, Pencil } from 'lucide-react'
 import { ap } from '@/lib/admin-path'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -27,8 +28,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
   const [loading, setLoading] = useState(true)
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState('')
-  const [showConfirm, setShowConfirm] = useState(false)
-  const confirmRef = useRef<HTMLDivElement>(null)
+  const confirm = useConfirm()
 
   useEffect(() => {
     fetch(`/api/admin/quotations/${id}`)
@@ -37,18 +37,14 @@ export default function QuotationDetailClient({ id }: { id: string }) {
       .catch(() => setLoading(false))
   }, [id])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setShowConfirm(false) }
-    function onOutside(e: MouseEvent) {
-      if (confirmRef.current && !confirmRef.current.contains(e.target as Node)) setShowConfirm(false)
-    }
-    document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onOutside)
-    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onOutside) }
-  }, [])
-
   async function finalize() {
-    setShowConfirm(false)
+    const ok = await confirm({
+      title: 'Finalize Quotation?',
+      message: 'This will mark the quotation as Final and send a confirmation email to the customer if an email address is on record. This action cannot be undone.',
+      confirmLabel: 'Yes, Finalize',
+      cancelLabel: 'Cancel',
+    })
+    if (!ok) return
     setFinalizing(true)
     setFinalizeError('')
     try {
@@ -99,31 +95,6 @@ export default function QuotationDetailClient({ id }: { id: string }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      {/* Finalize confirmation modal */}
-      {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div ref={confirmRef} className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default p-6 flex flex-col gap-4 max-w-sm w-full">
-            <h2 className="text-base font-semibold text-foreground">Finalize Quotation?</h2>
-            <p className="text-sm text-foreground-secondary">
-              This will mark the quotation as <span className="font-medium text-foreground">Final</span> and send a confirmation email to the customer if an email address is on record. This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="px-4 py-2 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={finalize}
-                className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
-              >
-                Yes, Finalize
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
         <a href={ap('/admin/quotations')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
@@ -154,7 +125,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           )}
           {q.status === 'draft' && q.from_rfq && (
             <button
-              onClick={() => setShowConfirm(true)}
+              onClick={finalize}
               disabled={finalizing}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-60"
             >

@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
@@ -117,8 +118,8 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const confirm = useConfirm()
   const [isPayingNow, setIsPayingNow] = useState(false)
   const [paymentError, setPaymentError] = useState('')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
@@ -206,7 +207,19 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     return () => clearInterval(interval)
   }, [params.id, order?.paymentMode, order?.paymentStatus, order?.status])
 
-  const handleCancelOrder = async () => {    setIsCancelling(true)
+  const handleCancelOrder = async () => {
+    const isImmediate = order?.status === 'pending' && order?.paymentStatus === 'unpaid'
+    const ok = await confirm({
+      title: isImmediate ? 'Cancel this order?' : 'Request cancellation for this order?',
+      message: isImmediate
+        ? 'This order will be cancelled immediately and stock will be restored. This action cannot be undone.'
+        : 'Your cancellation request will be sent to our team for review. You will be notified once it is approved or rejected.',
+      confirmLabel: isImmediate ? 'Yes, Cancel Order' : 'Yes, Request Cancellation',
+      cancelLabel: 'Keep Order',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setIsCancelling(true)
     try {
       const res = await fetch(`/api/orders/${params.id}/cancel`, {
         method: 'POST',
@@ -218,7 +231,6 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
       if (!res.ok) throw new Error(data.error || 'Failed to cancel order')
       await fetchOrder()
       await refreshCart()
-      setShowCancelConfirm(false)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -364,8 +376,9 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
                   {CANCELLABLE_STATUSES.includes(order.status) && (
                     <button
                       type="button"
-                      onClick={() => setShowCancelConfirm(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500 hover:bg-red-600 text-white shadow-sm transition-colors"
+                      onClick={handleCancelOrder}
+                      disabled={isCancelling}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500 hover:bg-red-600 text-white shadow-sm transition-colors disabled:opacity-50"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -389,48 +402,6 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
                 </div>
               </div>
             </div>
-
-            {/* Cancel Confirm */}
-            {showCancelConfirm && (
-              <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 sm:p-6">
-                {order.status === 'pending' && order.paymentStatus === 'unpaid' ? (
-                  <>
-                    <h3 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">Cancel this order?</h3>
-                    <p className="text-red-800 dark:text-red-300 text-sm mb-4">This order will be cancelled immediately and stock will be restored. This action cannot be undone.</p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">Request cancellation for this order?</h3>
-                    <p className="text-red-800 dark:text-red-300 text-sm mb-4">Your cancellation request will be sent to our team for review. You will be notified once it is approved or rejected.</p>
-                  </>
-                )}
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={handleCancelOrder}
-                    disabled={isCancelling}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium text-sm transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center"
-                  >
-                    {isCancelling ? (
-                      <>
-                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                        {order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Cancelling...' : 'Submitting...'}
-                      </>
-                    ) : (
-                      order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Yes, Cancel Order' : 'Yes, Request Cancellation'
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowCancelConfirm(false)}
-                    disabled={isCancelling}
-                    className="px-4 py-2 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors"
-                  >
-                    Keep Order
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Status banners */}
             {order.status === 'cancel_requested' && (

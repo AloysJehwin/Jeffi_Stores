@@ -232,8 +232,22 @@ export default function RFQDetailClient({ id }: { id: string }) {
     setSendingReply(false)
   }
 
-  // requested_price is incl-GST (stored as typed in the portal)
+  const latestCustomerCounter = [...messages].reverse().find(m => m.sender === 'customer' && m.counter_items?.length)
+  const customerCounterMap: Record<string, number> = {}
+  if (latestCustomerCounter?.counter_items) {
+    for (const ci of latestCustomerCounter.counter_items) {
+      customerCounterMap[ci.rfq_item_id] = ci.offered_price
+    }
+  }
+  // Once an offer is accepted/converted, requested_price holds the agreed price
+  // (stamped server-side from the admin's last counter). Don't override it with
+  // the customer's prior counter in that case.
+  const isFinalState = !!rfq && ['offer_accepted', 'converted'].includes(rfq.status)
+  // requested_price is incl-GST (stored as typed in the portal). Customer's
+  // latest counter (if any) takes precedence over the original requested_price
+  // while the deal is still being negotiated.
   const reqInclGst = (item: RFQItem) => {
+    if (!isFinalState && customerCounterMap[item.id] != null) return Number(customerCounterMap[item.id])
     if (item.requested_price == null) return null
     return Number(item.requested_price)
   }
@@ -249,14 +263,14 @@ export default function RFQDetailClient({ id }: { id: string }) {
     const mrp = resolveItemMrp(i)
     return sum + (mrp != null ? mrp * i.quantity : 0)
   }, 0)
-  // Only count selling/business price for items that actually have a requested price (for discount comparison)
+  // Only count selling/business price for items that actually have a target price (for discount comparison)
   const totalSellingForDiscountedItems = items.reduce((sum, i) => {
-    if (!i.requested_price) return sum
+    if (reqInclGst(i) == null) return sum
     const p = resolveItemSellingPrice(i) ?? resolveItemMrp(i)
     return sum + (p != null ? p * i.quantity : 0)
   }, 0)
   const totalBusinessPriceForRequestedItems = items.reduce((sum, i) => {
-    if (!i.requested_price) return sum
+    if (reqInclGst(i) == null) return sum
     const sell = resolveItemSellingPrice(i)
     if (sell == null) return sum
     const catId = i.product_category_id
@@ -881,7 +895,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                         </div>
                       </div>
                       {/* Counter items card */}
-                      {isAdmin && msg.counter_items && msg.counter_items.length > 0 && (
+                      {msg.counter_items && msg.counter_items.length > 0 && (
                         <div className="mr-8 bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 space-y-1 w-full max-w-[85%]">
                           <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Counter Prices</p>
                           {msg.counter_items.map(ci => {
@@ -955,7 +969,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                placeholder={item.requested_price != null ? String(item.requested_price) : '—'}
+                                placeholder={reqInclGst(item) != null ? String(reqInclGst(item)) : '—'}
                                 value={counterInputs[item.id] ?? ''}
                                 onChange={e => setCounterInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
                                 className="w-full pl-6 pr-2 py-1.5 text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
@@ -978,6 +992,31 @@ export default function RFQDetailClient({ id }: { id: string }) {
                 ) : (
                   /* Full composer for negotiating state */
                   <div className="border-t border-border-default p-4 space-y-3">
+                    <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide">Quick Replies</p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {[
+                        'Thanks for the counter. We\'re reviewing it and will respond shortly.',
+                        'We\'ve adjusted our pricing — please review the latest counter offer.',
+                        'That\'s the best price we can offer for this quantity.',
+                        'Could you increase the quantity? It will help us offer a better price.',
+                        'We can match this price. Shall we proceed to a final quotation?',
+                      ].map(preset => (
+                        <button
+                          key={preset}
+                          type="button"
+                          disabled={sendingReply}
+                          onClick={() => setReplyText(prev => prev === preset ? '' : preset)}
+                          className={`w-full text-left px-3 py-2.5 text-xs rounded-xl border transition-colors ${
+                            replyText === preset
+                              ? 'bg-accent-500/15 border-accent-500/50 text-foreground font-medium'
+                              : 'bg-surface border-border-default text-foreground-secondary hover:bg-surface-elevated hover:text-foreground hover:border-accent-500/30'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+
                     <textarea
                       value={replyText}
                       onChange={e => setReplyText(e.target.value)}
@@ -1010,7 +1049,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                placeholder={item.requested_price != null ? String(item.requested_price) : '—'}
+                                placeholder={reqInclGst(item) != null ? String(reqInclGst(item)) : '—'}
                                 value={counterInputs[item.id] ?? ''}
                                 onChange={e => setCounterInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
                                 className="w-full pl-6 pr-2 py-1.5 text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"

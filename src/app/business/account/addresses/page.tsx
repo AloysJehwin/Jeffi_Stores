@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import Link from 'next/link'
@@ -40,7 +41,8 @@ const emptyForm = {
 
 export default function AddressesPage() {
   const { user, isLoading } = useAuth()
-  const { showToast, showConfirm } = useToast()
+  const { showToast } = useToast()
+  const confirm = useConfirm()
   const router = useRouter()
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loading, setLoading] = useState(true)
@@ -165,27 +167,26 @@ export default function AddressesPage() {
   }
 
   const handleDelete = async (addressId: string) => {
-    showConfirm({
+    const ok = await confirm({
       title: 'Delete Address',
       message: 'Are you sure you want to delete this address? This action cannot be undone.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      type: 'danger',
-      onConfirm: async () => {
-        try {
-          const response = await fetch(`/api/user/addresses/${addressId}`, { method: 'DELETE', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
-          if (response.ok) {
-            await fetchAddresses()
-            showToast('Address deleted successfully', 'success')
-          } else {
-            const data = await response.json()
-            showToast(data.error || 'Failed to delete address', 'error')
-          }
-        } catch {
-          showToast('Failed to delete address', 'error')
-        }
-      },
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
     })
+    if (!ok) return
+    try {
+      const response = await fetch(`/api/user/addresses/${addressId}`, { method: 'DELETE', credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
+      if (response.ok) {
+        await fetchAddresses()
+        showToast('Address deleted successfully', 'success')
+      } else {
+        const data = await response.json()
+        showToast(data.error || 'Failed to delete address', 'error')
+      }
+    } catch {
+      showToast('Failed to delete address', 'error')
+    }
   }
 
   const pinLookupDone = pinLookupState === 'found'

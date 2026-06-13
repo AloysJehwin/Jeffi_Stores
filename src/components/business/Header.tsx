@@ -61,8 +61,8 @@ export default function BusinessHeader() {
               <div className="flex items-center gap-2 sm:gap-3">
                 <img src="/images/logo.png" alt="Jeffi Stores Logo" className="h-8 sm:h-10 lg:h-12 w-auto" />
                 <div>
-                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400">Jeffi Stores</div>
-                  <div className="hidden sm:block text-xs text-accent-500 font-semibold">Business</div>
+                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 leading-tight">Jeffi Stores</div>
+                  <div className="text-[10px] sm:text-xs text-accent-500 font-semibold leading-tight">Business</div>
                 </div>
               </div>
             </Link>
@@ -89,7 +89,7 @@ export default function BusinessHeader() {
 
             {/* Right Actions */}
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              <SearchBar isOpen={searchOpen} onOpen={() => setSearchOpen(true)} onClose={() => setSearchOpen(false)} basePath="/business/products" />
+              <SearchBar isOpen={searchOpen} onOpen={() => setSearchOpen(true)} onClose={() => setSearchOpen(false)} basePath={bp('/business/products')} />
 
               {/* Cart */}
               <Link href={bp('/business/cart')} className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group">

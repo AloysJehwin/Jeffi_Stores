@@ -609,7 +609,15 @@ function POTab({ initialPO }: { initialPO?: string }) {
                 )}
                 {sortedPOs.map(po => (
                   <tr key={po.id} className="hover:bg-surface-secondary/50 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-foreground-secondary font-medium">{po.po_number}</td>
+                    <td className="px-4 py-3 font-mono text-xs font-medium">
+                      <button
+                        type="button"
+                        onClick={() => openPO(po.id)}
+                        className="text-accent-500 hover:underline cursor-pointer font-mono"
+                      >
+                        {po.po_number}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 font-medium text-foreground">
                       <Link href={ap(`/admin/suppliers/${po.supplier_id}`)} className="hover:text-accent-500 hover:underline">{po.supplier_name}</Link>
                     </td>

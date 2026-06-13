@@ -4,6 +4,7 @@ import { queryOne, query } from '@/lib/db'
 import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
+import { cookieDomainOption } from '@/lib/cookie-domain'
 
 if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       sameSite: 'strict' as const,
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
-      ...(process.env.NODE_ENV === 'production' ? { domain: '.jeffistores.in' } : {}),
+      ...cookieDomainOption(),
     }
     cookieStore.set('business_auth_token', token, cookieOpts)
     cookieStore.set('session_id', newUser.id, cookieOpts)

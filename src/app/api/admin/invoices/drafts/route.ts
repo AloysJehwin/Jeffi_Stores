@@ -13,9 +13,44 @@ export async function GET(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const rows = await queryMany(
-      `SELECT o.id, o.order_number, o.customer_name, o.customer_phone, o.total_amount, o.source, o.created_at, o.updated_at
+    // For each draft, count how many of its line items are short on stock.
+    // A line is "short" when the chosen sub_variant / variant / product has
+    // less inventory than the requested qty. Each line-item is checked at the
+    // most specific level it targets (sub_variant > variant > product).
+    const rows = await queryMany<any>(
+      `WITH item_stock AS (
+         SELECT
+           oi.order_id,
+           oi.quantity::numeric                                    AS req_qty,
+           COALESCE(
+             psv.inventory_quantity,
+             pv.inventory_quantity,
+             p.inventory_quantity,
+             0
+           )::numeric                                              AS avail_qty,
+           oi.product_id IS NOT NULL                               AS tracked
+         FROM order_items oi
+         LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
+         LEFT JOIN product_variants     pv  ON pv.id  = oi.variant_id
+         LEFT JOIN products             p   ON p.id   = oi.product_id
+       ),
+       draft_stock AS (
+         SELECT
+           order_id,
+           COUNT(*) FILTER (WHERE tracked)                         AS total_tracked_items,
+           COUNT(*) FILTER (WHERE tracked AND avail_qty < req_qty) AS short_items,
+           COUNT(*) FILTER (WHERE tracked AND avail_qty <= 0)      AS out_of_stock_items
+         FROM item_stock
+         GROUP BY order_id
+       )
+       SELECT
+         o.id, o.order_number, o.customer_name, o.customer_phone,
+         o.total_amount, o.source, o.created_at, o.updated_at,
+         COALESCE(ds.total_tracked_items, 0)::int  AS total_items,
+         COALESCE(ds.short_items, 0)::int          AS short_items,
+         COALESCE(ds.out_of_stock_items, 0)::int   AS out_of_stock_items
        FROM orders o
+       LEFT JOIN draft_stock ds ON ds.order_id = o.id
        WHERE o.status = 'draft' AND o.source != 'cash_sale'
        ORDER BY o.updated_at DESC
        LIMIT 100`

@@ -2,32 +2,32 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 export default function DeleteCampaignButton({ id, title }: { id: string; title: string }) {
-  const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const confirm = useConfirm()
 
   async function handleDelete() {
+    const ok = await confirm({
+      title: 'Delete Campaign',
+      message: `Delete campaign "${title}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
+
     setLoading(true)
     await fetch(`/api/admin/mailer/${id}`, { method: 'DELETE' })
     router.refresh()
-  }
-
-  if (confirming) {
-    return (
-      <span className="flex items-center gap-1.5 text-xs">
-        <button type="button" onClick={handleDelete} disabled={loading} className="text-red-600 hover:underline font-medium disabled:opacity-50">
-          {loading ? 'Deleting…' : 'Confirm'}
-        </button>
-        <button type="button" onClick={() => setConfirming(false)} className="text-foreground-muted hover:underline">Cancel</button>
-      </span>
-    )
+    setLoading(false)
   }
 
   return (
-    <button type="button" onClick={() => setConfirming(true)} className="text-red-500 hover:underline text-sm">
-      Delete
+    <button type="button" onClick={handleDelete} disabled={loading} className="text-red-500 hover:underline text-sm disabled:opacity-50">
+      {loading ? 'Deleting…' : 'Delete'}
     </button>
   )
 }

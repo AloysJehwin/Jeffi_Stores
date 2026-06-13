@@ -182,9 +182,37 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     }
   }
 
+  function mergeOrReplaceItem(targetItemId: string, populated: LineItem): LineItem[] {
+    if (!populated.product_id) {
+      return items.map(it => it.id === targetItemId ? populated : it)
+    }
+    const dupIdx = items.findIndex(it =>
+      it.id !== targetItemId &&
+      it.product_id === populated.product_id &&
+      (it.variant_id || null) === (populated.variant_id || null) &&
+      (it.sub_variant_id || null) === (populated.sub_variant_id || null)
+    )
+    if (dupIdx === -1) {
+      return items.map(it => it.id === targetItemId ? populated : it)
+    }
+    const addQty = Number(populated.quantity) || 1
+    return items
+      .map((it, i) => {
+        if (i === dupIdx) {
+          const existing = Number(it.quantity) || 0
+          return { ...it, quantity: String(existing + addQty) }
+        }
+        return it
+      })
+      .filter(it => it.id !== targetItemId)
+  }
+
   function applyPickerProduct(s: Suggestion) {
     if (!pickerItemId) return
-    onChange(items.map(it => it.id !== pickerItemId ? it : buildLineItemFromSuggestion(it, s)))
+    const target = items.find(it => it.id === pickerItemId)
+    if (!target) return
+    const populated = buildLineItemFromSuggestion(target, s)
+    onChange(mergeOrReplaceItem(pickerItemId, populated))
     setPickerOpen(false)
     setPickerItemId(null)
   }
@@ -297,8 +325,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                         onChange={v => setNameInputs(p => ({ ...p, [item.id]: v }))}
                         onSelect={s => {
                           const d = decodeLineItemId(s.id)
-                          onChange(items.map(it => it.id !== item.id ? it : {
-                            ...it,
+                          const populated: LineItem = {
+                            ...item,
                             product_id: d.product_id,
                             product_name: s.label,
                             product_sku: s.sublabel?.split(' · ')[0] ?? '',
@@ -311,7 +339,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                             discount_pct: d.discount_pct,
                             mrp: d.mrp,
                             inventory_quantity: d.inventory_quantity,
-                          }))
+                          }
+                          onChange(mergeOrReplaceItem(item.id, populated))
                         }}
                         inputClassName={inputCls}
                         placeholder="Search by product name..."
@@ -326,8 +355,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                         onSelect={s => {
                           const d = decodeLineItemId(s.id)
                           const sku = s.sublabel?.split(' · ')[0] ?? ''
-                          onChange(items.map(it => it.id !== item.id ? it : {
-                            ...it,
+                          const populated: LineItem = {
+                            ...item,
                             product_id: d.product_id,
                             product_name: s.label,
                             product_sku: sku,
@@ -340,7 +369,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                             discount_pct: d.discount_pct,
                             mrp: d.mrp,
                             inventory_quantity: d.inventory_quantity,
-                          }))
+                          }
+                          onChange(mergeOrReplaceItem(item.id, populated))
                         }}
                         inputClassName={inputCls + ' font-mono'}
                         placeholder="e.g. JFS-1234"
@@ -441,6 +471,19 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
           )
         })}
       </div>
+
+      {items.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onChange([...items, newLineItem()])}
+          className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Item
+        </button>
+      )}
 
       <div className="flex justify-end border-t border-border-default pt-3 mt-1">
         <div className="text-right space-y-1 min-w-[220px]">

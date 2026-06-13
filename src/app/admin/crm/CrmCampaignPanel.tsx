@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/admin-path'
 
 interface CampaignForm {
@@ -46,7 +47,8 @@ interface Props {
 
 export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose }: Props) {
   const router = useRouter()
-  const { showToast, showConfirm } = useToast()
+  const { showToast } = useToast()
+  const confirm = useConfirm()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [selectedKind, setSelectedKind] = useState(defaultKind)
   const [form, setForm] = useState<CampaignForm | null>(null)
@@ -85,11 +87,10 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
 
   async function saveAndRun() {
     if (!form) return
-    const ok = await showConfirm({
+    const ok = await confirm({
       title: 'Save & Send Campaign',
       message: `Save settings and send campaign to ${recipientCount} customers?`,
-      confirmText: 'Send',
-      type: 'info',
+      confirmLabel: 'Send',
     })
     if (!ok) return
     setSaving(true)

@@ -140,7 +140,12 @@ export default function MyQuotesPage() {
                     {/* Top row: RFQ number + status + amount */}
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="min-w-0">
-                        <span className="font-semibold text-foreground font-mono text-sm break-all">{rfq.rfq_number}</span>
+                        <Link
+                          href={bp(`/business/quotes/${rfq.id}`)}
+                          className="font-semibold text-foreground hover:text-accent-500 hover:underline transition-colors font-mono text-sm break-all"
+                        >
+                          {rfq.rfq_number}
+                        </Link>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || STATUS_STYLES.pending}`}>
                             {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}

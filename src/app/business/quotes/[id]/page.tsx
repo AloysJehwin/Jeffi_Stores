@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { bp } from '@/lib/business-path'
 import { applyDiscount } from '@/lib/pricing'
@@ -118,7 +119,12 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
   const [respondingAction, setRespondingAction] = useState<'accept' | 'decline' | null>(null)
   const [counterReplyText, setCounterReplyText] = useState('')
   const [showCounterInput, setShowCounterInput] = useState(false)
+  const [counterPrices, setCounterPrices] = useState<Record<string, string>>({})
+  const [resubmitting, setResubmitting] = useState(false)
+  const [resubmitNotes, setResubmitNotes] = useState('')
+  const [resubmitError, setResubmitError] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   const load = () => {
     setLoading(true)
@@ -225,21 +231,55 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     setMsgError('')
     try {
       const message = action === 'decline' ? counterReplyText.trim() || undefined : undefined
+      const counter_items = action === 'decline'
+        ? Object.entries(counterPrices)
+            .map(([rfq_item_id, raw]) => ({ rfq_item_id, offered_price: Number(raw) }))
+            .filter(c => Number.isFinite(c.offered_price) && c.offered_price >= 0)
+        : undefined
+      const payload: { action: string; message?: string; counter_items?: typeof counter_items } = { action, message }
+      if (counter_items && counter_items.length > 0) payload.counter_items = counter_items
       const res = await fetch(`/api/business/rfqs/${params.id}/respond`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, message }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) { setMsgError(data.error || 'Failed to respond'); return }
       setShowCounterInput(false)
       setCounterReplyText('')
+      setCounterPrices({})
       load()
     } catch {
       setMsgError('Network error')
     } finally {
       setRespondingAction(null)
+    }
+  }
+
+  const handleResubmit = async () => {
+    setResubmitError('')
+    setResubmitting(true)
+    try {
+      const res = await fetch(`/api/business/rfqs/${params.id}/resubmit`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: resubmitNotes.trim() || undefined }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setResubmitError(data?.error || 'Failed to resubmit')
+        return
+      }
+      const newId = data?.rfq?.id
+      if (newId) {
+        router.push(bp(`/business/quotes/${newId}`))
+      }
+    } catch (e: any) {
+      setResubmitError(e?.message || 'Network error')
+    } finally {
+      setResubmitting(false)
     }
   }
 
@@ -257,9 +297,24 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
 
   const canEdit = EDITABLE_STATUSES.includes(rfq.status)
   const canMessage = !['converted', 'rejected', 'offer_accepted'].includes(rfq.status)
-  const totalRequested = items.reduce((sum, i) => sum + (i.requested_price ? Number(i.requested_price) * i.quantity : 0), 0)
-
   const latestCounter = [...messages].reverse().find(m => m.sender === 'admin' && m.counter_items?.length)
+  const latestCustomerCounter = [...messages].reverse().find(m => m.sender === 'customer' && m.counter_items?.length)
+  const customerCounterMap: Record<string, number> = {}
+  if (latestCustomerCounter?.counter_items) {
+    for (const ci of latestCustomerCounter.counter_items) {
+      customerCounterMap[ci.rfq_item_id] = ci.offered_price
+    }
+  }
+  const isFinalState = ['offer_accepted', 'converted'].includes(rfq.status)
+  const targetFor = (item: RFQItem): number | null => {
+    if (!isFinalState && customerCounterMap[item.id] != null) return customerCounterMap[item.id]
+    if (item.requested_price != null) return Number(item.requested_price)
+    return null
+  }
+  const totalRequested = items.reduce((sum, i) => {
+    const t = targetFor(i)
+    return sum + (t != null ? t * i.quantity : 0)
+  }, 0)
   const counterMap: Record<string, number> = {}
   if (latestCounter?.counter_items) {
     for (const ci of latestCounter.counter_items) {
@@ -314,10 +369,29 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
             </div>
           )}
 
-          {rfq.admin_note && (
-            <div className={`mt-4 rounded-lg p-3 text-sm ${rfq.status === 'rejected' ? 'bg-red-900/30 border border-red-800 text-red-300' : 'bg-blue-900/30 border border-blue-800 text-blue-300'}`}>
-              <p className="font-semibold mb-1">{rfq.status === 'rejected' ? 'Reason for rejection:' : 'Note from our team:'}</p>
-              <p className="font-normal">{rfq.admin_note}</p>
+          {rfq.status === 'rejected' && (
+            <div className="mt-4 rounded-lg border border-amber-800 bg-amber-900/20 p-4 text-sm">
+              <p className="font-semibold text-amber-200 mb-1">Need to revise and try again?</p>
+              <p className="text-amber-300/90 mb-3">
+                You can submit a new quote request with the same items. Our team will review it as a fresh ticket.
+              </p>
+              <textarea
+                value={resubmitNotes}
+                onChange={e => setResubmitNotes(e.target.value)}
+                rows={2}
+                placeholder="Optional: any updated context or reason for the resubmission..."
+                className="w-full px-3 py-2 rounded-lg border border-amber-700 bg-amber-950/40 text-amber-100 placeholder:text-amber-400/70 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mb-3"
+              />
+              {resubmitError && (
+                <p className="text-xs text-red-300 mb-2">{resubmitError}</p>
+              )}
+              <button
+                onClick={handleResubmit}
+                disabled={resubmitting}
+                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-900 text-sm font-semibold transition-colors disabled:opacity-60"
+              >
+                {resubmitting ? 'Submitting…' : 'Request New Quote'}
+              </button>
             </div>
           )}
         </div>
@@ -369,9 +443,11 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                       : offered != null ? Number(offered) : null
                     const offeredDiscountSource = item.quoted_rate != null ? item.quoted_discount_pct : null
 
+                    // resolved customer target — uses latest customer counter offer if present, else original requested_price
+                    const targetPrice = targetFor(item)
                     // requested discount % vs our business price
-                    const reqDiscountPct = item.requested_price != null && shownCatalogPrice && shownCatalogPrice > 0
-                      ? Math.round((1 - Number(item.requested_price) / Number(shownCatalogPrice)) * 100)
+                    const reqDiscountPct = targetPrice != null && shownCatalogPrice && shownCatalogPrice > 0
+                      ? Math.round((1 - Number(targetPrice) / Number(shownCatalogPrice)) * 100)
                       : null
                     // offered discount % vs our business price
                     const offeredDiscountPct = offeredDiscountSource != null
@@ -464,12 +540,12 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                           )}
 
                           {/* Your Target */}
-                          <div className={`rounded-xl px-3 py-2.5 ${item.requested_price != null ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-surface-secondary'}`}>
+                          <div className={`rounded-xl px-3 py-2.5 ${targetPrice != null ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-surface-secondary'}`}>
                             <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Your Target</p>
-                            {item.requested_price != null ? (
+                            {targetPrice != null ? (
                               <>
                                 <p className="text-sm font-bold text-amber-700 dark:text-amber-400 leading-none">
-                                  ₹{Number(item.requested_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{Number(targetPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </p>
                                 {reqDiscountPct != null && reqDiscountPct > 0 && (
                                   <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-500 mt-1">
@@ -513,9 +589,9 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                             ) : (
                               <p className="text-sm text-foreground-muted leading-none">—</p>
                             )}
-                            {item.requested_price != null && (
+                            {targetPrice != null && (
                               <p className="text-[10px] text-foreground-muted mt-1">
-                                Target: ₹{(Number(item.requested_price) * item.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                Target: ₹{(Number(targetPrice) * item.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                               </p>
                             )}
                           </div>
@@ -606,7 +682,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                               <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
                             </div>
 
-                            {isAdmin && msg.counter_items && msg.counter_items.length > 0 && (
+                            {msg.counter_items && msg.counter_items.length > 0 && (
                               <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-3 space-y-1.5 w-full">
                                 <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">Offered Prices</p>
                                 {msg.counter_items.map(ci => {
@@ -716,7 +792,14 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                               Accept Offer
                             </button>
                             <button
-                              onClick={() => setShowCounterInput(true)}
+                              onClick={() => {
+                                const seed: Record<string, string> = {}
+                                for (const ci of latestCounter.counter_items || []) {
+                                  seed[ci.rfq_item_id] = String(ci.offered_price)
+                                }
+                                setCounterPrices(seed)
+                                setShowCounterInput(true)
+                              }}
                               disabled={respondingAction != null}
                               className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 border border-border-secondary text-foreground-secondary hover:bg-surface-secondary text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
                             >
@@ -727,7 +810,32 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                             </button>
                           </div>
                         ) : (
-                          <div className="space-y-2 pt-1">
+                          <div className="space-y-3 pt-1">
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Your counter prices</p>
+                              {(latestCounter.counter_items || []).map(ci => {
+                                const item = items.find(it => it.id === ci.rfq_item_id)
+                                return (
+                                  <div key={ci.rfq_item_id} className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-800 rounded-lg px-3 py-2 border border-border-secondary">
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-xs text-foreground-secondary truncate block">{item?.description || 'Item'}</span>
+                                      <span className="text-[10px] text-foreground-muted">Admin offered ₹{Number(ci.offered_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <span className="text-xs text-foreground-secondary">₹</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        value={counterPrices[ci.rfq_item_id] ?? ''}
+                                        onChange={e => setCounterPrices(p => ({ ...p, [ci.rfq_item_id]: e.target.value }))}
+                                        className="w-24 px-2 py-1 border border-border-secondary rounded-md bg-surface text-foreground text-sm text-right focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                                      />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
                             <textarea
                               rows={2}
                               autoFocus
@@ -745,10 +853,10 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                                 {respondingAction === 'decline' ? (
                                   <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                 ) : null}
-                                Send Reply
+                                Send Counter Offer
                               </button>
                               <button
-                                onClick={() => { setShowCounterInput(false); setCounterReplyText('') }}
+                                onClick={() => { setShowCounterInput(false); setCounterReplyText(''); setCounterPrices({}) }}
                                 disabled={respondingAction != null}
                                 className="px-3 py-2 border border-border-secondary text-foreground-secondary hover:bg-surface-secondary text-sm rounded-lg transition-colors"
                               >

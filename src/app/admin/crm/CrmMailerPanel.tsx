@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Mail, Tag, Package, X, ChevronDown, Wand2 } from 'lucide-react'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Coupon {
   id: string
@@ -110,7 +111,8 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number } | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
 
-  const { showToast, showConfirm } = useToast()
+  const { showToast } = useToast()
+  const confirm = useConfirm()
 
   const quickTemplates = QUICK_TEMPLATES[segmentKey] || DEFAULT_TEMPLATES
 
@@ -191,11 +193,10 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
       return
     }
     setSendError(null)
-    const ok = await showConfirm({
+    const ok = await confirm({
       title: 'Send Mailer',
       message: `Send mailer to ${recipientCount} ${segmentLabel} customers?`,
-      confirmText: 'Send',
-      type: 'info',
+      confirmLabel: 'Send',
     })
     if (!ok) return
     setSending(true)
