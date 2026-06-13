@@ -130,29 +130,53 @@ export default function BusinessPublicHeader({ authState = 'guest' }: { authStat
       {mobileOpen && (
         <>
           <div
-            className="lg:hidden fixed inset-0 top-14 sm:top-16 bg-black/40 z-40"
+            className="lg:hidden fixed inset-0 z-50 bg-black/50 transition-opacity duration-300"
             onClick={() => setMobileOpen(false)}
             aria-hidden="true"
           />
-          <div className="lg:hidden absolute left-0 right-0 top-full bg-surface-elevated border-b border-border-default shadow-lg z-50">
-            <div className="container mx-auto px-3 sm:px-4 py-4 space-y-1">
-              <a onClick={() => setMobileOpen(false)} href="#advantages" className="block px-3 py-3 text-base text-foreground hover:bg-surface-secondary rounded-lg transition-colors">
+          <div className="lg:hidden fixed top-0 left-0 bottom-0 z-50 w-4/5 max-w-xs bg-surface-elevated shadow-xl flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out translate-x-0">
+            <div className="flex items-center justify-between p-4 border-b border-border-default">
+              <Link href={bp('/business')} className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
+                <img src="/images/logo.png" alt="Jeffi Stores Logo" className="h-10 w-auto" />
+                <div>
+                  <div className="font-bold text-secondary-500 dark:text-primary-400 leading-tight">Jeffi Stores</div>
+                  <div className="text-xs text-accent-500 font-semibold leading-tight">Business</div>
+                </div>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="p-2 text-foreground-muted hover:text-foreground rounded-lg"
+                aria-label="Close menu"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <nav className="flex flex-col p-4 gap-1">
+              <a onClick={() => setMobileOpen(false)} href="#advantages" className="px-4 py-3 rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
                 Why Business
               </a>
-              <a onClick={() => setMobileOpen(false)} href="#how-it-works" className="block px-3 py-3 text-base text-foreground hover:bg-surface-secondary rounded-lg transition-colors">
+              <a onClick={() => setMobileOpen(false)} href="#how-it-works" className="px-4 py-3 rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
                 How it Works
               </a>
-              <a onClick={() => setMobileOpen(false)} href="#faq" className="block px-3 py-3 text-base text-foreground hover:bg-surface-secondary rounded-lg transition-colors">
+              <a onClick={() => setMobileOpen(false)} href="#faq" className="px-4 py-3 rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
                 FAQ
               </a>
+            </nav>
 
-              <div className="pt-3 mt-2 border-t border-border-default flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Theme</span>
+            <div className="border-t border-border-default mx-4" />
+
+            <div className="p-4">
+              {renderMobileCtas()}
+            </div>
+
+            <div className="mt-auto p-4 border-t border-border-default">
+              <div className="flex items-center justify-between px-4">
+                <span className="text-sm text-foreground-muted">Theme</span>
                 <ThemeToggle />
-              </div>
-
-              <div className="pt-3">
-                {renderMobileCtas()}
               </div>
             </div>
           </div>
