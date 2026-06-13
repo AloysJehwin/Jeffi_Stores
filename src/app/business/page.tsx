@@ -3,6 +3,7 @@ import { cookies, headers } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { bp } from '@/lib/business-path'
 import BusinessPublicHeader from '@/components/business/PublicHeader'
+import ModelViewer from '@/components/ModelViewer'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,12 +64,15 @@ export default async function BusinessLandingPage() {
               </div>
 
               <div className="flex md:order-2 justify-center md:justify-end mt-4 md:mt-0">
-                <img
-                  src="/images/business-hero.png"
-                  alt="B2B procurement dashboard"
-                  className="w-80 sm:w-96 md:w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
-                  style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
-                />
+                <div className="w-80 sm:w-96 md:w-full max-w-xl lg:max-w-2xl aspect-square">
+                  <ModelViewer
+                    src="/models/business-hero.glb"
+                    alt="Tablet with business dashboard"
+                    autoRotate
+                    cameraOrbit="35deg 75deg 105%"
+                    exposure={1.1}
+                  />
+                </div>
               </div>
             </div>
           </div>
