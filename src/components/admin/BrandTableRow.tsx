@@ -104,9 +104,13 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
         <td className="px-6 py-4 whitespace-nowrap">
           <HoverCard
             trigger={
-              <span className="text-sm font-semibold text-foreground cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-500 transition-colors" onClick={e => e.stopPropagation()}>
+              <Link
+                href={ap(`/admin/brands/edit/${brand.id}`)}
+                className="text-sm font-semibold text-foreground hover:text-accent-500 transition-colors"
+                onClick={e => e.stopPropagation()}
+              >
                 {brand.name}
-              </span>
+              </Link>
             }
             align="left"
             side="bottom"

@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { CheckCircle, XCircle, Loader2, Sparkles, Play, ChevronDown, ChevronUp } from 'lucide-react'
+import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { ap } from '@/lib/admin-path'
 
 interface Item {
   id: string
@@ -47,6 +49,8 @@ function TagList({ tags, max = 4, className = '' }: { tags: string[] | null; max
 export default function CatalogEnrichmentPage() {
   const { showToast } = useToast()
   const [items, setItems] = useState<Item[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -55,14 +59,19 @@ export default function CatalogEnrichmentPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  const load = useCallback(async () => {
+  const PAGE_SIZE = 25
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  const load = useCallback(async (p = 1) => {
     setLoading(true)
     setSelected(new Set())
     try {
-      const res = await fetch(`/api/admin/catalog-enrichment?status=${statusFilter}&limit=200`, { credentials: 'include' })
+      const res = await fetch(`/api/admin/catalog-enrichment?status=${statusFilter}&page=${p}&pageSize=${PAGE_SIZE}`, { credentials: 'include' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Load failed')
       setItems(data.items || [])
+      setTotal(data.total || 0)
+      setPage(p)
     } catch (err: any) {
       showToast(err?.message || 'Load failed', 'error')
     } finally {
@@ -70,7 +79,7 @@ export default function CatalogEnrichmentPage() {
     }
   }, [statusFilter])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(1) }, [load])
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -122,7 +131,7 @@ export default function CatalogEnrichmentPage() {
       showToast(decision === 'approve'
         ? (data.reEmbedded ? 'Approved + re-embedded' : 'Approved')
         : 'Rejected', 'success')
-      setItems(prev => prev.filter(i => i.id !== id))
+      load(page)
       setSelected(prev => { const n = new Set(prev); n.delete(id); return n })
     } catch (err: any) {
       showToast(err?.message || 'Action failed', 'error')
@@ -144,7 +153,7 @@ export default function CatalogEnrichmentPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Bulk action failed')
       showToast(`${action === 'approve' ? 'Approved' : 'Rejected'} ${data.processed} items`, 'success')
-      setItems(prev => prev.filter(i => !selected.has(i.id)))
+      load(page)
       setSelected(new Set())
     } catch (err: any) {
       showToast(err?.message || 'Bulk action failed', 'error')
@@ -263,7 +272,12 @@ export default function CatalogEnrichmentPage() {
                         </td>
                       )}
                       <td className="px-4 py-3">
-                        <p className="text-sm font-medium text-foreground">{item.product_name}</p>
+                        <Link
+                          href={ap(`/admin/products/${item.product_id}`)}
+                          className="text-sm font-medium text-foreground hover:text-accent-500 transition-colors"
+                        >
+                          {item.product_name}
+                        </Link>
                         {item.ai_product_type && (
                           <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mt-0.5">{item.ai_product_type}</p>
                         )}
@@ -378,8 +392,22 @@ export default function CatalogEnrichmentPage() {
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-3 border-t border-border-default text-xs text-foreground-muted">
-            {items.length} item{items.length !== 1 ? 's' : ''}{selected.size > 0 ? ` · ${selected.size} selected` : ''}
+          <div className="px-4 py-3 border-t border-border-default flex items-center justify-between gap-2">
+            <div className="text-xs text-foreground-muted">
+              {total > 0 && (
+                <>Showing <span className="font-medium text-foreground">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}</span> of <span className="font-medium text-foreground">{total}</span></>
+              )}
+              {selected.size > 0 ? ` · ${selected.size} selected` : ''}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button disabled={page <= 1} onClick={() => load(page - 1)}
+                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
+                <span className="text-xs text-foreground-muted whitespace-nowrap">Page {page} of {totalPages}</span>
+                <button disabled={page >= totalPages} onClick={() => load(page + 1)}
+                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+              </div>
+            )}
           </div>
         </div>
       )}

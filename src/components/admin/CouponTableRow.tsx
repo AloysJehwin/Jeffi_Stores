@@ -116,9 +116,13 @@ export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
           <div className="flex flex-col gap-1">
             <HoverCard
               trigger={
-                <span className="text-accent-500 cursor-default underline decoration-dotted underline-offset-2 hover:text-accent-600 transition-colors" onClick={e => e.stopPropagation()}>
+                <Link
+                  href={ap(`/admin/coupons/edit/${c.id}`)}
+                  className="text-accent-500 hover:text-accent-600 hover:underline transition-colors"
+                  onClick={e => e.stopPropagation()}
+                >
                   {c.code}
-                </span>
+                </Link>
               }
               align="left"
               side="bottom"

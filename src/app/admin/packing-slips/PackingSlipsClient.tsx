@@ -353,8 +353,13 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                         className="rounded border-border-default"
                       />
                     </td>
-                    <td className="px-4 py-3 font-mono text-foreground font-medium">
-                      #{order.order_number}
+                    <td className="px-4 py-3 font-mono">
+                      <a
+                        href={ap(`/admin/orders/${order.id}`)}
+                        className="text-foreground font-medium hover:text-accent-500 hover:underline transition-colors"
+                      >
+                        #{order.order_number}
+                      </a>
                     </td>
                     <td className="px-4 py-3 text-foreground">{order.customer_name || '—'}</td>
                     <td className="px-4 py-3 text-foreground-secondary">
