@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface DeleteCategoryButtonProps {
   categoryId: string
@@ -12,11 +13,20 @@ interface DeleteCategoryButtonProps {
 
 export default function DeleteCategoryButton({ categoryId, categoryName, onDeleted }: DeleteCategoryButtonProps) {
   const [isDeleting, setIsDeleting] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const router = useRouter()
 
   async function handleDelete() {
+    const ok = await confirm({
+      title: 'Delete Category',
+      message: `Delete "${categoryName}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
+
     setIsDeleting(true)
 
     try {
@@ -32,7 +42,6 @@ export default function DeleteCategoryButton({ categoryId, categoryName, onDelet
       showToast(`"${categoryName}" deleted successfully.`, 'success')
       onDeleted?.()
       router.refresh()
-      setShowConfirm(false)
     } catch (error: any) {
       showToast(error.message || 'Failed to delete category. Please try again.', 'error')
     } finally {
@@ -40,33 +49,13 @@ export default function DeleteCategoryButton({ categoryId, categoryName, onDelet
     }
   }
 
-  if (showConfirm) {
-    return (
-      <div className="inline-flex items-center gap-2">
-        <button
-          onClick={handleDelete}
-          disabled={isDeleting}
-          className="text-red-600 hover:text-red-900 font-semibold disabled:opacity-50"
-        >
-          {isDeleting ? 'Deleting...' : 'Confirm'}
-        </button>
-        <button
-          onClick={() => setShowConfirm(false)}
-          disabled={isDeleting}
-          className="text-foreground-secondary hover:text-foreground"
-        >
-          Cancel
-        </button>
-      </div>
-    )
-  }
-
   return (
     <button
-      onClick={() => setShowConfirm(true)}
-      className="text-red-600 hover:text-red-900"
+      onClick={handleDelete}
+      disabled={isDeleting}
+      className="text-red-600 hover:text-red-900 disabled:opacity-50"
     >
-      Delete
+      {isDeleting ? 'Deleting...' : 'Delete'}
     </button>
   )
 }
