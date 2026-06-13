@@ -166,7 +166,10 @@ export async function POST(
       }
 
       const saveAsDraft = insufficientItems.length > 0
-      const orderStatus = saveAsDraft ? 'draft' : (enableDelivery ? 'processing' : 'delivered')
+      // Newly converted orders always start in 'processing'. The delivery toggle
+      // only controls whether a Delhivery shipment will be created later — it
+      // never means the order is already fulfilled.
+      const orderStatus = saveAsDraft ? 'draft' : 'processing'
 
       const orderResult = await client.query(
         `INSERT INTO orders (
