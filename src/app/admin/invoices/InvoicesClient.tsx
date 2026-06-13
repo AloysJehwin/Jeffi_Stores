@@ -789,7 +789,7 @@ export default function InvoicesClient() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-amber-200 dark:border-amber-700/50 bg-amber-100/50 dark:bg-amber-900/20">
-                      {['Order No', 'Customer', 'Phone', 'Amount', 'Created', 'Actions'].map(h => (
+                      {['Order No', 'Customer', 'Phone', 'Amount', 'Stock', 'Created', 'Actions'].map(h => (
                         <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-amber-700 dark:text-amber-400">{h}</th>
                       ))}
                     </tr>
@@ -802,6 +802,9 @@ export default function InvoicesClient() {
                         <td className="px-4 py-3 text-xs text-foreground-secondary">{draft.customer_phone ? `+91 ${draft.customer_phone}` : '—'}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-foreground">
                           ₹{parseFloat(draft.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <DraftStockPill draft={draft} />
                         </td>
                         <td className="px-4 py-3 text-xs text-foreground-secondary whitespace-nowrap">{fmtDate(draft.created_at)}</td>
                         <td className="px-4 py-3">
@@ -853,6 +856,9 @@ export default function InvoicesClient() {
                     {draft.customer_phone && (
                       <p className="text-xs text-foreground-secondary">+91 {draft.customer_phone}</p>
                     )}
+                    <div className="pt-1">
+                      <DraftStockPill draft={draft} />
+                    </div>
                     <div className="flex gap-4 pt-1">
                       {draft.source !== 'business' && (
                       <button
@@ -1391,5 +1397,50 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
       </div>
     </div>,
     document.body
+  )
+}
+
+// Inline stock-availability pill for the Draft Invoices table.
+// Backend returns total_items / short_items / out_of_stock_items per draft,
+// computed at sub_variant > variant > product level. We render one of:
+//   - "All in stock" (green)   when nothing is short
+//   - "N out of stock" (red)   when any line has zero inventory
+//   - "N short" (amber)        when stock exists but is below requested qty
+//   - "—" (neutral)            when no items have a product_id (free-text invoice)
+function DraftStockPill({ draft }: { draft: any }) {
+  const total = Number(draft?.total_items ?? 0)
+  const short = Number(draft?.short_items ?? 0)
+  const oos   = Number(draft?.out_of_stock_items ?? 0)
+
+  if (total === 0) {
+    return <span className="text-xs text-foreground-muted">—</span>
+  }
+  if (short === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+        All {total} in stock
+      </span>
+    )
+  }
+  if (oos > 0) {
+    return (
+      <span
+        title={`${oos} item${oos > 1 ? 's' : ''} out of stock, ${short - oos} short of full qty`}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+        {oos} of {total} out of stock
+      </span>
+    )
+  }
+  return (
+    <span
+      title={`${short} item${short > 1 ? 's' : ''} below required quantity`}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+      {short} of {total} short
+    </span>
   )
 }
