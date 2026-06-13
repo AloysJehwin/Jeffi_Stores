@@ -4,6 +4,7 @@ import { queryOne, query } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { uploadAvatarImage } from '@/lib/s3'
+import { cookieDomainOption } from '@/lib/cookie-domain'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest) {
       sameSite: 'strict',
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
+      ...cookieDomainOption(),
     })
 
     cookieStore.set('session_id', user.id, {
@@ -149,6 +151,7 @@ export async function POST(request: NextRequest) {
       sameSite: 'strict',
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
+      ...cookieDomainOption(),
     })
 
     return NextResponse.json({
