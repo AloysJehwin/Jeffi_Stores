@@ -119,6 +119,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
   const [respondingAction, setRespondingAction] = useState<'accept' | 'decline' | null>(null)
   const [counterReplyText, setCounterReplyText] = useState('')
   const [showCounterInput, setShowCounterInput] = useState(false)
+  const [counterPrices, setCounterPrices] = useState<Record<string, string>>({})
   const [resubmitting, setResubmitting] = useState(false)
   const [resubmitNotes, setResubmitNotes] = useState('')
   const [resubmitError, setResubmitError] = useState('')
@@ -230,16 +231,24 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     setMsgError('')
     try {
       const message = action === 'decline' ? counterReplyText.trim() || undefined : undefined
+      const counter_items = action === 'decline'
+        ? Object.entries(counterPrices)
+            .map(([rfq_item_id, raw]) => ({ rfq_item_id, offered_price: Number(raw) }))
+            .filter(c => Number.isFinite(c.offered_price) && c.offered_price >= 0)
+        : undefined
+      const payload: { action: string; message?: string; counter_items?: typeof counter_items } = { action, message }
+      if (counter_items && counter_items.length > 0) payload.counter_items = counter_items
       const res = await fetch(`/api/business/rfqs/${params.id}/respond`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, message }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) { setMsgError(data.error || 'Failed to respond'); return }
       setShowCounterInput(false)
       setCounterReplyText('')
+      setCounterPrices({})
       load()
     } catch {
       setMsgError('Network error')
@@ -766,7 +775,14 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                               Accept Offer
                             </button>
                             <button
-                              onClick={() => setShowCounterInput(true)}
+                              onClick={() => {
+                                const seed: Record<string, string> = {}
+                                for (const ci of latestCounter.counter_items || []) {
+                                  seed[ci.rfq_item_id] = String(ci.offered_price)
+                                }
+                                setCounterPrices(seed)
+                                setShowCounterInput(true)
+                              }}
                               disabled={respondingAction != null}
                               className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 border border-border-secondary text-foreground-secondary hover:bg-surface-secondary text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
                             >
@@ -777,7 +793,32 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                             </button>
                           </div>
                         ) : (
-                          <div className="space-y-2 pt-1">
+                          <div className="space-y-3 pt-1">
+                            <div className="space-y-1.5">
+                              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Your counter prices</p>
+                              {(latestCounter.counter_items || []).map(ci => {
+                                const item = items.find(it => it.id === ci.rfq_item_id)
+                                return (
+                                  <div key={ci.rfq_item_id} className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-800 rounded-lg px-3 py-2 border border-border-secondary">
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-xs text-foreground-secondary truncate block">{item?.description || 'Item'}</span>
+                                      <span className="text-[10px] text-foreground-muted">Admin offered ₹{Number(ci.offered_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <span className="text-xs text-foreground-secondary">₹</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        value={counterPrices[ci.rfq_item_id] ?? ''}
+                                        onChange={e => setCounterPrices(p => ({ ...p, [ci.rfq_item_id]: e.target.value }))}
+                                        className="w-24 px-2 py-1 border border-border-secondary rounded-md bg-surface text-foreground text-sm text-right focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                                      />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
                             <textarea
                               rows={2}
                               autoFocus
@@ -795,10 +836,10 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                                 {respondingAction === 'decline' ? (
                                   <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                 ) : null}
-                                Send Reply
+                                Send Counter Offer
                               </button>
                               <button
-                                onClick={() => { setShowCounterInput(false); setCounterReplyText('') }}
+                                onClick={() => { setShowCounterInput(false); setCounterReplyText(''); setCounterPrices({}) }}
                                 disabled={respondingAction != null}
                                 className="px-3 py-2 border border-border-secondary text-foreground-secondary hover:bg-surface-secondary text-sm rounded-lg transition-colors"
                               >
