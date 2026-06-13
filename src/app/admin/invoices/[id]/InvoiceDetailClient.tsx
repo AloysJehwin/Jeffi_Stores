@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, ChevronLeft, Pencil, QrCode } from 'lucide-react'
+import { Check, Pencil, QrCode } from 'lucide-react'
 import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
@@ -177,25 +177,18 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           </div>
         </div>
       )}
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href={ap('/admin/invoices')} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
-          <ChevronLeft className="w-4 h-4" />
-          Invoices
-        </a>
-        <span className="text-border-default">/</span>
-        <span className="text-foreground font-medium">Invoice #{o.invoice_number}</span>
-      </div>
+      {/* Breadcrumb (matches order detail pattern) */}
+      <a
+        href={ap('/admin/invoices')}
+        className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block"
+      >
+        ← Back to Invoices
+      </a>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Link href={ap('/admin/invoices')} className="text-foreground-secondary hover:text-foreground transition-colors">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <h1 className="text-xl font-bold text-foreground font-mono">{o.invoice_number}</h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground font-mono">Invoice #{o.invoice_number}</h1>
           {isVoided && (
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 uppercase">
               {o.status}

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { AccountNavBar } from '@/components/visitor/AccountSidebar'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
@@ -45,7 +46,8 @@ function WishlistInner() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { addToCart } = useCart()
-  const { showToast, showConfirm } = useToast()
+  const { showToast } = useToast()
+  const confirm = useConfirm()
   const { user } = useAuth()
   const [addingToCart, setAddingToCart] = useState<Set<string>>(new Set())
   const [filterStock, setFilterStock] = useState<'all' | 'in' | 'out'>('all')
@@ -76,26 +78,25 @@ function WishlistInner() {
   }, [])
 
   const handleRemove = async (productId: string) => {
-    showConfirm({
+    const ok = await confirm({
       title: 'Remove from Wishlist',
       message: 'Are you sure you want to remove this item from your wishlist?',
-      confirmText: 'Remove',
-      cancelText: 'Cancel',
-      type: 'warning',
-      onConfirm: async () => {
-        try {
-          const response = await fetch(`/api/wishlist?productId=${productId}`, {
-            method: 'DELETE',
-          })
-          if (response.ok) {
-            await fetchWishlist()
-            showToast('Item removed from wishlist', 'success')
-          }
-        } catch (error) {
-          showToast('Failed to remove item', 'error')
-        }
-      },
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
     })
+    if (!ok) return
+    try {
+      const response = await fetch(`/api/wishlist?productId=${productId}`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        await fetchWishlist()
+        showToast('Item removed from wishlist', 'success')
+      }
+    } catch (error) {
+      showToast('Failed to remove item', 'error')
+    }
   }
 
   const handleAddToCart = async (productId: string) => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 
 interface DateTimePickerProps {
   value: string
@@ -68,13 +69,18 @@ export default function DateTimePicker({
   const [selHour, setSelHour] = useState(parsed?.hour ?? 0)
   const [selMinute, setSelMinute] = useState(parsed?.minute ?? 0)
   const [mode, setMode] = useState<'day' | 'month' | 'year' | 'time'>('day')
-  const [dropUp, setDropUp] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
 
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const t = e.target as Node
+      if (
+        containerRef.current && !containerRef.current.contains(t) &&
+        popupRef.current   && !popupRef.current.contains(t)
+      ) {
         setOpen(false)
         setMode('day')
       }
@@ -83,12 +89,35 @@ export default function DateTimePicker({
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
+  useEffect(() => {
+    if (!open) return
+    function reposition() {
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const popupW = 288
+      const popupH = 360
+      const margin = 8
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      let left = rect.left
+      if (left + popupW + margin > vw) left = Math.max(margin, vw - popupW - margin)
+      let top = rect.bottom + 4
+      if (top + popupH + margin > vh && rect.top - popupH - 4 > margin) {
+        top = rect.top - popupH - 4
+      }
+      setPopupPos({ top, left })
+    }
+    reposition()
+    window.addEventListener('resize', reposition)
+    window.addEventListener('scroll', reposition, true)
+    return () => {
+      window.removeEventListener('resize', reposition)
+      window.removeEventListener('scroll', reposition, true)
+    }
+  }, [open])
+
   const openPicker = useCallback(() => {
     if (disabled) return
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      setDropUp(rect.bottom + 360 > window.innerHeight && rect.top > 360)
-    }
     const p = parseDT(value)
     if (p) {
       setViewYear(p.year); setViewMonth(p.month)
@@ -170,8 +199,12 @@ export default function DateTimePicker({
         </svg>
       </button>
 
-      {open && (
-        <div className={`absolute ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 z-50 w-72 bg-surface-elevated border border-border-default rounded-xl shadow-lg p-3 select-none`}>
+      {open && typeof document !== 'undefined' && popupPos && createPortal(
+        <div
+          ref={popupRef}
+          style={{ position: 'fixed', top: popupPos.top, left: popupPos.left }}
+          className="z-[1000] w-72 bg-surface-elevated border border-border-default rounded-xl shadow-lg p-3 select-none"
+        >
 
           {mode === 'day' && (
             <>
@@ -324,7 +357,8 @@ export default function DateTimePicker({
             </>
           )}
 
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

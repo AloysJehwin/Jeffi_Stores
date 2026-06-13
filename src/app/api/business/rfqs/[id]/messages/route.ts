@@ -34,13 +34,32 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({ error: 'Cannot message on a closed quote' }, { status: 400 })
   }
 
-  const { message } = await request.json()
+  const { message, counter_items } = await request.json()
   if (!message?.trim()) return NextResponse.json({ error: 'Message is required' }, { status: 400 })
 
+  if (counter_items != null) {
+    if (!Array.isArray(counter_items)) {
+      return NextResponse.json({ error: 'counter_items must be an array' }, { status: 400 })
+    }
+    for (const ci of counter_items) {
+      if (!ci.rfq_item_id || ci.offered_price == null || Number(ci.offered_price) < 0) {
+        return NextResponse.json({ error: 'Each counter item needs rfq_item_id and a non-negative offered_price' }, { status: 400 })
+      }
+    }
+    const ids = counter_items.map((c: any) => c.rfq_item_id)
+    const rows = await queryMany<{ id: string }>(
+      `SELECT id FROM business_rfq_items WHERE rfq_id = $1 AND id = ANY($2::uuid[])`,
+      [params.id, ids]
+    )
+    if (rows.length !== ids.length) {
+      return NextResponse.json({ error: 'One or more counter items do not belong to this RFQ' }, { status: 400 })
+    }
+  }
+
   const msg = await queryOne<any>(
-    `INSERT INTO rfq_messages (rfq_id, sender, message)
-     VALUES ($1, 'customer', $2) RETURNING id, sender, message, counter_items, created_at`,
-    [params.id, message.trim()]
+    `INSERT INTO rfq_messages (rfq_id, sender, message, counter_items)
+     VALUES ($1, 'customer', $2, $3) RETURNING id, sender, message, counter_items, created_at`,
+    [params.id, message.trim(), counter_items && counter_items.length ? JSON.stringify(counter_items) : null]
   )
 
   // Move to negotiating if still pending/reviewed

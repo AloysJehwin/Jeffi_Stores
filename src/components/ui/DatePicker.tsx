@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 
 interface DatePickerProps {
   value: string
@@ -49,12 +50,17 @@ export default function DatePicker({ value, onChange, disabled, min, max, classN
   const [viewMonth, setViewMonth] = useState(parsed?.month ?? today.getMonth())
   const [mode, setMode] = useState<'day' | 'month' | 'year'>('day')
   const containerRef = useRef<HTMLDivElement>(null)
-  const [dropUp, setDropUp] = useState(false)
+  const popupRef = useRef<HTMLDivElement>(null)
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(null)
 
   useEffect(() => {
     if (!open) return
     function onDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const t = e.target as Node
+      if (
+        containerRef.current && !containerRef.current.contains(t) &&
+        popupRef.current   && !popupRef.current.contains(t)
+      ) {
         setOpen(false)
         setMode('day')
       }
@@ -63,12 +69,37 @@ export default function DatePicker({ value, onChange, disabled, min, max, classN
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
+  useEffect(() => {
+    if (!open) return
+    function reposition() {
+      if (!containerRef.current) return
+      const rect = containerRef.current.getBoundingClientRect()
+      const popupW = 256
+      const popupH = 320
+      const margin = 8
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+
+      let left = rect.left
+      if (left + popupW + margin > vw) left = Math.max(margin, vw - popupW - margin)
+
+      let top = rect.bottom + 4
+      if (top + popupH + margin > vh && rect.top - popupH - 4 > margin) {
+        top = rect.top - popupH - 4
+      }
+      setPopupPos({ top, left })
+    }
+    reposition()
+    window.addEventListener('resize', reposition)
+    window.addEventListener('scroll', reposition, true)
+    return () => {
+      window.removeEventListener('resize', reposition)
+      window.removeEventListener('scroll', reposition, true)
+    }
+  }, [open])
+
   const openPicker = useCallback(() => {
     if (disabled) return
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      setDropUp(rect.bottom + 300 > window.innerHeight && rect.top > 300)
-    }
     const p = parseDateVal(value)
     if (p) { setViewYear(p.year); setViewMonth(p.month) }
     setMode('day')
@@ -142,8 +173,12 @@ export default function DatePicker({ value, onChange, disabled, min, max, classN
         </svg>
       </button>
 
-      {open && (
-        <div className={`absolute ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 z-50 w-64 bg-surface-elevated border border-border-default rounded-xl shadow-lg p-3 select-none`}>
+      {open && typeof document !== 'undefined' && popupPos && createPortal(
+        <div
+          ref={popupRef}
+          style={{ position: 'fixed', top: popupPos.top, left: popupPos.left }}
+          className="z-[1000] w-64 bg-surface-elevated border border-border-default rounded-xl shadow-lg p-3 select-none"
+        >
 
           {mode === 'day' && (
             <>
@@ -265,7 +300,8 @@ export default function DatePicker({ value, onChange, disabled, min, max, classN
               </div>
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

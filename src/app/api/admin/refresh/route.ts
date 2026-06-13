@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin, generateToken, JWT_MAX_AGE_S } from '@/lib/jwt'
+import { cookieDomainOption } from '@/lib/cookie-domain'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
     sameSite: 'lax',
     maxAge: JWT_MAX_AGE_S,
     path: '/',
+    ...cookieDomainOption(),
   })
   return response
 }

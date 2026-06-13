@@ -86,7 +86,14 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                 const formUrl = `${FORMS_BASE_URL}/${f.slug}`
                 return (
                   <tr key={f.id} className="hover:bg-surface-secondary/50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-foreground">{f.title}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <Link
+                        href={ap(`/admin/review-forms/edit/${f.id}`, host)}
+                        className="text-foreground hover:text-accent-500 transition-colors"
+                      >
+                        {f.title}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-1 rounded-full font-medium inline-flex items-center gap-1 ${
                         f.template_type === 'google_review' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :

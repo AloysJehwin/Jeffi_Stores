@@ -24,19 +24,26 @@ interface ProposedTool {
 export default function ProposedToolsPage() {
   const { showToast } = useToast()
   const [items, setItems] = useState<ProposedTool[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<'proposed' | 'approved' | 'rejected' | 'all'>('proposed')
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
 
-  async function load() {
+  const PAGE_SIZE = 25
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  async function load(p = 1) {
     setLoading(true)
     try {
-      const res = await fetch(`/api/admin/agent/proposed-tools?status=${statusFilter}&limit=100`, { credentials: 'include' })
+      const res = await fetch(`/api/admin/agent/proposed-tools?status=${statusFilter}&page=${p}&pageSize=${PAGE_SIZE}`, { credentials: 'include' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Load failed')
       setItems(data.items || [])
+      setTotal(data.total || 0)
+      setPage(p)
     } catch (err: any) {
       showToast(err?.message || 'Load failed', 'error')
     } finally {
@@ -44,7 +51,7 @@ export default function ProposedToolsPage() {
     }
   }
 
-  useEffect(() => { load() }, [statusFilter])
+  useEffect(() => { load(1) }, [statusFilter])
 
   async function decide(id: string, decision: 'approve' | 'reject') {
     if (decision === 'reject') {
@@ -67,7 +74,7 @@ export default function ProposedToolsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Action failed')
       showToast(decision === 'approve' ? 'Tool approved and now callable' : 'Rejected', 'success')
-      setItems(prev => prev.filter(i => i.id !== id))
+      load(page)
     } catch (err: any) {
       showToast(err?.message || 'Action failed', 'error')
     } finally {
@@ -223,6 +230,22 @@ export default function ProposedToolsPage() {
           </div>
         ))}
       </div>
+
+      {!loading && items.length > 0 && totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <p className="text-xs text-foreground-muted whitespace-nowrap">
+            Showing <span className="font-medium text-foreground">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}</span>
+            {' '}of <span className="font-medium text-foreground">{total}</span>
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button disabled={page <= 1} onClick={() => load(page - 1)}
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
+            <span className="text-xs text-foreground-muted whitespace-nowrap">Page {page} of {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => load(page + 1)}
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

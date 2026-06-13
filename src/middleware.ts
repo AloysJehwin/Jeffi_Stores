@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     // Public pages on the subdomain (paths are /signin, /signup, /pending — no /business/ prefix)
     const PUBLIC_BUSINESS_SUBDOMAIN = ['/signin', '/signup', '/pending']
-    const isPublicSubdomain = PUBLIC_BUSINESS_SUBDOMAIN.some(p => pathname.startsWith(p))
+    const isPublicSubdomain = pathname === '/' || PUBLIC_BUSINESS_SUBDOMAIN.some(p => pathname.startsWith(p))
     if (!isPublicSubdomain) {
       const token = request.cookies.get('business_auth_token')?.value
       if (!token) {

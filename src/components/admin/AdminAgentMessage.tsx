@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Fragment, ReactNode } from 'react'
+import { ap } from '@/lib/admin-path'
 
 const ENTITY_ROUTES: Record<string, (id: string) => string> = {
   product: id => `/admin/products/${id}`,
@@ -97,7 +98,7 @@ function renderInlineText(text: string, keyPrefix: string): ReactNode[] {
     }
     const [, kind, id, label] = match
     const builder = ENTITY_ROUTES[kind]
-    const href = builder ? builder(id.trim()) : null
+    const href = builder ? ap(builder(id.trim())) : null
     if (href) {
       out.push(
         <Link

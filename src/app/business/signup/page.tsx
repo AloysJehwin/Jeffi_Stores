@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { bp } from '@/lib/business-path'
+import BusinessPublicHeader from '@/components/business/PublicHeader'
 
 export default function BusinessSignUpWrapper() {
   return (
@@ -259,7 +260,9 @@ function BusinessSignUpPage() {
   const inputCls = 'w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500'
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <>
+    <BusinessPublicHeader />
+    <div className="min-h-screen grid lg:grid-cols-2 pt-16 lg:pt-20">
       {/* Left — form */}
       <div className="flex items-center justify-center px-6 py-12 bg-surface">
         <div className="w-full max-w-sm">
@@ -552,5 +555,6 @@ function BusinessSignUpPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

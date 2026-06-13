@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Category {
   id: string
@@ -93,7 +94,16 @@ export default function InflationClient({ categories }: { categories: Category[]
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
   const [rollingBack, setRollingBack] = useState<string | null>(null)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
-  const [confirmRollbackLog, setConfirmRollbackLog] = useState<InflationLog | null>(null)
+  const confirm = useConfirm()
+
+  const PAGE_SIZE = 25
+  const [logsPage, setLogsPage] = useState(1)
+  const logsTotalPages = Math.max(1, Math.ceil(logs.length / PAGE_SIZE))
+  useEffect(() => { if (logsPage > logsTotalPages) setLogsPage(logsTotalPages) }, [logsPage, logsTotalPages])
+  const pagedLogs = useMemo(
+    () => logs.slice((logsPage - 1) * PAGE_SIZE, logsPage * PAGE_SIZE),
+    [logs, logsPage]
+  )
 
   async function loadProducts(category: Category) {
     setProductListLoading(true)
@@ -129,8 +139,15 @@ export default function InflationClient({ categories }: { categories: Category[]
   }
 
   async function handleRollback(log: InflationLog) {
+    const ok = await confirm({
+      title: 'Rollback Price Change?',
+      message: 'This will restore prices from the snapshot taken at the time of this update. Are you sure?',
+      confirmLabel: 'Yes, rollback',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
     setRollingBack(log.id)
-    setConfirmRollbackLog(null)
     setRollbackError(null)
     try {
       const res = await fetch('/api/admin/inflation/rollback', {
@@ -414,7 +431,7 @@ export default function InflationClient({ categories }: { categories: Category[]
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
-                {logs.map(log => (
+                {pagedLogs.map(log => (
                   <>
                     <tr
                       key={log.id}
@@ -452,34 +469,14 @@ export default function InflationClient({ categories }: { categories: Category[]
                       </td>
                       <td className="py-2.5 px-3 text-right" onClick={e => e.stopPropagation()}>
                         {!log.is_rollback && !log.rolled_back_at && log.snapshot && (
-                          confirmRollbackLog?.id === log.id ? (
-                            <div className="flex items-center gap-2 justify-end">
-                              <span className="text-xs text-foreground-secondary whitespace-nowrap">Are you sure?</span>
-                              <button
-                                type="button"
-                                disabled={rollingBack === log.id}
-                                onClick={() => handleRollback(log)}
-                                className="px-2.5 py-1 text-xs font-medium rounded bg-orange-600 hover:bg-orange-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                              >
-                                {rollingBack === log.id ? 'Rolling back…' : 'Yes, rollback'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmRollbackLog(null)}
-                                className="px-2.5 py-1 text-xs font-medium rounded border border-border-secondary text-foreground-secondary hover:bg-surface transition-colors whitespace-nowrap"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setConfirmRollbackLog(log)}
-                              className="px-2.5 py-1 text-xs font-medium rounded border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors whitespace-nowrap"
-                            >
-                              Rollback
-                            </button>
-                          )
+                          <button
+                            type="button"
+                            onClick={() => handleRollback(log)}
+                            disabled={rollingBack === log.id}
+                            className="px-2.5 py-1 text-xs font-medium rounded border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {rollingBack === log.id ? 'Rolling back…' : 'Rollback'}
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -537,6 +534,21 @@ export default function InflationClient({ categories }: { categories: Category[]
                 ))}
               </tbody>
             </table>
+            {logsTotalPages > 1 && (
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border-default">
+                <p className="text-xs text-foreground-muted whitespace-nowrap">
+                  Showing <span className="font-medium text-foreground">{(logsPage - 1) * PAGE_SIZE + 1}–{Math.min(logsPage * PAGE_SIZE, logs.length)}</span>
+                  {' '}of <span className="font-medium text-foreground">{logs.length}</span>
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button disabled={logsPage <= 1} onClick={() => setLogsPage(p => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
+                  <span className="text-xs text-foreground-muted whitespace-nowrap">Page {logsPage} of {logsTotalPages}</span>
+                  <button disabled={logsPage >= logsTotalPages} onClick={() => setLogsPage(p => Math.min(logsTotalPages, p + 1))}
+                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

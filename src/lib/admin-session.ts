@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { generateToken, JWT_MAX_AGE_S } from '@/lib/jwt'
+import { cookieDomainOption } from '@/lib/cookie-domain'
 
 export interface AdminSessionAdmin {
   id: string
@@ -35,6 +36,7 @@ export async function issueAdminSession(
     sameSite: 'lax',
     maxAge: JWT_MAX_AGE_S,
     path: '/',
+    ...cookieDomainOption(),
   })
   return response
 }
