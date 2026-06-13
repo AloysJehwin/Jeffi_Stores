@@ -20,15 +20,34 @@ interface ModelViewerProps {
   exposure?: number
 }
 
+const MODEL_VIEWER_CDN = 'https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js'
+
 let loaderPromise: Promise<void> | null = null
 
 function loadModelViewer(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
   if (customElements.get('model-viewer')) return Promise.resolve()
   if (loaderPromise) return loaderPromise
-  loaderPromise = import('@google/model-viewer').then(() => undefined).catch(() => {
+
+  loaderPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[data-model-viewer-loader]`)
+    if (existing) {
+      if (customElements.get('model-viewer')) return resolve()
+      existing.addEventListener('load', () => resolve(), { once: true })
+      existing.addEventListener('error', () => reject(new Error('script load failed')), { once: true })
+      return
+    }
+    const script = document.createElement('script')
+    script.type = 'module'
+    script.src = MODEL_VIEWER_CDN
+    script.dataset.modelViewerLoader = '1'
+    script.addEventListener('load', () => resolve(), { once: true })
+    script.addEventListener('error', () => reject(new Error('script load failed')), { once: true })
+    document.head.appendChild(script)
+  }).catch(() => {
     loaderPromise = null
   })
+
   return loaderPromise
 }
 
@@ -46,13 +65,23 @@ export default function ModelViewer({
 
   useEffect(() => {
     let cancelled = false
-    loadModelViewer().then(() => {
+    let attempts = 0
+    const tick = () => {
       if (cancelled) return
       if (typeof window !== 'undefined' && customElements.get('model-viewer')) {
         setReady(true)
-      } else {
-        setErrored(true)
+        return
       }
+      attempts += 1
+      if (attempts > 100) {
+        setErrored(true)
+        return
+      }
+      setTimeout(tick, 50)
+    }
+    loadModelViewer().then(() => {
+      if (cancelled) return
+      tick()
     })
     return () => { cancelled = true }
   }, [])
@@ -69,9 +98,9 @@ export default function ModelViewer({
         {poster ? (
           <img src={poster} alt={alt} style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.5 }} />
         ) : (
-          <div style={{ width: 48, height: 48, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          <div style={{ width: 48, height: 48, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: 'white', borderRadius: '50%', animation: 'mvspin 1s linear infinite' }} />
         )}
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <style>{`@keyframes mvspin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
