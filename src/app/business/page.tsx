@@ -64,8 +64,8 @@ export default async function BusinessLandingPage() {
 
               <div className="flex md:order-2 justify-center md:justify-end mt-4 md:mt-0">
                 <img
-                  src="/images/Welcome.png"
-                  alt="Industrial hardware and tools"
+                  src="/images/business-hero.png"
+                  alt="B2B procurement dashboard"
                   className="w-80 sm:w-96 md:w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
                   style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
                 />
