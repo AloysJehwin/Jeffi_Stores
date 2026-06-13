@@ -305,8 +305,9 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
       customerCounterMap[ci.rfq_item_id] = ci.offered_price
     }
   }
+  const isFinalState = ['offer_accepted', 'converted'].includes(rfq.status)
   const targetFor = (item: RFQItem): number | null => {
-    if (customerCounterMap[item.id] != null) return customerCounterMap[item.id]
+    if (!isFinalState && customerCounterMap[item.id] != null) return customerCounterMap[item.id]
     if (item.requested_price != null) return Number(item.requested_price)
     return null
   }
