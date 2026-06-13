@@ -681,7 +681,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                               <p className="whitespace-pre-wrap leading-relaxed">{msg.message}</p>
                             </div>
 
-                            {isAdmin && msg.counter_items && msg.counter_items.length > 0 && (
+                            {msg.counter_items && msg.counter_items.length > 0 && (
                               <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-3 space-y-1.5 w-full">
                                 <p className="text-[11px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">Offered Prices</p>
                                 {msg.counter_items.map(ci => {

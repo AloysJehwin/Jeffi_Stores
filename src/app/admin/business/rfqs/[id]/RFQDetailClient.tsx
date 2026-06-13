@@ -890,7 +890,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                         </div>
                       </div>
                       {/* Counter items card */}
-                      {isAdmin && msg.counter_items && msg.counter_items.length > 0 && (
+                      {msg.counter_items && msg.counter_items.length > 0 && (
                         <div className="mr-8 bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 space-y-1 w-full max-w-[85%]">
                           <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Counter Prices</p>
                           {msg.counter_items.map(ci => {
@@ -987,6 +987,31 @@ export default function RFQDetailClient({ id }: { id: string }) {
                 ) : (
                   /* Full composer for negotiating state */
                   <div className="border-t border-border-default p-4 space-y-3">
+                    <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide">Quick Replies</p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {[
+                        'Thanks for the counter. We\'re reviewing it and will respond shortly.',
+                        'We\'ve adjusted our pricing — please review the latest counter offer.',
+                        'That\'s the best price we can offer for this quantity.',
+                        'Could you increase the quantity? It will help us offer a better price.',
+                        'We can match this price. Shall we proceed to a final quotation?',
+                      ].map(preset => (
+                        <button
+                          key={preset}
+                          type="button"
+                          disabled={sendingReply}
+                          onClick={() => setReplyText(prev => prev === preset ? '' : preset)}
+                          className={`w-full text-left px-3 py-2.5 text-xs rounded-xl border transition-colors ${
+                            replyText === preset
+                              ? 'bg-accent-500/15 border-accent-500/50 text-foreground font-medium'
+                              : 'bg-surface border-border-default text-foreground-secondary hover:bg-surface-elevated hover:text-foreground hover:border-accent-500/30'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+
                     <textarea
                       value={replyText}
                       onChange={e => setReplyText(e.target.value)}
