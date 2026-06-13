@@ -363,15 +363,13 @@ function SortableRow({
           <HoverCard
             trigger={
               <div onClick={e => e.stopPropagation()}>
-                <a
-                  href={`/categories/${category.slug}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`text-sm hover:text-accent-500 hover:underline cursor-pointer ${isSubcat ? 'text-foreground' : 'font-semibold text-foreground'}`}
+                <Link
+                  href={ap(`/admin/categories/edit/${category.id}`)}
+                  className={`text-sm hover:text-accent-500 transition-colors cursor-pointer ${isSubcat ? 'text-foreground' : 'font-semibold text-foreground'}`}
                   onClick={e => e.stopPropagation()}
                 >
                   {category.name}
-                </a>
+                </Link>
                 {category.description && (
                   <div className="text-xs text-foreground-muted max-w-xs truncate">{category.description}</div>
                 )}

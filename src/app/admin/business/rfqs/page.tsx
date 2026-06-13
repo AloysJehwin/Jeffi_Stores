@@ -160,7 +160,14 @@ export default async function BusinessRFQsPage({
               </tr>
             ) : rfqs.map(rfq => (
               <tr key={rfq.id} className="hover:bg-surface-secondary transition-colors">
-                <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">{rfq.rfq_number}</td>
+                <td className="px-4 py-3 font-mono text-xs font-semibold">
+                  <Link
+                    href={ap(`/admin/business/rfqs/${rfq.id}`, host)}
+                    className="text-foreground hover:text-accent-500 hover:underline transition-colors"
+                  >
+                    {rfq.rfq_number}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 font-medium text-foreground">{rfq.company_name || '—'}</td>
                 <td className="px-4 py-3">
                   <p className="text-foreground">{rfq.first_name} {rfq.last_name || ''}</p>

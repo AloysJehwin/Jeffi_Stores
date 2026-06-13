@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
@@ -79,10 +80,10 @@ export default function OrdersPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
   const { query: searchQuery, register } = useAccountSearch()
+  const confirm = useConfirm()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null)
-  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
@@ -137,6 +138,14 @@ export default function OrdersPage() {
   }
 
   const handleCancelOrder = async (orderId: string) => {
+    const ok = await confirm({
+      title: 'Request cancellation?',
+      message: 'Request cancellation for this order? This action cannot be undone.',
+      confirmLabel: 'Request Cancellation',
+      cancelLabel: 'Keep Order',
+      variant: 'danger',
+    })
+    if (!ok) return
     setCancellingOrderId(orderId)
     try {
       await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' })
@@ -144,7 +153,6 @@ export default function OrdersPage() {
     } catch {
     } finally {
       setCancellingOrderId(null)
-      setConfirmCancelId(null)
     }
   }
 
@@ -210,7 +218,12 @@ export default function OrdersPage() {
                     <div className="sm:hidden">
                       <div className="bg-surface border-b border-border-default px-4 py-3">
                         <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <p className="font-mono text-sm font-semibold text-foreground truncate">{order.order_number}</p>
+                          <Link
+                            href={`/account/orders/${order.id}`}
+                            className="font-mono text-sm font-semibold text-foreground hover:text-accent-500 hover:underline transition-colors truncate"
+                          >
+                            {order.order_number}
+                          </Link>
                           <span className={`flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                             {getStatusLabel(order.status)}
                           </span>
@@ -255,19 +268,9 @@ export default function OrdersPage() {
                             </svg>
                           </Link>
                           {(order.status === 'pending' || order.status === 'confirmed') && (
-                            confirmCancelId === order.id ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-red-700 dark:text-red-400">Cancel?</span>
-                                <button type="button" onClick={() => handleCancelOrder(order.id)} disabled={cancellingOrderId === order.id} className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center">
-                                  {cancellingOrderId === order.id ? <><div className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1" />Submitting</> : 'Yes'}
-                                </button>
-                                <button type="button" onClick={() => setConfirmCancelId(null)} className="px-2.5 py-1 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded text-xs font-medium transition-colors">No</button>
-                              </div>
-                            ) : (
-                              <button type="button" onClick={() => setConfirmCancelId(order.id)} className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs font-medium">
-                                Request Cancellation
-                              </button>
-                            )
+                            <button type="button" onClick={() => handleCancelOrder(order.id)} disabled={cancellingOrderId === order.id} className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs font-medium disabled:opacity-50">
+                              {cancellingOrderId === order.id ? 'Submitting…' : 'Request Cancellation'}
+                            </button>
                           )}
                         </div>
                       </div>
@@ -280,7 +283,12 @@ export default function OrdersPage() {
                           <div className="flex flex-wrap items-center gap-6">
                             <div>
                               <p className="text-xs text-foreground-muted mb-1">Order Number</p>
-                              <p className="font-mono text-sm font-medium text-foreground">{order.order_number}</p>
+                              <Link
+                                href={`/account/orders/${order.id}`}
+                                className="font-mono text-sm font-medium text-foreground hover:text-accent-500 hover:underline transition-colors"
+                              >
+                                {order.order_number}
+                              </Link>
                             </div>
                             <div>
                               <p className="text-xs text-foreground-muted mb-1">Order Date</p>
@@ -344,19 +352,9 @@ export default function OrdersPage() {
                             </svg>
                           </Link>
                           {(order.status === 'pending' || order.status === 'confirmed') && (
-                            confirmCancelId === order.id ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-red-700 dark:text-red-400">Request cancellation?</span>
-                                <button type="button" onClick={() => handleCancelOrder(order.id)} disabled={cancellingOrderId === order.id} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-medium transition-colors disabled:bg-red-300 disabled:cursor-not-allowed flex items-center">
-                                  {cancellingOrderId === order.id ? <><div className="animate-spin w-3 h-3 border-2 border-white border-t-transparent rounded-full mr-1" />Submitting</> : 'Yes'}
-                                </button>
-                                <button type="button" onClick={() => setConfirmCancelId(null)} className="px-3 py-1 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded text-xs font-medium transition-colors">No</button>
-                              </div>
-                            ) : (
-                              <button type="button" onClick={() => setConfirmCancelId(order.id)} className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium">
-                                Request Cancellation
-                              </button>
-                            )
+                            <button type="button" onClick={() => handleCancelOrder(order.id)} disabled={cancellingOrderId === order.id} className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50">
+                              {cancellingOrderId === order.id ? 'Submitting…' : 'Request Cancellation'}
+                            </button>
                           )}
                         </div>
                       </div>

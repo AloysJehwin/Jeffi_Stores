@@ -189,7 +189,14 @@ export default async function BusinessCustomersPage({
               </tr>
             ) : customers.map(c => (
               <tr key={c.user_id} className="hover:bg-surface-secondary transition-colors">
-                <td className="px-4 py-3 font-medium text-foreground">{c.company_name}</td>
+                <td className="px-4 py-3 font-medium">
+                  <Link
+                    href={ap(`/admin/business/customers/${c.user_id}`, host)}
+                    className="text-foreground hover:text-accent-500 transition-colors"
+                  >
+                    {c.company_name}
+                  </Link>
+                </td>
                 <td className="px-4 py-3">
                   <p className="text-foreground">{c.first_name} {c.last_name || ''}</p>
                   <p className="text-xs text-foreground-muted">{c.email}</p>
