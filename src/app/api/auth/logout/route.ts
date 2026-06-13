@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { authenticateUser } from '@/lib/jwt'
 import { logActivity } from '@/lib/activity'
+import { cookieDomainOption } from '@/lib/cookie-domain'
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,12 +11,13 @@ export async function POST(request: NextRequest) {
       logActivity({ userId: auth.userId, kind: 'logout', summary: 'Logged out' }).catch(() => {})
     }
 
-    cookies().delete('auth_token')
+    cookies().delete({ name: 'auth_token', path: '/', ...cookieDomainOption() })
 
     const newGuestSessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
     cookies().set('session_id', newGuestSessionId, {
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
+      ...cookieDomainOption(),
     })
 
     return NextResponse.json({ message: 'Logged out successfully' })
