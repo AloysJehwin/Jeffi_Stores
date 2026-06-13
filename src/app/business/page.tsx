@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
-import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { bp } from '@/lib/business-path'
 import BusinessPublicHeader from '@/components/business/PublicHeader'
@@ -15,17 +14,20 @@ export const metadata = {
 export default async function BusinessLandingPage() {
   const host = (await headers()).get('host') ?? ''
   const token = cookies().get('business_auth_token')?.value
+  let authState: 'guest' | 'pending' | 'approved' | 'rejected' = 'guest'
   if (token) {
     const payload = await verifyToken(token).catch(() => null)
     if (payload?.isBusiness) {
-      if (payload.approvalStatus === 'pending') redirect(bp('/business/pending', host))
-      if (payload.approvalStatus === 'approved') redirect(bp('/business/products', host))
+      const status = (payload.approvalStatus as string | undefined) || 'approved'
+      if (status === 'approved') authState = 'approved'
+      else if (status === 'pending') authState = 'pending'
+      else if (status === 'rejected') authState = 'rejected'
     }
   }
 
   return (
     <div className="bg-surface min-h-screen">
-      <BusinessPublicHeader />
+      <BusinessPublicHeader authState={authState} />
 
       <main className="pt-16 lg:pt-20">
         <section className="relative bg-gradient-to-br from-secondary-700 via-secondary-600 to-secondary-800 overflow-hidden">

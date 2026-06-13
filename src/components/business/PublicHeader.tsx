@@ -5,8 +5,66 @@ import { useState } from 'react'
 import { bp } from '@/lib/business-path'
 import ThemeToggle from '@/components/ThemeToggle'
 
-export default function BusinessPublicHeader() {
+type AuthState = 'guest' | 'pending' | 'approved' | 'rejected'
+
+export default function BusinessPublicHeader({ authState = 'guest' }: { authState?: AuthState }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const renderRightCtas = () => {
+    if (authState === 'approved') {
+      return (
+        <Link
+          href={bp('/business/products')}
+          className="inline-flex items-center gap-1.5 px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors"
+        >
+          Continue to Portal
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+        </Link>
+      )
+    }
+    if (authState === 'pending') {
+      return (
+        <Link
+          href={bp('/business/pending')}
+          className="inline-flex items-center px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition-colors"
+        >
+          Approval Pending
+        </Link>
+      )
+    }
+    return (
+      <>
+        <Link
+          href={bp('/business/signin')}
+          className="hidden sm:inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm font-medium text-foreground-secondary hover:text-foreground transition-colors"
+        >
+          Sign In
+        </Link>
+        <Link
+          href={bp('/business/signup')}
+          className="inline-flex items-center px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors"
+        >
+          Register
+        </Link>
+      </>
+    )
+  }
+
+  const renderMobileAuthRow = () => {
+    if (authState === 'approved') {
+      return (
+        <Link href={bp('/business/products')} className="block px-2 py-2 text-sm font-semibold text-accent-500 hover:bg-surface-secondary rounded-lg">Continue to Portal →</Link>
+      )
+    }
+    if (authState === 'pending') {
+      return (
+        <Link href={bp('/business/pending')} className="block px-2 py-2 text-sm font-semibold text-amber-500 hover:bg-surface-secondary rounded-lg">Approval Pending</Link>
+      )
+    }
+    return (
+      <Link href={bp('/business/signin')} className="block px-2 py-2 text-sm font-medium text-foreground hover:bg-surface-secondary rounded-lg">Sign In</Link>
+    )
+  }
 
   return (
     <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default fixed top-0 left-0 right-0 z-40 w-full">
@@ -30,18 +88,7 @@ export default function BusinessPublicHeader() {
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <ThemeToggle />
-            <Link
-              href={bp('/business/signin')}
-              className="hidden sm:inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm font-medium text-foreground-secondary hover:text-foreground transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              href={bp('/business/signup')}
-              className="inline-flex items-center px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors"
-            >
-              Register
-            </Link>
+            {renderRightCtas()}
             <button
               type="button"
               onClick={() => setMobileOpen(o => !o)}
@@ -60,7 +107,7 @@ export default function BusinessPublicHeader() {
             <a onClick={() => setMobileOpen(false)} href="#advantages" className="block px-2 py-2 text-sm text-foreground-secondary hover:bg-surface-secondary rounded-lg">Why Business</a>
             <a onClick={() => setMobileOpen(false)} href="#how-it-works" className="block px-2 py-2 text-sm text-foreground-secondary hover:bg-surface-secondary rounded-lg">How it Works</a>
             <a onClick={() => setMobileOpen(false)} href="#faq" className="block px-2 py-2 text-sm text-foreground-secondary hover:bg-surface-secondary rounded-lg">FAQ</a>
-            <Link href={bp('/business/signin')} className="block px-2 py-2 text-sm font-medium text-foreground hover:bg-surface-secondary rounded-lg">Sign In</Link>
+            {renderMobileAuthRow()}
           </div>
         )}
       </div>
