@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { categoryFor, type ActivityCategory } from '@/lib/activity-shared'
+import { ap } from '@/lib/admin-path'
 
 interface ActivityEvent {
   id: string
@@ -131,7 +132,7 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
 
   function refLink(e: ActivityEvent) {
     if (e.reference_type === 'orders' && e.reference_id) {
-      return `/admin/orders/${e.reference_id}`
+      return ap(`/admin/orders/${e.reference_id}`)
     }
     return null
   }
