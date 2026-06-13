@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { getCustomers } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
@@ -13,6 +14,7 @@ export const revalidate = 0
 const PAGE_SIZE = 25
 
 export default async function CustomersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+  const host = headers().get('host') ?? ''
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const sort = searchParams.sort
   const dir = searchParams.dir as 'asc' | 'desc' | undefined
@@ -47,7 +49,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
-    return `/admin/customers${qs ? `?${qs}` : ''}`
+    return ap(`/admin/customers${qs ? `?${qs}` : ''}`, host)
   }
 
   return (
