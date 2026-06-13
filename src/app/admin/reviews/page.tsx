@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { ap } from '@/lib/admin-path'
 
@@ -45,16 +46,21 @@ export default function AdminReviewsPage() {
   const router = useRouter()
 
   const [reviews, setReviews] = useState<Review[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>(
     (searchParams.get('filter') as 'all' | 'pending' | 'approved') || 'pending'
   )
   const [search, setSearch] = useState(searchParams.get('q') || '')
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const PAGE_SIZE = 25
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   useEffect(() => {
     if (!lightboxUrl) return
@@ -71,17 +77,21 @@ export default function AdminReviewsPage() {
     router.replace(ap(`/admin/reviews?${p.toString()}`), { scroll: false })
   }
 
-  useEffect(() => { fetchReviews() }, [filter])
+  useEffect(() => { fetchReviews(search, 1) }, [filter])
 
-  const fetchReviews = async (q = search) => {
+  const fetchReviews = async (q = search, p = page) => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ filter })
       if (q.trim()) params.set('q', q.trim())
+      params.set('page', String(p))
+      params.set('pageSize', String(PAGE_SIZE))
       const response = await fetch(`/api/admin/reviews?${params}`)
       if (response.ok) {
         const data = await response.json()
         setReviews(data.reviews || [])
+        setTotal(data.total || 0)
+        setPage(p)
       }
     } catch {
     } finally {
@@ -93,7 +103,7 @@ export default function AdminReviewsPage() {
     setSearch(val)
     syncUrl({ q: val })
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => fetchReviews(val), 300)
+    searchTimer.current = setTimeout(() => fetchReviews(val, 1), 300)
   }
 
   const handleApprove = async (reviewId: string) => {
@@ -104,7 +114,7 @@ export default function AdminReviewsPage() {
         body: JSON.stringify({ reviewId, action: 'approve' }),
       })
       if (response.ok) {
-        fetchReviews()
+        fetchReviews(search, page)
         showToast('Review approved', 'success')
       } else {
         showToast('Failed to approve review', 'error')
@@ -115,7 +125,14 @@ export default function AdminReviewsPage() {
   }
 
   const handleReject = async (reviewId: string) => {
-    setConfirmDeleteId(null)
+    const ok = await confirm({
+      title: 'Delete Review',
+      message: 'Delete this review? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
     try {
       const response = await fetch('/api/admin/reviews', {
         method: 'PATCH',
@@ -123,7 +140,7 @@ export default function AdminReviewsPage() {
         body: JSON.stringify({ reviewId, action: 'reject' }),
       })
       if (response.ok) {
-        fetchReviews()
+        fetchReviews(search, page)
         showToast('Review deleted', 'success')
       } else {
         showToast('Failed to delete review', 'error')
@@ -329,40 +346,37 @@ export default function AdminReviewsPage() {
                       </svg>
                       Approve
                     </button>
-                    {confirmDeleteId === review.id ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleReject(review.id)}
-                          className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-sm transition-colors"
-                        >
-                          Confirm delete
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="px-3 py-1.5 text-sm text-foreground-muted hover:text-foreground transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteId(review.id)}
-                        className="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleReject(review.id)}
+                      className="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete
+                    </button>
                   </div>
                 )}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {!isLoading && reviews.length > 0 && totalPages > 1 && (
+        <div className="mt-4 px-1 flex items-center justify-between gap-2">
+          <p className="text-xs text-foreground-muted whitespace-nowrap">
+            <span className="font-medium text-foreground">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}</span>
+            {' '}of <span className="font-medium text-foreground">{total}</span> reviews
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button disabled={page <= 1} onClick={() => fetchReviews(search, page - 1)}
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
+            <span className="text-xs text-foreground-muted whitespace-nowrap">Page {page} of {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => fetchReviews(search, page + 1)}
+              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+          </div>
         </div>
       )}
 

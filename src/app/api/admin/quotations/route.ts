@@ -54,7 +54,9 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get('q') || ''
     const from = searchParams.get('from') || ''
     const to = searchParams.get('to') || ''
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200)
+    const pageSize = Math.min(parseInt(searchParams.get('pageSize') || searchParams.get('limit') || '25'), 200)
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const offset = (page - 1) * pageSize
 
     const conditions: string[] = []
     const params: any[] = []
@@ -71,8 +73,14 @@ export async function GET(request: NextRequest) {
     if (to) { conditions.push(`quote_date <= $${i++}`); params.push(to) }
 
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
-    params.push(limit)
 
+    const countRow = await queryOne<{ total: string }>(
+      `SELECT COUNT(*)::text AS total FROM quotations ${where}`,
+      params
+    )
+    const total = parseInt(countRow?.total || '0', 10)
+
+    const dataParams = [...params, pageSize, offset]
     const rows = await queryMany(
       `SELECT id, quote_number, quote_date, status, consignee_name, consignee_addr1, consignee_addr2,
               consignee_city, consignee_state, consignee_gstin, consignee_phone, consignee_pincode,
@@ -87,10 +95,10 @@ export async function GET(request: NextRequest) {
               cgst_amount, sgst_amount, converted_order_id,
               view_token, created_at,
               EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = quotations.id) AS from_rfq
-       FROM quotations ${where} ORDER BY created_at DESC LIMIT $${i}`,
-      params
+       FROM quotations ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+      dataParams
     )
-    return NextResponse.json({ quotations: rows || [] })
+    return NextResponse.json({ quotations: rows || [], total, page, pageSize })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 })
   }

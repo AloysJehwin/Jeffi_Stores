@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryMany } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +14,18 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url)
   const status = (url.searchParams.get('status') || 'proposed').toLowerCase()
-  const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 200)
+  const pageSize = Math.min(parseInt(url.searchParams.get('pageSize') || url.searchParams.get('limit') || '25', 10), 200)
+  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
+  const offset = (page - 1) * pageSize
+
+  const countRow = await queryOne<{ total: string }>(
+    `SELECT COUNT(*)::text AS total
+       FROM product_ai_enrichment_log l
+       JOIN products p ON p.id = l.product_id
+      WHERE ($1 = 'all' OR l.status = $1)`,
+    [status]
+  )
+  const total = parseInt(countRow?.total || '0', 10)
 
   const rows = await queryMany<{
     id: string
@@ -46,9 +57,9 @@ export async function GET(req: NextRequest) {
        JOIN products p ON p.id = l.product_id
       WHERE ($1 = 'all' OR l.status = $1)
       ORDER BY l.proposed_at DESC
-      LIMIT $2`,
-    [status, limit]
+      LIMIT $2 OFFSET $3`,
+    [status, pageSize, offset]
   )
 
-  return NextResponse.json({ items: rows })
+  return NextResponse.json({ items: rows, total, page, pageSize })
 }

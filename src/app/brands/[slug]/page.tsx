@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import ProductCard from '@/components/visitor/ProductCard'
+import Pagination from '@/components/ui/Pagination'
+
+const PAGE_SIZE = 25
 
 async function getBrandBySlug(slug: string) {
   return queryOne(
@@ -11,8 +14,15 @@ async function getBrandBySlug(slug: string) {
   )
 }
 
-async function getBrandProducts(brandId: string) {
-  return queryMany(`
+async function getBrandProducts(brandId: string, page: number) {
+  const offset = (page - 1) * PAGE_SIZE
+  const countRow = await queryOne<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM products WHERE brand_id = $1 AND is_active = true`,
+    [brandId]
+  )
+  const total = parseInt(countRow?.total || '0', 10)
+
+  const products = await queryMany(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
       json_build_object('id', b.id, 'name', b.name) AS brands,
@@ -29,13 +39,18 @@ async function getBrandProducts(brandId: string) {
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.brand_id = $1 AND p.is_active = true
     ORDER BY p.created_at DESC
-  `, [brandId])
+    LIMIT $2 OFFSET $3
+  `, [brandId, PAGE_SIZE, offset])
+
+  return { products, total }
 }
 
 export default async function BrandDetailPage({
   params,
+  searchParams,
 }: {
   params: { slug: string }
+  searchParams: { page?: string }
 }) {
   const brand = await getBrandBySlug(params.slug)
 
@@ -43,7 +58,13 @@ export default async function BrandDetailPage({
     notFound()
   }
 
-  const products = await getBrandProducts(brand.id)
+  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const { products, total } = await getBrandProducts(brand.id, page)
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  function buildPageUrl(p: number) {
+    return p > 1 ? `/brands/${params.slug}?page=${p}` : `/brands/${params.slug}`
+  }
 
   return (
     <div className="bg-surface min-h-screen">
@@ -93,45 +114,48 @@ export default async function BrandDetailPage({
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-foreground">
-              Products ({products.length})
+              Products ({total})
             </h2>
           </div>
 
           {products.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-              {products.map((product) => {
-                const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-                const hasVariants = product.has_variants
-                const displayPrice = hasVariants && product.variant_min_price
-                  ? product.variant_min_price
-                  : (product.price_ex_gst || product.base_price)
-                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
-                const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
-                const inclPrice = hasVariants && product.variant_min_price
-                  ? Number(product.variant_min_price)
-                  : Number(product.base_price)
-                const mrpDiscount = mrp && mrp > inclPrice
-                  ? Math.round(((mrp - inclPrice) / mrp) * 100)
-                  : 0
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                {products.map((product) => {
+                  const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+                  const hasVariants = product.has_variants
+                  const displayPrice = hasVariants && product.variant_min_price
+                    ? product.variant_min_price
+                    : (product.price_ex_gst || product.base_price)
+                  const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                  const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                  const inclPrice = hasVariants && product.variant_min_price
+                    ? Number(product.variant_min_price)
+                    : Number(product.base_price)
+                  const mrpDiscount = mrp && mrp > inclPrice
+                    ? Math.round(((mrp - inclPrice) / mrp) * 100)
+                    : 0
 
-                return (
-                  <ProductCard
-                    key={product.id}
-                    id={product.id}
-                    name={product.name}
-                    slug={product.slug}
-                    hasVariants={hasVariants}
-                    displayPrice={Number(displayPrice)}
-                    mrp={mrp}
-                    mrpDiscount={mrpDiscount}
-                    effectiveStock={effectiveStock}
-                    primaryImage={primaryImage || null}
-                    brandName={product.brands?.name || null}
-                    categoryName={product.categories?.name || null}
-                  />
-                )
-              })}
-            </div>
+                  return (
+                    <ProductCard
+                      key={product.id}
+                      id={product.id}
+                      name={product.name}
+                      slug={product.slug}
+                      hasVariants={hasVariants}
+                      displayPrice={Number(displayPrice)}
+                      mrp={mrp}
+                      mrpDiscount={mrpDiscount}
+                      effectiveStock={effectiveStock}
+                      primaryImage={primaryImage || null}
+                      brandName={product.brands?.name || null}
+                      categoryName={product.categories?.name || null}
+                    />
+                  )
+                })}
+              </div>
+              <Pagination page={page} totalPages={totalPages} buildHref={buildPageUrl} />
+            </>
           ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
               <svg className="mx-auto h-24 w-24 text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

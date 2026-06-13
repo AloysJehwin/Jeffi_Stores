@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { Check, ExternalLink } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -72,7 +73,8 @@ function todayISO() {
 }
 
 export default function QuotationsClient() {
-  const { showToast, showConfirm } = useToast()
+  const { showToast } = useToast()
+  const confirm = useConfirm()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [view, setViewState] = useState<View>(() => {
@@ -106,6 +108,8 @@ export default function QuotationsClient() {
     }
   }
   const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [selectedQuote, setSelectedQuote] = useState<Quotation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -115,6 +119,9 @@ export default function QuotationsClient() {
   const [toDate, setToDate] = useState(searchParams.get('to') || '')
   const [sortCol, setSortCol] = useState<string | undefined>(undefined)
   const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
+
+  const PAGE_SIZE = 25
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   function syncUrl(patch: Record<string, string>) {
     const p = new URLSearchParams(window.location.search)
@@ -209,7 +216,7 @@ export default function QuotationsClient() {
     : quotations
 
 
-  async function loadList() {
+  async function loadList(p = 1) {
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -217,9 +224,13 @@ export default function QuotationsClient() {
       if (searchQ) params.set('q', searchQ)
       if (fromDate) params.set('from', fromDate)
       if (toDate) params.set('to', toDate)
+      params.set('page', String(p))
+      params.set('pageSize', String(PAGE_SIZE))
       const res = await fetch(`/api/admin/quotations?${params}`)
       const data = await res.json()
       setQuotations(data.quotations || [])
+      setTotal(data.total || 0)
+      setPage(p)
     } catch {
       setError('Failed to load quotations')
     } finally {
@@ -227,7 +238,7 @@ export default function QuotationsClient() {
     }
   }
 
-  useEffect(() => { if (view === 'list') loadList() }, [view, statusFilter])
+  useEffect(() => { if (view === 'list') loadList(1) }, [view, statusFilter, searchQ, fromDate, toDate])
 
   function newQuotation() {
     setEditId(null)
@@ -456,12 +467,11 @@ export default function QuotationsClient() {
   }
 
   async function deleteQuote(id: string) {
-    const confirmed = await showConfirm({
+    const confirmed = await confirm({
       title: 'Delete Quotation',
       message: 'Delete this draft quotation? This cannot be undone.',
-      confirmText: 'Delete',
-      type: 'danger',
-      onConfirm: () => {},
+      confirmLabel: 'Delete',
+      variant: 'danger',
     })
     if (!confirmed) return
     try {
@@ -576,7 +586,7 @@ export default function QuotationsClient() {
                 inputClassName={inputCls + ' pr-9'}
               />
             </div>
-            <button onClick={loadList} className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors">
+            <button onClick={() => loadList(1)} className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors">
               Search
             </button>
             {(searchQ || statusFilter !== 'all' || fromDate || toDate) && (
@@ -756,6 +766,21 @@ export default function QuotationsClient() {
               </tbody>
             </table>
           </div>
+          {totalPages > 1 && (
+            <div className="px-4 py-3 border-t border-border-default bg-surface-elevated flex items-center justify-between gap-2">
+              <p className="text-xs text-foreground-muted whitespace-nowrap">
+                <span className="font-medium text-foreground">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}</span>
+                {' '}of <span className="font-medium text-foreground">{total}</span> quotations
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button disabled={page <= 1} onClick={() => loadList(page - 1)}
+                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Prev</button>
+                <span className="text-xs text-foreground-muted whitespace-nowrap">Page {page} of {totalPages}</span>
+                <button disabled={page >= totalPages} onClick={() => loadList(page + 1)}
+                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors">Next</button>
+              </div>
+            </div>
+          )}
         </div>
         {selectedQuote && <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />}
 
