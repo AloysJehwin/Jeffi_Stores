@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 
 declare global {
   namespace JSX {
@@ -20,6 +20,18 @@ interface ModelViewerProps {
   exposure?: number
 }
 
+let loaderPromise: Promise<void> | null = null
+
+function loadModelViewer(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  if (customElements.get('model-viewer')) return Promise.resolve()
+  if (loaderPromise) return loaderPromise
+  loaderPromise = import('@google/model-viewer').then(() => undefined).catch(() => {
+    loaderPromise = null
+  })
+  return loaderPromise
+}
+
 export default function ModelViewer({
   src,
   alt = '',
@@ -29,15 +41,40 @@ export default function ModelViewer({
   cameraOrbit = '30deg 80deg 105%',
   exposure = 1,
 }: ModelViewerProps) {
-  const mounted = useRef(false)
+  const [ready, setReady] = useState(false)
+  const [errored, setErrored] = useState(false)
 
   useEffect(() => {
-    if (mounted.current) return
-    mounted.current = true
-    if (typeof window === 'undefined') return
-    if (customElements.get('model-viewer')) return
-    import('@google/model-viewer').catch(() => {/* swallow */})
+    let cancelled = false
+    loadModelViewer().then(() => {
+      if (cancelled) return
+      if (typeof window !== 'undefined' && customElements.get('model-viewer')) {
+        setReady(true)
+      } else {
+        setErrored(true)
+      }
+    })
+    return () => { cancelled = true }
   }, [])
+
+  if (errored) {
+    return poster ? (
+      <img src={poster} alt={alt} className={className} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+    ) : null
+  }
+
+  if (!ready) {
+    return (
+      <div className={className} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {poster ? (
+          <img src={poster} alt={alt} style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.5 }} />
+        ) : (
+          <div style={{ width: 48, height: 48, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        )}
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    )
+  }
 
   return (
     <model-viewer
@@ -53,7 +90,7 @@ export default function ModelViewer({
       interaction-prompt="none"
       shadow-intensity="1"
       exposure={exposure}
-      loading="lazy"
+      loading="eager"
       reveal="auto"
       style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
     />
