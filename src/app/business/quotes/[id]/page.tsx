@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { bp } from '@/lib/business-path'
 import { applyDiscount } from '@/lib/pricing'
@@ -118,7 +119,11 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
   const [respondingAction, setRespondingAction] = useState<'accept' | 'decline' | null>(null)
   const [counterReplyText, setCounterReplyText] = useState('')
   const [showCounterInput, setShowCounterInput] = useState(false)
+  const [resubmitting, setResubmitting] = useState(false)
+  const [resubmitNotes, setResubmitNotes] = useState('')
+  const [resubmitError, setResubmitError] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
 
   const load = () => {
     setLoading(true)
@@ -243,6 +248,32 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     }
   }
 
+  const handleResubmit = async () => {
+    setResubmitError('')
+    setResubmitting(true)
+    try {
+      const res = await fetch(`/api/business/rfqs/${params.id}/resubmit`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: resubmitNotes.trim() || undefined }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setResubmitError(data?.error || 'Failed to resubmit')
+        return
+      }
+      const newId = data?.rfq?.id
+      if (newId) {
+        router.push(bp(`/business/quotes/${newId}`))
+      }
+    } catch (e: any) {
+      setResubmitError(e?.message || 'Network error')
+    } finally {
+      setResubmitting(false)
+    }
+  }
+
   if (loading) return (
     <div className="bg-surface min-h-screen flex items-center justify-center">
       <div className="animate-spin w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full" />
@@ -314,10 +345,29 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
             </div>
           )}
 
-          {rfq.admin_note && (
-            <div className={`mt-4 rounded-lg p-3 text-sm ${rfq.status === 'rejected' ? 'bg-red-900/30 border border-red-800 text-red-300' : 'bg-blue-900/30 border border-blue-800 text-blue-300'}`}>
-              <p className="font-semibold mb-1">{rfq.status === 'rejected' ? 'Reason for rejection:' : 'Note from our team:'}</p>
-              <p className="font-normal">{rfq.admin_note}</p>
+          {rfq.status === 'rejected' && (
+            <div className="mt-4 rounded-lg border border-amber-800 bg-amber-900/20 p-4 text-sm">
+              <p className="font-semibold text-amber-200 mb-1">Need to revise and try again?</p>
+              <p className="text-amber-300/90 mb-3">
+                You can submit a new quote request with the same items. Our team will review it as a fresh ticket.
+              </p>
+              <textarea
+                value={resubmitNotes}
+                onChange={e => setResubmitNotes(e.target.value)}
+                rows={2}
+                placeholder="Optional: any updated context or reason for the resubmission..."
+                className="w-full px-3 py-2 rounded-lg border border-amber-700 bg-amber-950/40 text-amber-100 placeholder:text-amber-400/70 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 mb-3"
+              />
+              {resubmitError && (
+                <p className="text-xs text-red-300 mb-2">{resubmitError}</p>
+              )}
+              <button
+                onClick={handleResubmit}
+                disabled={resubmitting}
+                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-900 text-sm font-semibold transition-colors disabled:opacity-60"
+              >
+                {resubmitting ? 'Submitting…' : 'Request New Quote'}
+              </button>
             </div>
           )}
         </div>
