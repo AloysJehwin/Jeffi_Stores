@@ -168,7 +168,7 @@ export async function POST(
       const saveAsDraft = insufficientItems.length > 0
       const orderStatus = saveAsDraft
         ? (enableDelivery ? 'processing' : 'draft')
-        : 'processing'
+        : (enableDelivery ? 'processing' : 'delivered')
 
       const orderResult = await client.query(
         `INSERT INTO orders (
