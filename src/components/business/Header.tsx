@@ -61,8 +61,8 @@ export default function BusinessHeader() {
               <div className="flex items-center gap-2 sm:gap-3">
                 <img src="/images/logo.png" alt="Jeffi Stores Logo" className="h-8 sm:h-10 lg:h-12 w-auto" />
                 <div>
-                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400">Jeffi Stores</div>
-                  <div className="hidden sm:block text-xs text-accent-500 font-semibold">Business</div>
+                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 leading-tight">Jeffi Stores</div>
+                  <div className="text-[10px] sm:text-xs text-accent-500 font-semibold leading-tight">Business</div>
                 </div>
               </div>
             </Link>
