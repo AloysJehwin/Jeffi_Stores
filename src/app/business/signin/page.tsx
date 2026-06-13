@@ -235,7 +235,7 @@ function BusinessSignInPage() {
   return (
     <>
     <BusinessPublicHeader />
-    <div className="min-h-screen grid lg:grid-cols-2 pt-14 sm:pt-16 lg:pt-20">
+    <div className="min-h-screen grid lg:grid-cols-2 pt-16 lg:pt-20">
       {/* Left — form */}
       <div className="flex items-center justify-center px-6 py-12 bg-surface">
         <div className="w-full max-w-sm">
