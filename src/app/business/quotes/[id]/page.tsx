@@ -297,9 +297,23 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
 
   const canEdit = EDITABLE_STATUSES.includes(rfq.status)
   const canMessage = !['converted', 'rejected', 'offer_accepted'].includes(rfq.status)
-  const totalRequested = items.reduce((sum, i) => sum + (i.requested_price ? Number(i.requested_price) * i.quantity : 0), 0)
-
   const latestCounter = [...messages].reverse().find(m => m.sender === 'admin' && m.counter_items?.length)
+  const latestCustomerCounter = [...messages].reverse().find(m => m.sender === 'customer' && m.counter_items?.length)
+  const customerCounterMap: Record<string, number> = {}
+  if (latestCustomerCounter?.counter_items) {
+    for (const ci of latestCustomerCounter.counter_items) {
+      customerCounterMap[ci.rfq_item_id] = ci.offered_price
+    }
+  }
+  const targetFor = (item: RFQItem): number | null => {
+    if (customerCounterMap[item.id] != null) return customerCounterMap[item.id]
+    if (item.requested_price != null) return Number(item.requested_price)
+    return null
+  }
+  const totalRequested = items.reduce((sum, i) => {
+    const t = targetFor(i)
+    return sum + (t != null ? t * i.quantity : 0)
+  }, 0)
   const counterMap: Record<string, number> = {}
   if (latestCounter?.counter_items) {
     for (const ci of latestCounter.counter_items) {
@@ -428,9 +442,11 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                       : offered != null ? Number(offered) : null
                     const offeredDiscountSource = item.quoted_rate != null ? item.quoted_discount_pct : null
 
+                    // resolved customer target — uses latest customer counter offer if present, else original requested_price
+                    const targetPrice = targetFor(item)
                     // requested discount % vs our business price
-                    const reqDiscountPct = item.requested_price != null && shownCatalogPrice && shownCatalogPrice > 0
-                      ? Math.round((1 - Number(item.requested_price) / Number(shownCatalogPrice)) * 100)
+                    const reqDiscountPct = targetPrice != null && shownCatalogPrice && shownCatalogPrice > 0
+                      ? Math.round((1 - Number(targetPrice) / Number(shownCatalogPrice)) * 100)
                       : null
                     // offered discount % vs our business price
                     const offeredDiscountPct = offeredDiscountSource != null
@@ -523,12 +539,12 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                           )}
 
                           {/* Your Target */}
-                          <div className={`rounded-xl px-3 py-2.5 ${item.requested_price != null ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-surface-secondary'}`}>
+                          <div className={`rounded-xl px-3 py-2.5 ${targetPrice != null ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-surface-secondary'}`}>
                             <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Your Target</p>
-                            {item.requested_price != null ? (
+                            {targetPrice != null ? (
                               <>
                                 <p className="text-sm font-bold text-amber-700 dark:text-amber-400 leading-none">
-                                  ₹{Number(item.requested_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{Number(targetPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </p>
                                 {reqDiscountPct != null && reqDiscountPct > 0 && (
                                   <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-500 mt-1">
@@ -572,9 +588,9 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                             ) : (
                               <p className="text-sm text-foreground-muted leading-none">—</p>
                             )}
-                            {item.requested_price != null && (
+                            {targetPrice != null && (
                               <p className="text-[10px] text-foreground-muted mt-1">
-                                Target: ₹{(Number(item.requested_price) * item.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                                Target: ₹{(Number(targetPrice) * item.quantity).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                               </p>
                             )}
                           </div>
