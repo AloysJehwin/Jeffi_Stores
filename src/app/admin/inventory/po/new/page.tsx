@@ -90,11 +90,37 @@ export default function NewPOPage() {
     loadPickerProducts(catId, '')
   }
 
+  function mergeOrReplaceLineItem(targetItemId: string, populated: POLineItem): POLineItem[] {
+    if (!populated.product_id) {
+      return lineItems.map(it => it.id === targetItemId ? populated : it)
+    }
+    const dupIdx = lineItems.findIndex(it =>
+      it.id !== targetItemId &&
+      it.product_id === populated.product_id &&
+      (it.variant_id || '') === (populated.variant_id || '')
+    )
+    if (dupIdx === -1) {
+      return lineItems.map(it => it.id === targetItemId ? populated : it)
+    }
+    const addQty = parseFloat(String(populated.quantity)) || 1
+    return lineItems
+      .map((it, i) => {
+        if (i === dupIdx) {
+          const existing = parseFloat(String(it.quantity)) || 0
+          return { ...it, quantity: String(existing + addQty) }
+        }
+        return it
+      })
+      .filter(it => it.id !== targetItemId)
+  }
+
   function applyPickerProduct(p: PickerProduct) {
     if (!pickerItemId) return
+    const target = lineItems.find(it => it.id === pickerItemId)
+    if (!target) return
     const displayName = p.variant_name ? `${p.name} — ${p.variant_name}` : p.name
-    setLineItems(items => items.map(it => it.id !== pickerItemId ? it : {
-      ...it,
+    const populated: POLineItem = {
+      ...target,
       product_id: p.product_id,
       product_name: displayName,
       sku: p.sku || '',
@@ -102,7 +128,8 @@ export default function NewPOPage() {
       tax_rate: p.gst_percentage != null ? String(Math.round(Number(p.gst_percentage))) : '0',
       hsn_code: p.hsn_code || '',
       mrp: Number(p.mrp) || 0,
-    }))
+    }
+    setLineItems(mergeOrReplaceLineItem(pickerItemId, populated))
     setPickerOpen(false)
     setPickerItemId(null)
   }
@@ -260,7 +287,8 @@ export default function NewPOPage() {
                           onSelect={s => {
                             const d = decodePOLineItemId(s.id)
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
-                            setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code }))
+                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code }
+                            setLineItems(mergeOrReplaceLineItem(it.id, populated))
                           }}
                           inputClassName={inputCls} placeholder="Search by product name..." />
                       )}
@@ -270,7 +298,8 @@ export default function NewPOPage() {
                           onSelect={s => {
                             const d = decodePOLineItemId(s.id)
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
-                            setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code }))
+                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code }
+                            setLineItems(mergeOrReplaceLineItem(it.id, populated))
                           }}
                           inputClassName={inputCls + ' font-mono'} placeholder="e.g. JFS-1234" />
                       )}
@@ -326,6 +355,19 @@ export default function NewPOPage() {
               )
             })}
           </div>
+
+          {lineItems.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setLineItems([...lineItems, newPOLineItem()])}
+              className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Item
+            </button>
+          )}
 
           {lineItems.some(it => it.unit_cost) && (
             <div className="border-t border-border-default pt-3 mt-3 flex justify-end">
