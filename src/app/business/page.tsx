@@ -200,17 +200,6 @@ export default async function BusinessLandingPage() {
             </div>
           </div>
         </section>
-
-        <footer className="py-8 text-center text-xs text-foreground-muted border-t border-border-default">
-          <p>© {new Date().getFullYear()} Jeffi Stores · Business Portal</p>
-          <div className="flex justify-center gap-4 mt-2">
-            <Link href="/" className="hover:text-foreground transition-colors">Consumer storefront</Link>
-            <span>·</span>
-            <Link href={bp('/business/support')} className="hover:text-foreground transition-colors">Support</Link>
-            <span>·</span>
-            <Link href="/legal" className="hover:text-foreground transition-colors">Legal</Link>
-          </div>
-        </footer>
       </main>
     </div>
   )
