@@ -29,7 +29,7 @@ export default async function BusinessLandingPage() {
     <div className="bg-surface min-h-screen">
       <BusinessPublicHeader authState={authState} />
 
-      <main className="pt-16 lg:pt-20">
+      <main className="pt-14 sm:pt-16 lg:pt-20">
         <section className="relative bg-gradient-to-br from-secondary-700 via-secondary-600 to-secondary-800 overflow-hidden">
           <div className="container mx-auto px-4 sm:px-6 py-16 sm:py-20 md:py-28 relative z-10">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
