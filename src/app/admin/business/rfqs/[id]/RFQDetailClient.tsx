@@ -232,8 +232,17 @@ export default function RFQDetailClient({ id }: { id: string }) {
     setSendingReply(false)
   }
 
-  // requested_price is incl-GST (stored as typed in the portal)
+  const latestCustomerCounter = [...messages].reverse().find(m => m.sender === 'customer' && m.counter_items?.length)
+  const customerCounterMap: Record<string, number> = {}
+  if (latestCustomerCounter?.counter_items) {
+    for (const ci of latestCustomerCounter.counter_items) {
+      customerCounterMap[ci.rfq_item_id] = ci.offered_price
+    }
+  }
+  // requested_price is incl-GST (stored as typed in the portal). Customer's
+  // latest counter (if any) takes precedence over the original requested_price.
   const reqInclGst = (item: RFQItem) => {
+    if (customerCounterMap[item.id] != null) return Number(customerCounterMap[item.id])
     if (item.requested_price == null) return null
     return Number(item.requested_price)
   }
@@ -249,14 +258,14 @@ export default function RFQDetailClient({ id }: { id: string }) {
     const mrp = resolveItemMrp(i)
     return sum + (mrp != null ? mrp * i.quantity : 0)
   }, 0)
-  // Only count selling/business price for items that actually have a requested price (for discount comparison)
+  // Only count selling/business price for items that actually have a target price (for discount comparison)
   const totalSellingForDiscountedItems = items.reduce((sum, i) => {
-    if (!i.requested_price) return sum
+    if (reqInclGst(i) == null) return sum
     const p = resolveItemSellingPrice(i) ?? resolveItemMrp(i)
     return sum + (p != null ? p * i.quantity : 0)
   }, 0)
   const totalBusinessPriceForRequestedItems = items.reduce((sum, i) => {
-    if (!i.requested_price) return sum
+    if (reqInclGst(i) == null) return sum
     const sell = resolveItemSellingPrice(i)
     if (sell == null) return sum
     const catId = i.product_category_id
@@ -955,7 +964,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                placeholder={item.requested_price != null ? String(item.requested_price) : '—'}
+                                placeholder={reqInclGst(item) != null ? String(reqInclGst(item)) : '—'}
                                 value={counterInputs[item.id] ?? ''}
                                 onChange={e => setCounterInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
                                 className="w-full pl-6 pr-2 py-1.5 text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
@@ -1010,7 +1019,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                placeholder={item.requested_price != null ? String(item.requested_price) : '—'}
+                                placeholder={reqInclGst(item) != null ? String(reqInclGst(item)) : '—'}
                                 value={counterInputs[item.id] ?? ''}
                                 onChange={e => setCounterInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
                                 className="w-full pl-6 pr-2 py-1.5 text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
