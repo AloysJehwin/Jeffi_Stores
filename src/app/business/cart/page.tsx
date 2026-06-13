@@ -3,6 +3,7 @@
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -21,7 +22,8 @@ interface AppliedCoupon {
 export default function CartPage() {
   const { cartItems, savedItems, cartCount, isLoading, removeFromCart, updateQuantity, saveForLater, moveToCart, getCartTotal, getCartTax } = useCart()
   const { user } = useAuth()
-  const { showToast, showConfirm } = useToast()
+  const { showToast } = useToast()
+  const confirm = useConfirm()
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
   const [couponCode, setCouponCode] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
@@ -72,21 +74,20 @@ export default function CartPage() {
   }
 
   const handleRemove = async (cartItemId: string) => {
-    showConfirm({
+    const ok = await confirm({
       title: 'Remove from Cart',
       message: 'Are you sure you want to remove this item from your cart?',
-      confirmText: 'Remove',
-      cancelText: 'Cancel',
-      type: 'warning',
-      onConfirm: async () => {
-        try {
-          await removeFromCart(cartItemId)
-          showToast('Item removed from cart', 'success')
-        } catch (error) {
-          showToast('Failed to remove item', 'error')
-        }
-      },
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
     })
+    if (!ok) return
+    try {
+      await removeFromCart(cartItemId)
+      showToast('Item removed from cart', 'success')
+    } catch (error) {
+      showToast('Failed to remove item', 'error')
+    }
   }
 
   if (isLoading) {

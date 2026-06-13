@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import DatePicker from '@/components/ui/DatePicker'
@@ -81,6 +82,7 @@ function calcTotals(items: LineItem[]) {
 
 export default function CashSaleClient() {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [view, setView] = useState<View>('list')
@@ -90,7 +92,6 @@ export default function CashSaleClient() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [selectedSale, setSelectedSale] = useState<CashSale | null>(null)
-  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
   const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
@@ -172,6 +173,14 @@ export default function CashSaleClient() {
   }
 
   async function cancelSale(id: string) {
+    const ok = await confirm({
+      title: 'Cancel Sale',
+      message: 'Cancel this cash sale? Stock will be restocked. This action cannot be undone.',
+      confirmLabel: 'Cancel Sale',
+      cancelLabel: 'Keep',
+      variant: 'danger',
+    })
+    if (!ok) return
     setCancellingId(id)
     try {
       const res = await fetch(`/api/admin/cash-sale/${id}/detail`, {
@@ -188,7 +197,6 @@ export default function CashSaleClient() {
       showToast('Failed to cancel sale', 'error')
     } finally {
       setCancellingId(null)
-      setConfirmCancelId(null)
     }
   }
 
@@ -666,33 +674,16 @@ export default function CashSaleClient() {
                             </svg>
                           </a>
                           {sale.status !== 'cancelled' && (
-                            confirmCancelId === sale.id ? (
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => cancelSale(sale.id)}
-                                  disabled={cancellingId === sale.id}
-                                  className="px-2 py-1 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50 transition-colors"
-                                >
-                                  {cancellingId === sale.id ? '…' : 'Yes'}
-                                </button>
-                                <button
-                                  onClick={() => setConfirmCancelId(null)}
-                                  className="px-2 py-1 text-xs font-semibold border border-border-default text-foreground-secondary hover:bg-surface-secondary rounded-lg transition-colors"
-                                >
-                                  No
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setConfirmCancelId(sale.id)}
-                                title="Cancel Sale"
-                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            )
+                            <button
+                              onClick={() => cancelSale(sale.id)}
+                              disabled={cancellingId === sale.id}
+                              title="Cancel Sale"
+                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
                           )}
                         </div>
                       </td>
@@ -757,31 +748,13 @@ export default function CashSaleClient() {
                       View Detail
                     </a>
                     {sale.status !== 'cancelled' && (
-                      confirmCancelId === sale.id ? (
-                        <div className="flex items-center gap-2 ml-auto">
-                          <span className="text-xs text-foreground-muted">Restock?</span>
-                          <button
-                            onClick={() => cancelSale(sale.id)}
-                            disabled={cancellingId === sale.id}
-                            className="text-xs font-semibold text-white bg-red-600 hover:bg-red-700 px-2 py-0.5 rounded disabled:opacity-50 transition-colors"
-                          >
-                            {cancellingId === sale.id ? '…' : 'Yes'}
-                          </button>
-                          <button
-                            onClick={() => setConfirmCancelId(null)}
-                            className="text-xs font-medium text-foreground-secondary hover:text-foreground"
-                          >
-                            No
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmCancelId(sale.id)}
-                          className="ml-auto text-xs font-medium text-red-600 dark:text-red-400 hover:underline"
-                        >
-                          Cancel
-                        </button>
-                      )
+                      <button
+                        onClick={() => cancelSale(sale.id)}
+                        disabled={cancellingId === sale.id}
+                        className="ml-auto text-xs font-medium text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
                     )}
                   </div>
                 </div>
@@ -824,10 +797,18 @@ export default function CashSaleClient() {
 
 function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClose: () => void; onCancelled: () => void }) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [cancelling, setCancelling] = useState(false)
-  const [confirmCancel, setConfirmCancel] = useState(false)
 
   async function handleCancel() {
+    const ok = await confirm({
+      title: 'Cancel Sale',
+      message: 'Cancel this cash sale? Stock will be restocked. This action cannot be undone.',
+      confirmLabel: 'Cancel Sale',
+      cancelLabel: 'Keep',
+      variant: 'danger',
+    })
+    if (!ok) return
     setCancelling(true)
     try {
       const res = await fetch(`/api/admin/cash-sale/${sale.id}/detail`, {
@@ -844,7 +825,6 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
       showToast('Failed to cancel sale', 'error')
     } finally {
       setCancelling(false)
-      setConfirmCancel(false)
     }
   }
 
@@ -955,34 +935,16 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
             </a>
             {!isCancelled && (
               <div className="ml-auto">
-                {!confirmCancel ? (
-                  <button
-                    onClick={() => setConfirmCancel(true)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Cancel Sale
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-foreground-secondary">Restock inventory?</span>
-                    <button
-                      onClick={handleCancel}
-                      disabled={cancelling}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 transition-colors"
-                    >
-                      {cancelling ? 'Cancelling…' : 'Confirm'}
-                    </button>
-                    <button
-                      onClick={() => setConfirmCancel(false)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
-                    >
-                      No
-                    </button>
-                  </div>
-                )}
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  {cancelling ? 'Cancelling…' : 'Cancel Sale'}
+                </button>
               </div>
             )}
           </div>

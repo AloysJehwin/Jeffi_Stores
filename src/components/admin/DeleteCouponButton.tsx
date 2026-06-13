@@ -3,14 +3,24 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 export default function DeleteCouponButton({ id, code }: { id: string; code: string }) {
-  const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const { showToast } = useToast()
+  const confirm = useConfirm()
 
   const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete Coupon',
+      message: `Delete coupon "${code}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
+
     setLoading(true)
     const res = await fetch(`/api/admin/coupons/${id}`, { method: 'DELETE' })
     if (res.ok) {
@@ -20,23 +30,11 @@ export default function DeleteCouponButton({ id, code }: { id: string; code: str
       showToast(data.error || 'Failed to delete coupon', 'error')
     }
     setLoading(false)
-    setConfirming(false)
-  }
-
-  if (confirming) {
-    return (
-      <span className="flex items-center gap-1">
-        <button onClick={handleDelete} disabled={loading} className="text-xs text-red-600 hover:underline font-medium">
-          {loading ? 'Deleting…' : 'Confirm'}
-        </button>
-        <button onClick={() => setConfirming(false)} className="text-xs text-foreground-muted hover:underline">Cancel</button>
-      </span>
-    )
   }
 
   return (
-    <button onClick={() => setConfirming(true)} className="text-red-500 hover:underline text-sm">
-      Delete
+    <button onClick={handleDelete} disabled={loading} className="text-red-500 hover:underline text-sm disabled:opacity-50">
+      {loading ? 'Deleting…' : 'Delete'}
     </button>
   )
 }

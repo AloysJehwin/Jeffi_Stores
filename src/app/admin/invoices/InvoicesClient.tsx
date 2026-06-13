@@ -8,6 +8,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, { newLineItem, type LineItem as LILineItem } from '@/components/admin/LineItemsSection'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
@@ -78,6 +79,7 @@ const SOURCE_COLORS: Record<string, string> = {
 
 export default function InvoicesClient() {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [view, setViewState] = useState<View>(() => {
@@ -121,7 +123,6 @@ export default function InvoicesClient() {
   const [loading, setLoading] = useState(true)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
-  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const [sourceFilter, setSourceFilter] = useState(searchParams.get('source') || '')
   const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
@@ -335,8 +336,14 @@ export default function InvoicesClient() {
   }
 
   async function cancelInvoice(inv: Invoice) {
-    if (confirmCancelId !== inv.id) { setConfirmCancelId(inv.id); return }
-    setConfirmCancelId(null)
+    const ok = await confirm({
+      title: 'Cancel Invoice',
+      message: `Cancel invoice ${inv.invoice_number}? This action cannot be undone.`,
+      confirmLabel: 'Cancel Invoice',
+      cancelLabel: 'Keep',
+      variant: 'danger',
+    })
+    if (!ok) return
     setCancellingId(inv.id)
     try {
       const res = await fetch(`/api/admin/orders/${inv.id}/cancel`, { method: 'POST', credentials: 'include' })
@@ -797,7 +804,14 @@ export default function InvoicesClient() {
                   <tbody>
                     {drafts.map(draft => (
                       <tr key={draft.id} className="border-b border-amber-100 dark:border-amber-800/30 hover:bg-amber-100/40 dark:hover:bg-amber-900/20 transition-colors">
-                        <td className="px-4 py-3 font-mono text-xs text-foreground font-medium">{draft.order_number}</td>
+                        <td className="px-4 py-3 font-mono text-xs font-medium">
+                          <a
+                            href={ap(`/admin/invoices/${draft.id}`)}
+                            className="text-foreground hover:text-accent-500 hover:underline transition-colors"
+                          >
+                            {draft.order_number}
+                          </a>
+                        </td>
                         <td className="px-4 py-3 text-sm text-foreground">{draft.customer_name}</td>
                         <td className="px-4 py-3 text-xs text-foreground-secondary">{draft.customer_phone ? `+91 ${draft.customer_phone}` : '—'}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-foreground">
@@ -1080,35 +1094,16 @@ export default function InvoicesClient() {
                             </button>
                           )}
                           {inv.source === 'offline' && inv.status !== 'cancelled' && (
-                            confirmCancelId === inv.id ? (
-                              <div className="flex items-center gap-1.5 ml-1">
-                                <span className="text-xs text-foreground-secondary">Confirm?</span>
-                                <button
-                                  onClick={() => cancelInvoice(inv)}
-                                  disabled={cancellingId === inv.id}
-                                  className="text-xs text-red-600 hover:text-red-700 font-semibold disabled:opacity-50"
-                                >
-                                  {cancellingId === inv.id ? '…' : 'Yes'}
-                                </button>
-                                <button
-                                  onClick={() => setConfirmCancelId(null)}
-                                  className="text-xs text-foreground-muted hover:text-foreground font-medium"
-                                >
-                                  No
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => cancelInvoice(inv)}
-                                disabled={cancellingId === inv.id}
-                                title="Cancel Invoice"
-                                className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-red-500 transition-colors disabled:opacity-50"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            )
+                            <button
+                              onClick={() => cancelInvoice(inv)}
+                              disabled={cancellingId === inv.id}
+                              title="Cancel Invoice"
+                              className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-red-500 transition-colors disabled:opacity-50"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
                           )}
                             </>
                           )}
@@ -1225,32 +1220,13 @@ export default function InvoicesClient() {
                       </button>
                     )}
                     {inv.source === 'offline' && inv.status !== 'cancelled' && (
-                      confirmCancelId === inv.id ? (
-                        <>
-                          <span className="text-xs text-foreground-secondary">Cancel?</span>
-                          <button
-                            onClick={() => cancelInvoice(inv)}
-                            disabled={cancellingId === inv.id}
-                            className="text-xs text-red-600 font-semibold disabled:opacity-50"
-                          >
-                            {cancellingId === inv.id ? '…' : 'Yes'}
-                          </button>
-                          <button
-                            onClick={() => setConfirmCancelId(null)}
-                            className="text-xs text-foreground-muted"
-                          >
-                            No
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => cancelInvoice(inv)}
-                          disabled={cancellingId === inv.id}
-                          className="text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
-                        >
-                          Cancel
-                        </button>
-                      )
+                      <button
+                        onClick={() => cancelInvoice(inv)}
+                        disabled={cancellingId === inv.id}
+                        className="text-xs text-red-500 hover:text-red-700 font-medium disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
                     )}
                       </>
                     )}
