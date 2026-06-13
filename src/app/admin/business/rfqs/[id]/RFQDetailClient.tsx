@@ -239,10 +239,15 @@ export default function RFQDetailClient({ id }: { id: string }) {
       customerCounterMap[ci.rfq_item_id] = ci.offered_price
     }
   }
+  // Once an offer is accepted/converted, requested_price holds the agreed price
+  // (stamped server-side from the admin's last counter). Don't override it with
+  // the customer's prior counter in that case.
+  const isFinalState = !!rfq && ['offer_accepted', 'converted'].includes(rfq.status)
   // requested_price is incl-GST (stored as typed in the portal). Customer's
-  // latest counter (if any) takes precedence over the original requested_price.
+  // latest counter (if any) takes precedence over the original requested_price
+  // while the deal is still being negotiated.
   const reqInclGst = (item: RFQItem) => {
-    if (customerCounterMap[item.id] != null) return Number(customerCounterMap[item.id])
+    if (!isFinalState && customerCounterMap[item.id] != null) return Number(customerCounterMap[item.id])
     if (item.requested_price == null) return null
     return Number(item.requested_price)
   }
