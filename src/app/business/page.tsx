@@ -30,53 +30,45 @@ export default async function BusinessLandingPage() {
       <BusinessPublicHeader authState={authState} />
 
       <main className="pt-16 lg:pt-20">
-        <section className="relative bg-gradient-to-br from-secondary-700 via-secondary-600 to-secondary-800 overflow-hidden">
-          <div className="container mx-auto px-4 sm:px-6 py-16 sm:py-20 md:py-28 relative z-10">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-              <div>
-                <span className="inline-block bg-white/15 backdrop-blur-sm text-white font-bold uppercase tracking-widest rounded-full border border-white/30 text-xs px-3 py-1.5 mb-5">
+        <section className="relative bg-gradient-to-br from-secondary-700 via-secondary-600 to-secondary-800 overflow-hidden min-h-[calc(100svh-4rem)] flex items-center md:min-h-[calc(100vh-5rem)]">
+          <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 md:py-16 relative z-10 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-20 items-center">
+
+              <div className="md:order-1">
+                <span className="inline-block bg-white/15 backdrop-blur-sm text-white font-bold uppercase tracking-widest rounded-full border border-white/30 text-[10px] sm:text-xs px-3 py-1.5 mb-4 md:mb-6">
                   For Procurement Teams
                 </span>
-                <h1 className="font-extrabold text-white leading-[1.05] tracking-tight mb-5 text-[clamp(2rem,6vw,3.75rem)]">
+                <h1 className="font-extrabold text-white leading-[1.05] tracking-tight mb-3 sm:mb-5 md:mb-6 text-[clamp(2.25rem,8vw,5rem)] md:text-[clamp(3rem,6vw,5.5rem)]">
                   Industrial supplies <span className="text-accent-400">at business prices</span>
                 </h1>
-                <p className="text-white/85 leading-relaxed mb-8 max-w-xl text-[clamp(0.95rem,1.6vw,1.15rem)]">
+                <p className="text-white/85 leading-relaxed mb-6 sm:mb-8 max-w-md md:max-w-none text-[clamp(0.875rem,2.5vw,1.25rem)] md:text-[clamp(1rem,2vw,1.4rem)]">
                   Open a Jeffi Stores Business account and get category-tier discounts, GST-compliant invoicing,
-                  custom quotes for large orders, and a dedicated buying experience built for repeat procurement.
+                  custom quotes for large orders, and a dedicated buying experience.
                 </p>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-3 mb-4 sm:mb-6">
                   <Link
                     href={bp('/business/signup')}
-                    className="px-7 py-3.5 bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-colors text-base"
+                    className="bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-all px-5 py-2.5 text-sm sm:px-7 sm:py-3 sm:text-base md:px-8 md:py-4 md:text-lg"
                   >
                     Register Your Business
                   </Link>
                   <Link
                     href={bp('/business/signin')}
-                    className="px-7 py-3.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-colors text-base"
+                    className="bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-all px-5 py-2.5 text-sm sm:px-7 sm:py-3 sm:text-base md:px-8 md:py-4 md:text-lg"
                   >
                     Sign In
                   </Link>
                 </div>
-                <p className="text-white/60 text-xs mt-4">Approval typically takes 1 business day after document verification.</p>
+                <p className="text-white/60 text-xs sm:text-sm">Approval typically takes 1 business day after document verification.</p>
               </div>
 
-              <div className="hidden md:block">
-                <div className="relative bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 p-6">
-                  <div className="space-y-3">
-                    {[
-                      { label: 'Bulk Discount', value: 'up to 30%' },
-                      { label: 'GSTIN Invoicing', value: 'Auto' },
-                      { label: 'Quote Turnaround', value: '< 24h' },
-                      { label: 'Net-30 Credit', value: 'On approval' },
-                    ].map((s) => (
-                      <div key={s.label} className="flex items-center justify-between bg-white/10 rounded-xl px-4 py-3 border border-white/10">
-                        <span className="text-white/80 text-sm">{s.label}</span>
-                        <span className="text-white font-bold">{s.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div className="flex md:order-2 justify-center md:justify-end mt-4 md:mt-0">
+                <img
+                  src="/images/Welcome.png"
+                  alt="Industrial hardware and tools"
+                  className="w-80 sm:w-96 md:w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
+                  style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
+                />
               </div>
             </div>
           </div>
