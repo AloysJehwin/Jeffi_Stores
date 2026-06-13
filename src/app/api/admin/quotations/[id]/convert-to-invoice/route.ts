@@ -166,10 +166,9 @@ export async function POST(
       }
 
       const saveAsDraft = insufficientItems.length > 0
-      // Newly converted orders always start in 'processing'. The delivery toggle
-      // only controls whether a Delhivery shipment will be created later — it
-      // never means the order is already fulfilled.
-      const orderStatus = saveAsDraft ? 'draft' : 'processing'
+      const orderStatus = saveAsDraft
+        ? (enableDelivery ? 'processing' : 'draft')
+        : 'processing'
 
       const orderResult = await client.query(
         `INSERT INTO orders (
@@ -204,7 +203,7 @@ export async function POST(
           Math.round(totalSgst * 100) / 100,
           Math.round(totalIgst * 100) / 100,
           totalAmount,
-          enableDelivery && !saveAsDraft,
+          enableDelivery,
           `Converted from quotation ${quotation.quote_number}`,
         ]
       )
