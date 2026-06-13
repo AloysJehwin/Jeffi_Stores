@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><title>mv test</title>
+<style>body{background:#1a2535;color:#fff;font-family:system-ui;padding:20px;margin:0}
+model-viewer{width:600px;height:600px;background:rgba(255,255,255,0.05);border:2px dashed rgba(255,255,255,0.3);display:block;margin-top:10px}
+pre{background:rgba(0,0,0,0.4);padding:10px;font-size:12px;max-height:200px;overflow:auto}</style>
+</head><body>
+<h1>mv test (Draco)</h1>
+<p id="status">customElements: false</p>
+<pre id="log"></pre>
+<model-viewer id="mv" src="/models/business-hero.glb" alt="x" auto-rotate camera-controls
+  style="width:600px;height:600px"
+  onload="log('LOAD event fired')"
+  onerror="log('ERROR event fired')"
+  ></model-viewer>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.0.0/model-viewer.min.js"></script>
+<script>
+const logEl = document.getElementById('log');
+function log(...a){ logEl.textContent += a.join(' ') + '\n'; }
+const mv = document.getElementById('mv');
+mv.addEventListener('load', () => log('mv:load fired'));
+mv.addEventListener('error', e => log('mv:error', JSON.stringify(e.detail || {})));
+mv.addEventListener('model-visibility', e => log('mv:model-visibility', e.detail?.visible));
+mv.addEventListener('preload', () => log('mv:preload'));
+window.addEventListener('error', e => log('WINDOW error:', e.message));
+window.addEventListener('unhandledrejection', e => log('REJ:', e.reason?.message || e.reason));
+function check(){document.getElementById('status').textContent='customElements: '+!!customElements.get('model-viewer')}
+setInterval(check,400); check();
+</script>
+</body></html>
