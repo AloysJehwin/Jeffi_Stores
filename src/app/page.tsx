@@ -318,6 +318,52 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <section className="py-12 md:py-16 bg-gradient-to-r from-secondary-700 to-secondary-600 relative overflow-hidden">
+        <div className="container mx-auto px-4 sm:px-6 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <div>
+              <span className="inline-block bg-white/15 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-white/30 px-3 py-1.5 mb-4">
+                For Procurement Teams
+              </span>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-tight mb-3">
+                Buying for a business?
+              </h2>
+              <p className="text-white/85 text-sm sm:text-base leading-relaxed mb-6 max-w-lg">
+                Open a business account for tiered bulk discounts, GST-compliant invoices, and a dedicated quote-request workflow.
+                Approval typically within 1 business day.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/business"
+                  className="px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-colors text-sm sm:text-base"
+                >
+                  Learn More
+                </Link>
+                <Link
+                  href="/business/signup"
+                  className="px-5 py-2.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-colors text-sm sm:text-base"
+                >
+                  Register Your Business
+                </Link>
+              </div>
+            </div>
+            <div className="hidden md:grid grid-cols-2 gap-3">
+              {[
+                { label: 'Bulk Discount', value: 'up to 30%' },
+                { label: 'GSTIN Invoicing', value: 'Auto' },
+                { label: 'Quote Turnaround', value: '< 24h' },
+                { label: 'Net-30 Credit', value: 'On approval' },
+              ].map((s) => (
+                <div key={s.label} className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/15">
+                  <p className="text-white/70 text-xs">{s.label}</p>
+                  <p className="text-white font-bold mt-0.5">{s.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <ReviewCouponPopup />
     </div>
   )
