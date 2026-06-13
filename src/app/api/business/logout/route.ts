@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { authenticateBusiness } from '@/lib/jwt'
 import { logActivity } from '@/lib/activity'
+import { cookieDomainOption } from '@/lib/cookie-domain'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
       sameSite: 'strict' as const,
       maxAge: 0,
       path: '/',
-      ...(process.env.NODE_ENV === 'production' ? { domain: '.jeffistores.in' } : {}),
+      ...cookieDomainOption(),
     }
     cookieStore.set('business_auth_token', '', deleteOpts)
 
