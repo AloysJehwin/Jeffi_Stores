@@ -89,12 +89,12 @@ export default function BusinessPublicHeader({ authState = 'guest' }: { authStat
   return (
     <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default fixed top-0 left-0 right-0 z-40 w-full">
       <div className="container mx-auto px-3 sm:px-4">
-        <div className="flex items-center justify-between h-14 sm:h-16 lg:h-20 gap-2">
+        <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20 gap-2">
           <Link href={bp('/business')} className="flex items-center shrink-0 min-w-0" onClick={() => setMobileOpen(false)}>
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <img src="/images/logo.png" alt="Jeffi Stores Logo" className="h-7 sm:h-9 lg:h-12 w-auto shrink-0" />
+              <img src="/images/logo.png" alt="Jeffi Stores Logo" className="h-8 sm:h-10 lg:h-12 w-auto shrink-0" />
               <div className="min-w-0">
-                <div className="text-sm sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 truncate leading-tight">
+                <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 truncate leading-tight">
                   Jeffi Stores
                 </div>
                 <div className="text-[10px] sm:text-xs text-accent-500 font-semibold leading-tight">Business</div>
