@@ -97,6 +97,16 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
     })
   }, [orders, customerSearch, statusFilter])
 
+  const PAGE_SIZE = 25
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  useEffect(() => { setPage(1) }, [customerSearch, statusFilter, fromDate, toDate])
+  useEffect(() => { if (page > totalPages) setPage(totalPages) }, [page, totalPages])
+  const paged = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page]
+  )
+
   const allSelected = filtered.length > 0 && filtered.every(o => selectedIds.has(o.id))
 
   function toggleAll() {
@@ -333,7 +343,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
-                {filtered.map(order => (
+                {paged.map(order => (
                   <tr key={order.id} className="hover:bg-surface transition-colors">
                     <td className="px-4 py-3">
                       <input
@@ -374,6 +384,35 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between gap-2 mt-4 px-1 text-sm">
+            <span className="text-foreground-secondary text-xs">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-foreground-secondary">Page {page} of {totalPages}</span>
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
