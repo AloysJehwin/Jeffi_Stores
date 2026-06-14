@@ -11,10 +11,16 @@ export async function POST(request: NextRequest) {
       logActivity({ userId: auth.userId, kind: 'logout', summary: 'Logged out' }).catch(() => {})
     }
 
-    cookies().delete({ name: 'auth_token', path: '/', ...cookieDomainOption() })
+    const store = cookies()
+    // Delete both variants — modern cookies set with domain=.jeffistores.in
+    // and any legacy host-only cookies that pre-date the cookie-domain fix.
+    store.delete({ name: 'auth_token', path: '/', ...cookieDomainOption() })
+    store.delete({ name: 'auth_token', path: '/' })
+    store.delete({ name: 'session_id', path: '/', ...cookieDomainOption() })
+    store.delete({ name: 'session_id', path: '/' })
 
     const newGuestSessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(7)}`
-    cookies().set('session_id', newGuestSessionId, {
+    store.set('session_id', newGuestSessionId, {
       maxAge: 30 * 24 * 60 * 60,
       path: '/',
       ...cookieDomainOption(),
