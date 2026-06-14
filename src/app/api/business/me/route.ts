@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany } from '@/lib/db'
 import { authenticateBusiness } from '@/lib/jwt'
+import { POLICY_VERSION } from '@/app/legal/policies'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,6 +10,7 @@ export async function GET(request: NextRequest) {
 
     const user = await queryOne<any>(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.created_at, u.avatar_url,
+              u.policies_accepted_version,
               bp.approval_status, bp.company_name
        FROM users u
        LEFT JOIN business_profiles bp ON bp.user_id = u.id
@@ -39,6 +41,9 @@ export async function GET(request: NextRequest) {
         approvalStatus: user.approval_status || 'pending',
         companyName: user.company_name,
         businessDiscountMap: user.approval_status === 'approved' ? businessDiscountMap : undefined,
+        policiesAcceptedVersion: user.policies_accepted_version,
+        requiresPolicyAcceptance: user.policies_accepted_version !== POLICY_VERSION,
+        policyVersion: POLICY_VERSION,
       },
     })
   } catch {

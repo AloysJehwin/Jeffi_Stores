@@ -9,6 +9,7 @@ import { ToastProvider } from '@/contexts/ToastContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { ConfirmProvider } from '@/contexts/ConfirmContext'
 import PageTracker from './visitor/PageTracker'
+import PolicyConsentGate from './PolicyConsentGate'
 
 function shouldShowFooter(pathname: string | null): boolean {
   return false
@@ -28,6 +29,7 @@ export default function ConditionalLayout({ children, isFormsSubdomain, isDocume
           <ToastProvider>
             <ConfirmProvider>
               {children}
+              {isBusinessPage && <PolicyConsentGate />}
             </ConfirmProvider>
           </ToastProvider>
         </AuthProvider>
@@ -51,6 +53,7 @@ export default function ConditionalLayout({ children, isFormsSubdomain, isDocume
                 </main>
                 {showFooter && <Footer />}
               </div>
+              <PolicyConsentGate />
             </ConfirmProvider>
           </ToastProvider>
         </CartProvider>

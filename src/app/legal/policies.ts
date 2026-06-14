@@ -8,105 +8,203 @@ export type Policy = {
   sections: Section[]
 }
 
+// Bump this version (and the lastUpdated date on relevant policies) whenever
+// the privacy policy or T&C changes in a way that requires re-acceptance.
+// Users whose users.policies_accepted_version != POLICY_VERSION will be asked
+// to re-accept on next sign-in or first page load.
+export const POLICY_VERSION = '2026-06-14'
+
+// Slugs whose acceptance is gated by POLICY_VERSION.
+export const CONSENT_POLICIES = ['privacy-policy', 'terms-and-conditions'] as const
+
 export const policies: Policy[] = [
   {
     slug: 'privacy-policy',
     title: 'Privacy Policy',
-    description: 'How Jeffi Stores collects, uses, and protects your personal information.',
-    lastUpdated: '1 May 2025',
+    description: 'What we collect, why we collect it, how long we keep it, and your rights over your data.',
+    lastUpdated: '14 Jun 2026',
     sections: [
       {
-        heading: '1. Information We Collect',
+        heading: '1. The short version',
         body: [
-          'Name, email address, phone number, and delivery address when you register or place an order.',
-          'Payment information (processed securely via third-party gateways — we do not store card details).',
-          'Browsing behaviour, device information, and IP address via cookies and analytics tools.',
-          'Communications you send us via email, phone, or the support chat.',
+          'We collect what we need to run your account, fulfil your orders, file GST, and keep our platform secure — nothing more.',
+          'We do not sell your data. Ever.',
+          'Third parties only see what they need to do their job (Razorpay sees payment context; Delhivery sees the shipping label; AWS hosts the data; Google sign-in sees your email if you choose it).',
+          'You can ask us to export, correct, or delete your data anytime by writing to support@jeffistores.in.',
         ],
       },
       {
-        heading: '2. How We Use Your Information',
+        heading: '2. Who we are',
+        body: 'Jeffi Stores is operated from Raipur, Chhattisgarh, India. When this policy says "we", "us", or "Jeffi Stores", we mean the entity running jeffistores.in (and the business.jeffistores.in / admin.jeffistores.in subdomains). The data controller is Jeffi Stores; the GSTIN, registered address and grievance officer details are listed in the Grievance Redressal page.',
+      },
+      {
+        heading: '3. Information you give us directly',
         body: [
-          'To process and fulfil your orders and send order confirmations and invoices.',
-          'To communicate about your orders, returns, and support requests.',
-          'To send promotional offers and updates (you can opt out at any time).',
-          'To improve our website, products, and customer service.',
-          'To comply with legal obligations under Indian law.',
+          'Account: name, email, phone (mobile OTP is the primary auth), avatar (optional), and password if you set one.',
+          'For business accounts: company name, GSTIN, business address, industry, and the contact person.',
+          'Orders: shipping and billing addresses (with PIN code), GSTIN if you want a tax invoice, and any notes you add to the order.',
+          'Support: anything you type in the chatbox, send by email, or share on a phone call (which we do not record by default).',
+          'Reviews: the rating, photos, and text you submit alongside a review form.',
         ],
       },
       {
-        heading: '3. Sharing of Information',
-        body: 'We do not sell or rent your personal data to third parties. We share data only with logistics partners for delivery, payment gateways for transaction processing, and as required by law or court order.',
-      },
-      {
-        heading: '4. Cookies',
-        body: 'We use cookies to maintain your session, remember your cart, and analyse website traffic. You can disable cookies in your browser settings; however, some features may not function correctly.',
-      },
-      {
-        heading: '5. Data Security',
-        body: 'We implement industry-standard security measures including HTTPS encryption and secure database storage. Despite these measures, no transmission over the internet is 100% secure.',
-      },
-      {
-        heading: '6. Your Rights',
+        heading: '4. Information we collect automatically',
         body: [
-          'Access and review the personal data we hold about you.',
-          'Request correction of inaccurate data.',
-          'Request deletion of your account and associated data.',
-          'Opt out of marketing communications at any time.',
+          'Cart and browsing: products you view, items in your cart, search queries, and category filters — used to keep your session, recover an abandoned cart, and personalise recommendations.',
+          'Device and connection: IP address, user-agent, approximate location (city-level), referrer, and the time of each visit — used for security and fraud detection.',
+          'Cookies and similar: a session cookie for sign-in, a session id cookie for guest carts, and a theme preference. We do not run advertising trackers.',
+          'Analytics: aggregated page views, conversion events, and click events via Google Analytics 4 / Google Tag Manager. We do not use Analytics for cross-site advertising.',
+          'AI assistant: the prompt you type, the products our model retrieves to answer it, and a thumbs-up / thumbs-down rating if you give one. We do not link these prompts to your name in our analytics dashboards.',
         ],
       },
       {
-        heading: '7. Contact',
-        body: 'For privacy-related requests, contact us at jeffistoress@gmail.com or call +91 96853 54099.',
+        heading: '5. Why we use it',
+        body: [
+          'To run your account: sign you in, persist your cart, send transactional emails (OTP, order, invoice, RFQ updates).',
+          'To fulfil orders: print invoices and packing slips, generate Delhivery shipping labels, and track delivery status.',
+          'To comply with Indian tax law: store invoice copies and GST data per the GST rules (typically 8 financial years).',
+          'To prevent fraud and abuse: rate-limit suspicious sign-in attempts, flag risky payment patterns, log admin activity.',
+          'To improve the product: aggregate, anonymised analytics. We never act on individual records here.',
+          'To communicate, when you ask: order confirmations and shipping updates are mandatory. Marketing emails are opt-in (and there is an unsubscribe link in every email we send).',
+          'To deliver business-customer features: discount tiers, RFQ negotiations, and credit-limit decisions for approved business accounts.',
+        ],
+      },
+      {
+        heading: '6. How long we keep it',
+        body: [
+          'Account profile: while your account is active, plus 30 days after you close it (a window for account-recovery requests).',
+          'Order history and invoices: 8 financial years from the order date — required by GST law.',
+          'Payment metadata (Razorpay reference IDs, last 4 of card): 18 months for chargeback handling.',
+          'Failed sign-in logs: 90 days, then aggregated and deleted.',
+          'Anonymised analytics: indefinitely. These do not identify you.',
+          'Backups: rolling 7-day window. Backups age out automatically.',
+        ],
+      },
+      {
+        heading: '7. Who we share it with',
+        body: [
+          'Razorpay (payments): order amount, your name, email, phone, and the order id. Razorpay is PCI-DSS Level 1 — they store your card data, not us.',
+          'Delhivery (shipping): the recipient name, full shipping address, phone, and weight/dimensions of the package.',
+          'Amazon Web Services (hosting): all of our application data sits in AWS RDS, S3, and EC2 in their us-east-1 region. AWS is bound by their Data Processing Addendum.',
+          'Google (sign-in, Maps autocomplete, Analytics): your email and Google id when you choose Google sign-in; address autocomplete queries when you type in an address field.',
+          'OpenAI / our self-hosted models (AI assistant): the prompt you type. We do not send your account email or phone to the model.',
+          'SES (email): the recipient address and the email body. Standard email delivery.',
+          'Tax authorities: invoice and GSTIN data when filing GSTR-1 / GSTR-3B / e-invoicing.',
+          'Law enforcement: only when compelled by valid Indian legal process. We will tell you if we are required to share and the law lets us.',
+        ],
+      },
+      {
+        heading: '8. Where it is stored',
+        body: 'Right now, in AWS US-East-1 (Northern Virginia). India does not currently require local hosting for ecommerce data, but we monitor the DPDP Act rules and will move to in-region hosting if and when required. Any cross-border transfer relies on the AWS Data Processing Addendum and the Indian Data Protection rules.',
+      },
+      {
+        heading: '9. Your rights',
+        body: [
+          'Access — request a copy of your data.',
+          'Correction — fix anything wrong in your profile or address book directly, or write to us for changes outside the UI.',
+          'Deletion — close your account and ask us to delete data older than the legal retention windows above.',
+          'Withdraw marketing consent — every marketing email has an unsubscribe link, and your account preferences page lets you opt out.',
+          'Portability — get a JSON export of your orders and addresses.',
+          'Complain — you can write to our grievance officer (see Grievance Redressal) or, in India, escalate to the relevant data protection regulator.',
+        ],
+      },
+      {
+        heading: '10. Cookies',
+        body: 'We use only first-party functional cookies (session, cart, theme) plus Google Analytics. We do not run advertising or cross-site cookies. You can clear cookies in your browser; some features (sign-in, cart) will need to be re-set.',
+      },
+      {
+        heading: '11. Children',
+        body: 'The platform is intended for users aged 18 and above. We do not knowingly collect data from minors. If you believe a child has created an account, write to support@jeffistores.in and we will close it.',
+      },
+      {
+        heading: '12. Updates to this policy',
+        body: 'When we change this policy, we update the version and date at the top, and ask you to re-accept the next time you sign in or open the site. Material changes (new third-party data sharing, new categories of data we collect) will additionally be emailed to you.',
+      },
+      {
+        heading: '13. Contact',
+        body: 'Privacy questions: support@jeffistores.in. Grievance officer: see the Grievance Redressal policy. Postal: Jeffi Stores, Raipur, Chhattisgarh.',
       },
     ],
   },
   {
     slug: 'terms-and-conditions',
     title: 'Terms & Conditions',
-    description: 'The rules and guidelines governing your use of the Jeffi Stores website and services.',
-    lastUpdated: '1 May 2025',
+    description: 'The rules of using Jeffi Stores — accounts, orders, payments, returns, and what we expect from each other.',
+    lastUpdated: '14 Jun 2026',
     sections: [
       {
-        heading: '1. Acceptance of Terms',
-        body: 'By accessing or using jeffistoress.com, you agree to be bound by these Terms & Conditions. If you do not agree, please do not use our website.',
+        heading: '1. Accepting these terms',
+        body: 'By creating an account, placing an order, or otherwise using jeffistores.in (and our subdomains), you accept these terms and our Privacy Policy. If you do not agree, please do not use the platform.',
       },
       {
-        heading: '2. Use of the Website',
+        heading: '2. Eligibility',
         body: [
-          'You must be at least 18 years old or have parental consent to place orders.',
-          'You agree not to use the site for any unlawful purpose or in a way that disrupts its operation.',
-          'Account credentials are your responsibility — do not share your password.',
-          'We reserve the right to suspend or terminate accounts that violate these terms.',
+          'You must be at least 18 years old.',
+          'For business accounts you must be authorised to bind the business and provide a valid GSTIN.',
+          'You must provide accurate name, address, phone, and email — fraudulent details may cause your order to be cancelled and your account suspended.',
         ],
       },
       {
-        heading: '3. Products & Pricing',
-        body: 'All prices are listed in Indian Rupees (INR) and are inclusive of applicable GST unless stated otherwise. We reserve the right to modify prices, discontinue products, or limit quantities at any time without prior notice.',
-      },
-      {
-        heading: '4. Orders & Payment',
+        heading: '3. Your account',
         body: [
-          'An order confirmation email does not constitute acceptance — orders are accepted upon dispatch.',
-          'We reserve the right to cancel orders due to pricing errors, stock unavailability, or suspected fraud.',
-          'Payment must be completed at the time of order unless credit terms have been separately agreed.',
+          'You are responsible for keeping your sign-in credentials safe. We use OTP-based sign-in by default to reduce password risk, but if you set a password, do not share it.',
+          'Tell us immediately at support@jeffistores.in if you suspect unauthorised access.',
+          'We may suspend or close accounts that violate these terms, attempt to abuse coupons or RFQ flows, or use the site to harm other users or our infrastructure.',
         ],
       },
       {
-        heading: '5. Intellectual Property',
-        body: 'All content on this website — including text, images, logos, and product descriptions — is the property of Jeffi Stores or its licensors and may not be reproduced without written permission.',
+        heading: '4. Catalog, prices, and stock',
+        body: [
+          'All prices are in Indian Rupees and inclusive of GST unless stated otherwise.',
+          'We try hard to keep stock and prices accurate, but the canonical record is the order confirmation. Where a price is shown that is obviously a system error (e.g. a 99% mismatch from MRP), we may decline the order and refund.',
+          'Product images are illustrative. Industrial parts may vary slightly in finish or branding from photo to photo; the SKU and HSN code are the source of truth.',
+        ],
       },
       {
-        heading: '6. Limitation of Liability',
-        body: 'Jeffi Stores shall not be liable for any indirect, incidental, or consequential damages arising from the use of our products or website. Our maximum liability shall not exceed the value of the order in question.',
+        heading: '5. Orders, payments, and invoicing',
+        body: [
+          'An order placed online is an offer to buy. We accept the order when we dispatch it (or, for business credit orders, when we issue the invoice).',
+          'We accept Razorpay (cards/UPI/netbanking), UPI QR, bank transfer, and approved-business credit terms.',
+          'Tax invoices are emailed and available in your account. Provide a valid GSTIN at checkout if you want input tax credit on the invoice.',
+          'For business RFQs: a quoted price is valid for the period stated on the quotation; after that we may revise it based on stock and input cost.',
+        ],
       },
       {
-        heading: '7. Governing Law',
-        body: 'These terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts in Raipur, Chhattisgarh.',
+        heading: '6. Cancellation, returns, refunds',
+        body: 'See the dedicated Cancellation Policy and Return & Refund Policy. In short: cancellable until dispatch; returnable for manufacturing defects or wrong-item shipped within 7 days of delivery; refunds settle to the original payment method within 7 working days of pickup confirmation.',
       },
       {
-        heading: '8. Changes to Terms',
-        body: 'We may update these Terms & Conditions at any time. Continued use of the website after changes constitutes acceptance of the revised terms.',
+        heading: '7. Use of the platform',
+        body: [
+          'No scraping, automated probing, or denial-of-service activity.',
+          'No reverse-engineering the API or attempting to access data that is not yours.',
+          'No reselling Jeffi-Stores-only-priced products (business discount catalog) on other marketplaces — abuse will result in account termination.',
+          'Reviews and submissions must be your own work and not contain illegal, defamatory, or infringing content.',
+        ],
+      },
+      {
+        heading: '8. Intellectual property',
+        body: 'Site content, layout, brand marks, and Jeffi-Stores-authored product descriptions belong to Jeffi Stores. Manufacturer brand marks belong to their respective owners. Nothing here grants you a licence to use these marks beyond browsing and ordering.',
+      },
+      {
+        heading: '9. Liability',
+        body: [
+          'We do not guarantee uninterrupted availability — we run at normal SaaS uptime and may schedule maintenance.',
+          'Our liability for any single order is capped at the order value. We are not liable for indirect or consequential losses.',
+          'Manufacturer warranty applies as marked on the product detail page. We facilitate warranty claims but the manufacturer remains the warranty principal.',
+        ],
+      },
+      {
+        heading: '10. Changes',
+        body: 'We update these terms from time to time. When we make material changes (anything that affects your rights, pricing, or how we use your data), we ask you to re-accept the next time you sign in. Continued use after that is acceptance.',
+      },
+      {
+        heading: '11. Governing law',
+        body: 'Indian law. Disputes go to the courts in Raipur, Chhattisgarh.',
+      },
+      {
+        heading: '12. Contact',
+        body: 'For account, order, or terms-related queries write to support@jeffistores.in. Grievance officer details are in the Grievance Redressal policy.',
       },
     ],
   },

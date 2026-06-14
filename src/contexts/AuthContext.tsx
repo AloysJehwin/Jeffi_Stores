@@ -14,6 +14,9 @@ interface User {
   approvalStatus?: string
   companyName?: string
   businessDiscountMap?: Record<string, number>
+  policiesAcceptedVersion?: string | null
+  requiresPolicyAcceptance?: boolean
+  policyVersion?: string
 }
 
 interface AuthContextType {

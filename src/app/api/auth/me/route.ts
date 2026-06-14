@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { authenticateUser } from '@/lib/jwt'
+import { POLICY_VERSION } from '@/app/legal/policies'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +9,7 @@ export async function GET(request: NextRequest) {
     if (!userPayload) return NextResponse.json({ user: null })
 
     const user = await queryOne<any>(
-      `SELECT id, email, first_name, last_name, phone, created_at, avatar_url
+      `SELECT id, email, first_name, last_name, phone, created_at, avatar_url, policies_accepted_version
        FROM users WHERE id = $1 AND user_type != 'business'`,
       [userPayload.userId]
     )
@@ -23,6 +24,9 @@ export async function GET(request: NextRequest) {
         phone: user.phone,
         createdAt: user.created_at,
         avatarUrl: user.avatar_url || null,
+        policiesAcceptedVersion: user.policies_accepted_version,
+        requiresPolicyAcceptance: user.policies_accepted_version !== POLICY_VERSION,
+        policyVersion: POLICY_VERSION,
       },
     })
   } catch {
