@@ -20,13 +20,13 @@ const args = Object.fromEntries(
 )
 
 const RDS_URL = process.env.DATABASE_URL
-const RAZER_HOST = process.env.RAG_PG_HOST || '100.110.153.68'
+const RAZER_HOST = process.env.RAG_PG_HOST || '100.82.208.8'
 const RAZER_PASS = process.env.RAG_PG_PASSWORD
 if (!RDS_URL || !RAZER_PASS) {
   console.error('DATABASE_URL and RAG_PG_PASSWORD env vars are required')
   process.exit(1)
 }
-const OLLAMA_URL = (process.env.RAG_OLLAMA_URL || 'http://100.110.153.68:11434').replace(/\/$/, '')
+const OLLAMA_URL = (process.env.RAG_OLLAMA_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
 const EMBED_MODEL = process.env.RAG_EMBED_MODEL || 'nomic-embed-text'
 const LIMIT = parseInt(args.limit || '500', 10)
 

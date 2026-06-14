@@ -9,7 +9,7 @@ import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
 
 function triggerEnrichment(productId: string) {
-  const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.110.153.68:11434').replace(/\/$/, '')
+  const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
   const OLLAMA_MODEL = process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
   const SYSTEM_PROMPT = `You write product intelligence data for an Indian B2B/B2C hardware and tools store (jeffistores.com).
 Given a product name, category, brand, and description, produce ALL of the following fields:
