@@ -47,13 +47,13 @@ export default async function BusinessLandingPage() {
                 </p>
                 <div className="flex flex-wrap gap-3 mb-4 sm:mb-6">
                   <Link
-                    href={bp('/business/signup')}
+                    href={bp('/business/signup', host)}
                     className="bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-all px-5 py-2.5 text-sm sm:px-7 sm:py-3 sm:text-base md:px-8 md:py-4 md:text-lg"
                   >
                     Register Your Business
                   </Link>
                   <Link
-                    href={bp('/business/signin')}
+                    href={bp('/business/signin', host)}
                     className="bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-all px-5 py-2.5 text-sm sm:px-7 sm:py-3 sm:text-base md:px-8 md:py-4 md:text-lg"
                   >
                     Sign In
@@ -183,10 +183,10 @@ export default async function BusinessLandingPage() {
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-3">Ready to start procuring?</h2>
             <p className="text-white/85 mb-8 max-w-xl mx-auto">Register in minutes. Approval is fast, and you only see business prices once verified.</p>
             <div className="flex flex-wrap gap-3 justify-center">
-              <Link href={bp('/business/signup')} className="px-7 py-3.5 bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-colors">
+              <Link href={bp('/business/signup', host)} className="px-7 py-3.5 bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-colors">
                 Register Your Business
               </Link>
-              <Link href={bp('/business/signin')} className="px-7 py-3.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-colors">
+              <Link href={bp('/business/signin', host)} className="px-7 py-3.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-colors">
                 Sign In
               </Link>
             </div>
