@@ -21,7 +21,7 @@ function getPool(): Pool {
   if (!pool) {
     const password = process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
     pool = new Pool({
-      host: process.env.RAG_PG_HOST || '100.110.153.68',
+      host: process.env.RAG_PG_HOST || '100.82.208.8',
       port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
       user: process.env.RAG_PG_USER || 'postgres',
       password,
@@ -40,7 +40,7 @@ function toVectorLiteral(vec: number[]): string {
 }
 
 export async function embed(text: string): Promise<number[]> {
-  const url = process.env.RAG_OLLAMA_URL || 'http://100.110.153.68:11434'
+  const url = process.env.RAG_OLLAMA_URL || 'http://100.82.208.8:11434'
   const model = process.env.RAG_EMBED_MODEL || 'nomic-embed-text'
 
   const controller = new AbortController()

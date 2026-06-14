@@ -25,7 +25,7 @@ async function reEmbedProduct(productId: string): Promise<{ ok: boolean; error?:
     const { Pool } = await import('pg')
 
     const pool = new Pool({
-      host: process.env.RAG_PG_HOST || '100.110.153.68',
+      host: process.env.RAG_PG_HOST || '100.82.208.8',
       port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
       user: process.env.RAG_PG_USER || 'postgres',
       password: process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD,
