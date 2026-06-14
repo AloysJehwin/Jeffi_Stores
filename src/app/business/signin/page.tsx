@@ -23,7 +23,7 @@ function BusinessSignInPage() {
 
   useEffect(() => {
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'approved') {
-      router.replace(bp('/business'))
+      router.replace(bp('/business/products'))
     }
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'pending') {
       router.replace(bp('/business/pending'))
@@ -117,7 +117,7 @@ function BusinessSignInPage() {
         return
       }
       // Redirect to business portal
-      window.location.href = bp('/business')
+      window.location.href = bp('/business/products')
     } catch (err: any) {
       setError(err.message)
       setOtp('')
@@ -197,7 +197,7 @@ function BusinessSignInPage() {
         setShowPhoneModal(true)
         return
       }
-      window.location.href = bp('/business')
+      window.location.href = bp('/business/products')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -224,7 +224,7 @@ function BusinessSignInPage() {
         const d = await res.json()
         throw new Error(d.error || 'Failed to save phone number')
       }
-      window.location.href = bp('/business')
+      window.location.href = bp('/business/products')
     } catch (err: any) {
       setPhoneError(err.message)
     } finally {
