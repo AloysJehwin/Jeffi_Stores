@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function PolicyConsentGate() {
   const { user, refreshUser } = useAuth()
+  const pathname = usePathname()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [accepted, setAccepted] = useState(false)
 
-  const open = !!user && user.requiresPolicyAcceptance === true
+  const onLegalPage = pathname?.startsWith('/legal') ?? false
+  const open = !!user && user.requiresPolicyAcceptance === true && !onLegalPage
 
   useEffect(() => {
     if (open) {
