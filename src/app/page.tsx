@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { queryMany } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
@@ -40,6 +41,13 @@ async function getMainCategories() {
 export default async function HomePage() {
   const featuredProducts = await getFeaturedProducts()
   const mainCategories = await getMainCategories()
+
+  // Send business CTAs to the business subdomain on prod, /business locally.
+  const host = (await headers()).get('host') ?? ''
+  const isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$)/.test(host) || /\.local(:|$)/.test(host)
+  const businessOrigin = isLocal ? '' : 'https://business.jeffistores.in'
+  const businessLandingUrl = isLocal ? '/business' : `${businessOrigin}/`
+  const businessSignupUrl = isLocal ? '/business/signup' : `${businessOrigin}/signup`
 
   return (
     <div className="bg-surface">
@@ -333,18 +341,18 @@ export default async function HomePage() {
                 Approval typically within 1 business day.
               </p>
               <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/business"
+                <a
+                  href={businessLandingUrl}
                   className="px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-colors text-sm sm:text-base"
                 >
                   Learn More
-                </Link>
-                <Link
-                  href="/business/signup"
+                </a>
+                <a
+                  href={businessSignupUrl}
                   className="px-5 py-2.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-colors text-sm sm:text-base"
                 >
                   Register Your Business
-                </Link>
+                </a>
               </div>
             </div>
             <div className="hidden md:grid grid-cols-2 gap-3">
