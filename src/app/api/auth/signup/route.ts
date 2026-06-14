@@ -6,6 +6,7 @@ import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
+import { POLICY_VERSION } from '@/app/legal/policies'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -57,10 +58,11 @@ export async function POST(request: NextRequest) {
     }
 
     const newUser = await queryOne(
-      `INSERT INTO users (email, first_name, last_name, phone, is_active, last_login)
-       VALUES ($1, $2, $3, $4, $5, NOW())
+      `INSERT INTO users (email, first_name, last_name, phone, is_active, last_login,
+                         policies_accepted_version, policies_accepted_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW())
        RETURNING *`,
-      [email.toLowerCase(), firstName, lastName || null, normalizedPhone, true]
+      [email.toLowerCase(), firstName, lastName || null, normalizedPhone, true, POLICY_VERSION]
     )
 
     if (!newUser) {

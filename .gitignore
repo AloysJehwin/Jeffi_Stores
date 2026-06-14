@@ -61,3 +61,6 @@ GST Certificate*.pdf
 INV*.pdf
 # pg_dump artifact (regenerate via database/schema/README.md)
 database/schema-live.sql
+
+# Personal notes (career planning, scratch docs)
+ML_JOURNEY.md
