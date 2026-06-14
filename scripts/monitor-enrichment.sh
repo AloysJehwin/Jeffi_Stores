@@ -2,8 +2,8 @@
 # Quick joint progress monitor: GPU temp/util on Razer + enrichment script progress.
 # Usage: bash scripts/monitor-enrichment.sh
 
-GPU=$(ssh -o ConnectTimeout=3 -o BatchMode=yes aloys@100.110.153.68 \
-  '/mnt/c/Windows/System32/nvidia-smi.exe --query-gpu=temperature.gpu,utilization.gpu,memory.used,power.draw --format=csv,noheader,nounits' 2>/dev/null)
+GPU=$(ssh -o ConnectTimeout=3 -o BatchMode=yes aloysjehwin@100.82.208.8 \
+  'nvidia-smi --query-gpu=temperature.gpu,utilization.gpu,memory.used,power.draw --format=csv,noheader,nounits' 2>/dev/null)
 
 if [ -z "$GPU" ]; then
   echo "GPU: unreachable"

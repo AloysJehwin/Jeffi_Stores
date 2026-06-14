@@ -26,10 +26,10 @@ function logCall(toolName, input, result, errorMsg) {
   fs.appendFile(LOG_FILE, JSON.stringify(entry) + '\n', () => {})
 }
 
-const RAG_OLLAMA_URL = (process.env.RAG_OLLAMA_URL || 'http://100.110.153.68:11434').replace(/\/$/, '')
+const RAG_OLLAMA_URL = (process.env.RAG_OLLAMA_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
 const RAG_EMBED_MODEL = process.env.RAG_EMBED_MODEL || 'nomic-embed-text'
 const RAG_PG = {
-  host: process.env.RAG_PG_HOST || '100.110.153.68',
+  host: process.env.RAG_PG_HOST || '100.82.208.8',
   port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
   user: process.env.RAG_PG_USER || 'postgres',
   password: process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD,
