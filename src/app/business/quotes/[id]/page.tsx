@@ -307,6 +307,14 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
   }
   const isFinalState = ['offer_accepted', 'converted'].includes(rfq.status)
   const targetFor = (item: RFQItem): number | null => {
+    // In a final state, the agreed price is whatever the quotation was generated at —
+    // pull it from quoted_rate * (1 - discount) * (1 + gst). Falls through to legacy
+    // sources if no quotation row joined.
+    if (isFinalState && item.quoted_rate != null) {
+      const gst = item.quoted_gst_rate != null ? Number(item.quoted_gst_rate) : 18
+      const disc = item.quoted_discount_pct != null ? Number(item.quoted_discount_pct) : 0
+      return Number(item.quoted_rate) * (1 - disc / 100) * (1 + gst / 100)
+    }
     if (!isFinalState && customerCounterMap[item.id] != null) return customerCounterMap[item.id]
     if (item.requested_price != null) return Number(item.requested_price)
     return null
@@ -436,10 +444,11 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                     const shownCatalogPrice = businessUnitPrice ?? catalogUnit
                     const catalogMrp = item.variant_mrp ?? item.catalog_mrp
 
-                    // "Offered" = quoted_rate (finalized quotation, ex-GST → convert back to incl-GST) or counter offer from messages (already incl-GST)
+                    // "Offered" = quoted_rate (finalized quotation, ex-GST → convert back to incl-GST after discount) or counter offer from messages (already incl-GST)
                     const quotedGstRate = item.quoted_gst_rate != null ? Number(item.quoted_gst_rate) : 18
+                    const quotedDiscPct = item.quoted_rate != null && item.quoted_discount_pct != null ? Number(item.quoted_discount_pct) : 0
                     const offeredPrice = item.quoted_rate != null
-                      ? Number(item.quoted_rate) * (1 + quotedGstRate / 100)
+                      ? Number(item.quoted_rate) * (1 - quotedDiscPct / 100) * (1 + quotedGstRate / 100)
                       : offered != null ? Number(offered) : null
                     const offeredDiscountSource = item.quoted_rate != null ? item.quoted_discount_pct : null
 
