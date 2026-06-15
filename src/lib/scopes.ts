@@ -165,6 +165,13 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/audit'],
     group: 'Settings',
   },
+  {
+    key: 'replication',
+    label: 'Replication Runs',
+    description: 'View nightly RDS→Razer ML-replica replication history',
+    routes: ['/admin/replication'],
+    group: 'Settings',
+  },
 ]
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
@@ -210,6 +217,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/catalog-enrichment')) return 'catalog_enrichment'
   if (pathname.startsWith('/api/admin/audit')) return 'audit'
   if (pathname.startsWith('/api/admin/cron')) return 'audit'
+  if (pathname.startsWith('/api/admin/replication')) return 'replication'
   if (pathname.startsWith('/api/internal/cron-record')) return null
   if (pathname.startsWith('/api/brands')) return 'brands'
   if (pathname.startsWith('/api/customers')) return 'customers'
