@@ -40,6 +40,7 @@ function SignupPage() {
   const [resendCooldown, setResendCooldown] = useState(0)
   const [error, setError] = useState('')
   const [policyAccepted, setPolicyAccepted] = useState(false)
+  const [phoneRequiresPolicy, setPhoneRequiresPolicy] = useState(false)
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
 
@@ -68,7 +69,11 @@ function SignupPage() {
     try {
       const loggedInUser = await googleLoginWithAccessToken(result.accessToken)
       await refreshCart()
-      if (!loggedInUser?.phone) {
+      const needsPhone = !loggedInUser?.phone
+      const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
+      if (needsPhone || needsPolicy) {
+        setPhoneRequiresPolicy(needsPolicy)
+        setPolicyAccepted(false)
         setStep('phone')
       } else {
         router.push(redirectTo)
@@ -110,6 +115,7 @@ function SignupPage() {
 
   const submitVerifyOTP = async (otpValue: string) => {
     if (submittedOtpRef.current === otpValue) return
+    if (!policyAccepted) return
     submittedOtpRef.current = otpValue
     setError('')
     setIsLoading(true)
@@ -141,8 +147,9 @@ function SignupPage() {
     if (step !== 'otp') return
     if (otp.length !== 6) return
     if (isLoading) return
+    if (!policyAccepted) return
     submitVerifyOTP(otp)
-  }, [otp, step, isLoading])
+  }, [otp, step, isLoading, policyAccepted])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -198,6 +205,10 @@ function SignupPage() {
       setError('Enter a valid 10-digit mobile number')
       return
     }
+    if (phoneRequiresPolicy && !policyAccepted) {
+      setError('Please accept the Privacy Policy and Terms & Conditions')
+      return
+    }
     setIsLoading(true)
     try {
       const res = await fetch('/api/user/update', {
@@ -209,6 +220,14 @@ function SignupPage() {
       if (!res.ok) {
         const d = await res.json()
         throw new Error(d.error || 'Failed to save phone number')
+      }
+      if (phoneRequiresPolicy && policyAccepted) {
+        await fetch('/api/user/accept-policies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        }).catch(() => {})
       }
       router.push(redirectTo)
     } catch (err: any) {
@@ -287,20 +306,7 @@ function SignupPage() {
                   placeholder="your@email.com"
                 />
               </div>
-              <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={policyAccepted}
-                  onChange={e => setPolicyAccepted(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
-                />
-                <span>
-                  I agree to the{' '}
-                  <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
-                  <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
-                </span>
-              </label>
-              <button type="submit" disabled={isLoading || !policyAccepted}
+              <button type="submit" disabled={isLoading}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending OTP...</>
@@ -343,7 +349,20 @@ function SignupPage() {
                   Change Email
                 </button>
               </div>
-              <button type="submit" disabled={otp.length !== 6 || isLoading}
+              <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={policyAccepted}
+                  onChange={e => setPolicyAccepted(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
+                />
+                <span>
+                  I agree to the{' '}
+                  <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
+                  <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
+                </span>
+              </label>
+              <button type="submit" disabled={otp.length !== 6 || isLoading || !policyAccepted}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Verifying...</>
@@ -404,7 +423,7 @@ function SignupPage() {
             <form onSubmit={handleSavePhone} className="space-y-6">
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-2">
                 <p className="text-sm text-blue-800 dark:text-blue-300">
-                  One last step — add your mobile number so we can keep you updated on your orders.
+                  One last step — add your mobile number{phoneRequiresPolicy ? ' and accept our policies' : ''} so we can keep you updated on your orders.
                 </p>
               </div>
               <div>
@@ -424,7 +443,22 @@ function SignupPage() {
                   <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
                 )}
               </div>
-              <button type="submit" disabled={isLoading || phone.length !== 10}
+              {phoneRequiresPolicy && (
+                <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={policyAccepted}
+                    onChange={e => setPolicyAccepted(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
+                    <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
+                  </span>
+                </label>
+              )}
+              <button type="submit" disabled={isLoading || phone.length !== 10 || (phoneRequiresPolicy && !policyAccepted)}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Saving...</>
