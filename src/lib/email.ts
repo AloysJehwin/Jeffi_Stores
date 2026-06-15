@@ -1449,8 +1449,12 @@ export async function sendAdminContactEmail(
   email: string,
   name: string,
   subject: string,
-  message: string
+  message: string,
+  opts: { isHtml?: boolean } = {}
 ) {
+  const messageHtml = opts.isHtml
+    ? message
+    : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const mailOptions = {
     from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
     to: email,
@@ -1464,7 +1468,7 @@ export async function sendAdminContactEmail(
             .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
             .header { text-align: center; padding-bottom: 20px; border-bottom: 3px solid #f97316; margin-bottom: 30px; }
             .logo { font-size: 28px; font-weight: bold; color: #f97316; }
-            .message-box { background-color: #fff; border-left: 4px solid #f97316; padding: 20px; border-radius: 4px; margin: 20px 0; white-space: pre-wrap; }
+            .message-box { background-color: #fff; border-left: 4px solid #f97316; padding: 20px; border-radius: 4px; margin: 20px 0;${opts.isHtml ? '' : ' white-space: pre-wrap;'} }
             .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 13px; }
           </style>
         </head>
@@ -1476,7 +1480,7 @@ export async function sendAdminContactEmail(
             </div>
             <p>Hello ${name || 'Valued Customer'},</p>
             <p>You have received a message from the Jeffi Stores team:</p>
-            <div class="message-box">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            <div class="message-box">${messageHtml}</div>
             <div class="footer">
               <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
               <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
