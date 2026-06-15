@@ -413,6 +413,7 @@ jobs:
               add_discount_pct_to_products.sql
               add_payment_mode_to_orders.sql
               add_qr_fields_to_orders.sql
+              extend_email_logs_for_audit.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')
