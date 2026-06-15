@@ -24,6 +24,15 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const pathname = request.nextUrl.pathname
 
+  // Canonicalise: www.jeffistores.in → jeffistores.in (preserve path + query).
+  // Cookies (.jeffistores.in domain) cover both, but a permanent redirect
+  // ensures one canonical origin for SEO, sharing, analytics, and caching.
+  if (hostname === 'www.jeffistores.in') {
+    const url = request.nextUrl.clone()
+    url.host = 'jeffistores.in'
+    return NextResponse.redirect(url, 308)
+  }
+
   const isAdminApiPath = pathname.startsWith('/api/admin')
   const isAdminSubdomain = hostname.startsWith('admin.')
   const isAdminPath = pathname.startsWith('/admin')
