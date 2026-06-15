@@ -40,9 +40,15 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Canonicalise: www.jeffistores.in → jeffistores.in (preserve path + query).
+  // 307 (temporary) instead of 308 so browsers don't cache the redirect — earlier
+  // releases briefly served a 308 with a leaked :3000 port which some browsers
+  // cached and then could not follow. Add no-store so any intermediate cache is
+  // not poisoned again.
   if (hostname.startsWith('www.jeffistores.in')) {
     const target = new URL(pathname + request.nextUrl.search, 'https://jeffistores.in')
-    return NextResponse.redirect(target, 308)
+    const res = NextResponse.redirect(target, 307)
+    res.headers.set('Cache-Control', 'no-store, must-revalidate')
+    return res
   }
 
   const isAdminApiPath = pathname.startsWith('/api/admin')
