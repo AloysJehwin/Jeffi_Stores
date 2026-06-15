@@ -72,10 +72,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   )
   if (items.length === 0) return NextResponse.json({ error: 'RFQ has no items' }, { status: 400 })
 
-  // If the customer accepted a counter offer, use those negotiated prices
+  // Pick the latest counter offer regardless of sender — when admin converts
+  // to a quotation, they're accepting whatever is on the table (whether the
+  // last word came from admin or customer). Falls back to requested_price.
   const acceptedOfferRow = await queryOne<{ counter_items: any }>(
     `SELECT counter_items FROM rfq_messages
-     WHERE rfq_id = $1 AND sender = 'admin' AND counter_items IS NOT NULL
+     WHERE rfq_id = $1 AND counter_items IS NOT NULL
      ORDER BY created_at DESC LIMIT 1`,
     [params.id]
   )

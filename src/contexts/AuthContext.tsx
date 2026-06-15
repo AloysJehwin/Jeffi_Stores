@@ -22,7 +22,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   isLoading: boolean
-  login: (email: string, otp: string) => Promise<void>
+  login: (email: string, otp: string, policiesAccepted?: boolean) => Promise<void>
   googleLogin: (idToken: string) => Promise<void>
   googleLoginWithAccessToken: (accessToken: string) => Promise<User>
   signup: (data: SignupData) => Promise<void>
@@ -72,11 +72,11 @@ export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { childr
     fetchUser()
   }, [])
 
-  const login = async (email: string, otp: string) => {
+  const login = async (email: string, otp: string, policiesAccepted?: boolean) => {
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, otp }),
+      body: JSON.stringify({ email, otp, policiesAccepted }),
     })
     if (!response.ok) {
       const data = await response.json()

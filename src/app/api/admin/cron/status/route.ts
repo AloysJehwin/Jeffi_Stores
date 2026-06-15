@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'settings')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'audit')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const result = await query<{ key: string; value: string }>(
       `SELECT key, value FROM site_settings WHERE key LIKE 'cron_%'`
