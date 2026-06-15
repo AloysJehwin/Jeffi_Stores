@@ -20,17 +20,29 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
   return response
 }
 
+// Build a redirect URL that ignores the internal Next listener port (3000).
+// In prod the LB forwards to Next on :3000, so request.url carries that port
+// and naive `new URL('/x', request.url)` would emit redirects to :3000.
+function buildRedirectUrl(request: NextRequest, path: string): URL {
+  const xfHost = request.headers.get('x-forwarded-host')
+  const xfProto = request.headers.get('x-forwarded-proto')
+  const rawHost = xfHost || request.headers.get('host') || request.nextUrl.host
+  // Strip any :port suffix unless it's a well-known dev port (localhost only).
+  const host = rawHost.replace(/:\d+$/, (m) => {
+    return process.env.NODE_ENV === 'production' ? '' : m
+  })
+  const proto = xfProto || (process.env.NODE_ENV === 'production' ? 'https' : request.nextUrl.protocol.replace(':', ''))
+  return new URL(path, `${proto}://${host}`)
+}
+
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const pathname = request.nextUrl.pathname
 
   // Canonicalise: www.jeffistores.in → jeffistores.in (preserve path + query).
-  // Cookies (.jeffistores.in domain) cover both, but a permanent redirect
-  // ensures one canonical origin for SEO, sharing, analytics, and caching.
-  if (hostname === 'www.jeffistores.in') {
-    const url = request.nextUrl.clone()
-    url.host = 'jeffistores.in'
-    return NextResponse.redirect(url, 308)
+  if (hostname.startsWith('www.jeffistores.in')) {
+    const target = new URL(pathname + request.nextUrl.search, 'https://jeffistores.in')
+    return NextResponse.redirect(target, 308)
   }
 
   const isAdminApiPath = pathname.startsWith('/api/admin')
@@ -76,19 +88,19 @@ export async function middleware(request: NextRequest) {
     if (!isPublicSubdomain) {
       const token = request.cookies.get('business_auth_token')?.value
       if (!token) {
-        return NextResponse.redirect(new URL('/signin', request.url))
+        return NextResponse.redirect(buildRedirectUrl(request, '/signin'))
       }
       const payload = await verifyToken(token)
       if (!payload || !payload.isBusiness) {
-        const res = NextResponse.redirect(new URL('/signin', request.url))
+        const res = NextResponse.redirect(buildRedirectUrl(request, '/signin'))
         res.cookies.delete('business_auth_token')
         return res
       }
       if (payload.approvalStatus === 'pending') {
-        return NextResponse.redirect(new URL('/pending', request.url))
+        return NextResponse.redirect(buildRedirectUrl(request, '/pending'))
       }
       if (payload.approvalStatus === 'rejected') {
-        return NextResponse.redirect(new URL('/signin?rejected=1', request.url))
+        return NextResponse.redirect(buildRedirectUrl(request, '/signin?rejected=1'))
       }
     }
     const slug = pathname === '/' ? '' : pathname
@@ -103,26 +115,26 @@ export async function middleware(request: NextRequest) {
     if (!isPublic) {
       const token = request.cookies.get('business_auth_token')?.value
       if (!token) {
-        return NextResponse.redirect(new URL('/business/signin', request.url))
+        return NextResponse.redirect(buildRedirectUrl(request, '/business/signin'))
       }
       const payload = await verifyToken(token)
       if (!payload || !payload.isBusiness) {
-        const res = NextResponse.redirect(new URL('/business/signin', request.url))
+        const res = NextResponse.redirect(buildRedirectUrl(request, '/business/signin'))
         res.cookies.delete('business_auth_token')
         return res
       }
       if (payload.approvalStatus === 'pending') {
-        return NextResponse.redirect(new URL('/business/pending', request.url))
+        return NextResponse.redirect(buildRedirectUrl(request, '/business/pending'))
       }
       if (payload.approvalStatus === 'rejected') {
-        return NextResponse.redirect(new URL('/business/signin?rejected=1', request.url))
+        return NextResponse.redirect(buildRedirectUrl(request, '/business/signin?rejected=1'))
       }
     }
   }
 
   if (pathname.startsWith('/forms/')) {
     const slug = pathname.replace('/forms/', '')
-    return NextResponse.redirect(new URL(`https://forms.jeffistores.in/${slug}`, request.url), 301)
+    return NextResponse.redirect(`https://forms.jeffistores.in/${slug}`, 301)
   }
 
   const publicApiPaths = [
@@ -146,8 +158,9 @@ export async function middleware(request: NextRequest) {
       // B2B portal pages have no admin equivalent — redirect to the business subdomain
       const BUSINESS_ONLY = ['/business/signin', '/business/signup', '/business/pending']
       if (BUSINESS_ONLY.some(p => pathname.startsWith(p))) {
-        const businessOrigin = hostname.replace(/^admin\./, 'business.')
-        return NextResponse.redirect(new URL(pathname, `${request.nextUrl.protocol}//${businessOrigin}`))
+        const businessOrigin = hostname.replace(/^admin\./, 'business.').replace(/:\d+$/, '')
+        const proto = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+        return NextResponse.redirect(new URL(pathname, `${proto}://${businessOrigin}`))
       }
       // Rewrite subdomain root paths to /admin/* (same pattern as business subdomain)
       // e.g. admin.jeffistores.in/dashboard → served from /admin/dashboard
@@ -158,11 +171,11 @@ export async function middleware(request: NextRequest) {
       if (!isAdminLogin) {
         const token = request.cookies.get('admin_token')?.value
         if (!token) {
-          return NextResponse.redirect(new URL('/login', request.url))
+          return NextResponse.redirect(buildRedirectUrl(request, '/login'))
         }
         const payload = await verifyToken(token)
         if (!payload) {
-          const res = NextResponse.redirect(new URL('/login', request.url))
+          const res = NextResponse.redirect(buildRedirectUrl(request, '/login'))
           res.cookies.delete('admin_token')
           return res
         }
@@ -230,7 +243,7 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get('admin_token')?.value
 
     if (!token) {
-      const loginUrl = new URL('/admin/login', request.url)
+      const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
       return NextResponse.redirect(loginUrl)
     }
@@ -238,7 +251,7 @@ export async function middleware(request: NextRequest) {
     const payload = await verifyToken(token)
 
     if (!payload) {
-      const loginUrl = new URL('/admin/login', request.url)
+      const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
       const response = NextResponse.redirect(loginUrl)
       response.cookies.delete('admin_token')
@@ -248,7 +261,7 @@ export async function middleware(request: NextRequest) {
     const certCN = request.headers.get('x-client-cert-cn') || ''
     const tokenCertCN = payload.authCertCN || payload.username
     if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
-      const loginUrl = new URL('/admin/login', request.url)
+      const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
       const response = NextResponse.redirect(loginUrl)
       response.cookies.delete('admin_token')
