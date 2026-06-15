@@ -484,22 +484,34 @@ jobs:
           exit 1
 
   # ────────────────────────────────────────────────────────
-  # Stage 7 — Invalidate CDN  (main only, gate: smoke-test + migrate)
+  # Stage 7 — Invalidate CDN  (main only, gate: deploy)
+  # Runs as soon as the new image is live so cached 30x/HTML at the edge
+  # gets cleared before the smoke test, not after. Also waits for the
+  # invalidation to complete so the next stage sees a clean cache.
   # ────────────────────────────────────────────────────────
   invalidate-cdn:
     name: Invalidate CloudFront
     runs-on: ubuntu-latest
-    needs: [smoke-test, migrate]
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.smoke-test.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
+    needs: [deploy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Invalidate cache
-        uses: chetan/invalidate-cloudfront-action@v2
+      - name: Create invalidation and wait
         env:
-          DISTRIBUTION: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-          PATHS: "/*"
-          AWS_REGION: us-east-1
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          set -euo pipefail
+          INV_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" \
+            --paths '/*' \
+            --query 'Invalidation.Id' --output text)
+          echo "Invalidation $INV_ID created — waiting for completion..."
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$DIST_ID" \
+            --id "$INV_ID"
+          echo "Invalidation $INV_ID complete."
 
   # ────────────────────────────────────────────────────────
   # Final — Summary  (always runs)
