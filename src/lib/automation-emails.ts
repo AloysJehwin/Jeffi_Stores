@@ -1,4 +1,3 @@
-import { transporter } from './email'
 import {
   type CampaignKind,
   type Campaign,
@@ -14,6 +13,7 @@ import {
 } from './marketing'
 import { baseLayout, ctaButton } from './email-campaigns'
 import { queryOne } from './db'
+import { sendAuditedMail } from './mail-audit'
 
 function resolveAppUrl(): string {
   const isLocalhost = (v: string | undefined) => !!v && /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(v)
@@ -72,7 +72,7 @@ export async function sendCampaignEmail(params: {
   const html = baseLayout(subject, tracked)
 
   try {
-    await transporter.sendMail({
+    await sendAuditedMail({
       from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
       to: user.email,
       subject,
@@ -81,6 +81,12 @@ export async function sendCampaignEmail(params: {
         'List-Unsubscribe': `<${unsubscribeUrl}>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       },
+      kind: 'automation',
+      templateName: campaign.kind,
+      entityType: 'users',
+      entityId: user.id,
+      userId: user.id,
+      metadata: { sentId, referenceId },
     })
     return { ok: true, sentId }
   } catch {
@@ -379,11 +385,16 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
   const html = baseLayout(subject, body + `<p style="margin-top:24px;color:#999;font-size:12px;">— This is a test send. Tracking pixel and unsubscribe footer omitted.</p>`)
 
   try {
-    await transporter.sendMail({
+    await sendAuditedMail({
       from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
       to: toEmail,
       subject,
       html,
+      kind: 'automation',
+      templateName: `${kind}_test`,
+      entityType: null,
+      entityId: null,
+      userId: null,
     })
     return { ok: true }
   } catch (err: any) {

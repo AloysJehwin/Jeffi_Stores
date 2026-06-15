@@ -122,40 +122,50 @@ export default function AdminAuditClient() {
   const [cronTriggeringId, setCronTriggeringId] = useState<string | null>(null)
   const [expandedCronId, setExpandedCronId] = useState<string | null>(null)
 
-  // ── Mail Log state ──────────────────────────────────────────────────────────
-  interface MailLog {
+  // ── Mail Log state (email_logs — every outbound mail with body) ────────────
+  interface MailLogRow {
+    id: string
     email: string
+    from_email: string | null
+    cc: string | null
+    bcc: string | null
+    subject: string
+    template_name: string | null
+    kind: string | null
+    entity_type: string | null
+    entity_id: string | null
     status: 'sent' | 'failed'
     error: string | null
     sent_at: string
+    message_id: string | null
+    body_size: number
   }
-  interface MailCampaign {
-    id: string
-    title: string
-    template_key: string
-    subject: string
-    audience_type: string
-    recipient_count: number | null
-    status: string
-    sent_at: string | null
-    created_at: string
-    logs?: MailLog[]
-    logsLoading?: boolean
-  }
-  const [mailCampaigns, setMailCampaigns] = useState<MailCampaign[]>([])
+  const [mailRows, setMailRows] = useState<MailLogRow[]>([])
   const [mailLoading, setMailLoading] = useState(false)
   const [mailPage, setMailPage] = useState(1)
   const [mailTotal, setMailTotal] = useState(0)
-  const mailPageSize = 20
+  const mailPageSize = 25
+  const [mailKind, setMailKind] = useState<string>('all')
+  const [mailStatus, setMailStatus] = useState<string>('all')
+  const [mailQuery, setMailQuery] = useState<string>('')
+  const [mailQueryDebounced, setMailQueryDebounced] = useState<string>('')
   const [expandedMailId, setExpandedMailId] = useState<string | null>(null)
+  const [mailBodies, setMailBodies] = useState<Record<string, { html: string | null; text: string | null; metadata: any; loading: boolean }>>({})
 
   async function loadMailLog() {
     setMailLoading(true)
     try {
-      const res = await fetch(`/api/admin/mailer?page=${mailPage}`, { credentials: 'include' })
+      const qs = new URLSearchParams({
+        page: String(mailPage),
+        pageSize: String(mailPageSize),
+      })
+      if (mailKind !== 'all') qs.set('kind', mailKind)
+      if (mailStatus !== 'all') qs.set('status', mailStatus)
+      if (mailQueryDebounced) qs.set('q', mailQueryDebounced)
+      const res = await fetch(`/api/admin/audit/mail-log?${qs.toString()}`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
-        setMailCampaigns((data.campaigns || []).map((c: MailCampaign) => ({ ...c, logs: undefined, logsLoading: false })))
+        setMailRows(data.rows || [])
         setMailTotal(data.total || 0)
       }
     } finally {
@@ -163,28 +173,31 @@ export default function AdminAuditClient() {
     }
   }
 
-  async function loadCampaignLogs(campaignId: string) {
-    setMailCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, logsLoading: true } : c))
+  async function loadMailBody(id: string) {
+    setMailBodies(prev => ({ ...prev, [id]: { html: null, text: null, metadata: null, loading: true } }))
     try {
-      const res = await fetch(`/api/admin/mailer/${campaignId}?logPage=1`, { credentials: 'include' })
+      const res = await fetch(`/api/admin/audit/mail-log/${id}`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
-        setMailCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, logs: data.logs || [], logsLoading: false } : c))
+        setMailBodies(prev => ({
+          ...prev,
+          [id]: { html: data.row?.body_html ?? null, text: data.row?.body_text ?? null, metadata: data.row?.metadata ?? null, loading: false },
+        }))
+      } else {
+        setMailBodies(prev => ({ ...prev, [id]: { html: null, text: null, metadata: null, loading: false } }))
       }
     } catch {
-      setMailCampaigns(prev => prev.map(c => c.id === campaignId ? { ...c, logsLoading: false } : c))
+      setMailBodies(prev => ({ ...prev, [id]: { html: null, text: null, metadata: null, loading: false } }))
     }
   }
 
-  function toggleMailExpand(id: string, campaign: MailCampaign) {
+  function toggleMailExpand(id: string) {
     if (expandedMailId === id) {
       setExpandedMailId(null)
-    } else {
-      setExpandedMailId(id)
-      if (!campaign.logs && !campaign.logsLoading) {
-        loadCampaignLogs(id)
-      }
+      return
     }
+    setExpandedMailId(id)
+    if (!mailBodies[id]) loadMailBody(id)
   }
 
   async function load() {
@@ -250,7 +263,12 @@ export default function AdminAuditClient() {
   useEffect(() => { setPage(1) }, [entityFilter, actionFilter, pageSize])
   useEffect(() => { load() }, [entityFilter, actionFilter, page, pageSize])
   useEffect(() => { if (pageTab === 'cron') loadCronJobs() }, [pageTab])
-  useEffect(() => { if (pageTab === 'mail_log') loadMailLog() }, [pageTab, mailPage])
+  useEffect(() => { if (pageTab === 'mail_log') loadMailLog() }, [pageTab, mailPage, mailKind, mailStatus, mailQueryDebounced])
+  useEffect(() => {
+    const id = setTimeout(() => setMailQueryDebounced(mailQuery), 300)
+    return () => clearTimeout(id)
+  }, [mailQuery])
+  useEffect(() => { setMailPage(1) }, [mailKind, mailStatus, mailQueryDebounced])
 
   const entityOptions = useMemo(() => [
     { value: 'all', label: 'All entities' },
@@ -517,88 +535,107 @@ export default function AdminAuditClient() {
 
       {pageTab === 'mail_log' && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-foreground-muted">All outbound email campaigns. Click a row to expand individual recipient logs.</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <p className="text-sm text-foreground-muted">Every outbound email — transactional, automation, business, and broadcasts. Click a row to see the full HTML body.</p>
             <button
               type="button"
               onClick={loadMailLog}
               disabled={mailLoading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${mailLoading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
           </div>
 
-          {mailLoading && mailCampaigns.length === 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
+            <input
+              type="text"
+              placeholder="Search by recipient or subject..."
+              value={mailQuery}
+              onChange={e => setMailQuery(e.target.value)}
+              className="text-sm px-3 py-2 rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+            />
+            <AdminSelect
+              value={mailKind}
+              onChange={(v) => setMailKind(v)}
+              options={[
+                { value: 'all', label: 'All kinds' },
+                { value: 'otp', label: 'OTP' },
+                { value: 'welcome', label: 'Welcome' },
+                { value: 'order', label: 'Order' },
+                { value: 'invoice', label: 'Invoice' },
+                { value: 'quotation', label: 'Quotation' },
+                { value: 'rfq', label: 'RFQ' },
+                { value: 'purchase_order', label: 'Purchase Order' },
+                { value: 'business', label: 'Business' },
+                { value: 'automation', label: 'Automation' },
+                { value: 'campaign', label: 'Campaign' },
+                { value: 'admin_notification', label: 'Admin notification' },
+                { value: 'support', label: 'Support' },
+                { value: 'other', label: 'Other' },
+              ]}
+            />
+            <AdminSelect
+              value={mailStatus}
+              onChange={(v) => setMailStatus(v)}
+              options={[
+                { value: 'all', label: 'All status' },
+                { value: 'sent', label: 'Sent' },
+                { value: 'failed', label: 'Failed' },
+              ]}
+            />
+          </div>
+
+          {mailLoading && mailRows.length === 0 ? (
             <div className="space-y-3">
               {[1,2,3,4,5].map(i => <div key={i} className="h-14 rounded-lg bg-surface-secondary animate-pulse" />)}
             </div>
-          ) : mailCampaigns.length === 0 ? (
-            <p className="text-sm text-foreground-muted italic">No mail campaigns found.</p>
+          ) : mailRows.length === 0 ? (
+            <p className="text-sm text-foreground-muted italic">No emails found.</p>
           ) : (
             <div className="space-y-2">
-              {mailCampaigns.map(campaign => {
-                const isExpanded = expandedMailId === campaign.id
-                const isSingle = campaign.audience_type === 'specific_user'
-                const sentCount = campaign.logs ? campaign.logs.filter(l => l.status === 'sent').length : null
-                const failedCount = campaign.logs ? campaign.logs.filter(l => l.status === 'failed').length : null
-
+              {mailRows.map(row => {
+                const isExpanded = expandedMailId === row.id
+                const body = mailBodies[row.id]
                 return (
-                  <div key={campaign.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+                  <div key={row.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
                     <button
                       type="button"
-                      onClick={() => toggleMailExpand(campaign.id, campaign)}
-                      className="w-full text-left p-4 flex items-center gap-4 hover:bg-surface-secondary/40 transition-colors"
+                      onClick={() => toggleMailExpand(row.id)}
+                      className="w-full text-left p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:bg-surface-secondary/40 transition-colors"
                     >
-                      {/* Icon */}
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${isSingle ? 'bg-blue-500' : 'bg-emerald-500'}`}>
-                        {isSingle ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${row.status === 'sent' ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                        {row.status === 'sent' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                       </div>
-
-                      {/* Main info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-foreground truncate">{campaign.title}</span>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                            campaign.status === 'sent' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                            campaign.status === 'sending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-                            campaign.status === 'draft' ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' :
-                            'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                          }`}>{campaign.status}</span>
+                          <span className="text-sm font-semibold text-foreground truncate">{row.subject || '(no subject)'}</span>
+                          {row.kind && (
+                            <span className="text-[10px] font-mono uppercase tracking-wide text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
+                              {row.kind}
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-foreground-muted mt-0.5 truncate">
-                          {campaign.subject}
+                          To: {row.email}
+                          {row.from_email ? <span className="ml-2">From: {row.from_email}</span> : null}
                         </p>
                         <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                           <span className="text-[11px] text-foreground-muted">
-                            {campaign.sent_at
-                              ? `Sent ${new Date(campaign.sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-                              : `Created ${new Date(campaign.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                            {new Date(row.sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          {campaign.recipient_count !== null && (
-                            <span className="text-[11px] text-foreground-muted">{campaign.recipient_count} recipient{campaign.recipient_count !== 1 ? 's' : ''}</span>
+                          {row.entity_type && row.entity_id && (
+                            <span className="text-[11px] text-foreground-muted">
+                              {row.entity_type} · <span className="font-mono">{row.entity_id.slice(0, 8)}</span>
+                            </span>
                           )}
-                          <span className="text-[10px] font-mono text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
-                            {campaign.template_key} · {campaign.audience_type.replace(/_/g, ' ')}
-                          </span>
+                          {row.template_name && (
+                            <span className="text-[10px] font-mono text-foreground-muted">{row.template_name}</span>
+                          )}
                         </div>
                       </div>
-
-                      {/* Stats + chevron */}
-                      <div className="flex items-center gap-3 shrink-0">
-                        {sentCount !== null && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> {sentCount}
-                            </span>
-                            {failedCount! > 0 && (
-                              <span className="flex items-center gap-1 text-red-500">
-                                <XCircle className="w-3.5 h-3.5" /> {failedCount}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                      <div className="shrink-0">
                         {isExpanded
                           ? <ChevronUp className="w-4 h-4 text-foreground-muted" />
                           : <ChevronDown className="w-4 h-4 text-foreground-muted" />
@@ -608,39 +645,37 @@ export default function AdminAuditClient() {
 
                     {isExpanded && (
                       <div className="border-t border-border-default">
-                        {campaign.logsLoading ? (
-                          <div className="flex items-center justify-center py-6">
-                            <RefreshCw className="w-4 h-4 animate-spin text-foreground-muted" />
-                          </div>
-                        ) : !campaign.logs || campaign.logs.length === 0 ? (
-                          <p className="px-4 py-4 text-xs text-foreground-muted italic">No recipient logs found.</p>
-                        ) : (
-                          <div className="divide-y divide-border-default max-h-80 overflow-y-auto">
-                            {/* Header */}
-                            <div className="grid grid-cols-[1fr_80px_140px] px-4 py-2 bg-surface-secondary text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
-                              <span>Recipient</span>
-                              <span>Status</span>
-                              <span>Sent at</span>
-                            </div>
-                            {campaign.logs.map((log, idx) => (
-                              <div key={`${log.email}-${idx}`} className="grid grid-cols-[1fr_80px_140px] px-4 py-2.5 items-center hover:bg-surface-secondary/40 transition-colors">
-                                <span className="text-xs text-foreground truncate pr-2">{log.email}</span>
-                                <span>
-                                  {log.status === 'sent'
-                                    ? <span className="flex items-center gap-1 text-[11px] text-green-600 dark:text-green-400"><CheckCircle2 className="w-3 h-3" /> Sent</span>
-                                    : <span className="flex items-center gap-1 text-[11px] text-red-500"><XCircle className="w-3 h-3" /> Failed</span>
-                                  }
-                                </span>
-                                <span className="text-[11px] text-foreground-muted">
-                                  {log.sent_at ? new Date(log.sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
-                                </span>
-                                {log.error && (
-                                  <span className="col-span-3 text-[10px] text-red-500 font-mono mt-0.5 truncate">{log.error}</span>
-                                )}
-                              </div>
-                            ))}
+                        {row.error && (
+                          <div className="px-4 py-2 bg-red-50 dark:bg-red-950/30 text-[11px] text-red-700 dark:text-red-300 font-mono break-all">
+                            {row.error}
                           </div>
                         )}
+                        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-0 md:gap-4 text-xs">
+                          <dl className="px-4 py-3 space-y-1.5 bg-surface-secondary/40 md:bg-transparent">
+                            <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">From</dt><dd className="text-foreground break-all">{row.from_email || '—'}</dd></div>
+                            <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">To</dt><dd className="text-foreground break-all">{row.email}</dd></div>
+                            {row.cc && <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">Cc</dt><dd className="text-foreground break-all">{row.cc}</dd></div>}
+                            {row.bcc && <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">Bcc</dt><dd className="text-foreground break-all">{row.bcc}</dd></div>}
+                            <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">Subject</dt><dd className="text-foreground">{row.subject}</dd></div>
+                            {row.message_id && <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">Message-ID</dt><dd className="text-foreground font-mono text-[10px] break-all">{row.message_id}</dd></div>}
+                          </dl>
+                          <div className="p-3 sm:p-4">
+                            {body?.loading ? (
+                              <div className="flex items-center justify-center py-10"><RefreshCw className="w-4 h-4 animate-spin text-foreground-muted" /></div>
+                            ) : body?.html ? (
+                              <iframe
+                                title={`mail-${row.id}`}
+                                srcDoc={body.html}
+                                sandbox=""
+                                className="w-full h-96 rounded border border-border-default bg-white"
+                              />
+                            ) : body?.text ? (
+                              <pre className="text-xs whitespace-pre-wrap text-foreground bg-surface-secondary/50 p-3 rounded border border-border-default max-h-96 overflow-auto">{body.text}</pre>
+                            ) : (
+                              <p className="text-xs text-foreground-muted italic">No body recorded for this email.</p>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -649,13 +684,12 @@ export default function AdminAuditClient() {
             </div>
           )}
 
-          {/* Pagination */}
           {!mailLoading && mailTotal > mailPageSize && (() => {
             const totalPages = Math.ceil(mailTotal / mailPageSize)
             return (
               <div className="mt-6 flex items-center justify-between border-t border-border-default pt-4">
                 <p className="text-xs text-foreground-muted">
-                  Page <span className="font-medium text-foreground">{mailPage}</span> of <span className="font-medium text-foreground">{totalPages}</span> · {mailTotal} campaigns
+                  Page <span className="font-medium text-foreground">{mailPage}</span> of <span className="font-medium text-foreground">{totalPages}</span> · {mailTotal} email{mailTotal !== 1 ? 's' : ''}
                 </p>
                 <div className="flex items-center gap-1">
                   <button type="button" onClick={() => setMailPage(p => Math.max(1, p - 1))} disabled={mailPage === 1} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"><ChevronLeft className="w-3.5 h-3.5" /></button>

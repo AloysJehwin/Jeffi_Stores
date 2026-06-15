@@ -45,31 +45,24 @@ async function redisIncrExpire(key: string, windowSecs: number): Promise<{ count
   if (!redisUrl || !redisToken) return null
 
   try {
-    const [incrRes, expireRes] = await Promise.all([
-      fetch(`${redisUrl}/incr/${encodeURIComponent(key)}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${redisToken}` },
-      }),
-      fetch(`${redisUrl}/expire/${encodeURIComponent(key)}/${windowSecs}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${redisToken}` },
-      }),
-    ])
-
-    const incrData = await incrRes.json()
-    const count = incrData.result as number
-
-    if (count === 1) {
-      await expireRes
-    }
-
-    const ttlRes = await fetch(`${redisUrl}/ttl/${encodeURIComponent(key)}`, {
-      headers: { Authorization: `Bearer ${redisToken}` },
+    // Single pipelined round-trip: INCR + EXPIRE. We don't need a separate TTL
+    // fetch — the worst-case Retry-After is the full window, which is fine.
+    const res = await fetch(`${redisUrl}/pipeline`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${redisToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([
+        ['INCR', key],
+        ['EXPIRE', key, String(windowSecs)],
+      ]),
     })
-    const ttlData = await ttlRes.json()
-    const ttl = ttlData.result as number
-
-    return { count, ttl: ttl > 0 ? ttl : windowSecs }
+    if (!res.ok) return null
+    const data = (await res.json()) as Array<{ result: number }>
+    const count = data?.[0]?.result
+    if (typeof count !== 'number') return null
+    return { count, ttl: windowSecs }
   } catch {
     return null
   }

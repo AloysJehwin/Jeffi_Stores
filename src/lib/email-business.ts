@@ -1,4 +1,4 @@
-import { transporter } from './email'
+import { sendAuditedMail } from './mail-audit'
 
 const FROM = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@admin.jeffistores.in'
@@ -22,9 +22,24 @@ function baseLayout(body: string) {
 </div></body></html>`
 }
 
-async function send(to: string, subject: string, html: string) {
+async function send(
+  to: string,
+  subject: string,
+  html: string,
+  audit: { templateName: string; entityType?: string | null; entityId?: string | null; userId?: string | null },
+) {
   try {
-    const info = await transporter.sendMail({ from: FROM, to, subject, html })
+    const info = await sendAuditedMail({
+      from: FROM,
+      to,
+      subject,
+      html,
+      kind: 'business',
+      templateName: audit.templateName,
+      entityType: audit.entityType ?? null,
+      entityId: audit.entityId ?? null,
+      userId: audit.userId ?? null,
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -57,8 +72,12 @@ export async function sendRfqSubmittedEmail(
   `)
 
   await Promise.allSettled([
-    send(toEmail, `RFQ ${rfqNumber} submitted — Jeffi Stores`, userHtml),
-    send(ADMIN_EMAIL, `New RFQ ${rfqNumber} from ${name}`, adminHtml),
+    send(toEmail, `RFQ ${rfqNumber} submitted — Jeffi Stores`, userHtml, {
+      templateName: 'rfq_submitted_user',
+    }),
+    send(ADMIN_EMAIL, `New RFQ ${rfqNumber} from ${name}`, adminHtml, {
+      templateName: 'rfq_submitted_admin',
+    }),
   ])
 }
 
@@ -82,7 +101,9 @@ export async function sendRfqConvertedToQuotationEmail(
     <p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Quotation</a></p>
     <p>Please review the quotation. If you have any questions, contact us at +91 96853 54099.</p>
   `)
-  return send(toEmail, `Quotation ${quoteNumber} ready — Jeffi Stores`, html)
+  return send(toEmail, `Quotation ${quoteNumber} ready — Jeffi Stores`, html, {
+    templateName: 'rfq_converted_to_quotation',
+  })
 }
 
 // Business account approved
@@ -97,7 +118,9 @@ export async function sendBusinessAccountApprovedEmail(
     <p>You can now log in and start placing RFQs and orders.</p>
     <p style="text-align:center"><a href="${BUSINESS_URL}/signin" class="btn" style="color:#ffffff;">Log In to Business Portal</a></p>
   `)
-  return send(toEmail, `Business account approved — Jeffi Stores`, html)
+  return send(toEmail, `Business account approved — Jeffi Stores`, html, {
+    templateName: 'business_account_approved',
+  })
 }
 
 // Business account rejected
@@ -113,7 +136,9 @@ export async function sendBusinessAccountRejectedEmail(
     ${rejectionNote ? `<div class="box"><p style="margin:0"><strong>Reason:</strong> ${rejectionNote}</p></div>` : ''}
     <p>If you believe this is an error or would like to reapply, please contact us at jeffistoress@gmail.com or +91 96853 54099.</p>
   `)
-  return send(toEmail, `Business account application update — Jeffi Stores`, html)
+  return send(toEmail, `Business account application update — Jeffi Stores`, html, {
+    templateName: 'business_account_rejected',
+  })
 }
 
 // Business invoice generated (quotation converted to invoice)
@@ -137,7 +162,9 @@ export async function sendBusinessInvoiceGeneratedEmail(
     <p style="text-align:center"><a href="${invoiceViewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>
     <p>For payment enquiries, contact us at +91 96853 54099 or jeffistoress@gmail.com.</p>
   `)
-  return send(toEmail, `Invoice ${invoiceNumber} — Jeffi Stores`, html)
+  return send(toEmail, `Invoice ${invoiceNumber} — Jeffi Stores`, html, {
+    templateName: 'business_invoice_generated',
+  })
 }
 
 // Business order status update
@@ -161,5 +188,7 @@ export async function sendBusinessOrderStatusEmail(
     ${invoiceViewUrl ? `<p style="text-align:center"><a href="${invoiceViewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>` : ''}
     <p>For any queries, contact us at +91 96853 54099 or jeffistoress@gmail.com.</p>
   `)
-  return send(toEmail, `Order ${orderNumber} — ${label} | Jeffi Stores`, html)
+  return send(toEmail, `Order ${orderNumber} — ${label} | Jeffi Stores`, html, {
+    templateName: 'business_order_status',
+  })
 }
