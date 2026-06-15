@@ -19,13 +19,18 @@ export async function POST(request: NextRequest) {
       maxAge: 0,
       path: '/',
     }
-    // Expire both variants — modern (domain-scoped) and legacy host-only.
-    cookieStore.set('business_auth_token', '', { ...baseOpts, ...cookieDomainOption() })
     cookieStore.set('business_auth_token', '', baseOpts)
-    cookieStore.set('session_id', '', { ...baseOpts, ...cookieDomainOption() })
+    cookieStore.set('business_auth_token', '', { ...baseOpts, ...cookieDomainOption() })
     cookieStore.set('session_id', '', baseOpts)
+    cookieStore.set('session_id', '', { ...baseOpts, ...cookieDomainOption() })
 
-    return NextResponse.json({ message: 'Logged out successfully' })
+    const res = NextResponse.json({ message: 'Logged out successfully' })
+    const flags = `Path=/; Max-Age=0; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
+    res.headers.append('Set-Cookie', `business_auth_token=; ${flags}`)
+    if (process.env.NODE_ENV === 'production') {
+      res.headers.append('Set-Cookie', `business_auth_token=; Domain=.jeffistores.in; ${flags}`)
+    }
+    return res
   } catch {
     return NextResponse.json({ error: 'Logout failed' }, { status: 500 })
   }

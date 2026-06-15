@@ -12,9 +12,16 @@ export async function POST() {
       maxAge: 0,
       path: '/',
     }
-    cookieStore.set('admin_token', '', { ...baseOpts, ...cookieDomainOption() })
     cookieStore.set('admin_token', '', baseOpts)
-    return NextResponse.json({ message: 'Logged out' })
+    cookieStore.set('admin_token', '', { ...baseOpts, ...cookieDomainOption() })
+
+    const res = NextResponse.json({ message: 'Logged out' })
+    const flags = `Path=/; Max-Age=0; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
+    res.headers.append('Set-Cookie', `admin_token=; ${flags}`)
+    if (process.env.NODE_ENV === 'production') {
+      res.headers.append('Set-Cookie', `admin_token=; Domain=.jeffistores.in; ${flags}`)
+    }
+    return res
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
