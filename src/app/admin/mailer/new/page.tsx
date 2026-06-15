@@ -6,6 +6,7 @@ import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import RichTextEditor from '@/components/admin/RichTextEditor'
 
 import { ap } from '@/lib/admin-path'
 
@@ -60,6 +61,9 @@ export default function NewCampaignPage() {
   const [audienceLoading, setAudienceLoading] = useState(false)
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audienceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [scenarioPrompt, setScenarioPrompt] = useState('')
+  const [scenarioLoading, setScenarioLoading] = useState(false)
+  const [scenarioError, setScenarioError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/review-forms?page=1')
@@ -118,6 +122,29 @@ export default function NewCampaignPage() {
 
   function setField(key: string, value: string) {
     setTemplateData(prev => ({ ...prev, [key]: value }))
+  }
+
+  async function generateFromScenario() {
+    if (scenarioPrompt.trim().length < 10 || scenarioLoading) return
+    setScenarioLoading(true)
+    setScenarioError(null)
+    try {
+      const res = await fetch('/api/admin/ai-generate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario: scenarioPrompt, subject }),
+      })
+      const data = await res.json() as { html?: string; error?: string }
+      if (!res.ok || !data.html) {
+        setScenarioError(data.error || 'Generation failed')
+        return
+      }
+      setField('htmlBody', data.html)
+    } catch {
+      setScenarioError('Network error')
+    } finally {
+      setScenarioLoading(false)
+    }
   }
 
   async function handleSubmit(sendNow: boolean) {
@@ -306,7 +333,56 @@ export default function NewCampaignPage() {
             )}
 
             {templateKey === 'custom' && (
-              <div><label className={labelClass}>HTML Body *</label><textarea value={templateData.htmlBody || ''} onChange={e => setField('htmlBody', e.target.value)} rows={10} className={`${textareaClass} font-mono text-xs`} placeholder="<!DOCTYPE html>..." /></div>
+              <div className="space-y-4">
+                <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-4 space-y-3">
+                  <div>
+                    <label className={`${labelClass} flex items-center gap-1.5`}>
+                      <svg className="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                      Generate with AI
+                    </label>
+                    <textarea
+                      value={scenarioPrompt}
+                      onChange={e => setScenarioPrompt(e.target.value)}
+                      rows={3}
+                      className={`${textareaClass}`}
+                      placeholder="Describe the email scenario — e.g. 'Diwali sale 20% off all power tools, valid till 5 Nov, include CTA to /products' or 'Welcome new business customers, mention 10-day net credit and bulk discount tier'."
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={generateFromScenario}
+                      disabled={scenarioLoading || scenarioPrompt.trim().length < 10}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {scenarioLoading ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                          Generating…
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                          {templateData.htmlBody ? 'Regenerate' : 'Generate Email Body'}
+                        </>
+                      )}
+                    </button>
+                    {scenarioError && <span className="text-xs text-red-500">{scenarioError}</span>}
+                  </div>
+                  <p className="text-[11px] text-foreground-muted">
+                    AI uses placeholder tags like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code> that get replaced per recipient at send time.
+                  </p>
+                </div>
+                <div>
+                  <label className={labelClass}>Email Body</label>
+                  <RichTextEditor
+                    value={templateData.htmlBody || ''}
+                    onChange={v => setField('htmlBody', v)}
+                    placeholder="Click 'Generate Email Body' above, or write your own here."
+                    minHeight={360}
+                  />
+                </div>
+              </div>
             )}
 
             <div className="flex gap-3 pt-2">
