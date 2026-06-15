@@ -33,12 +33,15 @@ function LoginPage() {
   const [resendCooldown, setResendCooldown] = useState(0)
   const [error, setError] = useState('')
   const [policyAccepted, setPolicyAccepted] = useState(false)
+  const [requiresPolicy, setRequiresPolicy] = useState(false)
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
   const [showPhoneModal, setShowPhoneModal] = useState(false)
   const [phone, setPhone] = useState('')
   const [phoneSaving, setPhoneSaving] = useState(false)
   const [phoneError, setPhoneError] = useState('')
+  const [phonePolicyAccepted, setPhonePolicyAccepted] = useState(false)
+  const [phoneRequiresPolicy, setPhoneRequiresPolicy] = useState(false)
 
   useEffect(() => {
     if (!authLoading && user && !showPhoneModal) {
@@ -71,7 +74,10 @@ function LoginPage() {
     try {
       const loggedInUser = await googleLoginWithAccessToken(result.accessToken)
       await refreshCart()
-      if (!loggedInUser?.phone) {
+      const needsPhone = !loggedInUser?.phone
+      const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
+      if (needsPhone || needsPolicy) {
+        setPhoneRequiresPolicy(needsPolicy)
         setShowPhoneModal(true)
       } else {
         router.push(redirect)
@@ -108,6 +114,8 @@ function LoginPage() {
         throw new Error(data.error || 'Failed to send OTP')
       }
       setStep('otp')
+      setRequiresPolicy(!!data.requiresPolicyAcceptance)
+      setPolicyAccepted(false)
       setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 30)
     } catch (err: any) {
       setError(err.message)
@@ -118,11 +126,12 @@ function LoginPage() {
 
   const submitLogin = async (otpValue: string) => {
     if (submittedOtpRef.current === otpValue) return
+    if (requiresPolicy && !policyAccepted) return
     submittedOtpRef.current = otpValue
     setError('')
     setIsLoading(true)
     try {
-      await login(email, otpValue)
+      await login(email, otpValue, requiresPolicy ? policyAccepted : undefined)
       await refreshCart()
       router.push(redirect)
     } catch (err: any) {
@@ -144,8 +153,9 @@ function LoginPage() {
     if (step !== 'otp') return
     if (otp.length !== 6) return
     if (isLoading) return
+    if (requiresPolicy && !policyAccepted) return
     submitLogin(otp)
-  }, [otp, step, isLoading])
+  }, [otp, step, isLoading, requiresPolicy, policyAccepted])
 
   const handleResendOTP = async () => {
     setError('')
@@ -183,6 +193,10 @@ function LoginPage() {
       setPhoneError('Enter a valid 10-digit mobile number')
       return
     }
+    if (phoneRequiresPolicy && !phonePolicyAccepted) {
+      setPhoneError('Please accept the Privacy Policy and Terms & Conditions')
+      return
+    }
     setPhoneSaving(true)
     try {
       const res = await fetch('/api/user/update', {
@@ -194,6 +208,14 @@ function LoginPage() {
       if (!res.ok) {
         const d = await res.json()
         throw new Error(d.error || 'Failed to save phone number')
+      }
+      if (phoneRequiresPolicy && phonePolicyAccepted) {
+        await fetch('/api/user/accept-policies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        }).catch(() => {})
       }
       await refreshUser()
       router.push(redirect)
@@ -265,20 +287,7 @@ function LoginPage() {
                   placeholder="your@email.com"
                 />
               </div>
-              <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={policyAccepted}
-                  onChange={e => setPolicyAccepted(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
-                />
-                <span>
-                  I agree to the{' '}
-                  <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
-                  <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
-                </span>
-              </label>
-              <button type="submit" disabled={isLoading || !policyAccepted}
+              <button type="submit" disabled={isLoading}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending OTP...</>
@@ -321,7 +330,22 @@ function LoginPage() {
                   Change Email
                 </button>
               </div>
-              <button type="submit" disabled={otp.length !== 6 || isLoading}
+              {requiresPolicy && (
+                <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={policyAccepted}
+                    onChange={e => setPolicyAccepted(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
+                    <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
+                  </span>
+                </label>
+              )}
+              <button type="submit" disabled={otp.length !== 6 || isLoading || (requiresPolicy && !policyAccepted)}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Logging in...</>
@@ -342,9 +366,11 @@ function LoginPage() {
       {showPhoneModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-surface-elevated rounded-lg shadow-xl p-6 w-full max-w-sm">
-            <h3 className="text-lg font-semibold text-foreground mb-2">Add Mobile Number</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              {phoneRequiresPolicy ? 'Almost there' : 'Add Mobile Number'}
+            </h3>
             <p className="text-sm text-foreground-secondary mb-6">
-              Add your mobile number so we can keep you updated on your orders.
+              Add your mobile number{phoneRequiresPolicy ? ' and accept our policies' : ''} so we can keep you updated on your orders.
             </p>
             {phoneError && (
               <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-3 py-2 rounded-lg text-sm">
@@ -377,9 +403,24 @@ function LoginPage() {
                   <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
                 )}
               </div>
+              {phoneRequiresPolicy && (
+                <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={phonePolicyAccepted}
+                    onChange={e => setPhonePolicyAccepted(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
+                    <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
+                  </span>
+                </label>
+              )}
               <button
                 type="submit"
-                disabled={phoneSaving || phone.length !== 10}
+                disabled={phoneSaving || phone.length !== 10 || (phoneRequiresPolicy && !phonePolicyAccepted)}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {phoneSaving ? (

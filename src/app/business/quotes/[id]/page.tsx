@@ -299,6 +299,13 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
   const canMessage = !['converted', 'rejected', 'offer_accepted'].includes(rfq.status)
   const latestCounter = [...messages].reverse().find(m => m.sender === 'admin' && m.counter_items?.length)
   const latestCustomerCounter = [...messages].reverse().find(m => m.sender === 'customer' && m.counter_items?.length)
+  // Only treat the admin counter as "pending on customer" if the customer hasn't
+  // already replied with their own counter — once the customer counters back,
+  // the ball is in admin's court and the Accept/Negotiate card should hide.
+  const pendingAdminOffer = !!latestCounter && (
+    !latestCustomerCounter ||
+    new Date(latestCounter.created_at).getTime() > new Date(latestCustomerCounter.created_at).getTime()
+  )
   const customerCounterMap: Record<string, number> = {}
   if (latestCustomerCounter?.counter_items) {
     for (const ci of latestCustomerCounter.counter_items) {
@@ -307,6 +314,14 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
   }
   const isFinalState = ['offer_accepted', 'converted'].includes(rfq.status)
   const targetFor = (item: RFQItem): number | null => {
+    // In a final state, the agreed price is whatever the quotation was generated at —
+    // pull it from quoted_rate * (1 - discount) * (1 + gst). Falls through to legacy
+    // sources if no quotation row joined.
+    if (isFinalState && item.quoted_rate != null) {
+      const gst = item.quoted_gst_rate != null ? Number(item.quoted_gst_rate) : 18
+      const disc = item.quoted_discount_pct != null ? Number(item.quoted_discount_pct) : 0
+      return Number(item.quoted_rate) * (1 - disc / 100) * (1 + gst / 100)
+    }
     if (!isFinalState && customerCounterMap[item.id] != null) return customerCounterMap[item.id]
     if (item.requested_price != null) return Number(item.requested_price)
     return null
@@ -436,10 +451,11 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                     const shownCatalogPrice = businessUnitPrice ?? catalogUnit
                     const catalogMrp = item.variant_mrp ?? item.catalog_mrp
 
-                    // "Offered" = quoted_rate (finalized quotation, ex-GST → convert back to incl-GST) or counter offer from messages (already incl-GST)
+                    // "Offered" = quoted_rate (finalized quotation, ex-GST → convert back to incl-GST after discount) or counter offer from messages (already incl-GST)
                     const quotedGstRate = item.quoted_gst_rate != null ? Number(item.quoted_gst_rate) : 18
+                    const quotedDiscPct = item.quoted_rate != null && item.quoted_discount_pct != null ? Number(item.quoted_discount_pct) : 0
                     const offeredPrice = item.quoted_rate != null
-                      ? Number(item.quoted_rate) * (1 + quotedGstRate / 100)
+                      ? Number(item.quoted_rate) * (1 - quotedDiscPct / 100) * (1 + quotedGstRate / 100)
                       : offered != null ? Number(offered) : null
                     const offeredDiscountSource = item.quoted_rate != null ? item.quoted_discount_pct : null
 
@@ -736,8 +752,8 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                   <div className="px-4 pb-4 pt-2 border-t border-border-default space-y-3">
                     {msgError && <p className="text-xs text-red-500">{msgError}</p>}
 
-                    {/* Counter offer action card — shown when last admin message has counter_items */}
-                    {latestCounter ? (
+                    {/* Counter offer action card — shown when last admin message has counter_items AND customer hasn't replied yet */}
+                    {pendingAdminOffer && latestCounter ? (
                       <div className="rounded-xl border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-4 space-y-3">
                         <div className="flex items-center gap-2">
                           <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

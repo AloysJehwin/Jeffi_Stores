@@ -1,75 +1,52 @@
 'use client'
 
 import { useState } from 'react'
+import RichTextEditor from '@/components/admin/RichTextEditor'
 
 const TEMPLATES = [
   {
     id: 'delay_processing',
     label: 'Processing Delay',
     subject: 'Update on Your Order #{order_number}',
-    body: `Dear {customer_name},
-
-Thank you for your order with Jeffi Stores.
-
-We wanted to let you know that your order #{order_number} is currently in the final stages of processing. Our team is ensuring everything is packed perfectly before it heads your way.
-
-We expect your order to be dispatched within the next 1–2 business days. You'll receive a shipping confirmation with tracking details as soon as it's on the way.
-
-We sincerely appreciate your patience and look forward to getting your order to you soon.
-
-Warm regards,
-Team Jeffi Stores`,
+    body: `<p>Dear {customer_first_name},</p>
+<p>Thank you for your order with Jeffi Stores.</p>
+<p>We wanted to let you know that your order <strong>#{order_number}</strong> is currently in the final stages of processing. Our team is ensuring everything is packed perfectly before it heads your way.</p>
+<p>We expect your order to be dispatched within the next 1–2 business days. You'll receive a shipping confirmation with tracking details as soon as it's on the way.</p>
+<p>We sincerely appreciate your patience and look forward to getting your order to you soon.</p>
+<p>Warm regards,<br>Team Jeffi Stores</p>`,
   },
   {
     id: 'delay_shipping',
     label: 'Shipping Delay',
     subject: 'Shipping Update for Your Order #{order_number}',
-    body: `Dear {customer_name},
-
-We hope you're doing well. We're writing to share a brief update about your order #{order_number}.
-
-Due to some logistical factors outside our control, there has been a slight delay in the delivery timeline. We sincerely apologise for any inconvenience this may have caused.
-
-Your order is still on its way and we expect it to reach you within {estimated_date}. We'll keep you updated and notify you as soon as there's any further progress.
-
-Thank you so much for your understanding — it truly means a lot to us.
-
-Warm regards,
-Team Jeffi Stores`,
+    body: `<p>Dear {customer_first_name},</p>
+<p>We hope you're doing well. We're writing to share a brief update about your order <strong>#{order_number}</strong>.</p>
+<p>Due to some logistical factors outside our control, there has been a slight delay in the delivery timeline. We sincerely apologise for any inconvenience this may have caused.</p>
+<p>Your order is still on its way and we expect it to reach you soon. We'll keep you updated and notify you as soon as there's any further progress.</p>
+<p>Thank you so much for your understanding — it truly means a lot to us.</p>
+<p>Warm regards,<br>Team Jeffi Stores</p>`,
   },
   {
     id: 'out_of_stock',
     label: 'Item Unavailable',
     subject: 'Important Update About Your Order #{order_number}',
-    body: `Dear {customer_name},
-
-Thank you for choosing Jeffi Stores. We're reaching out regarding your order #{order_number}.
-
-Unfortunately, one of the items in your order has become temporarily unavailable due to higher-than-expected demand. We completely understand how frustrating this can be and we are truly sorry for the inconvenience.
-
-Our team is actively working to source the item at the earliest. We will reach out to you as soon as it is available. In the meantime, if you'd prefer a full refund or would like to explore alternative options, please don't hesitate to reply to this email or contact our support team.
-
-We value your trust in us and will do our best to make this right.
-
-Warm regards,
-Team Jeffi Stores`,
+    body: `<p>Dear {customer_first_name},</p>
+<p>Thank you for choosing Jeffi Stores. We're reaching out regarding your order <strong>#{order_number}</strong>.</p>
+<p>Unfortunately, one of the items in your order has become temporarily unavailable due to higher-than-expected demand. We completely understand how frustrating this can be and we are truly sorry for the inconvenience.</p>
+<p>Our team is actively working to source the item at the earliest. We will reach out to you as soon as it is available. In the meantime, if you'd prefer a full refund or would like to explore alternative options, please don't hesitate to reply to this email or contact our support team.</p>
+<p>We value your trust in us and will do our best to make this right.</p>
+<p>Warm regards,<br>Team Jeffi Stores</p>`,
   },
   {
     id: 'quality_check',
     label: 'Quality Check Hold',
     subject: 'Brief Hold on Your Order #{order_number}',
-    body: `Dear {customer_name},
-
-We appreciate your order with Jeffi Stores.
-
-We wanted to inform you that your order #{order_number} is currently undergoing our quality verification process. This is a standard check we carry out to ensure that every product we send meets our quality standards.
-
-This should be resolved within 24 hours and your order will be dispatched promptly thereafter. We'll notify you as soon as it's on the way.
-
-Thank you for your patience and continued trust in us.
-
-Warm regards,
-Team Jeffi Stores`,
+    body: `<p>Dear {customer_first_name},</p>
+<p>We appreciate your order with Jeffi Stores.</p>
+<p>We wanted to inform you that your order <strong>#{order_number}</strong> is currently undergoing our quality verification process. This is a standard check we carry out to ensure that every product we send meets our quality standards.</p>
+<p>This should be resolved within 24 hours and your order will be dispatched promptly thereafter. We'll notify you as soon as it's on the way.</p>
+<p>Thank you for your patience and continued trust in us.</p>
+<p>Warm regards,<br>Team Jeffi Stores</p>`,
   },
   {
     id: 'custom',
@@ -93,16 +70,15 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [scenarioPrompt, setScenarioPrompt] = useState('')
+  const [scenarioLoading, setScenarioLoading] = useState(false)
+  const [scenarioError, setScenarioError] = useState<string | null>(null)
 
   function applyTemplate(templateId: string) {
     const t = TEMPLATES.find(t => t.id === templateId)
     if (!t) return
     setSelectedTemplate(templateId)
-    const filled = (s: string) =>
-      s
-        .replace(/\{order_number\}/g, orderNumber)
-        .replace(/\{customer_name\}/g, customerName)
-        .replace(/\{estimated_date\}/g, '')
+    const filled = (s: string) => s.replace(/\{order_number\}/g, orderNumber)
     setSubject(filled(t.subject))
     setBody(filled(t.body))
   }
@@ -110,6 +86,30 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
   function handleTemplateChange(templateId: string) {
     applyTemplate(templateId)
     setResult(null)
+  }
+
+  async function generateFromScenario() {
+    if (scenarioPrompt.trim().length < 10 || scenarioLoading) return
+    setScenarioLoading(true)
+    setScenarioError(null)
+    try {
+      const ctx = `Order #${orderNumber} for ${customerName}.`
+      const res = await fetch('/api/admin/ai-generate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenario: `${ctx} ${scenarioPrompt}`, subject }),
+      })
+      const data = await res.json() as { html?: string; error?: string }
+      if (!res.ok || !data.html) {
+        setScenarioError(data.error || 'Generation failed')
+        return
+      }
+      setBody(data.html)
+    } catch {
+      setScenarioError('Network error')
+    } finally {
+      setScenarioLoading(false)
+    }
   }
 
   async function handleSend() {
@@ -120,7 +120,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
       const res = await fetch(`/api/admin/orders/${orderId}/send-customer-mail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, body }),
+        body: JSON.stringify({ subject, body, isHtml: true }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -185,6 +185,33 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
             </div>
           </div>
 
+          {selectedTemplate === 'custom' && (
+            <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-3 space-y-2">
+              <label className="text-xs font-semibold text-violet-700 dark:text-violet-300 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                Generate with AI
+              </label>
+              <textarea
+                value={scenarioPrompt}
+                onChange={e => setScenarioPrompt(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-border-secondary rounded text-sm bg-surface text-foreground resize-none"
+                placeholder="Describe the situation — e.g. 'Apologize for shipping delay and offer 10% off next order'"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={generateFromScenario}
+                  disabled={scenarioLoading || scenarioPrompt.trim().length < 10}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-500 hover:bg-violet-600 text-white rounded text-xs font-medium disabled:opacity-50"
+                >
+                  {scenarioLoading ? 'Generating…' : (body ? 'Regenerate' : 'Generate')}
+                </button>
+                {scenarioError && <span className="text-[11px] text-red-500">{scenarioError}</span>}
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-medium text-foreground-muted mb-1.5">Subject</label>
             <input
@@ -197,12 +224,10 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
 
           <div>
             <label className="block text-xs font-medium text-foreground-muted mb-1.5">Message</label>
-            <textarea
-              rows={10}
-              value={body}
-              onChange={e => setBody(e.target.value)}
-              className="w-full border border-border-secondary rounded-lg px-3 py-2 text-sm bg-surface text-foreground focus:ring-accent-500 focus:border-accent-500 font-mono resize-y"
-            />
+            <RichTextEditor value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
+            <p className="text-[11px] text-foreground-muted mt-1.5">
+              Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code> are replaced with the actual customer details when the email is sent.
+            </p>
           </div>
 
           {result && (

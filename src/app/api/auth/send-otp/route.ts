@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateOTP, storeOTP, checkSendOtpRateLimit, recordSendOtp } from '@/lib/otp'
 import { sendOTPEmail } from '@/lib/email'
 import { queryOne } from '@/lib/db'
+import { POLICY_VERSION } from '@/app/legal/policies'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,6 +29,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    let requiresPolicyAcceptance = false
+
     if (isSignup) {
       const existingUser = await queryOne(
         userType === 'business'
@@ -39,17 +42,19 @@ export async function POST(request: NextRequest) {
       if (existingUser) {
         return NextResponse.json({ error: 'Email already registered', userExists: true }, { status: 400 })
       }
+      requiresPolicyAcceptance = true
     } else {
       const existingUser = await queryOne(
         userType === 'business'
-          ? "SELECT id, first_name FROM users WHERE email = $1 AND user_type = 'business'"
-          : "SELECT id, first_name FROM users WHERE email = $1 AND user_type != 'business'",
+          ? "SELECT id, first_name, policies_accepted_version FROM users WHERE email = $1 AND user_type = 'business'"
+          : "SELECT id, first_name, policies_accepted_version FROM users WHERE email = $1 AND user_type != 'business'",
         [email.toLowerCase()]
       )
 
       if (!existingUser) {
         return NextResponse.json({ error: 'No account found with this email. Please sign up first.', userNotFound: true }, { status: 404 })
       }
+      requiresPolicyAcceptance = existingUser.policies_accepted_version !== POLICY_VERSION
     }
 
     const otp = generateOTP()
@@ -70,6 +75,8 @@ export async function POST(request: NextRequest) {
       message: 'OTP sent successfully to your email',
       email: email.toLowerCase(),
       nextCooldown: rateLimit.nextCooldown,
+      requiresPolicyAcceptance,
+      policyVersion: POLICY_VERSION,
     })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to send OTP' }, { status: 500 })

@@ -5,6 +5,7 @@ import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
+import { POLICY_VERSION } from '@/app/legal/policies'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -26,7 +27,7 @@ async function recordFailedLogin(req: NextRequest, email: string, reason: string
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, otp } = body
+    const { email, otp, policiesAccepted } = body
 
     if (!email || !otp) {
       return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
@@ -51,6 +52,13 @@ export async function POST(request: NextRequest) {
     if (!user.is_active) {
       await recordFailedLogin(request, email, 'inactive_account', user.id)
       return NextResponse.json({ error: 'Account is inactive' }, { status: 403 })
+    }
+
+    if (policiesAccepted === true && user.policies_accepted_version !== POLICY_VERSION) {
+      await query(
+        'UPDATE users SET policies_accepted_version = $1, policies_accepted_at = NOW() WHERE id = $2',
+        [POLICY_VERSION, user.id]
+      )
     }
 
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])

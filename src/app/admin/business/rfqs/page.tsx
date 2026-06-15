@@ -26,8 +26,20 @@ interface RFQRow {
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   reviewed: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  negotiating: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  offer_accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   converted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  all: 'All',
+  pending: 'Pending',
+  reviewed: 'Reviewed',
+  negotiating: 'Negotiating',
+  offer_accepted: 'Offer Accepted',
+  converted: 'Converted',
+  rejected: 'Rejected',
 }
 
 export default async function BusinessRFQsPage({
@@ -124,17 +136,17 @@ export default async function BusinessRFQsPage({
 
       {/* Status tabs */}
       <div className="flex gap-2 mb-4 flex-wrap">
-        {['all', 'pending', 'reviewed', 'converted', 'rejected'].map(s => (
+        {['all', 'pending', 'reviewed', 'negotiating', 'offer_accepted', 'converted', 'rejected'].map(s => (
           <Link
             key={s}
             href={buildUrl(1, s === 'all' ? {} : { status: s })}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-full capitalize transition-colors ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
               (status ?? 'all') === s
                 ? 'bg-accent-500 text-white'
                 : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
             }`}
           >
-            {s}
+            {STATUS_LABELS[s] ?? s}
           </Link>
         ))}
       </div>
@@ -175,8 +187,8 @@ export default async function BusinessRFQsPage({
                 </td>
                 <td className="px-4 py-3 text-center text-foreground-secondary">{rfq.item_count}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || ''}`}>
-                    {rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
+                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || 'bg-surface-secondary text-foreground-secondary'}`}>
+                    {STATUS_LABELS[rfq.status] ?? rfq.status.charAt(0).toUpperCase() + rfq.status.slice(1)}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-foreground-secondary text-xs">

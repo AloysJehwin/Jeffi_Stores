@@ -7,7 +7,7 @@ import {
   ArrowRight, Image as ImageIcon, Truck, Receipt, Wallet, MapPin, Settings,
   Warehouse, TrendingUp, Wand2, ClipboardList, Tag,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  Clock, CheckCircle2, XCircle, RefreshCw, Play, Mail, ChevronDown, ChevronUp, Users, User,
+  Clock, CheckCircle2, XCircle, RefreshCw, Play, Mail, ChevronDown, ChevronUp, Users, User, Database,
 } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
@@ -90,9 +90,9 @@ interface CronJob {
   log: Array<{ t: string; ok: boolean; err?: string; detail?: unknown }>
 }
 
-type PageTab = 'audit' | 'mail_log' | 'cron'
+type PageTab = 'audit' | 'mail_log' | 'cron' | 'replication'
 
-export default function AdminAuditClient() {
+export default function AdminAuditClient({ canViewReplication = false }: { canViewReplication?: boolean }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [events, setEvents] = useState<AuditEvent[]>([])
@@ -107,6 +107,7 @@ export default function AdminAuditClient() {
     const t = searchParams?.get('tab')
     if (t === 'cron') return t
     if (t === 'mail_log') return t
+    if (t === 'replication' && canViewReplication) return t
     return 'audit'
   }
   const [pageTab, setPageTabState] = useState<PageTab>(initialTab)
@@ -200,6 +201,37 @@ export default function AdminAuditClient() {
     if (!mailBodies[id]) loadMailBody(id)
   }
 
+  interface ReplicationRun {
+    id: string
+    run_id: string
+    source: string
+    status: 'ok' | 'failed' | 'partial' | 'started'
+    started_at: string | null
+    duration_seconds: number | null
+    row_count: number | null
+    dump_bytes: number | null
+    message: string | null
+    recorded_at: string
+  }
+  const [replRuns, setReplRuns] = useState<ReplicationRun[]>([])
+  const [replLoading, setReplLoading] = useState(false)
+  const [replError, setReplError] = useState<string | null>(null)
+
+  async function loadReplication() {
+    setReplLoading(true)
+    setReplError(null)
+    try {
+      const res = await fetch('/api/admin/replication/log?limit=50', { credentials: 'include', cache: 'no-store' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setReplRuns(data.runs || [])
+    } catch (e: any) {
+      setReplError(e?.message || 'failed to load')
+    } finally {
+      setReplLoading(false)
+    }
+  }
+
   async function load() {
     setLoading(true)
     try {
@@ -263,6 +295,7 @@ export default function AdminAuditClient() {
   useEffect(() => { setPage(1) }, [entityFilter, actionFilter, pageSize])
   useEffect(() => { load() }, [entityFilter, actionFilter, page, pageSize])
   useEffect(() => { if (pageTab === 'cron') loadCronJobs() }, [pageTab])
+  useEffect(() => { if (pageTab === 'replication') loadReplication() }, [pageTab])
   useEffect(() => { if (pageTab === 'mail_log') loadMailLog() }, [pageTab, mailPage, mailKind, mailStatus, mailQueryDebounced])
   useEffect(() => {
     const id = setTimeout(() => setMailQueryDebounced(mailQuery), 300)
@@ -513,10 +546,11 @@ export default function AdminAuditClient() {
 
       <div className="flex items-center gap-1 border-b border-border-default mb-5">
         {([
-          { id: 'audit', label: 'Audit Events', icon: ScrollText },
-          { id: 'mail_log', label: 'Mail Log', icon: Mail },
-          { id: 'cron', label: 'Cron Jobs', icon: Clock },
-        ] as const).map(({ id, label, icon: Icon }) => (
+          { id: 'audit' as const, label: 'Audit Events', icon: ScrollText, show: true },
+          { id: 'mail_log' as const, label: 'Mail Log', icon: Mail, show: true },
+          { id: 'cron' as const, label: 'Cron Jobs', icon: Clock, show: true },
+          { id: 'replication' as const, label: 'Replication', icon: Database, show: canViewReplication },
+        ]).filter(t => t.show).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
@@ -814,6 +848,124 @@ export default function AdminAuditClient() {
                 })}
             </div>
           )}
+        </div>
+      )}
+
+      {pageTab === 'replication' && canViewReplication && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-foreground-muted">
+              Nightly RDS → Razer ML-replica replication runs. Logged by <code className="bg-surface-secondary px-1 py-0.5 rounded text-[11px]">scripts/replicate_jeffi.sh</code> on the Razer at 03:30 IST.
+            </p>
+            <button
+              type="button"
+              onClick={loadReplication}
+              disabled={replLoading}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${replLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+
+          {replError && (
+            <div className="mb-4 p-3 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 text-sm text-red-700 dark:text-red-300">
+              Failed to load: {replError}
+            </div>
+          )}
+
+          {(() => {
+            const lastOk = replRuns.find(r => r.status === 'ok')
+            const lastFail = replRuns.find(r => r.status === 'failed')
+            const fmtBytes = (n: number | null) => {
+              if (n === null || n === undefined) return '—'
+              if (n < 1024) return `${n} B`
+              if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+              if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`
+              return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`
+            }
+            const fmtDur = (s: number | null) => {
+              if (s === null || s === undefined) return '—'
+              if (s < 60) return `${s}s`
+              const m = Math.floor(s / 60)
+              return `${m}m ${s % 60}s`
+            }
+            const fmtNum = (n: number | null) => n === null || n === undefined ? '—' : n.toLocaleString()
+            const fmtTime = (iso: string | null) => !iso ? '—' : new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+            return (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                  <div className="bg-surface-elevated border border-border-default rounded-lg p-4">
+                    <div className="text-[10px] uppercase tracking-wide text-foreground-muted">Last successful</div>
+                    <div className="text-sm font-semibold text-foreground mt-1">{lastOk ? fmtTime(lastOk.recorded_at) : '—'}</div>
+                    {lastOk && (
+                      <div className="text-[11px] text-foreground-muted mt-1">
+                        {fmtNum(lastOk.row_count)} rows · {fmtBytes(lastOk.dump_bytes)} · {fmtDur(lastOk.duration_seconds)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="bg-surface-elevated border border-border-default rounded-lg p-4">
+                    <div className="text-[10px] uppercase tracking-wide text-foreground-muted">Last failure</div>
+                    <div className="text-sm font-semibold text-foreground mt-1">{lastFail ? fmtTime(lastFail.recorded_at) : 'No failures recorded'}</div>
+                    {lastFail?.message && (
+                      <div className="text-[11px] text-red-600 dark:text-red-400 mt-1 truncate" title={lastFail.message}>{lastFail.message}</div>
+                    )}
+                  </div>
+                  <div className="bg-surface-elevated border border-border-default rounded-lg p-4">
+                    <div className="text-[10px] uppercase tracking-wide text-foreground-muted">Total runs (this view)</div>
+                    <div className="text-sm font-semibold text-foreground mt-1">{replRuns.length}</div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto bg-surface-elevated border border-border-default rounded-lg">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-surface-secondary text-left text-[10px] uppercase tracking-wide text-foreground-muted">
+                      <tr>
+                        <th className="px-4 py-2">Run ID</th>
+                        <th className="px-4 py-2">Status</th>
+                        <th className="px-4 py-2">Started</th>
+                        <th className="px-4 py-2">Duration</th>
+                        <th className="px-4 py-2 text-right">Rows</th>
+                        <th className="px-4 py-2 text-right">Dump</th>
+                        <th className="px-4 py-2">Source</th>
+                        <th className="px-4 py-2">Message</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-default">
+                      {replLoading && replRuns.length === 0 && (
+                        <tr><td colSpan={8} className="px-4 py-10 text-center"><RefreshCw className="w-4 h-4 animate-spin inline text-foreground-muted" /></td></tr>
+                      )}
+                      {!replLoading && replRuns.length === 0 && (
+                        <tr><td colSpan={8} className="px-4 py-10 text-center text-foreground-muted text-xs italic">
+                          No replication runs recorded yet. The nightly timer fires at 03:30 IST on the Razer; the first POST will appear here within a few seconds of completion.
+                        </td></tr>
+                      )}
+                      {replRuns.map(r => (
+                        <tr key={r.id} className="hover:bg-surface-secondary/40">
+                          <td className="px-4 py-2 font-mono text-[11px] text-foreground">{r.run_id}</td>
+                          <td className="px-4 py-2">
+                            <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${
+                              r.status === 'ok' ? 'bg-green-100 text-green-800 ring-green-600/20 dark:bg-green-900/30 dark:text-green-300' :
+                              r.status === 'failed' ? 'bg-red-100 text-red-800 ring-red-600/20 dark:bg-red-900/30 dark:text-red-300' :
+                              r.status === 'partial' ? 'bg-yellow-100 text-yellow-800 ring-yellow-600/20 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                              'bg-blue-100 text-blue-800 ring-blue-600/20 dark:bg-blue-900/30 dark:text-blue-300'
+                            }`}>{r.status}</span>
+                          </td>
+                          <td className="px-4 py-2 text-foreground-muted text-[11px]">{fmtTime(r.started_at)}</td>
+                          <td className="px-4 py-2 text-foreground-muted text-[11px]">{fmtDur(r.duration_seconds)}</td>
+                          <td className="px-4 py-2 text-right text-foreground-muted text-[11px]">{fmtNum(r.row_count)}</td>
+                          <td className="px-4 py-2 text-right text-foreground-muted text-[11px]">{fmtBytes(r.dump_bytes)}</td>
+                          <td className="px-4 py-2 text-foreground-muted text-[11px]">{r.source}</td>
+                          <td className="px-4 py-2 text-foreground-muted text-[11px] max-w-xs truncate" title={r.message ?? ''}>{r.message ?? ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )
+          })()}
         </div>
       )}
 
