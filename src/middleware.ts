@@ -39,10 +39,11 @@ export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const pathname = request.nextUrl.pathname
 
-  // Canonicalise: www.jeffistores.in → jeffistores.in (preserve path + query).
   if (hostname.startsWith('www.jeffistores.in')) {
     const target = new URL(pathname + request.nextUrl.search, 'https://jeffistores.in')
-    return NextResponse.redirect(target, 308)
+    const res = NextResponse.redirect(target, 307)
+    res.headers.set('Cache-Control', 'no-store, must-revalidate')
+    return res
   }
 
   const isAdminApiPath = pathname.startsWith('/api/admin')
