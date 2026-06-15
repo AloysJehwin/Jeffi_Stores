@@ -15,15 +15,15 @@ export async function POST(request: NextRequest) {
     const baseOpts = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      sameSite: 'lax' as const,
       maxAge: 0,
       path: '/',
     }
     // Expire both variants — modern (domain-scoped) and legacy host-only.
     cookieStore.set('business_auth_token', '', { ...baseOpts, ...cookieDomainOption() })
     cookieStore.set('business_auth_token', '', baseOpts)
-    cookieStore.delete({ name: 'session_id', path: '/', ...cookieDomainOption() })
-    cookieStore.delete({ name: 'session_id', path: '/' })
+    cookieStore.set('session_id', '', { ...baseOpts, ...cookieDomainOption() })
+    cookieStore.set('session_id', '', baseOpts)
 
     return NextResponse.json({ message: 'Logged out successfully' })
   } catch {
