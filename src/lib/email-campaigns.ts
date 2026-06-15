@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import { query, queryMany, queryOne } from './db'
 import { sendAuditedMail } from './mail-audit'
+import { buildVarMap, substituteVars } from './template-vars'
 
 const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -95,10 +96,13 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
     }
 
     case 'custom': {
-      return {
-        subject: data.subject || 'Message from Jeffi Store\'s',
-        html: data.htmlBody || '',
-      }
+      const subject = data.subject || 'Message from Jeffi Store\'s'
+      const body = data.htmlBody || ''
+      const isFullDoc = /<html[\s>]/i.test(body) || /<!DOCTYPE/i.test(body)
+      const html = isFullDoc
+        ? body
+        : baseLayout(subject, `<p style="font-size:16px;color:#333;margin:0 0 12px;">${greeting}</p>${body}`)
+      return { subject, html }
     }
 
     default:
@@ -217,11 +221,14 @@ export async function sendCampaign(campaignId: string): Promise<{ sent: number; 
       }
 
       const { subject, html } = renderCampaignEmail(campaign.template_key, templateData, recipient.first_name || undefined)
+      const vars = buildVarMap({ recipient: { email: recipient.email, first_name: recipient.first_name } })
+      const finalSubject = substituteVars(subject, vars)
+      const finalHtml = substituteVars(html, vars)
       await sendAuditedMail({
         from: FROM,
         to: recipient.email,
-        subject,
-        html,
+        subject: finalSubject,
+        html: finalHtml,
         kind: 'campaign',
         templateName: campaign.template_key,
         entityType: 'email_campaigns',
