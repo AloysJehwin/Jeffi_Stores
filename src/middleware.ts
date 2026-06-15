@@ -43,6 +43,7 @@ export async function middleware(request: NextRequest) {
     const target = new URL(pathname + request.nextUrl.search, 'https://jeffistores.in')
     const res = NextResponse.redirect(target, 307)
     res.headers.set('Cache-Control', 'no-store, must-revalidate')
+    res.headers.set('Clear-Site-Data', '"cache"')
     return res
   }
 
