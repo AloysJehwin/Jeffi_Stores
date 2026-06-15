@@ -65,7 +65,7 @@ export async function loadStoreSettings(): Promise<StoreSettings> {
     phone: s.business_phone || '',
     email: s.business_email || '',
     gstin: s.business_gstin || '',
-    web: 'www.jeffistores.in',
+    web: 'jeffistores.in',
   }
 }
 
