@@ -11,7 +11,7 @@ interface Props {
   className?: string
 }
 
-const TOOLBAR_BTN = 'inline-flex items-center justify-center w-7 h-7 rounded text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-xs'
+const TOOLBAR_BTN = 'inline-flex items-center justify-center w-7 h-7 rounded text-foreground hover:bg-surface-secondary hover:text-accent-600 dark:hover:text-accent-400 transition-colors text-xs font-semibold'
 
 export default function RichTextEditor({ value, onChange, placeholder = 'Write your email…', minHeight = 320, className = '' }: Props) {
   const editorRef = useRef<HTMLDivElement>(null)
@@ -111,38 +111,38 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write y
 
   return (
     <div className={`border border-border-secondary rounded-lg bg-surface ${className}`}>
-      <div className="flex flex-wrap items-center gap-0.5 p-1.5 border-b border-border-default bg-surface-secondary/50 rounded-t-lg">
-        <button type="button" title="Bold" className={`${TOOLBAR_BTN} font-bold`} onMouseDown={e => { e.preventDefault(); exec('bold') }}>B</button>
-        <button type="button" title="Italic" className={`${TOOLBAR_BTN} italic`} onMouseDown={e => { e.preventDefault(); exec('italic') }}>I</button>
-        <button type="button" title="Underline" className={`${TOOLBAR_BTN} underline`} onMouseDown={e => { e.preventDefault(); exec('underline') }}>U</button>
+      <div className="flex flex-wrap items-center gap-0.5 p-1.5 border-b border-border-default bg-surface-secondary rounded-t-lg">
+        <button type="button" title="Bold" className={`${TOOLBAR_BTN} font-bold text-base`} onMouseDown={e => { e.preventDefault(); exec('bold') }}>B</button>
+        <button type="button" title="Italic" className={`${TOOLBAR_BTN} italic text-base`} onMouseDown={e => { e.preventDefault(); exec('italic') }}>I</button>
+        <button type="button" title="Underline" className={`${TOOLBAR_BTN} underline text-base`} onMouseDown={e => { e.preventDefault(); exec('underline') }}>U</button>
         <span className="w-px h-5 bg-border-default mx-1" />
-        <button type="button" title="Heading" className={TOOLBAR_BTN} onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'H2') }}>H</button>
-        <button type="button" title="Paragraph" className={TOOLBAR_BTN} onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'P') }}>P</button>
+        <button type="button" title="Heading" className={`${TOOLBAR_BTN} text-base`} onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'H2') }}>H</button>
+        <button type="button" title="Paragraph" className={`${TOOLBAR_BTN} text-base`} onMouseDown={e => { e.preventDefault(); exec('formatBlock', 'P') }}>P</button>
         <span className="w-px h-5 bg-border-default mx-1" />
         <button type="button" title="Bulleted list" className={TOOLBAR_BTN} onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList') }}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h.01M4 12h.01M4 18h.01M8 6h12M8 12h12M8 18h12" /></svg>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h.01M4 12h.01M4 18h.01M8 6h12M8 12h12M8 18h12" /></svg>
         </button>
         <button type="button" title="Numbered list" className={TOOLBAR_BTN} onMouseDown={e => { e.preventDefault(); exec('insertOrderedList') }}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 6h10M7 12h10M7 18h10M3 6h.01M3 12h.01M3 18h.01" /></svg>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 6h10M7 12h10M7 18h10M3 6h.01M3 12h.01M3 18h.01" /></svg>
         </button>
         <span className="w-px h-5 bg-border-default mx-1" />
         <button type="button" title="Insert link" className={TOOLBAR_BTN} onMouseDown={e => { e.preventDefault(); openLink() }}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
         </button>
-        <button type="button" title="Insert CTA button" className={`${TOOLBAR_BTN} px-2 w-auto text-[10px] font-semibold uppercase`} onMouseDown={e => { e.preventDefault(); insertCta() }}>CTA</button>
+        <button type="button" title="Insert CTA button" className={`${TOOLBAR_BTN} px-2 w-auto text-[11px] font-bold uppercase`} onMouseDown={e => { e.preventDefault(); insertCta() }}>CTA</button>
         <span className="w-px h-5 bg-border-default mx-1" />
         <button type="button" title="Clear formatting" className={TOOLBAR_BTN} onMouseDown={e => { e.preventDefault(); exec('removeFormat') }}>
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m0 0H6m6 0h6M5 4h14M5 12h14" /></svg>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 7h14M9 7v12m6-12v12M5 19h14" /></svg>
         </button>
         <span className="w-px h-5 bg-border-default mx-1" />
         <div className="relative">
           <button
             type="button"
             onMouseDown={e => { e.preventDefault(); saveSelection(); setShowVars(v => !v) }}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/30 transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/30 transition-colors"
             title="Insert customer/store variable"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 8h4M8 12h8M9 16h6M3 12a9 9 0 1118 0 9 9 0 01-18 0z" /></svg>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 8h4M8 12h8M9 16h6M3 12a9 9 0 1118 0 9 9 0 01-18 0z" /></svg>
             Insert variable
           </button>
           {showVars && (
@@ -186,9 +186,32 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Write y
         .rich-text-editor-content :global(h2) { font-size: 18px; }
         .rich-text-editor-content :global(h3) { font-size: 16px; }
         .rich-text-editor-content :global(p) { margin: 6px 0; line-height: 1.55; }
-        .rich-text-editor-content :global(ul),
-        .rich-text-editor-content :global(ol) { margin: 6px 0; padding-left: 22px; }
+        .rich-text-editor-content :global(ul) {
+          list-style-type: disc !important;
+          margin: 8px 0 !important;
+          padding-left: 28px !important;
+        }
+        .rich-text-editor-content :global(ol) {
+          list-style-type: decimal !important;
+          margin: 8px 0 !important;
+          padding-left: 28px !important;
+        }
+        .rich-text-editor-content :global(li) {
+          margin: 2px 0;
+          line-height: 1.55;
+          display: list-item !important;
+        }
         .rich-text-editor-content :global(a) { color: #e07b3f; text-decoration: underline; }
+        .rich-text-editor-content :global(strong),
+        .rich-text-editor-content :global(b) { font-weight: 700; }
+        .rich-text-editor-content :global(em),
+        .rich-text-editor-content :global(i) { font-style: italic; }
+        .rich-text-editor-content :global(blockquote) {
+          margin: 8px 0;
+          padding-left: 12px;
+          border-left: 3px solid #e07b3f;
+          color: #4b5563;
+        }
       `}</style>
 
       {showLinkModal && (
