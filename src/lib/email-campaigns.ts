@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { query, queryMany, queryOne } from './db'
+import { sendAuditedMail } from './mail-audit'
 
 const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -216,7 +217,17 @@ export async function sendCampaign(campaignId: string): Promise<{ sent: number; 
       }
 
       const { subject, html } = renderCampaignEmail(campaign.template_key, templateData, recipient.first_name || undefined)
-      await transporter.sendMail({ from: FROM, to: recipient.email, subject, html })
+      await sendAuditedMail({
+        from: FROM,
+        to: recipient.email,
+        subject,
+        html,
+        kind: 'campaign',
+        templateName: campaign.template_key,
+        entityType: 'email_campaigns',
+        entityId: campaignId,
+        userId: recipient.user_id,
+      })
       await query(
         `INSERT INTO email_campaign_logs (campaign_id, email, status) VALUES ($1, $2, 'sent')`,
         [campaignId, recipient.email]

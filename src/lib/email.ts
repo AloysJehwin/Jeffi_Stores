@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
+import { sendAuditedMail } from './mail-audit'
 
 export const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -26,11 +27,9 @@ async function getAdminNotificationEmails(): Promise<string> {
 }
 
 export async function sendOTPEmail(email: string, otp: string, name?: string) {
-  const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
-    to: email,
-    subject: 'Your Verification Code - Jeffi Stores',
-    html: `
+  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const subject = 'Your Verification Code - Jeffi Stores'
+  const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -116,11 +115,19 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
           </div>
         </body>
       </html>
-    `,
-  }
+    `
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      from,
+      to: email,
+      subject,
+      html,
+      kind: 'otp',
+      templateName: 'otp',
+      entityType: null,
+      entityId: null,
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -128,11 +135,9 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
 }
 
 export async function sendWelcomeEmail(email: string, name: string) {
-  const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
-    to: email,
-    subject: 'Welcome to Jeffi Stores!',
-    html: `
+  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const subject = 'Welcome to Jeffi Stores!'
+  const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -216,11 +221,17 @@ export async function sendWelcomeEmail(email: string, name: string) {
           </div>
         </body>
       </html>
-    `,
-  }
+    `
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      from,
+      to: email,
+      subject,
+      html,
+      kind: 'welcome',
+      templateName: 'welcome',
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -228,11 +239,9 @@ export async function sendWelcomeEmail(email: string, name: string) {
 }
 
 export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[], invoicePdfBuffer?: Buffer | null) {
-  const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
-    to: email,
-    subject: `Order Confirmation - ${order.order_number}`,
-    html: `
+  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const subject = `Order Confirmation - ${order.order_number}`
+  const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -377,16 +386,26 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
           </div>
         </body>
       </html>
-    `,
-    attachments: invoicePdfBuffer ? [{
-      filename: `Invoice-${order.invoice_number || order.order_number}.pdf`,
-      content: invoicePdfBuffer,
-      contentType: 'application/pdf',
-    }] : [],
-  }
+    `
+  const attachments = invoicePdfBuffer ? [{
+    filename: `Invoice-${order.invoice_number || order.order_number}.pdf`,
+    content: invoicePdfBuffer,
+    contentType: 'application/pdf',
+  }] : []
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      from,
+      to: email,
+      subject,
+      html,
+      attachments,
+      kind: 'order',
+      templateName: 'order_confirmation',
+      entityType: 'orders',
+      entityId: order?.id ?? null,
+      userId: order?.user_id ?? null,
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -396,11 +415,9 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
 export async function sendNewOrderNotification(order: any, orderItems: any[], _user: any) {
   const adminEmail = await getAdminNotificationEmails()
 
-  const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
-    to: adminEmail,
-    subject: `New Order - ${order.order_number}`,
-    html: `
+  const from = `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`
+  const subject = `New Order - ${order.order_number}`
+  const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -513,11 +530,20 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
           </div>
         </body>
       </html>
-    `,
-  }
+    `
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      from,
+      to: adminEmail,
+      subject,
+      html,
+      kind: 'admin_notification',
+      templateName: 'new_order_admin',
+      entityType: 'orders',
+      entityId: order?.id ?? null,
+      userId: null,
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -588,11 +614,9 @@ export async function sendOrderStatusUpdate(
     color: '#6b7280',
   }
 
-  const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
-    to: customerEmail,
-    subject: `${statusInfo.title} - Order ${orderNumber}`,
-    html: `
+  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const subject = `${statusInfo.title} - Order ${orderNumber}`
+  const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -733,16 +757,25 @@ export async function sendOrderStatusUpdate(
           </div>
         </body>
       </html>
-    `,
-    attachments: invoicePdfBuffer ? [{
-      filename: `Invoice-${orderNumber}.pdf`,
-      content: invoicePdfBuffer,
-      contentType: 'application/pdf',
-    }] : [],
-  }
+    `
+  const attachments = invoicePdfBuffer ? [{
+    filename: `Invoice-${orderNumber}.pdf`,
+    content: invoicePdfBuffer,
+    contentType: 'application/pdf',
+  }] : []
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      from,
+      to: customerEmail,
+      subject,
+      html,
+      attachments,
+      kind: 'order',
+      templateName: 'order_status_update',
+      entityType: 'orders',
+      entityId: orderId ?? null,
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -786,11 +819,9 @@ export async function sendPaymentStatusUpdate(
     color: '#6b7280',
   }
 
-  const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
-    to: customerEmail,
-    subject: `${paymentInfo.title} - Order ${orderNumber}`,
-    html: `
+  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const subject = `${paymentInfo.title} - Order ${orderNumber}`
+  const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -950,11 +981,19 @@ export async function sendPaymentStatusUpdate(
           </div>
         </body>
       </html>
-    `,
-  }
+    `
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      from,
+      to: customerEmail,
+      subject,
+      html,
+      kind: 'order',
+      templateName: 'payment_status',
+      entityType: 'orders',
+      entityId: orderId ?? null,
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -970,11 +1009,9 @@ export async function sendAdminCertificateEmail(
   expiresAt: string,
   role: string
 ) {
-  const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
-    to: email,
-    subject: 'Your Admin Certificate - Jeffi Stores',
-    html: `
+  const from = `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`
+  const subject = 'Your Admin Certificate - Jeffi Stores'
+  const html = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -1105,18 +1142,25 @@ export async function sendAdminCertificateEmail(
           </div>
         </body>
       </html>
-    `,
-    attachments: [
-      {
-        filename: `${username}-admin-cert.p12`,
-        content: p12Buffer,
-        contentType: 'application/x-pkcs12',
-      },
-    ],
-  }
+    `
+  const attachments = [
+    {
+      filename: `${username}-admin-cert.p12`,
+      content: p12Buffer,
+      contentType: 'application/x-pkcs12',
+    },
+  ]
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      from,
+      to: email,
+      subject,
+      html,
+      attachments,
+      kind: 'admin_notification',
+      templateName: 'admin_certificate',
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -1283,7 +1327,14 @@ export async function sendNewReviewNotification(review: any, user: any, product:
   }
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      ...mailOptions,
+      kind: 'admin_notification',
+      templateName: 'new_review',
+      entityType: 'product_reviews',
+      entityId: review?.id ?? null,
+      userId: user?.id ?? null,
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -1381,7 +1432,13 @@ export async function sendPaymentFailedAdminNotification(
   }
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      ...mailOptions,
+      kind: 'admin_notification',
+      templateName: 'payment_failed_admin',
+      entityType: 'orders',
+      entityId: order?.id ?? null,
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -1432,7 +1489,11 @@ export async function sendAdminContactEmail(
   }
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      ...mailOptions,
+      kind: 'admin_notification',
+      templateName: 'admin_contact',
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -1484,7 +1545,11 @@ export async function sendSupportEscalationEmail(
   }
 
   try {
-    await transporter.sendMail(mailOptions)
+    await sendAuditedMail({
+      ...mailOptions,
+      kind: 'support',
+      templateName: 'support_escalation',
+    })
     return { success: true }
   } catch (error) {
     return { success: false, error }
@@ -1532,7 +1597,11 @@ export async function sendAgentConnectedEmail(
   }
 
   try {
-    await transporter.sendMail(mailOptions)
+    await sendAuditedMail({
+      ...mailOptions,
+      kind: 'support',
+      templateName: 'agent_connected',
+    })
     return { success: true }
   } catch (error) {
     return { success: false, error }
@@ -1622,7 +1691,14 @@ export async function sendReturnStatusEmail(
   }
 
   try {
-    await transporter.sendMail(mailOptions)
+    await sendAuditedMail({
+      ...mailOptions,
+      kind: 'order',
+      templateName: 'return_status',
+      entityType: 'orders',
+      entityId: orderId ?? null,
+      metadata: { event, orderNumber },
+    })
     return { success: true }
   } catch (error) {
     return { success: false, error }
@@ -1671,11 +1747,16 @@ export async function sendPaymentRetryEmail(
 </body></html>`
 
   try {
-    await transporter.sendMail({
+    await sendAuditedMail({
       from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
       to: customerEmail,
       subject: `Sorry your order didn't go through — Order #${orderNumber}`,
       html,
+      kind: 'order',
+      templateName: 'payment_retry',
+      entityType: 'orders',
+      entityId: null,
+      metadata: { orderNumber, orderTotal },
     })
     return { success: true }
   } catch (error) {
@@ -1735,7 +1816,14 @@ export async function sendInvoiceFinalizedEmail(
     `,
   }
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      ...mailOptions,
+      kind: 'invoice',
+      templateName: 'invoice_finalized',
+      entityType: 'orders',
+      entityId: null,
+      metadata: { invoiceNumber, orderNumber: orderNumber ?? null, totalAmount },
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -1810,7 +1898,14 @@ export async function sendPurchaseOrderEmail(
     `,
   }
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      ...mailOptions,
+      kind: 'purchase_order',
+      templateName: 'purchase_order',
+      entityType: 'purchase_orders',
+      entityId: null,
+      metadata: { poNumber, supplierName, totalAmount },
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -1884,7 +1979,14 @@ export async function sendPOReceiveNotificationEmail(
     `,
   }
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      ...mailOptions,
+      kind: 'admin_notification',
+      templateName: 'po_receive',
+      entityType: 'purchase_orders',
+      entityId: null,
+      metadata: { poNumber, grnNumber, newStatus, supplierName },
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -1941,7 +2043,14 @@ export async function sendQuotationFinalizedEmail(
     `,
   }
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      ...mailOptions,
+      kind: 'quotation',
+      templateName: 'quotation_finalized',
+      entityType: 'quotations',
+      entityId: null,
+      metadata: { quoteNumber, totalAmount },
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -2018,7 +2127,14 @@ export async function sendOrderAutoCancelledEmail(
   }
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      ...mailOptions,
+      kind: 'order',
+      templateName: 'order_auto_cancelled',
+      entityType: 'orders',
+      entityId: orderId ?? null,
+      metadata: { orderNumber, orderType, orderTotal },
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -2071,7 +2187,13 @@ export async function sendOrderAutoCancelledAdminNotification(order: any, redire
   }
 
   try {
-    const info = await transporter.sendMail(mailOptions)
+    const info = await sendAuditedMail({
+      ...mailOptions,
+      kind: 'admin_notification',
+      templateName: 'order_auto_cancelled_admin',
+      entityType: 'orders',
+      entityId: order?.id ?? null,
+    })
     return { success: true, messageId: info.messageId }
   } catch (error) {
     return { success: false, error }
@@ -2121,12 +2243,17 @@ If you have any questions, just reply to this email.
 — The Jeffi Stores team`
 
   try {
-    const info = await transporter.sendMail({
+    const info = await sendAuditedMail({
       from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
       to: toEmail,
       subject,
       html,
       text,
+      kind: 'order',
+      templateName: 'order_delay',
+      entityType: 'orders',
+      entityId: null,
+      metadata: { orderNumber, delayDays, reason },
     })
     return { success: true, messageId: info.messageId }
   } catch (error) {
@@ -2198,12 +2325,15 @@ export async function sendProductAnnouncementEmail(args: {
   const text = `Hi ${customerName || 'there'},\n\n${cleanIntro}\n\n${textProducts}\n\nVisit ${siteUrl} for the full catalogue.\n\n— Jeffi Stores`
 
   try {
-    const info = await transporter.sendMail({
+    const info = await sendAuditedMail({
       from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
       to: toEmail,
       subject,
       html,
       text,
+      kind: 'campaign',
+      templateName: 'product_announcement',
+      metadata: { productCount: products.length, productIds: products.map(p => p.id) },
     })
     return { success: true, messageId: info.messageId }
   } catch (error) {
