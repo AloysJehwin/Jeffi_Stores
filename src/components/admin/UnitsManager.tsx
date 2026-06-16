@@ -94,7 +94,6 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
   const [volWidth, setVolWidth] = useState<string>('')
   const [volHeight, setVolHeight] = useState<string>('')
   const [volDimUnit, setVolDimUnit] = useState<string>('cm')
-  const [priceOverride, setPriceOverride] = useState<string>('')
   const [isSellDefault, setIsSellDefault] = useState(false)
   const [isPurchaseDefault, setIsPurchaseDefault] = useState(false)
 
@@ -104,7 +103,6 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
     setFactor('')
     setAreaLength(''); setAreaWidth('')
     setVolLength(''); setVolWidth(''); setVolHeight('')
-    setPriceOverride('')
     setIsSellDefault(false)
     setIsPurchaseDefault(false)
   }
@@ -172,7 +170,6 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
           dimension,
           conversion_meta,
           display_label: unitLabel || null,
-          price_override: priceOverride ? Number(priceOverride) : null,
           is_sell_default: isSellDefault,
           is_purchase_default: isPurchaseDefault,
         }),
@@ -244,7 +241,6 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
                 <th className="px-3 py-2 text-left">Dim.</th>
                 <th className="px-3 py-2 text-right">Factor</th>
                 <th className="px-3 py-2 text-left">How it converts</th>
-                <th className="px-3 py-2 text-right">Price ovrd.</th>
                 <th className="px-3 py-2 text-center">Base</th>
                 <th className="px-3 py-2 text-center">Sell def.</th>
                 <th className="px-3 py-2 text-center">Buy def.</th>
@@ -264,9 +260,6 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
                   </td>
                   <td className="px-3 py-2 text-[11px] text-foreground-muted">
                     {describeMeta(u, baseUnit)}
-                  </td>
-                  <td className="px-3 py-2 text-right text-foreground-secondary">
-                    {u.price_override != null ? `₹${Number(u.price_override).toFixed(2)}` : '—'}
                   </td>
                   <td className="px-3 py-2 text-center">
                     {u.is_base
@@ -427,14 +420,10 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
           </p>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 items-end">
+        <div className="grid grid-cols-2 gap-2 items-end">
           <div>
             <label className="block text-[10px] text-foreground-muted mb-0.5">Label (UI)</label>
             <input value={unitLabel} onChange={e => setUnitLabel(e.target.value)} className={inputCls} placeholder="e.g. Sheet 4'×8'" />
-          </div>
-          <div>
-            <label className="block text-[10px] text-foreground-muted mb-0.5">Price override</label>
-            <input type="number" step="0.01" value={priceOverride} onChange={e => setPriceOverride(e.target.value)} className={inputCls} placeholder="optional" />
           </div>
           <div className="flex items-center gap-4 pb-1.5">
             <Toggle checked={isSellDefault} onChange={setIsSellDefault} label="Sell default" size="sm" />

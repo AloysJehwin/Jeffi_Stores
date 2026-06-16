@@ -1819,7 +1819,8 @@ export default function ProductForm({ categories, brands, action, product, produ
           <p className="text-xs text-foreground-muted mb-4">
             Configure alternate units (e.g. box of 100, sheet of 4'×8', tin of 5 L). The pricing engine
             multiplies the base price by the factor automatically. Stock always lives in the BASE unit.
-            Units configured here apply to <strong>every variant</strong> of this product.
+            Units configured here apply to <strong>every variant</strong> by default — open a variant to override per-variant.
+            For bulk discounts, attach a tiered_price rule to the unit instead of overriding the price.
           </p>
           <UnitsManager
             productId={productId}
@@ -1886,7 +1887,10 @@ export default function ProductForm({ categories, brands, action, product, produ
               <div className="p-5 space-y-6">
                 {/* Pricing & Identifiers */}
                 <div>
-                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Pricing & Identifiers</p>
+                  <div className="flex items-baseline justify-between mb-3">
+                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Pricing & Identifiers</p>
+                    <span className="text-[10px] text-foreground-muted">Per BASE unit. Other units convert via factor — configure in Variant Units below.</span>
+                  </div>
                   {popupVariant.sub_variant_type_on ? (
                     <div className="rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-3 space-y-3">
                       <p className="text-xs text-foreground-secondary">Pricing is managed at the sub-variant level for this variant. Use the Sub-variants section below to set prices.</p>
