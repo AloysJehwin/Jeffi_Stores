@@ -74,7 +74,7 @@ export default function UnitsManager({ productId, variantId }: Props) {
       setDraftUnit(u.unit)
       setDraftDimension(u.dimension)
       setDraftLabel(u.display_label || '')
-      setDraftFactor(String(u.factor))
+      setDraftFactor(String(parseFloat(String(u.factor)) || ''))
     } else {
       setDraftUnit('')
       setDraftDimension('count')
@@ -273,7 +273,7 @@ export default function UnitsManager({ productId, variantId }: Props) {
               {isPredefined ? (
                 <div className={lockedCls} title="Predefined — value is fixed">
                   <span className="text-foreground font-mono">{draftFactor}</span>
-                  <span className="ml-1 text-[10px]">🔒</span>
+                  <span className="ml-2 text-[10px] text-foreground-muted">(fixed)</span>
                 </div>
               ) : (
                 <input
