@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import AdminSelect from '@/components/admin/AdminSelect'
-import Toggle from '@/components/ui/Toggle'
 import {
   ALL_DIMENSIONS,
   Dimension,
@@ -55,6 +54,7 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
   const showConfirm = useConfirm()
   const [units, setUnits] = useState<ProductUnit[]>([])
   const [rules, setRules] = useState<UnitRule[]>([])
+  const [inherited, setInherited] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -71,6 +71,7 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
         const data = await res.json()
         setUnits(data.units || [])
         setRules(data.rules || [])
+        setInherited(data.inherited ?? false)
       }
     } finally {
       setLoading(false)
@@ -94,8 +95,6 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
   const [volWidth, setVolWidth] = useState<string>('')
   const [volHeight, setVolHeight] = useState<string>('')
   const [volDimUnit, setVolDimUnit] = useState<string>('cm')
-  const [isSellDefault, setIsSellDefault] = useState(false)
-  const [isPurchaseDefault, setIsPurchaseDefault] = useState(false)
 
   function resetDraft() {
     setUnitKey('')
@@ -103,8 +102,6 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
     setFactor('')
     setAreaLength(''); setAreaWidth('')
     setVolLength(''); setVolWidth(''); setVolHeight('')
-    setIsSellDefault(false)
-    setIsPurchaseDefault(false)
   }
 
   // Compute the factor from current draft state
@@ -139,13 +136,13 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
     else setMode('same_dim')
   }, [dimension])
 
-  async function handleAdd(e: React.FormEvent) {
-    e.preventDefault()
-    if (!baseUnit) { showToast('No base unit configured for this variant yet', 'error'); return }
+  async function handleAdd() {
+    const isFirstUnit = units.length === 0
     const finalUnitKey = (mode === 'simple' || mode === 'area' || mode === 'volume') ? unitKey.trim() : unitKey
     if (!finalUnitKey) { showToast('Pick or enter a unit name', 'error'); return }
-    const f = computedFactor
-    if (f == null || f <= 0) { showToast('Factor must be > 0 — fill the conversion fields', 'error'); return }
+    if (!isFirstUnit && !baseUnit) { showToast('No base unit configured yet', 'error'); return }
+    const f = isFirstUnit ? 1 : computedFactor
+    if (!isFirstUnit && (f == null || f <= 0)) { showToast('Factor must be > 0 — fill the conversion fields', 'error'); return }
 
     let conversion_meta: any = null
     if (mode === 'area') {
@@ -166,12 +163,13 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           unit: finalUnitKey,
-          factor: f,
+          factor: isFirstUnit ? 1 : f,
           dimension,
           conversion_meta,
           display_label: unitLabel || null,
-          is_sell_default: isSellDefault,
-          is_purchase_default: isPurchaseDefault,
+          is_base: isFirstUnit,
+          is_sell_default: false,
+          is_purchase_default: false,
         }),
       })
       const data = await res.json()
@@ -216,12 +214,17 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
   return (
     <div className="border-t border-border-default pt-4 mt-4 space-y-3">
       <div className="flex items-baseline justify-between">
-        <h4 className="text-xs font-bold uppercase tracking-wide text-foreground-secondary">
-          {isVariantScope ? 'Variant Units (override)' : 'Selling Units'}
+        <h4 className="text-xs font-bold uppercase tracking-wide text-foreground-secondary flex items-center gap-2">
+          {isVariantScope ? 'Variant Units' : 'Selling Units'}
+          {isVariantScope && inherited && (
+            <span className="text-[10px] font-normal normal-case bg-surface-secondary border border-border-default text-foreground-muted px-2 py-0.5 rounded-full">inherited from product</span>
+          )}
         </h4>
         <span className="text-[10px] text-foreground-muted">
           {isVariantScope
-            ? 'Adding units here overrides product-level units for this variant only.'
+            ? inherited
+              ? 'Add a unit below to override for this variant.'
+              : 'Variant-specific units — override product-level.'
             : 'Stock + base price live in the BASE unit. Other units convert via factor.'}
         </span>
       </div>
@@ -264,20 +267,20 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
                   <td className="px-3 py-2 text-center">
                     {u.is_base
                       ? <span className="text-[10px] font-bold text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded-full">BASE</span>
-                      : <button type="button" onClick={() => setFlag(u, 'is_base')} className="text-[10px] text-accent-600 hover:underline">make base</button>}
+                      : !inherited && <button type="button" onClick={() => setFlag(u, 'is_base')} className="text-[10px] text-accent-600 hover:underline">make base</button>}
                   </td>
                   <td className="px-3 py-2 text-center">
                     {u.is_sell_default
                       ? <span className="text-[10px] font-bold text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full">DEFAULT</span>
-                      : <button type="button" onClick={() => setFlag(u, 'is_sell_default')} className="text-[10px] text-accent-600 hover:underline">set</button>}
+                      : !inherited && <button type="button" onClick={() => setFlag(u, 'is_sell_default')} className="text-[10px] text-accent-600 hover:underline">set</button>}
                   </td>
                   <td className="px-3 py-2 text-center">
                     {u.is_purchase_default
                       ? <span className="text-[10px] font-bold text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-2 py-0.5 rounded-full">DEFAULT</span>
-                      : <button type="button" onClick={() => setFlag(u, 'is_purchase_default')} className="text-[10px] text-accent-600 hover:underline">set</button>}
+                      : !inherited && <button type="button" onClick={() => setFlag(u, 'is_purchase_default')} className="text-[10px] text-accent-600 hover:underline">set</button>}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {!u.is_base && (
+                    {!u.is_base && !inherited && (
                       <button type="button" onClick={() => deleteUnit(u)} className="text-[10px] text-red-500 hover:text-red-600">Delete</button>
                     )}
                   </td>
@@ -288,8 +291,8 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
         </div>
       )}
 
-      {/* Add form */}
-      <form onSubmit={handleAdd} className="bg-surface border border-border-default rounded-lg p-3 space-y-2">
+      {/* Add unit */}
+      <div className="bg-surface border border-border-default rounded-lg p-3 space-y-2">
         <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Add a unit</p>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
@@ -310,7 +313,13 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
                 {dimUnitsForDropdown.length > 0 ? (
                   <AdminSelect
                     value={unitKey}
-                    onChange={setUnitKey}
+                    onChange={(v) => {
+                      setUnitKey(v)
+                      if (v && v !== '__custom') {
+                        const def = dimUnitsForDropdown.find(u => u.key === v)
+                        if (def?.multiplier) setFactor(String(def.multiplier))
+                      }
+                    }}
                     placeholder="— pick —"
                     options={[
                       ...dimUnitsForDropdown.map(u => ({ value: u.key, label: u.label })),
@@ -420,23 +429,17 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-2 items-end">
-          <div>
+        <div>
             <label className="block text-[10px] text-foreground-muted mb-0.5">Label (UI)</label>
             <input value={unitLabel} onChange={e => setUnitLabel(e.target.value)} className={inputCls} placeholder="e.g. Sheet 4'×8'" />
           </div>
-          <div className="flex items-center gap-4 pb-1.5">
-            <Toggle checked={isSellDefault} onChange={setIsSellDefault} label="Sell default" size="sm" />
-            <Toggle checked={isPurchaseDefault} onChange={setIsPurchaseDefault} label="Purchase default" size="sm" />
-          </div>
-        </div>
 
         <div className="flex justify-end">
-          <button type="submit" disabled={saving || computedFactor == null} className="px-3 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50">
+          <button type="button" onClick={handleAdd} disabled={saving} className="px-3 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50">
             {saving ? 'Saving…' : '+ Add Unit'}
           </button>
         </div>
-      </form>
+      </div>
     </div>
   )
 }
