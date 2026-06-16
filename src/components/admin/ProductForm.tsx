@@ -2439,6 +2439,12 @@ export default function ProductForm({ categories, brands, action, product, produ
                 )}
               </div>
 
+              {productId && variantPopupId && !variantPopupId.startsWith('temp-') && (
+                <div className="px-5 pb-4">
+                  <UnitsManager productId={productId} variantId={variantPopupId} />
+                </div>
+              )}
+
               <div className="px-5 py-4 border-t border-border-default flex justify-end">
                 <button type="button" onClick={() => setVariantPopupId(null)} className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Done</button>
               </div>
