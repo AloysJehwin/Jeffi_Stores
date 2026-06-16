@@ -5,13 +5,14 @@ import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
+import { POLICY_VERSION } from '@/app/legal/policies'
 
 if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, otp } = await request.json()
+    const { email, otp, policiesAccepted } = await request.json()
     if (!email || !otp) return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
 
     const otpVerification = await verifyOTP(email, otp)
@@ -41,6 +42,13 @@ export async function POST(request: NextRequest) {
       await deleteOTP(email)
       await resetSendOtpCounter(email)
       return NextResponse.json({ approvalStatus, message: approvalStatus === 'rejected' ? 'Your application was not approved.' : 'Your account is awaiting approval.' })
+    }
+
+    if (policiesAccepted === true && user.policies_accepted_version !== POLICY_VERSION) {
+      await query(
+        'UPDATE users SET policies_accepted_version = $1, policies_accepted_at = NOW() WHERE id = $2',
+        [POLICY_VERSION, user.id]
+      )
     }
 
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])

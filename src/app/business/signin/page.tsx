@@ -38,12 +38,15 @@ function BusinessSignInPage() {
   const [resendCooldown, setResendCooldown] = useState(0)
   const [error, setError] = useState('')
   const [policyAccepted, setPolicyAccepted] = useState(false)
+  const [requiresPolicy, setRequiresPolicy] = useState(false)
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
   const [showPhoneModal, setShowPhoneModal] = useState(false)
   const [phone, setPhone] = useState('')
   const [phoneSaving, setPhoneSaving] = useState(false)
   const [phoneError, setPhoneError] = useState('')
+  const [phonePolicyAccepted, setPhonePolicyAccepted] = useState(false)
+  const [phoneRequiresPolicy, setPhoneRequiresPolicy] = useState(false)
 
   const rejectedParam = searchParams.get('rejected')
 
@@ -78,6 +81,8 @@ function BusinessSignInPage() {
         throw new Error(data.error || 'Failed to send OTP')
       }
       setStep('otp')
+      setRequiresPolicy(!!data.requiresPolicyAcceptance)
+      setPolicyAccepted(false)
       setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 30)
     } catch (err: any) {
       setError(err.message)
@@ -88,6 +93,7 @@ function BusinessSignInPage() {
 
   const submitLogin = async (otpValue: string) => {
     if (submittedOtpRef.current === otpValue) return
+    if (requiresPolicy && !policyAccepted) return
     submittedOtpRef.current = otpValue
     setError('')
     setIsLoading(true)
@@ -96,7 +102,7 @@ function BusinessSignInPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, otp: otpValue }),
+        body: JSON.stringify({ email, otp: otpValue, policiesAccepted: requiresPolicy ? policyAccepted : undefined }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -136,8 +142,9 @@ function BusinessSignInPage() {
 
   useEffect(() => {
     if (step !== 'otp' || otp.length !== 6 || isLoading) return
+    if (requiresPolicy && !policyAccepted) return
     submitLogin(otp)
-  }, [otp, step, isLoading])
+  }, [otp, step, isLoading, requiresPolicy, policyAccepted])
 
   const handleResendOTP = async () => {
     setError('')
@@ -194,7 +201,19 @@ function BusinessSignInPage() {
         router.push(bp('/business/pending'))
         return
       }
-      if (!data.phone) {
+      // Fetch business profile to know if policy acceptance is needed
+      let needsPolicy = false
+      try {
+        const meRes = await fetch('/api/business/me', { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
+        if (meRes.ok) {
+          const meData = await meRes.json()
+          needsPolicy = !!meData?.user?.requiresPolicyAcceptance
+        }
+      } catch {}
+      const needsPhone = !data.phone
+      if (needsPhone || needsPolicy) {
+        setPhoneRequiresPolicy(needsPolicy)
+        setPhonePolicyAccepted(false)
         setShowPhoneModal(true)
         return
       }
@@ -213,6 +232,10 @@ function BusinessSignInPage() {
       setPhoneError('Enter a valid 10-digit mobile number')
       return
     }
+    if (phoneRequiresPolicy && !phonePolicyAccepted) {
+      setPhoneError('Please accept the Privacy Policy and Terms & Conditions')
+      return
+    }
     setPhoneSaving(true)
     try {
       const res = await fetch('/api/user/update', {
@@ -224,6 +247,14 @@ function BusinessSignInPage() {
       if (!res.ok) {
         const d = await res.json()
         throw new Error(d.error || 'Failed to save phone number')
+      }
+      if (phoneRequiresPolicy && phonePolicyAccepted) {
+        await fetch('/api/user/accept-policies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        }).catch(() => {})
       }
       window.location.href = bp('/business/products')
     } catch (err: any) {
@@ -301,20 +332,7 @@ function BusinessSignInPage() {
                   placeholder="you@company.com"
                 />
               </div>
-              <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={policyAccepted}
-                  onChange={e => setPolicyAccepted(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
-                />
-                <span>
-                  I agree to the{' '}
-                  <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
-                  <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
-                </span>
-              </label>
-              <button type="submit" disabled={isLoading || !policyAccepted}
+              <button type="submit" disabled={isLoading}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center">
                 {isLoading ? <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending…</> : 'Send Verification Code'}
               </button>
@@ -353,7 +371,22 @@ function BusinessSignInPage() {
                   Change Email
                 </button>
               </div>
-              <button type="submit" disabled={otp.length !== 6 || isLoading}
+              {requiresPolicy && (
+                <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={policyAccepted}
+                    onChange={e => setPolicyAccepted(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
+                    <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
+                  </span>
+                </label>
+              )}
+              <button type="submit" disabled={otp.length !== 6 || isLoading || (requiresPolicy && !policyAccepted)}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center">
                 {isLoading ? <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Signing in…</> : 'Sign In'}
               </button>
@@ -405,8 +438,12 @@ function BusinessSignInPage() {
     {showPhoneModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
         <div className="bg-surface rounded-xl shadow-xl w-full max-w-sm p-6">
-          <h2 className="text-lg font-semibold text-foreground mb-1">One last step</h2>
-          <p className="text-sm text-foreground-secondary mb-5">Please enter your mobile number to complete sign-in.</p>
+          <h2 className="text-lg font-semibold text-foreground mb-1">
+            {phoneRequiresPolicy ? 'Almost there' : 'One last step'}
+          </h2>
+          <p className="text-sm text-foreground-secondary mb-5">
+            Please enter your mobile number{phoneRequiresPolicy ? ' and accept our policies' : ''} to complete sign-in.
+          </p>
           {phoneError && (
             <p className="mb-3 text-sm text-red-600 dark:text-red-400">{phoneError}</p>
           )}
@@ -433,9 +470,24 @@ function BusinessSignInPage() {
                 <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
               )}
             </div>
+            {phoneRequiresPolicy && (
+              <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={phonePolicyAccepted}
+                  onChange={e => setPhonePolicyAccepted(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
+                />
+                <span>
+                  I agree to the{' '}
+                  <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
+                  <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
+                </span>
+              </label>
+            )}
             <button
               type="submit"
-              disabled={phoneSaving || phone.length !== 10}
+              disabled={phoneSaving || phone.length !== 10 || (phoneRequiresPolicy && !phonePolicyAccepted)}
               className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center text-sm"
             >
               {phoneSaving ? (

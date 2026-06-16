@@ -138,6 +138,7 @@ function BusinessSignUpPage() {
 
   const handleVerifyOTP = async (otpValue: string) => {
     if (submittedOtpRef.current === otpValue) return
+    if (!policyAccepted) return
     submittedOtpRef.current = otpValue
     setError('')
     setIsLoading(true)
@@ -168,8 +169,9 @@ function BusinessSignUpPage() {
 
   useEffect(() => {
     if (step !== 'otp' || otp.length !== 6 || isLoading) return
+    if (!policyAccepted) return
     handleVerifyOTP(otp)
-  }, [otp, step, isLoading])
+  }, [otp, step, isLoading, policyAccepted])
 
   const handleResendOTP = async () => {
     setError('')
@@ -326,20 +328,7 @@ function BusinessSignUpPage() {
                     placeholder="you@company.com"
                   />
                 </div>
-                <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={policyAccepted}
-                    onChange={e => setPolicyAccepted(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
-                  />
-                  <span>
-                    I agree to the{' '}
-                    <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
-                    <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
-                  </span>
-                </label>
-                <button type="submit" disabled={isLoading || !policyAccepted}
+                <button type="submit" disabled={isLoading}
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center">
                   {isLoading ? <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending…</> : 'Send Verification Code'}
                 </button>
@@ -384,7 +373,20 @@ function BusinessSignUpPage() {
                   Change Email
                 </button>
               </div>
-              <button type="submit" disabled={otp.length !== 6 || isLoading}
+              <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={policyAccepted}
+                  onChange={e => setPolicyAccepted(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
+                />
+                <span>
+                  I agree to the{' '}
+                  <a href="/legal/privacy-policy" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Privacy Policy</a>{' '}and{' '}
+                  <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
+                </span>
+              </label>
+              <button type="submit" disabled={otp.length !== 6 || isLoading || !policyAccepted}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 flex items-center justify-center">
                 {isLoading ? <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Verifying…</> : 'Verify Email'}
               </button>
