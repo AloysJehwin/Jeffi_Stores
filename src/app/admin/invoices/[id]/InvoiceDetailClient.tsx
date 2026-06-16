@@ -121,21 +121,17 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[200px]">
-        <div className="w-8 h-8 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (!data?.order) {
+  if (!loading && !data?.order) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Invoice not found.</p>
         <Link href={ap('/admin/invoices')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Invoices</Link>
       </div>
     )
+  }
+
+  if (loading || !data?.order) {
+    return null
   }
 
   const o = data.order

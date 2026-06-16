@@ -275,21 +275,17 @@ export default function ProductDetailClient({ id }: { id: string }) {
       .catch(() => {})
   }, [id])
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[300px]">
-        <div className="w-8 h-8 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (!product || product.error) {
+  if (!loading && (!product || product.error)) {
     return (
       <div className="p-6 space-y-3">
         <p className="text-foreground-secondary">Product not found.</p>
         <Link href={ap('/admin/products')} className="text-accent-500 hover:underline text-sm">← Back to Products</Link>
       </div>
     )
+  }
+
+  if (loading || !product) {
+    return null
   }
 
   const p = product

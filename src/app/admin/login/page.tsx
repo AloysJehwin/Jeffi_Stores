@@ -153,13 +153,7 @@ export default function AdminLogin() {
     })
   }
 
-  if (checkingSession) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center">
-        <div className="animate-spin w-10 h-10 border-4 border-white border-t-transparent rounded-full"></div>
-      </div>
-    )
-  }
+  if (checkingSession) return null
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center px-4 py-10">
