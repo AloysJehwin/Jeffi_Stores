@@ -255,17 +255,7 @@ export default function AccountPage() {
     return () => { document.body.style.overflow = '' }
   }, [])
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-foreground-secondary">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
+  if (!isLoading && !user) return null
   if (!user) return null
 
   return (

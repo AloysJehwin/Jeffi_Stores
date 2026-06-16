@@ -283,15 +283,41 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     }
   }
 
-  if (loading) return (
-    <div className="bg-surface min-h-screen flex items-center justify-center">
-      <div className="animate-spin w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full" />
+  if (!loading && !rfq) return (
+    <div className="bg-surface min-h-screen flex items-center justify-center text-foreground-muted">
+      Quote not found.
     </div>
   )
 
   if (!rfq) return (
-    <div className="bg-surface min-h-screen flex items-center justify-center text-foreground-muted">
-      Quote not found.
+    <div className="bg-surface min-h-screen">
+      <BusinessAccountNavBar />
+      <BusinessAccountMobileHeader />
+      <div className="container mx-auto px-4 py-6 pb-32">
+        <div className="flex items-center gap-2 text-sm text-foreground-secondary mb-5">
+          <Link href={bp('/business/quotes')} className="text-accent-500 hover:text-accent-600 transition-colors">My Quotes</Link>
+          <span>/</span>
+          <div className="h-4 w-24 bg-surface-secondary rounded animate-pulse" />
+        </div>
+        <div className="bg-zinc-800 rounded-2xl p-5 text-white border border-zinc-700 mb-5">
+          <div className="h-6 w-40 bg-zinc-700 rounded animate-pulse mb-2" />
+          <div className="h-4 w-56 bg-zinc-700/70 rounded animate-pulse" />
+        </div>
+        <div className="lg:grid lg:grid-cols-3 lg:gap-6 space-y-5 lg:space-y-0">
+          <div className="lg:col-span-2 space-y-5">
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-5 space-y-3">
+              <div className="h-4 w-32 bg-surface-secondary rounded animate-pulse" />
+              <div className="h-16 w-full bg-surface-secondary rounded animate-pulse" />
+              <div className="h-16 w-full bg-surface-secondary rounded animate-pulse" />
+            </div>
+          </div>
+          <div className="lg:col-span-1 space-y-4">
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
+              <div className="h-4 w-24 bg-surface-secondary rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 

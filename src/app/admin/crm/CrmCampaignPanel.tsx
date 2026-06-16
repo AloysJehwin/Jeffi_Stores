@@ -149,14 +149,6 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
 
   const inputCls = 'w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <span className="w-5 h-5 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
   const previewSubject = form ? renderTemplate(form.subject_template, SAMPLE_VARS) : ''
   const previewBody = form ? renderTemplate(form.body_template, SAMPLE_VARS) : ''
 
@@ -168,6 +160,13 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
           Campaign
         </label>
         <div className="flex flex-wrap gap-2">
+          {loading && campaigns.length === 0 && (
+            <>
+              <div className="h-7 w-24 bg-surface-secondary rounded-lg animate-pulse" />
+              <div className="h-7 w-28 bg-surface-secondary rounded-lg animate-pulse" />
+              <div className="h-7 w-20 bg-surface-secondary rounded-lg animate-pulse" />
+            </>
+          )}
           {campaigns.map(c => (
             <button
               key={c.kind}
