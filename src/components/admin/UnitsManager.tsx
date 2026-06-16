@@ -241,7 +241,7 @@ export default function UnitsManager({ productId, variantId }: Props) {
                     onChange={handleUnitChange}
                     placeholder="— pick —"
                     options={[
-                      ...dimUnits.map(u => ({ value: u.key, label: u.label })),
+                      ...dimUnits.map(u => ({ value: u.key, label: u.multiplier != null ? `${u.label} — ${u.multiplier}` : u.label })),
                       { value: '__custom', label: 'Custom…' },
                     ]}
                     sm
