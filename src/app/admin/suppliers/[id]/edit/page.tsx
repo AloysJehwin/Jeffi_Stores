@@ -84,11 +84,7 @@ export default function EditSupplierPage() {
   }
 
   if (loading) {
-    return (
-      <div className="p-4 sm:p-6 flex items-center justify-center py-24">
-        <div className="w-6 h-6 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
+    return null
   }
 
   return (

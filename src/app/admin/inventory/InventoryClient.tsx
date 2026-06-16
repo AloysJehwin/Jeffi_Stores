@@ -179,8 +179,11 @@ function SuppliersTab() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-6 h-6 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
+          <div className="h-5 w-32 bg-surface-secondary rounded animate-pulse" />
+          <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+          <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+          <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
         </div>
       ) : (
         <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
@@ -582,8 +585,11 @@ function POTab({ initialPO }: { initialPO?: string }) {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-6 h-6 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
+          <div className="h-5 w-32 bg-surface-secondary rounded animate-pulse" />
+          <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+          <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+          <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
         </div>
       ) : (
         <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
@@ -873,8 +879,11 @@ function StockTab() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-6 h-6 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
+              <div className="h-5 w-32 bg-surface-secondary rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
             </div>
           ) : (
             <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
@@ -1107,8 +1116,11 @@ function StockTab() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-6 h-6 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
+              <div className="h-5 w-32 bg-surface-secondary rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
             </div>
           ) : valuation ? (
             <>

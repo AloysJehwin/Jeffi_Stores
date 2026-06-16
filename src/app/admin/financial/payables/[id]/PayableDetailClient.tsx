@@ -39,21 +39,17 @@ export default function PayableDetailClient({ id }: { id: string }) {
       .catch(() => setLoading(false))
   }, [id])
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[200px]">
-        <div className="w-8 h-8 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (!data?.expense) {
+  if (!loading && !data?.expense) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Expense not found.</p>
         <Link href={ap('/admin/financial?tab=payables')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Payables</Link>
       </div>
     )
+  }
+
+  if (loading || !data?.expense) {
+    return null
   }
 
   const e = data.expense

@@ -287,11 +287,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
   // For header stat: prefer selling total, fallback to MRP total
   const totalCatalog = totalSelling > 0 ? totalSelling : totalMrp
 
-  if (loading) return (
-    <div className="p-6 flex items-center justify-center py-24">
-      <div className="animate-spin w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full" />
-    </div>
-  )
+  if (loading) return null
 
   if (!rfq) return <div className="p-6 text-center text-foreground-muted">RFQ not found.</div>
 

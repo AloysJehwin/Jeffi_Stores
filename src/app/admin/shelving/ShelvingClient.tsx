@@ -213,12 +213,6 @@ export default function ShelvingClient() {
     } catch (e: any) { showToast(e.message || 'Label generation failed', 'error') } finally { setGeneratingLabels(false) }
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-24">
-      <div className="w-6 h-6 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-
   return (
     <div className="space-y-0 h-full flex flex-col">
       <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-surface shrink-0">
