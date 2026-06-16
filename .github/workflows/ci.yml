@@ -417,6 +417,7 @@ jobs:
               add_replication_runs.sql
               add_product_units_phase1.sql
               cascade_shelf_stock_on_variant_delete.sql
+              cascade_variant_fk_history_tables.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')
