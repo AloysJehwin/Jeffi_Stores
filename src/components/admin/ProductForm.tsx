@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
@@ -1646,8 +1646,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                               const perUnit = null
                               const isExpanded = false
                               return (
-                                <>
-                                <tr key={variant.id || index} className={`border-b border-border-default ${isExpanded ? 'bg-surface-secondary' : 'hover:bg-surface-secondary/40'}`}>
+                                <React.Fragment key={variant.id || index}>
+                                <tr className={`border-b border-border-default ${isExpanded ? 'bg-surface-secondary' : 'hover:bg-surface-secondary/40'}`}>
                                   <td className="py-2 px-3">
                                     <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
                                   </td>
@@ -1747,7 +1747,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     </div>
                                   </td>
                                 </tr>
-                                </>
+                                </React.Fragment>
                               )
                             })}
                           </tbody>
