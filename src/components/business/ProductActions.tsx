@@ -42,6 +42,18 @@ interface Variant {
   sub_variants?: SubVariant[]
 }
 
+interface ProductUnit {
+  id: string
+  variant_id: string | null
+  unit: string
+  factor: number
+  is_base: boolean
+  is_sell_default: boolean
+  is_purchase_default: boolean
+  display_label: string | null
+  dimension: string
+}
+
 interface ProductActionsProps {
   productId: string
   productName: string
@@ -58,6 +70,7 @@ interface ProductActionsProps {
   onVariantChange?: (variant: Variant | null) => void
   onSelectionChange?: (variantId: string | null, subVariantId: string | null) => void
   categoryId?: string | null
+  productUnits?: ProductUnit[]
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -80,6 +93,7 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
   variants, variantType, initialSkuParam,
   onVariantChange, onSelectionChange, categoryId,
+  productUnits: productUnitsProp,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -221,6 +235,21 @@ export default function ProductActions({
     ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
     : null
 
+  const units = productUnitsProp ?? []
+  const sellUnit = (() => {
+    if (!selectedVariantId) {
+      return units.find(u => u.variant_id === null && u.is_sell_default)
+        ?? units.find(u => u.variant_id === null && u.is_base)
+        ?? null
+    }
+    return units.find(u => u.variant_id === selectedVariantId && u.is_sell_default)
+      ?? units.find(u => u.variant_id === null && u.is_sell_default)
+      ?? units.find(u => u.variant_id === null && u.is_base)
+      ?? null
+  })()
+  const effectiveUnitKey = sellUnit?.unit ?? 'unit'
+  const effectiveUnitLabel = sellUnit?.display_label ?? sellUnit?.unit ?? null
+
   useEffect(() => {
     setQuantity(1)
   }, [selectedVariantId])
@@ -232,7 +261,7 @@ export default function ProductActions({
         showToast(`Please select a ${selectedVariant.sub_variant_type || 'sub-variant'}`, 'error')
         return
       }
-      await addToCart(productId, quantity, selectedVariantId || undefined, 'unit', undefined, selectedSubVariantId || undefined)
+      await addToCart(productId, quantity, selectedVariantId || undefined, effectiveUnitKey, effectiveUnitKey, selectedSubVariantId || undefined)
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')
@@ -258,8 +287,8 @@ export default function ProductActions({
           variantId: selectedVariantId || null,
           subVariantId: selectedSubVariantId || null,
           qty: quantity,
-          buyMode: 'unit',
-          buyUnit: null,
+          buyMode: effectiveUnitKey,
+          buyUnit: effectiveUnitKey,
         }),
       })
       const data = await res.json()
@@ -456,6 +485,11 @@ export default function ProductActions({
             {perUnitRate && (
               <p className="text-sm font-medium text-accent-600 dark:text-accent-400 mb-2">
                 {perUnitRate}
+              </p>
+            )}
+            {effectiveUnitLabel && effectiveUnitKey !== 'unit' && (
+              <p className="text-sm font-medium text-accent-600 dark:text-accent-400 mb-2">
+                ₹{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
               </p>
             )}
             {mrpDiscount > 0 && (

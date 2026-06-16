@@ -57,8 +57,13 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
 }
 
 export function cartLineUnitPrice(item: CartLine): number {
-  // Legacy weight/length sales removed — new orders are always 'unit'.
-  return Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+  const basePrice = Number(item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst ?? item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+  // If the cart item was stored with a unit factor already applied in price_at_addition, use that directly.
+  // Otherwise fall back to raw variant price.
+  if (item.price_at_addition && Number(item.price_at_addition) > 0) {
+    return Number(item.price_at_addition)
+  }
+  return basePrice
 }
 
 export function cartItemsForHash(items: CartLine[]): DraftCartItem[] {
@@ -99,8 +104,7 @@ export async function resolveBuyNowItem(input: {
   if (!input.productId) return { ok: false, error: 'productId required' }
   const qty = Number(input.qty)
   if (!Number.isFinite(qty) || qty <= 0 || qty > 10_000) return { ok: false, error: 'Invalid qty' }
-  // Legacy 'weight'/'length' buy modes removed — new orders are always 'unit'.
-  const buyMode = 'unit'
+  const buyMode = input.buyMode || 'unit'
 
   const product = await queryOne<{
     id: string
@@ -135,6 +139,23 @@ export async function resolveBuyNowItem(input: {
   }
 
   let price: number = Number(subVariant?.price ?? variant?.price ?? product.base_price ?? 0)
+  // Apply unit factor if buyMode is a real unit key (not 'unit')
+  if (buyMode && buyMode !== 'unit') {
+    const effectiveVariantId = input.variantId || null
+    const unitRow = await queryOne<{ factor: string | number }>(
+      `SELECT factor FROM product_units
+       WHERE product_id = $1 AND unit = $2
+         AND (variant_id = $3 OR (variant_id IS NULL AND NOT EXISTS (
+           SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2 AND pu2.variant_id = $3
+         )))
+       ORDER BY variant_id NULLS LAST
+       LIMIT 1`,
+      [input.productId, buyMode, effectiveVariantId]
+    )
+    if (unitRow) {
+      price = Math.round(price * Number(unitRow.factor) * 100) / 100
+    }
+  }
   if (!Number.isFinite(price) || price <= 0) return { ok: false, error: 'Could not resolve price for this product' }
   price = Math.round(price * 100) / 100
 
@@ -369,8 +390,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
 
     if (input.mode === 'cart') {
       itemRows = input.cartItems.map(item => {
-        // Legacy weight/length sales removed — new orders always use the unit price path.
-        const unitPrice = Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        const unitPrice = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
         const qty = Number(item.quantity)
         const gstRate = parseFloat(String(item.products.gst_percentage || '0'))
         const itemTotal = unitPrice * qty
@@ -400,8 +420,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           gstRate,
           hsn: isGSTEnabled ? (item.products.hsn_code || null) : null,
           gst,
-          buyMode: 'unit',
-          buyUnit: null,
+          buyMode: item.buy_mode || 'unit',
+          buyUnit: item.buy_unit || null,
         }
       })
     } else {
@@ -434,8 +454,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         gstRate,
         hsn: isGSTEnabled ? (input.product.hsn_code || null) : null,
         gst,
-        buyMode: 'unit',
-        buyUnit: null,
+        buyMode: i.buyMode || 'unit',
+        buyUnit: i.buyUnit || null,
       }]
     }
 

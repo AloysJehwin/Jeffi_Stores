@@ -14,7 +14,7 @@ const AddCartSchema = z
     variantId: zUuid.nullish(),
     subVariantId: zUuid.nullish(),
     quantity: z.number().positive().optional(),
-    buyMode: z.enum(['unit']).nullish(),
+    buyMode: z.string().max(40).nullish(),
     buyUnit: z.string().nullish(),
   })
   .refine(
@@ -78,7 +78,32 @@ export async function GET(request: NextRequest) {
             'mrp_ex_gst', psv.mrp_ex_gst, 'wholeprice_ex_gst', psv.wholeprice_ex_gst,
             'stock_quantity', psv.stock_quantity, 'inventory_quantity', psv.inventory_quantity
           )
-        ELSE NULL END AS sub_variant
+        ELSE NULL END AS sub_variant,
+        COALESCE(
+          (SELECT json_build_object(
+             'unit', pu.unit,
+             'display_label', pu.display_label,
+             'factor', pu.factor,
+             'is_base', pu.is_base,
+             'is_sell_default', pu.is_sell_default
+           )
+           FROM product_units pu
+           WHERE pu.product_id = ci.product_id
+             AND pu.unit = ci.buy_unit
+             AND (
+               pu.variant_id = ci.variant_id
+               OR (pu.variant_id IS NULL AND NOT EXISTS (
+                 SELECT 1 FROM product_units pu2
+                 WHERE pu2.product_id = ci.product_id
+                   AND pu2.unit = ci.buy_unit
+                   AND pu2.variant_id = ci.variant_id
+               ))
+             )
+           ORDER BY pu.variant_id NULLS LAST
+           LIMIT 1
+          ),
+          NULL
+        ) AS cart_item_unit
       FROM cart_items ci
       LEFT JOIN products p ON ci.product_id = p.id
       LEFT JOIN brands b ON p.brand_id = b.id
@@ -135,6 +160,26 @@ export async function POST(request: NextRequest) {
       priceAtAddition = variant.price ?? product.base_price
     } else {
       priceAtAddition = product.price_ex_gst || product.base_price
+    }
+
+    // Apply unit factor: if buying by a non-base unit (e.g. 'm' when base is 'pc'),
+    // multiply price by the unit's factor so the stored price is per-selected-unit.
+    if (buyMode && buyMode !== 'unit') {
+      const effectiveVariantId = variantId || null
+      // Prefer variant-level unit override, fall back to product-level
+      const unitRow = await queryOne<{ factor: string | number; is_base: boolean }>(
+        `SELECT factor, is_base FROM product_units
+         WHERE product_id = $1 AND unit = $2
+           AND (variant_id = $3 OR (variant_id IS NULL AND NOT EXISTS (
+             SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2 AND pu2.variant_id = $3
+           )))
+         ORDER BY variant_id NULLS LAST
+         LIMIT 1`,
+        [productId, buyMode, effectiveVariantId]
+      )
+      if (unitRow) {
+        priceAtAddition = Math.round(priceAtAddition * Number(unitRow.factor) * 100) / 100
+      }
     }
 
     const existingItem = await queryOne(

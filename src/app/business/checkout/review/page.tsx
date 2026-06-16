@@ -522,6 +522,9 @@ function CheckoutReviewPage() {
                     const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
                     const gstRate = Number(item.products.gst_percentage || 0)
                     const itemGst = gstRate > 0 ? itemTotal - (itemTotal / (1 + gstRate / 100)) : 0
+                    const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                    const unitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
+                    const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
 
                     return (
                       <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
@@ -560,7 +563,7 @@ function CheckoutReviewPage() {
                           </div>
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-sm text-foreground-secondary">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')} × {isCustomQty ? `${Number(item.quantity).toFixed(3)} ${unitLabel ?? item.buy_unit ?? ''}` : `${Math.round(Number(item.quantity))}${showUnitLabel ? ` ${unitLabel}` : ''}`}
                               {showMrp && (
                                 <>
                                   {' '}<span className="line-through text-foreground-muted">₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>

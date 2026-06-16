@@ -41,7 +41,41 @@ export async function GET(
           '[]'::json
         ) AS product_variants,
         ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-        ${VARIANT_MIN_PRICE_SQL} AS variant_min_price
+        ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+        COALESCE(
+          (SELECT json_agg(
+             json_build_object(
+               'id', pu.id,
+               'variant_id', pu.variant_id,
+               'unit', pu.unit,
+               'factor', pu.factor,
+               'is_base', pu.is_base,
+               'is_sell_default', pu.is_sell_default,
+               'is_purchase_default', pu.is_purchase_default,
+               'display_label', pu.display_label,
+               'dimension', pu.dimension
+             ) ORDER BY pu.is_sell_default DESC, pu.is_base DESC
+           )
+           FROM product_units pu WHERE pu.product_id = p.id
+          ),
+          '[]'::json
+        ) AS product_units,
+        COALESCE(
+          (SELECT json_agg(
+             json_build_object(
+               'id', pur.id,
+               'product_unit_id', pur.product_unit_id,
+               'rule_type', pur.rule_type,
+               'config', pur.config,
+               'priority', pur.priority
+             ) ORDER BY pur.priority
+           )
+           FROM product_unit_rules pur
+           JOIN product_units pu2 ON pur.product_unit_id = pu2.id
+           WHERE pu2.product_id = p.id AND pur.is_active = TRUE
+          ),
+          '[]'::json
+        ) AS product_unit_rules
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN brands b ON p.brand_id = b.id
