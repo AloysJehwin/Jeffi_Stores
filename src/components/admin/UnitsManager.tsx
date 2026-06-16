@@ -42,6 +42,7 @@ interface UnitRule {
 
 interface Props {
   productId: string
+  variantId?: string | null
   baseUnitName?: string
 }
 
@@ -49,7 +50,7 @@ type Mode = 'simple' | 'area' | 'volume' | 'same_dim'
 
 const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]"
 
-export default function UnitsManager({ productId, baseUnitName }: Props) {
+export default function UnitsManager({ productId, variantId, baseUnitName }: Props) {
   const { showToast } = useToast()
   const showConfirm = useConfirm()
   const [units, setUnits] = useState<ProductUnit[]>([])
@@ -57,7 +58,10 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const baseUrl = `/api/admin/products/${productId}/units`
+  const baseUrl = variantId
+    ? `/api/admin/products/${productId}/variants/${variantId}/units`
+    : `/api/admin/products/${productId}/units`
+  const isVariantScope = !!variantId
 
   async function load() {
     setLoading(true)
@@ -73,7 +77,7 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
     }
   }
 
-  useEffect(() => { load() }, [productId])
+  useEffect(() => { load() }, [productId, variantId])
 
   const baseUnit = units.find(u => u.is_base)
 
@@ -215,14 +219,22 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
   return (
     <div className="border-t border-border-default pt-4 mt-4 space-y-3">
       <div className="flex items-baseline justify-between">
-        <h4 className="text-xs font-bold uppercase tracking-wide text-foreground-secondary">Selling Units</h4>
+        <h4 className="text-xs font-bold uppercase tracking-wide text-foreground-secondary">
+          {isVariantScope ? 'Variant Units (override)' : 'Selling Units'}
+        </h4>
         <span className="text-[10px] text-foreground-muted">
-          Stock + base price live in the BASE unit. Other units convert via factor.
+          {isVariantScope
+            ? 'Adding units here overrides product-level units for this variant only.'
+            : 'Stock + base price live in the BASE unit. Other units convert via factor.'}
         </span>
       </div>
 
       {units.length === 0 ? (
-        <p className="text-xs text-foreground-muted italic">No units configured.</p>
+        <p className="text-xs text-foreground-muted italic">
+          {isVariantScope
+            ? 'No variant-specific units. This variant uses the product-level units above.'
+            : 'No units configured.'}
+        </p>
       ) : (
         <div className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
           <table className="w-full text-xs">
