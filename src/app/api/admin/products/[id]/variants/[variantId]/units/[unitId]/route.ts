@@ -76,6 +76,22 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     updates.push(`notes = $${i++}`)
     vals.push(body.notes ? String(body.notes).slice(0, 500) : null)
   }
+  if (body.dimension !== undefined) {
+    const allowed = ['count', 'length', 'area', 'volume', 'weight', 'custom']
+    if (!allowed.includes(body.dimension)) {
+      return NextResponse.json({ error: `dimension must be one of ${allowed.join(', ')}` }, { status: 400 })
+    }
+    updates.push(`dimension = $${i++}`)
+    vals.push(body.dimension)
+  }
+  if (body.conversion_meta !== undefined) {
+    if (body.conversion_meta === null) {
+      updates.push(`conversion_meta = NULL`)
+    } else {
+      updates.push(`conversion_meta = $${i++}`)
+      vals.push(JSON.stringify(body.conversion_meta))
+    }
+  }
 
   const setBase = body.is_base === true
   const setSellDefault = body.is_sell_default === true
