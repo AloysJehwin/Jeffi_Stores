@@ -31,11 +31,25 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
             </svg>
             Legal &amp; Policies
           </Link>
-          <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
-            {policy.title}
-          </h1>
-          <p className="text-foreground-secondary text-sm">{policy.description}</p>
-          <p className="text-foreground-muted text-xs mt-1">Last updated: {policy.lastUpdated}</p>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
+                {policy.title}
+              </h1>
+              <p className="text-foreground-secondary text-sm">{policy.description}</p>
+              <p className="text-foreground-muted text-xs mt-1">Last updated: {policy.lastUpdated}</p>
+            </div>
+            <a
+              href={`/api/legal/${policy.slug}/pdf`}
+              download={`jeffistores-${policy.slug}.pdf`}
+              className="shrink-0 inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              Download PDF
+            </a>
+          </div>
         </div>
       </div>
 
