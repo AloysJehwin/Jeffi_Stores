@@ -416,6 +416,7 @@ jobs:
               extend_email_logs_for_audit.sql
               add_replication_runs.sql
               add_product_units_phase1.sql
+              cascade_shelf_stock_on_variant_delete.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')
