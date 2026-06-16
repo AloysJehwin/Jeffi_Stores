@@ -1,0 +1,141 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
+import { queryOne, withTransaction } from '@/lib/db'
+
+export const dynamic = 'force-dynamic'
+
+interface Params {
+  params: { id: string; variantId: string; unitId: string }
+}
+
+async function ensureVariant(productId: string, variantId: string) {
+  const row = await queryOne<{ id: string }>(
+    `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`,
+    [variantId, productId]
+  )
+  return !!row
+}
+
+async function ensureUnitOwnership(unitId: string, variantId: string) {
+  const row = await queryOne<{ id: string; is_base: boolean }>(
+    `SELECT id, is_base FROM product_units WHERE id = $1 AND variant_id = $2`,
+    [unitId, variantId]
+  )
+  return row
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  if (!(await ensureVariant(params.id, params.variantId))) {
+    return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
+  }
+  const existing = await ensureUnitOwnership(params.unitId, params.variantId)
+  if (!existing) return NextResponse.json({ error: 'Unit not found' }, { status: 404 })
+
+  const body = await request.json().catch(() => null)
+  if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+
+  const updates: string[] = []
+  const vals: unknown[] = []
+  let i = 1
+  if (body.unit !== undefined) {
+    const u = String(body.unit).trim()
+    if (!u) return NextResponse.json({ error: 'unit cannot be empty' }, { status: 400 })
+    updates.push(`unit = $${i++}`)
+    vals.push(u)
+  }
+  if (body.factor !== undefined) {
+    const f = Number(body.factor)
+    if (!Number.isFinite(f) || f <= 0) {
+      return NextResponse.json({ error: 'factor must be a positive number' }, { status: 400 })
+    }
+    updates.push(`factor = $${i++}`)
+    vals.push(f)
+  }
+  if (body.price_override !== undefined) {
+    if (body.price_override === null || body.price_override === '') {
+      updates.push(`price_override = NULL`)
+    } else {
+      const p = Number(body.price_override)
+      if (!Number.isFinite(p)) return NextResponse.json({ error: 'price_override must be a number' }, { status: 400 })
+      updates.push(`price_override = $${i++}`)
+      vals.push(p)
+    }
+  }
+  if (body.display_label !== undefined) {
+    updates.push(`display_label = $${i++}`)
+    vals.push(body.display_label ? String(body.display_label).slice(0, 80) : null)
+  }
+  if (body.notes !== undefined) {
+    updates.push(`notes = $${i++}`)
+    vals.push(body.notes ? String(body.notes).slice(0, 500) : null)
+  }
+
+  const setBase = body.is_base === true
+  const setSellDefault = body.is_sell_default === true
+  const setPurchaseDefault = body.is_purchase_default === true
+  // Note: we don't allow flipping a flag to false directly — the flag moves
+  // to another row by setting it true on that row. This keeps "exactly one"
+  // invariants intact.
+
+  try {
+    const updated = await withTransaction(async (client) => {
+      if (setBase) {
+        await client.query(`UPDATE product_units SET is_base = FALSE WHERE variant_id = $1`, [params.variantId])
+        updates.push(`is_base = TRUE`)
+      }
+      if (setSellDefault) {
+        await client.query(`UPDATE product_units SET is_sell_default = FALSE WHERE variant_id = $1`, [params.variantId])
+        updates.push(`is_sell_default = TRUE`)
+      }
+      if (setPurchaseDefault) {
+        await client.query(`UPDATE product_units SET is_purchase_default = FALSE WHERE variant_id = $1`, [params.variantId])
+        updates.push(`is_purchase_default = TRUE`)
+      }
+      if (updates.length === 0) {
+        const cur = await client.query(`SELECT * FROM product_units WHERE id = $1`, [params.unitId])
+        return cur.rows[0]
+      }
+      updates.push(`updated_at = NOW()`)
+      vals.push(params.unitId)
+      const res = await client.query(
+        `UPDATE product_units SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
+        vals
+      )
+      return res.rows[0]
+    })
+    return NextResponse.json({ unit: updated })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    if (msg.includes('duplicate key')) {
+      return NextResponse.json({ error: 'A unit with this name already exists for this variant' }, { status: 409 })
+    }
+    return NextResponse.json({ error: 'Failed to update unit' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: Params) {
+  const admin = await authenticateAdmin(_request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  if (!(await ensureVariant(params.id, params.variantId))) {
+    return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
+  }
+  const existing = await ensureUnitOwnership(params.unitId, params.variantId)
+  if (!existing) return NextResponse.json({ error: 'Unit not found' }, { status: 404 })
+  if (existing.is_base) {
+    return NextResponse.json({ error: 'Cannot delete the base unit. Make another unit the base first.' }, { status: 400 })
+  }
+
+  await queryOne(`DELETE FROM product_units WHERE id = $1`, [params.unitId])
+  return NextResponse.json({ ok: true })
+}

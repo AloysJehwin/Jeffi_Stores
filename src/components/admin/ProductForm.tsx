@@ -9,6 +9,7 @@ import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
+import UnitsManager from './UnitsManager'
 import { applyDiscount } from '@/lib/pricing'
 
 interface Category {
@@ -2699,6 +2700,14 @@ export default function ProductForm({ categories, brands, action, product, produ
                       )
                     })()}
                   </div>
+                )}
+
+                {productId && variantPopupId && !variantPopupId.startsWith('temp-') && (
+                  <UnitsManager
+                    productId={productId}
+                    variantId={variantPopupId}
+                    baseUnitName={popupVariant?.unit || undefined}
+                  />
                 )}
               </div>
 
