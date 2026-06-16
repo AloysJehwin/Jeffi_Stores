@@ -63,21 +63,17 @@ export default function QuotationDetailClient({ id }: { id: string }) {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[200px]">
-        <div className="w-8 h-8 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (!data?.quotation) {
+  if (!loading && !data?.quotation) {
     return (
       <div className="p-6">
         <p className="text-foreground-secondary">Quotation not found.</p>
         <Link href={ap('/admin/quotations')} className="text-accent-500 hover:underline text-sm mt-2 inline-block">← Back to Quotations</Link>
       </div>
     )
+  }
+
+  if (loading || !data?.quotation) {
+    return null
   }
 
   const q = data.quotation

@@ -214,9 +214,20 @@ export default function AdminReviewsPage() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="flex flex-col items-center py-16 gap-3">
-          <div className="w-8 h-8 border-[3px] border-accent-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-foreground-muted">Loading reviews…</p>
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-surface-secondary animate-pulse shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-1/3 bg-surface-secondary rounded animate-pulse" />
+                  <div className="h-3 w-1/4 bg-surface-secondary rounded animate-pulse" />
+                  <div className="h-3 w-full bg-surface-secondary rounded animate-pulse" />
+                  <div className="h-3 w-5/6 bg-surface-secondary rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : reviews.length === 0 ? (
         <div className="bg-surface-elevated rounded-xl border border-border-default py-16 flex flex-col items-center gap-3">
