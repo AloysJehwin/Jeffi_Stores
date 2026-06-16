@@ -1789,7 +1789,6 @@ export default function ProductForm({ categories, brands, action, product, produ
           </p>
           <UnitsManager
             productId={productId}
-            baseUnitName={variants.find(v => v.id && !v._isDeleted)?.unit || undefined}
           />
         </div>
       )}

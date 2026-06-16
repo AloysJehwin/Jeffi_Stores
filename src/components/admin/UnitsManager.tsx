@@ -1,23 +1,19 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
-import { useConfirm } from '@/contexts/ConfirmContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import {
   ALL_DIMENSIONS,
   Dimension,
   DIMENSION_LABEL,
   UNITS,
-  computeAreaFactor,
-  computeVolumeFactor,
-  sameDimensionFactor,
 } from '@/lib/units'
 
 interface ProductUnit {
   id: string
   product_id: string
-  variant_id: string
+  variant_id: string | null
   unit: string
   factor: number | string
   dimension: Dimension
@@ -30,32 +26,19 @@ interface ProductUnit {
   notes: string | null
 }
 
-interface UnitRule {
-  id: string
-  product_unit_id: string
-  rule_type: 'tiered_price' | 'gst_threshold' | 'bonus_qty' | 'bundle_split' | 'physical_variance'
-  config: any
-  is_active: boolean
-  priority: number
-}
-
 interface Props {
   productId: string
   variantId?: string | null
-  baseUnitName?: string
 }
-
-type Mode = 'simple' | 'area' | 'volume' | 'same_dim'
 
 const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]"
 
-export default function UnitsManager({ productId, variantId, baseUnitName }: Props) {
+export default function UnitsManager({ productId, variantId }: Props) {
   const { showToast } = useToast()
-  const showConfirm = useConfirm()
-  const [units, setUnits] = useState<ProductUnit[]>([])
-  const [rules, setRules] = useState<UnitRule[]>([])
+  const [unit, setUnit] = useState<ProductUnit | null>(null)
   const [inherited, setInherited] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const baseUrl = variantId
@@ -63,14 +46,19 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
     : `/api/admin/products/${productId}/units`
   const isVariantScope = !!variantId
 
+  // Edit / create draft
+  const [draftUnit, setDraftUnit] = useState('')
+  const [draftDimension, setDraftDimension] = useState<Dimension>('count')
+  const [draftLabel, setDraftLabel] = useState('')
+
   async function load() {
     setLoading(true)
     try {
       const res = await fetch(baseUrl, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
-        setUnits(data.units || [])
-        setRules(data.rules || [])
+        const units: ProductUnit[] = data.units || []
+        setUnit(units[0] ?? null)
         setInherited(data.inherited ?? false)
       }
     } finally {
@@ -80,376 +68,195 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
 
   useEffect(() => { load() }, [productId, variantId])
 
-  const baseUnit = units.find(u => u.is_base)
-
-  // Add-form state
-  const [dimension, setDimension] = useState<Dimension>('count')
-  const [mode, setMode] = useState<Mode>('simple')
-  const [unitKey, setUnitKey] = useState<string>('')
-  const [unitLabel, setUnitLabel] = useState<string>('')
-  const [factor, setFactor] = useState<string>('')
-  const [areaLength, setAreaLength] = useState<string>('')
-  const [areaWidth, setAreaWidth] = useState<string>('')
-  const [areaDimUnit, setAreaDimUnit] = useState<string>('ft')
-  const [volLength, setVolLength] = useState<string>('')
-  const [volWidth, setVolWidth] = useState<string>('')
-  const [volHeight, setVolHeight] = useState<string>('')
-  const [volDimUnit, setVolDimUnit] = useState<string>('cm')
-
-  function resetDraft() {
-    setUnitKey('')
-    setUnitLabel('')
-    setFactor('')
-    setAreaLength(''); setAreaWidth('')
-    setVolLength(''); setVolWidth(''); setVolHeight('')
+  function openEdit(u?: ProductUnit) {
+    if (u) {
+      setDraftUnit(u.unit)
+      setDraftDimension(u.dimension)
+      setDraftLabel(u.display_label || '')
+    } else {
+      setDraftUnit('')
+      setDraftDimension('count')
+      setDraftLabel('')
+    }
+    setEditing(true)
   }
 
-  // Compute the factor from current draft state
-  const computedFactor: number | null = useMemo(() => {
-    try {
-      if (mode === 'simple') {
-        const f = parseFloat(factor)
-        return Number.isFinite(f) && f > 0 ? f : null
-      }
-      if (mode === 'area' && baseUnit) {
-        const l = parseFloat(areaLength); const w = parseFloat(areaWidth)
-        if (!Number.isFinite(l) || !Number.isFinite(w) || l <= 0 || w <= 0) return null
-        return computeAreaFactor({ length: l, width: w, dim_unit: areaDimUnit }, baseUnit.unit)
-      }
-      if (mode === 'volume' && baseUnit) {
-        const l = parseFloat(volLength); const w = parseFloat(volWidth); const h = parseFloat(volHeight)
-        if (!Number.isFinite(l) || !Number.isFinite(w) || !Number.isFinite(h) || l <= 0 || w <= 0 || h <= 0) return null
-        return computeVolumeFactor({ length: l, width: w, height: h, dim_unit: volDimUnit }, baseUnit.unit)
-      }
-      if (mode === 'same_dim' && baseUnit && unitKey) {
-        return sameDimensionFactor(unitKey, baseUnit.unit, dimension)
-      }
-    } catch { /* user is mid-typing */ }
-    return null
-  }, [mode, factor, areaLength, areaWidth, areaDimUnit, volLength, volWidth, volHeight, volDimUnit, baseUnit, unitKey, dimension])
-
-  // When dimension changes, reset to a sensible mode
-  useEffect(() => {
-    if (dimension === 'area') setMode('area')
-    else if (dimension === 'volume') setMode('volume')
-    else if (dimension === 'count' || dimension === 'custom') { setMode('simple'); setUnitKey('') }
-    else setMode('same_dim')
-  }, [dimension])
-
-  async function handleAdd() {
-    const isFirstUnit = units.length === 0
-    const finalUnitKey = (mode === 'simple' || mode === 'area' || mode === 'volume') ? unitKey.trim() : unitKey
-    if (!finalUnitKey) { showToast('Pick or enter a unit name', 'error'); return }
-    if (!isFirstUnit && !baseUnit) { showToast('No base unit configured yet', 'error'); return }
-    const f = isFirstUnit ? 1 : computedFactor
-    if (!isFirstUnit && (f == null || f <= 0)) { showToast('Factor must be > 0 — fill the conversion fields', 'error'); return }
-
-    let conversion_meta: any = null
-    if (mode === 'area') {
-      conversion_meta = { type: 'area', length: parseFloat(areaLength), width: parseFloat(areaWidth), dim_unit: areaDimUnit }
-    } else if (mode === 'volume') {
-      conversion_meta = { type: 'volume', length: parseFloat(volLength), width: parseFloat(volWidth), height: parseFloat(volHeight), dim_unit: volDimUnit }
-    } else if (mode === 'same_dim') {
-      conversion_meta = { type: 'same_dim' }
-    } else {
-      conversion_meta = { type: 'simple' }
-    }
+  async function handleSave() {
+    const key = draftUnit.trim()
+    if (!key) { showToast('Unit name is required', 'error'); return }
 
     setSaving(true)
     try {
-      const res = await fetch(baseUrl, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          unit: finalUnitKey,
-          factor: isFirstUnit ? 1 : f,
-          dimension,
-          conversion_meta,
-          display_label: unitLabel || null,
-          is_base: isFirstUnit,
-          is_sell_default: false,
-          is_purchase_default: false,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) { showToast(data.error || 'Failed to add unit', 'error'); return }
-      resetDraft()
+      if (unit && !inherited) {
+        const res = await fetch(`${baseUrl}/${unit.id}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            unit: key,
+            dimension: draftDimension,
+            display_label: draftLabel || null,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) { showToast(data.error || 'Failed to update', 'error'); return }
+      } else {
+        const res = await fetch(baseUrl, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            unit: key,
+            factor: 1,
+            dimension: draftDimension,
+            display_label: draftLabel || null,
+            is_base: true,
+            is_sell_default: false,
+            is_purchase_default: false,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) { showToast(data.error || 'Failed to save', 'error'); return }
+      }
+      setEditing(false)
       await load()
     } finally {
       setSaving(false)
     }
   }
 
-  async function setFlag(unit: ProductUnit, flag: 'is_base' | 'is_sell_default' | 'is_purchase_default') {
-    const res = await fetch(`${baseUrl}/${unit.id}`, {
-      method: 'PATCH',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [flag]: true }),
-    })
-    if (!res.ok) { const d = await res.json(); showToast(d.error || 'Failed to update', 'error'); return }
-    await load()
-  }
+  if (loading) return <div className="text-xs text-foreground-muted py-3">Loading…</div>
 
-  async function deleteUnit(u: ProductUnit) {
-    if (u.is_base) { showToast('Set another unit as base before deleting this one', 'info'); return }
-    const ok = await showConfirm({
-      title: 'Delete unit',
-      message: `Delete the "${u.unit}" unit and any rules attached to it?`,
-      confirmLabel: 'Delete',
-      variant: 'danger',
-    })
-    if (!ok) return
-    const res = await fetch(`${baseUrl}/${u.id}`, { method: 'DELETE', credentials: 'include' })
-    if (!res.ok) { const d = await res.json(); showToast((await res.json()).error || 'Failed to delete', 'error'); return }
-    await load()
-  }
-
-  if (loading) return <div className="text-xs text-foreground-muted py-3">Loading units…</div>
-
-  // Unit name suggestions for the picker
-  const dimUnitsForDropdown = UNITS[dimension] || []
+  const dimUnits = UNITS[draftDimension] || []
 
   return (
     <div className="border-t border-border-default pt-4 mt-4 space-y-3">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-center justify-between">
         <h4 className="text-xs font-bold uppercase tracking-wide text-foreground-secondary flex items-center gap-2">
-          {isVariantScope ? 'Variant Units' : 'Selling Units'}
+          {isVariantScope ? 'Variant Unit' : 'Selling Unit'}
           {isVariantScope && inherited && (
-            <span className="text-[10px] font-normal normal-case bg-surface-secondary border border-border-default text-foreground-muted px-2 py-0.5 rounded-full">inherited from product</span>
+            <span className="text-[10px] font-normal normal-case bg-surface-secondary border border-border-default text-foreground-muted px-2 py-0.5 rounded-full">
+              inherited from product
+            </span>
           )}
         </h4>
-        <span className="text-[10px] text-foreground-muted">
-          {isVariantScope
-            ? inherited
-              ? 'Add a unit below to override for this variant.'
-              : 'Variant-specific units — override product-level.'
-            : 'Stock + base price live in the BASE unit. Other units convert via factor.'}
-        </span>
+        {!editing && (
+          <span className="text-[10px] text-foreground-muted">
+            {isVariantScope
+              ? inherited ? 'Click Override to set a variant-specific unit.' : 'Variant-specific unit.'
+              : 'The unit stock and base price are measured in.'}
+          </span>
+        )}
       </div>
 
-      {units.length === 0 ? (
-        <p className="text-xs text-foreground-muted italic">
-          {isVariantScope
-            ? 'No variant-specific units. This variant uses the product-level units above.'
-            : 'No units configured.'}
-        </p>
-      ) : (
-        <div className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
-          <table className="w-full text-xs">
-            <thead className="bg-surface-secondary text-[10px] uppercase tracking-wide text-foreground-muted">
-              <tr>
-                <th className="px-3 py-2 text-left">Unit</th>
-                <th className="px-3 py-2 text-left">Dim.</th>
-                <th className="px-3 py-2 text-right">Factor</th>
-                <th className="px-3 py-2 text-left">How it converts</th>
-                <th className="px-3 py-2 text-center">Base</th>
-                <th className="px-3 py-2 text-center">Sell def.</th>
-                <th className="px-3 py-2 text-center">Buy def.</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {units.map(u => (
-                <tr key={u.id} className="hover:bg-surface-secondary/40">
-                  <td className="px-3 py-2 font-medium text-foreground">
-                    {u.unit}
-                    {u.display_label && <p className="text-[10px] text-foreground-muted mt-0.5">{u.display_label}</p>}
-                  </td>
-                  <td className="px-3 py-2 text-foreground-muted text-[11px] capitalize">{u.dimension}</td>
-                  <td className="px-3 py-2 text-right text-foreground-secondary">
-                    {Number(u.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })}
-                  </td>
-                  <td className="px-3 py-2 text-[11px] text-foreground-muted">
-                    {describeMeta(u, baseUnit)}
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    {u.is_base
-                      ? <span className="text-[10px] font-bold text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded-full">BASE</span>
-                      : !inherited && <button type="button" onClick={() => setFlag(u, 'is_base')} className="text-[10px] text-accent-600 hover:underline">make base</button>}
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    {u.is_sell_default
-                      ? <span className="text-[10px] font-bold text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full">DEFAULT</span>
-                      : !inherited && <button type="button" onClick={() => setFlag(u, 'is_sell_default')} className="text-[10px] text-accent-600 hover:underline">set</button>}
-                  </td>
-                  <td className="px-3 py-2 text-center">
-                    {u.is_purchase_default
-                      ? <span className="text-[10px] font-bold text-purple-700 bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 px-2 py-0.5 rounded-full">DEFAULT</span>
-                      : !inherited && <button type="button" onClick={() => setFlag(u, 'is_purchase_default')} className="text-[10px] text-accent-600 hover:underline">set</button>}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {!u.is_base && !inherited && (
-                      <button type="button" onClick={() => deleteUnit(u)} className="text-[10px] text-red-500 hover:text-red-600">Delete</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Add unit */}
-      <div className="bg-surface border border-border-default rounded-lg p-3 space-y-2">
-        <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Add a unit</p>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
-          <div>
-            <label className="block text-[10px] text-foreground-muted mb-0.5">Dimension</label>
-            <AdminSelect
-              value={dimension}
-              onChange={(v) => setDimension(v as Dimension)}
-              options={ALL_DIMENSIONS.map(d => ({ value: d, label: DIMENSION_LABEL[d] }))}
-              sm
-            />
+      {!editing ? (
+        unit ? (
+          <div className="flex items-center justify-between bg-surface-elevated border border-border-default rounded-lg px-4 py-3">
+            <div>
+              <span className="text-sm font-semibold text-foreground">{unit.unit}</span>
+              <span className="ml-2 text-[11px] text-foreground-muted capitalize">{unit.dimension}</span>
+              {unit.display_label && (
+                <span className="ml-2 text-[11px] text-foreground-muted">· {unit.display_label}</span>
+              )}
+              <span className="ml-2 text-[10px] font-bold text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded-full">BASE</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => openEdit(inherited ? undefined : unit)}
+              className="text-xs text-accent-600 hover:underline"
+            >
+              {inherited ? 'Override' : 'Edit'}
+            </button>
           </div>
+        ) : (
+          <div className="flex items-center justify-between bg-surface border border-dashed border-border-default rounded-lg px-4 py-3">
+            <span className="text-xs text-foreground-muted italic">No unit set</span>
+            <button type="button" onClick={() => openEdit()} className="text-xs text-accent-600 hover:underline">
+              Set unit
+            </button>
+          </div>
+        )
+      ) : (
+        <div className="bg-surface border border-border-default rounded-lg p-3 space-y-3">
+          <p className="text-[10px] uppercase tracking-wide text-foreground-muted">
+            {unit && !inherited ? 'Edit unit' : isVariantScope ? 'Override unit for this variant' : 'Set unit'}
+          </p>
 
-          {mode === 'simple' && (
-            <>
-              <div>
-                <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
-                {dimUnitsForDropdown.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div>
+              <label className="block text-[10px] text-foreground-muted mb-0.5">Dimension</label>
+              <AdminSelect
+                value={draftDimension}
+                onChange={(v) => {
+                  setDraftDimension(v as Dimension)
+                  setDraftUnit('')
+                }}
+                options={ALL_DIMENSIONS.map(d => ({ value: d, label: DIMENSION_LABEL[d] }))}
+                sm
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
+              {dimUnits.length > 0 ? (
+                <>
                   <AdminSelect
-                    value={unitKey}
-                    onChange={(v) => {
-                      setUnitKey(v)
-                      if (v && v !== '__custom') {
-                        const def = dimUnitsForDropdown.find(u => u.key === v)
-                        if (def?.multiplier) setFactor(String(def.multiplier))
-                      }
-                    }}
+                    value={dimUnits.some(u => u.key === draftUnit) ? draftUnit : (draftUnit ? '__custom' : '')}
+                    onChange={(v) => setDraftUnit(v === '__custom' ? '' : v)}
                     placeholder="— pick —"
                     options={[
-                      ...dimUnitsForDropdown.map(u => ({ value: u.key, label: u.label })),
+                      ...dimUnits.map(u => ({ value: u.key, label: u.label })),
                       { value: '__custom', label: 'Custom…' },
                     ]}
                     sm
                   />
-                ) : (
-                  <input value={unitKey} onChange={e => setUnitKey(e.target.value)} className={inputCls} placeholder="e.g. bundle" />
-                )}
-                {unitKey === '__custom' && (
-                  <input className={`${inputCls} mt-1`} placeholder="custom name" onChange={e => setUnitKey(e.target.value)} />
-                )}
-              </div>
-              <div>
-                <label className="block text-[10px] text-foreground-muted mb-0.5">
-                  Factor * <span className="text-foreground-muted">(1 {unitKey || dimension} = N {baseUnit?.unit || 'base'})</span>
-                </label>
-                <input type="number" step="0.0001" min="0.0001" value={factor} onChange={e => setFactor(e.target.value)} className={inputCls} placeholder="100" />
-              </div>
-            </>
-          )}
-
-          {mode === 'same_dim' && (
-            <>
-              <div>
-                <label className="block text-[10px] text-foreground-muted mb-0.5">Unit *</label>
-                <AdminSelect
-                  value={unitKey}
-                  onChange={setUnitKey}
-                  placeholder="— pick —"
-                  options={dimUnitsForDropdown.map(u => ({ value: u.key, label: u.label }))}
-                  sm
+                  {!dimUnits.some(u => u.key === draftUnit) && (
+                    <input
+                      value={draftUnit}
+                      onChange={e => setDraftUnit(e.target.value)}
+                      className={`${inputCls} mt-1`}
+                      placeholder="custom unit name"
+                    />
+                  )}
+                </>
+              ) : (
+                <input
+                  value={draftUnit}
+                  onChange={e => setDraftUnit(e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. roll, bundle"
                 />
-              </div>
-              <div>
-                <label className="block text-[10px] text-foreground-muted mb-0.5">Factor (auto)</label>
-                <input readOnly value={computedFactor != null ? computedFactor.toFixed(6) : ''} className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder={baseUnit ? `1 ${unitKey || '?'} = ? ${baseUnit.unit}` : ''} />
-              </div>
-            </>
-          )}
-
-          {mode === 'area' && (
-            <>
-              <div>
-                <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
-                <input value={unitKey} onChange={e => setUnitKey(e.target.value)} className={inputCls} placeholder="sheet, panel" />
-              </div>
-              <div className="col-span-2 grid grid-cols-3 gap-1.5">
-                <div>
-                  <label className="block text-[10px] text-foreground-muted mb-0.5">Length</label>
-                  <input type="number" step="0.01" value={areaLength} onChange={e => setAreaLength(e.target.value)} className={inputCls} placeholder="4" />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-foreground-muted mb-0.5">Width</label>
-                  <input type="number" step="0.01" value={areaWidth} onChange={e => setAreaWidth(e.target.value)} className={inputCls} placeholder="8" />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-foreground-muted mb-0.5">In</label>
-                  <AdminSelect
-                    value={areaDimUnit}
-                    onChange={setAreaDimUnit}
-                    options={UNITS.length.map(u => ({ value: u.key, label: u.label }))}
-                    sm
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          {mode === 'volume' && (
-            <>
-              <div>
-                <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
-                <input value={unitKey} onChange={e => setUnitKey(e.target.value)} className={inputCls} placeholder="tin, drum, can" />
-              </div>
-              <div className="col-span-2 grid grid-cols-4 gap-1.5">
-                <div>
-                  <label className="block text-[10px] text-foreground-muted mb-0.5">L</label>
-                  <input type="number" step="0.01" value={volLength} onChange={e => setVolLength(e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-foreground-muted mb-0.5">W</label>
-                  <input type="number" step="0.01" value={volWidth} onChange={e => setVolWidth(e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-foreground-muted mb-0.5">H</label>
-                  <input type="number" step="0.01" value={volHeight} onChange={e => setVolHeight(e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-foreground-muted mb-0.5">In</label>
-                  <AdminSelect
-                    value={volDimUnit}
-                    onChange={setVolDimUnit}
-                    options={UNITS.length.map(u => ({ value: u.key, label: u.label }))}
-                    sm
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {(mode === 'area' || mode === 'volume' || mode === 'same_dim') && computedFactor != null && (
-          <p className="text-[11px] text-foreground-muted">
-            → 1 {unitKey || 'unit'} = <span className="font-mono font-semibold text-foreground">{computedFactor.toFixed(4)}</span> {baseUnit?.unit || 'base'}
-          </p>
-        )}
-
-        <div>
-            <label className="block text-[10px] text-foreground-muted mb-0.5">Label (UI)</label>
-            <input value={unitLabel} onChange={e => setUnitLabel(e.target.value)} className={inputCls} placeholder="e.g. Sheet 4'×8'" />
+              )}
+            </div>
+            <div>
+              <label className="block text-[10px] text-foreground-muted mb-0.5">Label (UI)</label>
+              <input
+                value={draftLabel}
+                onChange={e => setDraftLabel(e.target.value)}
+                className={inputCls}
+                placeholder="e.g. Sheet 4'×8'"
+              />
+            </div>
           </div>
 
-        <div className="flex justify-end">
-          <button type="button" onClick={handleAdd} disabled={saving} className="px-3 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50">
-            {saving ? 'Saving…' : '+ Add Unit'}
-          </button>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="px-3 py-1.5 text-xs text-foreground-muted hover:text-foreground border border-border-secondary rounded"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
-}
-
-function describeMeta(u: ProductUnit, baseUnit?: ProductUnit): string {
-  if (u.is_base) return '— base —'
-  const m = u.conversion_meta
-  if (!m) return `× ${Number(u.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })}`
-  if (m.type === 'area') return `${m.length} × ${m.width} ${m.dim_unit}`
-  if (m.type === 'volume') return `${m.length} × ${m.width} × ${m.height} ${m.dim_unit}`
-  if (m.type === 'same_dim') return `1 ${u.unit} = ${Number(u.factor).toFixed(4)} ${baseUnit?.unit || 'base'}`
-  return `1 ${u.unit} = ${Number(u.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })} ${baseUnit?.unit || 'base'}`
 }
