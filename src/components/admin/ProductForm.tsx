@@ -482,13 +482,6 @@ export default function ProductForm({ categories, brands, action, product, produ
     }).filter(Boolean) as VariantRow[])
   }
 
-  function updateGroupUnit(pricing_type: string, unit: string) {
-    setGroups(groups.map(g => g.pricing_type === pricing_type ? { ...g, unit } : g))
-    setVariants(variants.map(v =>
-      v.pricing_type === pricing_type && !v._isDeleted ? { ...v, unit, variant_name: buildVariantName(v.numeric_value, unit, pricing_type) } : v
-    ))
-  }
-
   function updateGroupVariantType(pricing_type: string, variant_type: string) {
     setGroups(groups.map(g => g.pricing_type === pricing_type ? { ...g, variant_type } : g))
   }
@@ -1386,48 +1379,20 @@ export default function ProductForm({ categories, brands, action, product, produ
                 {groups.map((group) => {
                   const groupVariants = variants.filter(v => v.pricing_type === group.pricing_type && !v._isDeleted)
                   const allGroupVariants = variants.filter(v => v.pricing_type === group.pricing_type)
-                  const unitOptions = getUnitOptions(group.pricing_type)
 
                   return (
                     <div key={group.pricing_type} className="border border-border-default rounded-lg overflow-hidden">
                       {/* Group header */}
                       <div className="flex items-center justify-between px-4 py-3 bg-surface-secondary border-b border-border-default">
                         <div className="flex items-center gap-3">
-                          <span className="text-sm font-semibold text-foreground">
-                            By Piece / Unit
-                          </span>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-foreground-muted">Unit:</span>
-                            <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const idx = unitOptions.indexOf(group.unit)
-                                  updateGroupUnit(group.pricing_type, unitOptions[(idx - 1 + unitOptions.length) % unitOptions.length])
-                                }}
-                                className="px-2 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none"
-                              >‹</button>
-                              <span className="px-2 py-1.5 text-sm font-medium text-foreground min-w-[2.5rem] text-center border-x border-border-secondary">
-                                {group.unit}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const idx = unitOptions.indexOf(group.unit)
-                                  updateGroupUnit(group.pricing_type, unitOptions[(idx + 1) % unitOptions.length])
-                                }}
-                                className="px-2 py-1.5 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none"
-                              >›</button>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-foreground-muted">Label:</span>
+                            <span className="text-xs text-foreground-muted">Differentiator:</span>
                             <input
                               type="text"
                               value={group.variant_type}
                               onChange={(e) => updateGroupVariantType(group.pricing_type, e.target.value)}
-                              className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 focus:border-transparent w-28"
-                              placeholder="e.g. Size, Pack"
+                              className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 focus:border-transparent w-36"
+                              placeholder="e.g. Size, Pack, Colour"
                             />
                           </div>
                         </div>
