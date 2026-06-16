@@ -2056,6 +2056,41 @@ export default function ProductForm({ categories, brands, action, product, produ
         </div>
       </div>
 
+      {/* Selling Units (per saved variant) */}
+      {productId && variants.some(v => v.id && !v._isDeleted && !v.id.startsWith('temp-')) && (
+        <div className="px-4 sm:px-6 py-4 border-t border-border-default">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Selling Units &amp; Conversions</h3>
+          <p className="text-xs text-foreground-muted mb-4">
+            Configure alternate units (e.g. box of 100, sheet of 4'×8', tin of 5 L). The pricing engine
+            multiplies the variant's base price by the factor automatically. Stock always lives in the BASE unit.
+          </p>
+          <div className="space-y-5">
+            {variants
+              .filter(v => v.id && !v._isDeleted && !v.id.startsWith('temp-'))
+              .map(v => (
+                <details key={v.id} className="group bg-surface-elevated border border-border-default rounded-lg" open>
+                  <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/40 transition-colors">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <svg className="w-4 h-4 text-foreground-muted shrink-0 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      <span className="text-sm font-medium text-foreground truncate">
+                        {v.variant_name || v.unit || 'Variant'}
+                      </span>
+                      <span className="text-[11px] text-foreground-muted">— current base: <code className="font-mono">{v.unit || 'pc'}</code></span>
+                    </div>
+                  </summary>
+                  <div className="px-4 pb-4">
+                    <UnitsManager
+                      productId={productId}
+                      variantId={v.id!}
+                      baseUnitName={v.unit || undefined}
+                    />
+                  </div>
+                </details>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Form Actions */}
       <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
         <Link
