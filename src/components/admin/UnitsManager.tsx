@@ -32,6 +32,7 @@ interface Props {
 }
 
 const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]"
+const lockedCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface-secondary text-foreground-muted text-sm w-full h-[34px] cursor-not-allowed select-none"
 
 export default function UnitsManager({ productId, variantId }: Props) {
   const { showToast } = useToast()
@@ -46,10 +47,10 @@ export default function UnitsManager({ productId, variantId }: Props) {
     : `/api/admin/products/${productId}/units`
   const isVariantScope = !!variantId
 
-  // Edit / create draft
   const [draftUnit, setDraftUnit] = useState('')
   const [draftDimension, setDraftDimension] = useState<Dimension>('count')
   const [draftLabel, setDraftLabel] = useState('')
+  const [draftFactor, setDraftFactor] = useState('')
 
   async function load() {
     setLoading(true)
@@ -73,17 +74,48 @@ export default function UnitsManager({ productId, variantId }: Props) {
       setDraftUnit(u.unit)
       setDraftDimension(u.dimension)
       setDraftLabel(u.display_label || '')
+      setDraftFactor(String(u.factor))
     } else {
       setDraftUnit('')
       setDraftDimension('count')
       setDraftLabel('')
+      setDraftFactor('')
     }
     setEditing(true)
+  }
+
+  // When unit selection changes, auto-fill factor for predefined units
+  function handleUnitChange(v: string) {
+    if (v === '__custom') {
+      setDraftUnit('')
+      setDraftFactor('')
+      return
+    }
+    setDraftUnit(v)
+    const def = (UNITS[draftDimension] || []).find(u => u.key === v)
+    if (def?.multiplier != null) {
+      setDraftFactor(String(def.multiplier))
+    } else {
+      setDraftFactor('')
+    }
+  }
+
+  // When dimension changes, reset unit + factor
+  function handleDimensionChange(v: string) {
+    setDraftDimension(v as Dimension)
+    setDraftUnit('')
+    setDraftFactor('')
   }
 
   async function handleSave() {
     const key = draftUnit.trim()
     if (!key) { showToast('Unit name is required', 'error'); return }
+
+    const factorNum = parseFloat(draftFactor)
+    if (!Number.isFinite(factorNum) || factorNum <= 0) {
+      showToast('Enter a valid factor (e.g. 12 for dozen)', 'error')
+      return
+    }
 
     setSaving(true)
     try {
@@ -94,6 +126,7 @@ export default function UnitsManager({ productId, variantId }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             unit: key,
+            factor: factorNum,
             dimension: draftDimension,
             display_label: draftLabel || null,
           }),
@@ -107,7 +140,7 @@ export default function UnitsManager({ productId, variantId }: Props) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             unit: key,
-            factor: 1,
+            factor: factorNum,
             dimension: draftDimension,
             display_label: draftLabel || null,
             is_base: true,
@@ -128,6 +161,9 @@ export default function UnitsManager({ productId, variantId }: Props) {
   if (loading) return <div className="text-xs text-foreground-muted py-3">Loading…</div>
 
   const dimUnits = UNITS[draftDimension] || []
+  const selectedDef = dimUnits.find(u => u.key === draftUnit)
+  const isPredefined = selectedDef?.multiplier != null
+  const isCustomName = draftUnit !== '' && !dimUnits.some(u => u.key === draftUnit)
 
   return (
     <div className="border-t border-border-default pt-4 mt-4 space-y-3">
@@ -152,13 +188,16 @@ export default function UnitsManager({ productId, variantId }: Props) {
       {!editing ? (
         unit ? (
           <div className="flex items-center justify-between bg-surface-elevated border border-border-default rounded-lg px-4 py-3">
-            <div>
+            <div className="flex items-center gap-3">
               <span className="text-sm font-semibold text-foreground">{unit.unit}</span>
-              <span className="ml-2 text-[11px] text-foreground-muted capitalize">{unit.dimension}</span>
-              {unit.display_label && (
-                <span className="ml-2 text-[11px] text-foreground-muted">· {unit.display_label}</span>
+              <span className="text-[11px] text-foreground-muted capitalize">{unit.dimension}</span>
+              {Number(unit.factor) !== 1 && (
+                <span className="text-[11px] text-foreground-muted">× {Number(unit.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })}</span>
               )}
-              <span className="ml-2 text-[10px] font-bold text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded-full">BASE</span>
+              {unit.display_label && (
+                <span className="text-[11px] text-foreground-muted">· {unit.display_label}</span>
+              )}
+              <span className="text-[10px] font-bold text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded-full">BASE</span>
             </div>
             <button
               type="button"
@@ -182,26 +221,24 @@ export default function UnitsManager({ productId, variantId }: Props) {
             {unit && !inherited ? 'Edit unit' : isVariantScope ? 'Override unit for this variant' : 'Set unit'}
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
             <div>
               <label className="block text-[10px] text-foreground-muted mb-0.5">Dimension</label>
               <AdminSelect
                 value={draftDimension}
-                onChange={(v) => {
-                  setDraftDimension(v as Dimension)
-                  setDraftUnit('')
-                }}
+                onChange={handleDimensionChange}
                 options={ALL_DIMENSIONS.map(d => ({ value: d, label: DIMENSION_LABEL[d] }))}
                 sm
               />
             </div>
+
             <div>
               <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
               {dimUnits.length > 0 ? (
                 <>
                   <AdminSelect
-                    value={dimUnits.some(u => u.key === draftUnit) ? draftUnit : (draftUnit ? '__custom' : '')}
-                    onChange={(v) => setDraftUnit(v === '__custom' ? '' : v)}
+                    value={isCustomName ? '__custom' : draftUnit}
+                    onChange={handleUnitChange}
                     placeholder="— pick —"
                     options={[
                       ...dimUnits.map(u => ({ value: u.key, label: u.label })),
@@ -209,12 +246,13 @@ export default function UnitsManager({ productId, variantId }: Props) {
                     ]}
                     sm
                   />
-                  {!dimUnits.some(u => u.key === draftUnit) && (
+                  {isCustomName && (
                     <input
                       value={draftUnit}
                       onChange={e => setDraftUnit(e.target.value)}
                       className={`${inputCls} mt-1`}
                       placeholder="custom unit name"
+                      autoFocus
                     />
                   )}
                 </>
@@ -227,13 +265,36 @@ export default function UnitsManager({ productId, variantId }: Props) {
                 />
               )}
             </div>
+
+            <div>
+              <label className="block text-[10px] text-foreground-muted mb-0.5">
+                {isPredefined ? 'Units per pc (locked)' : 'Units per pc *'}
+              </label>
+              {isPredefined ? (
+                <div className={lockedCls} title="Predefined — value is fixed">
+                  <span className="text-foreground font-mono">{draftFactor}</span>
+                  <span className="ml-1 text-[10px]">🔒</span>
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0.0001"
+                  value={draftFactor}
+                  onChange={e => setDraftFactor(e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. 12"
+                />
+              )}
+            </div>
+
             <div>
               <label className="block text-[10px] text-foreground-muted mb-0.5">Label (UI)</label>
               <input
                 value={draftLabel}
                 onChange={e => setDraftLabel(e.target.value)}
                 className={inputCls}
-                placeholder="e.g. Sheet 4'×8'"
+                placeholder="e.g. Box of 12"
               />
             </div>
           </div>
