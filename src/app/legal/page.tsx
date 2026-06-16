@@ -50,25 +50,37 @@ export default function LegalIndexPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {policies.map((policy) => (
-            <Link
+            <div
               key={policy.slug}
-              href={`/legal/${policy.slug}`}
-              className="group bg-surface-elevated rounded-xl border border-border-default p-5 hover:border-primary-400 hover:shadow-md transition-all duration-200 flex gap-4 items-start"
+              className="group bg-surface-elevated rounded-xl border border-border-default hover:border-primary-400 hover:shadow-md transition-all duration-200 flex gap-3 items-start"
             >
-              <div className="w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center shrink-0 group-hover:bg-primary-100 transition-colors">
-                <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {icons[policy.slug] ?? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
+              <Link
+                href={`/legal/${policy.slug}`}
+                className="flex-1 flex gap-4 items-start p-5 min-w-0"
+              >
+                <div className="w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center shrink-0 group-hover:bg-primary-100 transition-colors">
+                  <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {icons[policy.slug] ?? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-bold text-foreground text-sm group-hover:text-primary-600 transition-colors">{policy.title}</h2>
+                  <p className="text-xs text-foreground-secondary mt-0.5 leading-relaxed line-clamp-2">{policy.description}</p>
+                  <p className="text-xs text-foreground-muted mt-2">Updated {policy.lastUpdated}</p>
+                </div>
+              </Link>
+              <a
+                href={`/api/legal/${policy.slug}/pdf`}
+                download={`jeffistores-${policy.slug}.pdf`}
+                title="Download PDF"
+                aria-label={`Download ${policy.title} as PDF`}
+                className="shrink-0 self-stretch flex items-center justify-center px-3 border-l border-border-default text-foreground-muted hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-colors rounded-r-xl"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
                 </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="font-bold text-foreground text-sm group-hover:text-primary-600 transition-colors">{policy.title}</h2>
-                <p className="text-xs text-foreground-secondary mt-0.5 leading-relaxed line-clamp-2">{policy.description}</p>
-                <p className="text-xs text-foreground-muted mt-2">Updated {policy.lastUpdated}</p>
-              </div>
-              <svg className="w-4 h-4 text-foreground-muted group-hover:text-primary-500 transition-colors shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+              </a>
+            </div>
           ))}
         </div>
 
