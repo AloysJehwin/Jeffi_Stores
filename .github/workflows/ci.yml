@@ -419,6 +419,7 @@ jobs:
               cascade_shelf_stock_on_variant_delete.sql
               cascade_variant_fk_history_tables.sql
               add_dimension_to_product_units.sql
+              product_level_units.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')

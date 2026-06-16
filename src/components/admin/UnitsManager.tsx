@@ -41,7 +41,6 @@ interface UnitRule {
 
 interface Props {
   productId: string
-  variantId: string
   baseUnitName?: string
 }
 
@@ -49,7 +48,7 @@ type Mode = 'simple' | 'area' | 'volume' | 'same_dim'
 
 const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-xs focus:ring-1 focus:ring-accent-500 w-full"
 
-export default function UnitsManager({ productId, variantId, baseUnitName }: Props) {
+export default function UnitsManager({ productId, baseUnitName }: Props) {
   const { showToast } = useToast()
   const showConfirm = useConfirm()
   const [units, setUnits] = useState<ProductUnit[]>([])
@@ -57,7 +56,7 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const baseUrl = `/api/admin/products/${productId}/variants/${variantId}/units`
+  const baseUrl = `/api/admin/products/${productId}/units`
 
   async function load() {
     setLoading(true)
@@ -73,7 +72,7 @@ export default function UnitsManager({ productId, variantId, baseUnitName }: Pro
     }
   }
 
-  useEffect(() => { load() }, [productId, variantId])
+  useEffect(() => { load() }, [productId])
 
   const baseUnit = units.find(u => u.is_base)
 
