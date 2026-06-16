@@ -1169,8 +1169,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                           const newPriceIncl = exToIncl(newPriceEx, gstRate)
                           return { ...vr, discount_pct: v,
                             price_ex_gst: newPriceEx, price: newPriceIncl,
-                            wholeprice_ex_gst: !vr.wholesaleLockSide ? newPriceEx : vr.wholeprice_ex_gst,
-                            wholeprice_incl: !vr.wholesaleLockSide ? newPriceIncl : vr.wholeprice_incl,
+                            wholeprice_ex_gst: !vr.wholesaleLockSide ? vr.mrp_ex_gst : vr.wholeprice_ex_gst,
+                            wholeprice_incl: !vr.wholesaleLockSide ? vr.mrp : vr.wholeprice_incl,
                           }
                         }
                         return { ...vr, discount_pct: v }
@@ -1677,7 +1677,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     const v = e.target.value
                                     const updated = [...variants]
                                     updated[index] = { ...updated[index], mrp_ex_gst: v }
-                                    updated[index].mrp = v ? exToIncl(v, gstRate) : ''
+                                    const newMrpIncl = v ? exToIncl(v, gstRate) : ''
+                                    updated[index].mrp = newMrpIncl
                                     const mrpExN = parseFloat(v)
                                     const disc = parseFloat(discountPct || '0')
                                     if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
@@ -1686,8 +1687,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       updated[index].price_ex_gst = newPriceEx
                                       updated[index].price = newPriceIncl
                                       if (!updated[index].wholesaleLockSide) {
-                                        updated[index].wholeprice_ex_gst = newPriceEx
-                                        updated[index].wholeprice_incl = newPriceIncl
+                                        updated[index].wholeprice_ex_gst = v
+                                        updated[index].wholeprice_incl = newMrpIncl
                                       }
                                     } else {
                                       updated[index].price_ex_gst = ''
@@ -1940,7 +1941,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       const v = e.target.value
                                       const updated = [...variants]
                                       updated[index] = { ...updated[index], mrp_ex_gst: v }
-                                      updated[index].mrp = v ? exToIncl(v, gstRate) : ''
+                                      const newMrpIncl = v ? exToIncl(v, gstRate) : ''
+                                      updated[index].mrp = newMrpIncl
                                       const mrpExN = parseFloat(v)
                                       const disc = parseFloat(discountPct || '0')
                                       if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
@@ -1949,8 +1951,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         updated[index].price_ex_gst = newPriceEx
                                         updated[index].price = newPriceIncl
                                         if (!updated[index].wholesaleLockSide) {
-                                          updated[index].wholeprice_ex_gst = newPriceEx
-                                          updated[index].wholeprice_incl = newPriceIncl
+                                          updated[index].wholeprice_ex_gst = v
+                                          updated[index].wholeprice_incl = newMrpIncl
                                         }
                                       } else {
                                         updated[index].price_ex_gst = ''; updated[index].price = ''
@@ -2135,7 +2137,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                         const v = e.target.value
                         const updated = [...variants]
                         updated[popupIndex] = { ...updated[popupIndex], mrp_ex_gst: v }
-                        updated[popupIndex].mrp = v ? exToIncl(v, gstRate) : ''
+                        const newMrpIncl = v ? exToIncl(v, gstRate) : ''
+                        updated[popupIndex].mrp = newMrpIncl
                         const mrpExN = parseFloat(v)
                         const disc = parseFloat(discountPct || '0')
                         if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
@@ -2144,8 +2147,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                           updated[popupIndex].price_ex_gst = newPriceEx
                           updated[popupIndex].price = newPriceIncl
                           if (!updated[popupIndex].wholesaleLockSide) {
-                            updated[popupIndex].wholeprice_ex_gst = newPriceEx
-                            updated[popupIndex].wholeprice_incl = newPriceIncl
+                            updated[popupIndex].wholeprice_ex_gst = v
+                            updated[popupIndex].wholeprice_incl = newMrpIncl
                           }
                         } else {
                           updated[popupIndex].price_ex_gst = ''; updated[popupIndex].price = ''
@@ -2554,8 +2557,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
                                       const newPriceIncl = exToIncl(newPriceEx, gstRate)
                                       setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: newPriceEx, price: newPriceIncl,
-                                        wholeprice_ex_gst: d.wholesaleManuallySet ? d.wholeprice_ex_gst : newPriceEx,
-                                        wholeprice_incl: d.wholesaleManuallySet ? d.wholeprice_incl : newPriceIncl,
+                                        wholeprice_ex_gst: d.wholesaleManuallySet ? d.wholeprice_ex_gst : v,
+                                        wholeprice_incl: d.wholesaleManuallySet ? d.wholeprice_incl : newMrpIncl,
                                       }))
                                     } else {
                                       setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: '', price: '',
@@ -2643,8 +2646,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
                                 const newPriceIncl = exToIncl(newPriceEx, gstRate)
                                 setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: newPriceEx, price: newPriceIncl,
-                                  wholeprice_ex_gst: d.wholesaleManuallySet ? d.wholeprice_ex_gst : newPriceEx,
-                                  wholeprice_incl: d.wholesaleManuallySet ? d.wholeprice_incl : newPriceIncl,
+                                  wholeprice_ex_gst: d.wholesaleManuallySet ? d.wholeprice_ex_gst : v,
+                                  wholeprice_incl: d.wholesaleManuallySet ? d.wholeprice_incl : newMrpIncl,
                                 } }))
                               } else {
                                 setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: '', price: '',
