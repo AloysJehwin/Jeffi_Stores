@@ -39,15 +39,9 @@ interface VariantRow {
   stock_quantity: string
   mpn: string
   gtin: string
-  pricing_type: 'unit' | 'weight' | 'length'
+  pricing_type: 'unit'
   unit: string
   numeric_value: string
-  weight_rate: string
-  weight_unit: string
-  weight_rate_on: boolean
-  length_rate: string
-  length_unit: string
-  length_rate_on: boolean
   weight_grams: string
   package_type: string
   length_cm: string
@@ -61,7 +55,7 @@ interface VariantRow {
 }
 
 interface VariantGroup {
-  pricing_type: 'unit' | 'weight' | 'length'
+  pricing_type: 'unit'
   unit: string
   variant_type: string
 }
@@ -74,8 +68,6 @@ interface ProductFormProps {
   productId?: string
 }
 
-const WEIGHT_UNITS = ['kg', 'g', 'lb', 'oz']
-const LENGTH_UNITS = ['m', 'cm', 'mm', 'ft', 'in']
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
 const PACKAGE_TYPES = ['flat_poly_auto', 'flat_poly_s', 'flat_poly_m', 'flat_poly_l', 'flat_poly_xl', 'drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
 const PACKAGE_TYPE_LABELS: Record<string, string> = {
@@ -90,15 +82,7 @@ const PACKAGE_TYPE_LABELS: Record<string, string> = {
   long_tube: 'Long Tube / Rod',
 }
 
-const PRICING_TYPE_LABELS: Record<string, string> = {
-  unit: 'By Piece / Unit',
-  weight: 'By Weight',
-  length: 'By Length',
-}
-
-function getUnitOptions(pricing_type: string) {
-  if (pricing_type === 'weight') return WEIGHT_UNITS
-  if (pricing_type === 'length') return LENGTH_UNITS
+function getUnitOptions(_pricing_type: string) {
   return UNIT_UNITS
 }
 
@@ -161,37 +145,16 @@ function generateSku(name: string, brandName: string): string {
 }
 
 
-function getPerUnitLabel(unit: string): string {
-  const map: Record<string, string> = {
-    kg: '/kg', g: '/100g', lb: '/lb', oz: '/oz',
-    m: '/m', cm: '/cm', mm: '/mm', ft: '/ft', in: '/in',
-  }
-  return map[unit] || `/${unit}`
-}
-
-function calcPerUnitRate(price: string, numeric_value: string, unit: string): string | null {
-  const p = parseFloat(price)
-  const n = parseFloat(numeric_value)
-  if (!p || !n || n === 0) return null
-  let rate = p / n
-  if (unit === 'g') rate = (p / n) * 100
-  return `₹${rate.toFixed(2)}${getPerUnitLabel(unit)}`
-}
-
-function defaultUnit(pricing_type: string): string {
-  if (pricing_type === 'weight') return 'kg'
-  if (pricing_type === 'length') return 'm'
+function defaultUnit(_pricing_type: string): string {
   return 'pcs'
 }
 
-function emptyVariant(pricing_type: 'unit' | 'weight' | 'length', unit: string): VariantRow {
+function emptyVariant(pricing_type: 'unit', unit: string): VariantRow {
   return {
     id: `temp-${Math.random().toString(36).slice(2, 11)}`,
     variant_name: '', price: '', mrp: '', mrp_ex_gst: '', price_ex_gst: '', wholeprice_ex_gst: '', wholeprice_incl: '', discount_pct: '',
     stock_quantity: '0', mpn: '', gtin: '',
     pricing_type, unit, numeric_value: '',
-    weight_rate: '', weight_unit: 'kg', weight_rate_on: false,
-    length_rate: '', length_unit: 'm', length_rate_on: false,
     weight_grams: '', package_type: '', length_cm: '', breadth_cm: '', height_cm: '',
     sub_variant_type: '', sub_variant_type_on: false,
     variant_type: '',
@@ -289,12 +252,6 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [subVariantEditId, setSubVariantEditId] = useState<string | null>(null)
   const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; wholeprice_ex_gst: string; discount_pct: string; wholesaleManuallySet: boolean; stock: string; sku: string } | null>(null)
   const [productPackageType, setProductPackageType] = useState<string>(product?.package_type || 'flat_poly_auto')
-  const [weightRate, setWeightRate] = useState(product?.weight_rate != null ? String(product.weight_rate) : '')
-  const [weightUnit, setWeightUnit] = useState(product?.weight_unit || 'kg')
-  const [weightEnabled, setWeightEnabled] = useState(product?.weight_rate != null && Number(product?.weight_rate) > 0)
-  const [lengthRate, setLengthRate] = useState(product?.length_rate != null ? String(product.length_rate) : '')
-  const [lengthUnit, setLengthUnit] = useState(product?.length_unit || 'm')
-  const [lengthEnabled, setLengthEnabled] = useState(product?.length_rate != null && Number(product?.length_rate) > 0)
   const [gstRate, setGstRate] = useState<number>(product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18)
 
   const [basePrice, setBasePrice] = useState(() => {
@@ -394,12 +351,6 @@ export default function ProductForm({ categories, brands, action, product, produ
         pricing_type: v.pricing_type || 'unit',
         unit: v.unit || 'pcs',
         numeric_value: v.numeric_value != null ? String(v.numeric_value) : '',
-        weight_rate: v.weight_rate != null ? String(v.weight_rate) : '',
-        weight_unit: v.weight_unit || 'kg',
-        weight_rate_on: v.weight_rate != null && Number(v.weight_rate) > 0,
-        length_rate: v.length_rate != null ? String(v.length_rate) : '',
-        length_unit: v.length_unit || 'm',
-        length_rate_on: v.length_rate != null && Number(v.length_rate) > 0,
         weight_grams: v.weight_grams != null ? String(v.weight_grams) : '',
         package_type: v.package_type || '',
         length_cm: v.length_cm != null ? String(v.length_cm) : '',
@@ -466,8 +417,6 @@ export default function ProductForm({ categories, brands, action, product, produ
         basePrice, mrp, mrpExGst, salePrice, wholesalePrice, wholesalePriceEx, costPrice,
         discountPct,
         topPriceLockSide, topMrpLockSide, topWholesaleLockSide,
-        weightRate, weightUnit, weightEnabled,
-        lengthRate, lengthUnit, lengthEnabled,
         gstRate, isActive,
       }
       localStorage.setItem(draftKey, JSON.stringify(snapshot))
@@ -478,8 +427,6 @@ export default function ProductForm({ categories, brands, action, product, produ
     hasVariants, variants, groups,
     basePrice, mrp, mrpExGst, salePrice, wholesalePrice, wholesalePriceEx, costPrice, discountPct,
     topPriceLockSide, topMrpLockSide, topWholesaleLockSide,
-    weightRate, weightUnit, weightEnabled,
-    lengthRate, lengthUnit, lengthEnabled,
     gstRate, isActive, draftKey,
   ])
 
@@ -509,12 +456,6 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (snap.topPriceLockSide !== undefined) setTopPriceLockSide(snap.topPriceLockSide)
       if (snap.topMrpLockSide !== undefined) setTopMrpLockSide(snap.topMrpLockSide)
       if (snap.topWholesaleLockSide !== undefined) setTopWholesaleLockSide(snap.topWholesaleLockSide)
-      if (snap.weightRate !== undefined) setWeightRate(snap.weightRate)
-      if (snap.weightUnit !== undefined) setWeightUnit(snap.weightUnit)
-      if (snap.weightEnabled !== undefined) setWeightEnabled(snap.weightEnabled)
-      if (snap.lengthRate !== undefined) setLengthRate(snap.lengthRate)
-      if (snap.lengthUnit !== undefined) setLengthUnit(snap.lengthUnit)
-      if (snap.lengthEnabled !== undefined) setLengthEnabled(snap.lengthEnabled)
       if (snap.gstRate !== undefined) setGstRate(snap.gstRate)
       if (snap.isActive !== undefined) setIsActive(snap.isActive)
     } catch {}
@@ -526,7 +467,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     window.location.reload()
   }
 
-  function addGroup(pricing_type: 'unit' | 'weight' | 'length') {
+  function addGroup(pricing_type: 'unit') {
     if (groups.find(g => g.pricing_type === pricing_type)) return
     const unit = defaultUnit(pricing_type)
     setGroups([...groups, { pricing_type, unit, variant_type: '' }])
@@ -558,7 +499,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     return `${numeric_value}${unit}`
   }
 
-  function addVariantToGroup(pricing_type: 'unit' | 'weight' | 'length', unit: string) {
+  function addVariantToGroup(pricing_type: 'unit', unit: string) {
     setVariants([...variants, emptyVariant(pricing_type, unit)])
   }
 
@@ -583,18 +524,6 @@ export default function ProductForm({ categories, brands, action, product, produ
         row.pricing_type
       )
     }
-    updated[index] = row
-    setVariants(updated)
-  }
-
-  function toggleVariantRate(index: number, rateType: 'weight' | 'length') {
-    const updated = [...variants]
-    const row = { ...updated[index] }
-    const onField = rateType === 'weight' ? 'weight_rate_on' : 'length_rate_on'
-    const rateField = rateType === 'weight' ? 'weight_rate' : 'length_rate'
-    const turningOff = row[onField]
-    row[onField] = !turningOff
-    if (turningOff) row[rateField] = ''
     updated[index] = row
     setVariants(updated)
   }
@@ -825,10 +754,6 @@ export default function ProductForm({ categories, brands, action, product, produ
       formData.append('existing_images_to_keep', JSON.stringify(existingImagesToKeep))
 
       formData.set('has_variants', hasVariants ? 'true' : 'false')
-      formData.set('weight_rate', weightEnabled ? weightRate : '')
-      formData.set('weight_unit', weightEnabled ? weightUnit : '')
-      formData.set('length_rate', lengthEnabled ? lengthRate : '')
-      formData.set('length_unit', lengthEnabled ? lengthUnit : '')
 
       if (!hasVariants) {
         formData.set('base_price', basePrice || '')
@@ -859,8 +784,6 @@ export default function ProductForm({ categories, brands, action, product, produ
             mrp_ex_gst: v.mrp_ex_gst,
             price_ex_gst: v.price_ex_gst || (v.price ? inclToEx(v.price, gstRate) : ''),
             wholeprice_ex_gst: v.wholeprice_ex_gst || (v.wholeprice_incl ? inclToEx(v.wholeprice_incl, gstRate) : ''),
-            weight_rate: v.weight_rate_on ? v.weight_rate : '',
-            length_rate: v.length_rate_on ? v.length_rate : '',
           }
         })
         formData.set('variants_json', JSON.stringify(convertedVariants))
@@ -1329,88 +1252,6 @@ export default function ProductForm({ categories, brands, action, product, produ
             </>
           )}
 
-          {/* Custom Quantity Selling — only for non-variant products */}
-          {!hasVariants && (
-          <div className="md:col-span-2 border border-border-default rounded-lg p-4 bg-surface-secondary">
-            <h3 className="text-sm font-semibold text-foreground mb-1">Custom Quantity Selling</h3>
-            <p className="text-xs text-foreground-muted mb-4">Enable if customers can buy any amount (e.g. 2.5 kg). Leave blank to disable a mode.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => { setWeightEnabled(!weightEnabled); if (weightEnabled) setWeightRate('') }}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${weightEnabled ? 'bg-accent-500' : 'bg-border-secondary'}`}
-                    role="switch"
-                    aria-checked={weightEnabled}
-                  >
-                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${weightEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                  </button>
-                  <label className="text-xs font-medium text-foreground-secondary">Rate per {weightUnit} / weight unit (Rs.)</label>
-                </div>
-                {weightEnabled && (
-                  <>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={weightRate}
-                        onChange={e => setWeightRate(e.target.value)}
-                        className="flex-1 px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                        placeholder="e.g. 200"
-                      />
-                      <AdminSelect
-                        value={weightUnit}
-                        onChange={setWeightUnit}
-                        options={['kg', 'g', 'lb', 'oz'].map(u => ({ value: u, label: u }))}
-                        className="w-24"
-                      />
-                    </div>
-                    {weightRate && <p className="text-xs text-accent-600 dark:text-accent-400 mt-1">₹{weightRate}/{weightUnit}</p>}
-                  </>
-                )}
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => { setLengthEnabled(!lengthEnabled); if (lengthEnabled) setLengthRate('') }}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${lengthEnabled ? 'bg-accent-500' : 'bg-border-secondary'}`}
-                    role="switch"
-                    aria-checked={lengthEnabled}
-                  >
-                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${lengthEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-                  </button>
-                  <label className="text-xs font-medium text-foreground-secondary">Rate per {lengthUnit} / length unit (Rs.)</label>
-                </div>
-                {lengthEnabled && (
-                  <>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={lengthRate}
-                        onChange={e => setLengthRate(e.target.value)}
-                        className="flex-1 px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                        placeholder="e.g. 50"
-                      />
-                      <AdminSelect
-                        value={lengthUnit}
-                        onChange={setLengthUnit}
-                        options={['m', 'cm', 'mm', 'ft', 'in'].map(u => ({ value: u, label: u }))}
-                        className="w-24"
-                      />
-                    </div>
-                    {lengthRate && <p className="text-xs text-accent-600 dark:text-accent-400 mt-1">₹{lengthRate}/{lengthUnit}</p>}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-          )}
-
           {/* Shipping Weight — only when no variants; per-variant weight is in the variant table */}
           {!hasVariants && (
           <div>
@@ -1546,7 +1387,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                   const groupVariants = variants.filter(v => v.pricing_type === group.pricing_type && !v._isDeleted)
                   const allGroupVariants = variants.filter(v => v.pricing_type === group.pricing_type)
                   const unitOptions = getUnitOptions(group.pricing_type)
-                  const isWeightOrLength = group.pricing_type !== 'unit'
 
                   return (
                     <div key={group.pricing_type} className="border border-border-default rounded-lg overflow-hidden">
@@ -1554,7 +1394,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       <div className="flex items-center justify-between px-4 py-3 bg-surface-secondary border-b border-border-default">
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-semibold text-foreground">
-                            {PRICING_TYPE_LABELS[group.pricing_type]}
+                            By Piece / Unit
                           </span>
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs text-foreground-muted">Unit:</span>
@@ -1597,12 +1437,12 @@ export default function ProductForm({ categories, brands, action, product, produ
                       <div className="md:hidden p-3 space-y-3">
                         {groupVariants.map((variant) => {
                           const index = variants.indexOf(variant)
-                          const perUnit = isWeightOrLength ? calcPerUnitRate(variant.price, variant.numeric_value, group.unit) : null
+                          const perUnit = null
                           return (
                             <div key={variant.id || index} className="border border-border-default rounded-lg p-3 space-y-3 bg-surface">
                               <div className="flex items-center justify-between">
                                 <span className="text-xs font-medium text-foreground-muted uppercase">
-                                  {isWeightOrLength ? `${group.pricing_type === 'weight' ? 'Weight' : 'Length'} Variant` : 'Variant'}
+                                  Variant
                                 </span>
                                 {groupVariants.length > 1 && (
                                   <button type="button" onClick={() => removeVariant(index)} className="text-red-500 hover:text-red-700 text-xs font-medium">
@@ -1611,49 +1451,17 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 )}
                               </div>
 
-                              {isWeightOrLength ? (
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-foreground-secondary mb-1">
-                                      Value ({group.unit}) *
-                                    </label>
-                                    <input
-                                      type="number"
-                                      step="any"
-                                      min="0"
-                                      value={variant.numeric_value}
-                                      onChange={(e) => updateVariant(index, 'numeric_value', e.target.value)}
-                                      className={inputCls}
-                                      placeholder="e.g. 500"
-                                      required
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-foreground-secondary mb-1">Variant Name</label>
-                                    <input
-                                      type="text"
-                                      value={variant.variant_name}
-                                      readOnly
-                                      className={`${inputCls} bg-surface-secondary cursor-default`}
-                                      placeholder="Auto-filled"
-                                    />
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Name *</label>
-                                  <input
-                                    type="text"
-                                    value={variant.variant_name}
-                                    onChange={(e) => updateVariant(index, 'variant_name', e.target.value)}
-                                    className={inputCls}
-                                    placeholder="e.g. Small, M8, Red"
-                                    required
-                                  />
-                                </div>
-</>
-                              )}
+                              <div>
+                                <label className="block text-xs font-medium text-foreground-secondary mb-1">Name *</label>
+                                <input
+                                  type="text"
+                                  value={variant.variant_name}
+                                  onChange={(e) => updateVariant(index, 'variant_name', e.target.value)}
+                                  className={inputCls}
+                                  placeholder="e.g. Small, M8, Red"
+                                  required
+                                />
+                              </div>
 
                               <div className="grid grid-cols-2 gap-3">
                                 {variant.sub_variant_type_on ? (
@@ -1790,48 +1598,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => toggleVariantRate(index, 'weight')}
-                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.weight_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
-                                    role="switch"
-                                    aria-checked={variant.weight_rate_on}
-                                  >
-                                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.weight_rate_on ? 'translate-x-4' : 'translate-x-0'}`} />
-                                  </button>
-                                  <span className="text-xs font-medium text-foreground-secondary">Also sell by weight</span>
-                                </div>
-                                {variant.weight_rate_on && (
-                                  <div className="flex items-center gap-2 pl-11">
-                                    <span className="text-xs text-foreground-muted">Rate (Rs.)</span>
-                                    <input type="number" step="0.01" min="0" value={variant.weight_rate} onChange={(e) => updateVariant(index, 'weight_rate', e.target.value)} className="w-24 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs" placeholder="e.g. 200" required />
-                                    <span className="text-xs text-foreground-muted">per</span>
-                                    <AdminSelect value={variant.weight_unit} onChange={(val) => updateVariant(index, 'weight_unit', val)} options={['kg','g','lb','oz'].map(u => ({ value: u, label: u }))} className="w-20" compact />
-                                    {variant.weight_rate && <span className="text-xs text-accent-600 dark:text-accent-400">₹{variant.weight_rate}/{variant.weight_unit}</span>}
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleVariantRate(index, 'length')}
-                                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${variant.length_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
-                                    role="switch"
-                                    aria-checked={variant.length_rate_on}
-                                  >
-                                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${variant.length_rate_on ? 'translate-x-4' : 'translate-x-0'}`} />
-                                  </button>
-                                  <span className="text-xs font-medium text-foreground-secondary">Also sell by length</span>
-                                </div>
-                                {variant.length_rate_on && (
-                                  <div className="flex items-center gap-2 pl-11">
-                                    <span className="text-xs text-foreground-muted">Rate (Rs.)</span>
-                                    <input type="number" step="0.01" min="0" value={variant.length_rate} onChange={(e) => updateVariant(index, 'length_rate', e.target.value)} className="w-24 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs" placeholder="e.g. 50" required />
-                                    <span className="text-xs text-foreground-muted">per</span>
-                                    <AdminSelect value={variant.length_unit} onChange={(val) => updateVariant(index, 'length_unit', val)} options={['m','cm','mm','ft','in'].map(u => ({ value: u, label: u }))} className="w-20" compact />
-                                    {variant.length_rate && <span className="text-xs text-accent-600 dark:text-accent-400">₹{variant.length_rate}/{variant.length_unit}</span>}
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
                                     onClick={() => {
                                       const updated = [...variants]
                                       const row = { ...updated[index] }
@@ -1897,7 +1663,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border-secondary bg-surface">
-                              {isWeightOrLength && <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Value ({group.unit}) *</th>}
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Name *</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">MRP (Ex. GST) *</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Disc %</th>
@@ -1913,22 +1678,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                           <tbody>
                             {groupVariants.map((variant) => {
                               const index = variants.indexOf(variant)
-                              const perUnit = isWeightOrLength ? calcPerUnitRate(variant.price, variant.numeric_value, group.unit) : null
+                              const perUnit = null
                               const isExpanded = false
                               return (
                                 <>
                                 <tr key={variant.id || index} className={`border-b border-border-default ${isExpanded ? 'bg-surface-secondary' : 'hover:bg-surface-secondary/40'}`}>
-                                  {isWeightOrLength && (
-                                    <td className="py-2 px-3">
-                                      <input type="number" step="any" min="0" value={variant.numeric_value} onChange={(e) => updateVariant(index, 'numeric_value', e.target.value)} className="w-24 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. 500" required />
-                                    </td>
-                                  )}
                                   <td className="py-2 px-3">
-                                    {isWeightOrLength ? (
-                                      <input type="text" value={variant.variant_name} readOnly className="w-24 px-2 py-1.5 border border-border-default rounded-lg bg-surface-secondary text-foreground-muted text-sm cursor-default" placeholder="Auto" />
-                                    ) : (
-                                      <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
-                                    )}
+                                    <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
                                   </td>
                                   {variant.sub_variant_type_on ? (
                                     <td className="py-2 px-3" colSpan={6}>
@@ -2040,7 +1796,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           onClick={() => addVariantToGroup(group.pricing_type, group.unit)}
                           className="px-3 py-1.5 text-xs font-medium text-accent-600 dark:text-accent-400 border border-accent-300 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors"
                         >
-                          + Add {PRICING_TYPE_LABELS[group.pricing_type]} Variant
+                          + Add Variant
                         </button>
                       </div>
                     </div>
@@ -2226,44 +1982,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                     </div>
                   </div>
                   )}
-                  {/* Rate toggles */}
+                  {/* Sub-variants toggle */}
                   <div className="space-y-2 pt-3">
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => toggleVariantRate(popupIndex, 'weight')} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.weight_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.weight_rate_on}>
-                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.weight_rate_on ? 'translate-x-4' : 'translate-x-0'}`} />
-                      </button>
-                      <span className="text-xs font-medium text-foreground-secondary">Also sell by weight</span>
-                    </div>
-                    {popupVariant.weight_rate_on && (
-                      <div className="flex items-center gap-2 pl-11">
-                        <span className="text-xs text-foreground-muted">Rate (₹)</span>
-                        <input type="number" step="0.01" min="0" value={popupVariant.weight_rate} onChange={(e) => updateVariant(popupIndex, 'weight_rate', e.target.value)} className="w-24 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 200" />
-                        <span className="text-xs text-foreground-muted">per</span>
-                        <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
-                          <button type="button" onClick={() => { const idx = WEIGHT_UNITS.indexOf(popupVariant.weight_unit || 'kg'); updateVariant(popupIndex, 'weight_unit', WEIGHT_UNITS[(idx - 1 + WEIGHT_UNITS.length) % WEIGHT_UNITS.length]) }} className="px-1.5 py-1 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
-                          <span className="px-1.5 py-1 text-xs font-medium text-foreground min-w-[2rem] text-center border-x border-border-secondary">{popupVariant.weight_unit || 'kg'}</span>
-                          <button type="button" onClick={() => { const idx = WEIGHT_UNITS.indexOf(popupVariant.weight_unit || 'kg'); updateVariant(popupIndex, 'weight_unit', WEIGHT_UNITS[(idx + 1) % WEIGHT_UNITS.length]) }} className="px-1.5 py-1 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => toggleVariantRate(popupIndex, 'length')} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.length_rate_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.length_rate_on}>
-                        <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.length_rate_on ? 'translate-x-4' : 'translate-x-0'}`} />
-                      </button>
-                      <span className="text-xs font-medium text-foreground-secondary">Also sell by length</span>
-                    </div>
-                    {popupVariant.length_rate_on && (
-                      <div className="flex items-center gap-2 pl-11">
-                        <span className="text-xs text-foreground-muted">Rate (₹)</span>
-                        <input type="number" step="0.01" min="0" value={popupVariant.length_rate} onChange={(e) => updateVariant(popupIndex, 'length_rate', e.target.value)} className="w-24 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 50" />
-                        <span className="text-xs text-foreground-muted">per</span>
-                        <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
-                          <button type="button" onClick={() => { const idx = LENGTH_UNITS.indexOf(popupVariant.length_unit || 'm'); updateVariant(popupIndex, 'length_unit', LENGTH_UNITS[(idx - 1 + LENGTH_UNITS.length) % LENGTH_UNITS.length]) }} className="px-1.5 py-1 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
-                          <span className="px-1.5 py-1 text-xs font-medium text-foreground min-w-[2rem] text-center border-x border-border-secondary">{popupVariant.length_unit || 'm'}</span>
-                          <button type="button" onClick={() => { const idx = LENGTH_UNITS.indexOf(popupVariant.length_unit || 'm'); updateVariant(popupIndex, 'length_unit', LENGTH_UNITS[(idx + 1) % LENGTH_UNITS.length]) }} className="px-1.5 py-1 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
-                        </div>
-                      </div>
-                    )}
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) { row.use_own_images = true; row.price = ''; row.price_ex_gst = ''; row.mrp = ''; row.mrp_ex_gst = ''; row.wholeprice_ex_gst = ''; row.wholeprice_incl = '' } updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
                         <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`} />

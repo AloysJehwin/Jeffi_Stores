@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import AdminSelect from '@/components/admin/AdminSelect'
+import Toggle from '@/components/ui/Toggle'
 import {
   ALL_DIMENSIONS,
   Dimension,
@@ -11,7 +13,6 @@ import {
   computeAreaFactor,
   computeVolumeFactor,
   sameDimensionFactor,
-  getUnitDef,
 } from '@/lib/units'
 
 interface ProductUnit {
@@ -46,7 +47,7 @@ interface Props {
 
 type Mode = 'simple' | 'area' | 'volume' | 'same_dim'
 
-const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-xs focus:ring-1 focus:ring-accent-500 w-full"
+const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]"
 
 export default function UnitsManager({ productId, baseUnitName }: Props) {
   const { showToast } = useToast()
@@ -289,9 +290,12 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
           <div>
             <label className="block text-[10px] text-foreground-muted mb-0.5">Dimension</label>
-            <select value={dimension} onChange={e => setDimension(e.target.value as Dimension)} className={inputCls}>
-              {ALL_DIMENSIONS.map(d => <option key={d} value={d}>{DIMENSION_LABEL[d]}</option>)}
-            </select>
+            <AdminSelect
+              value={dimension}
+              onChange={(v) => setDimension(v as Dimension)}
+              options={ALL_DIMENSIONS.map(d => ({ value: d, label: DIMENSION_LABEL[d] }))}
+              sm
+            />
           </div>
 
           {mode === 'simple' && (
@@ -299,11 +303,16 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
               <div>
                 <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
                 {dimUnitsForDropdown.length > 0 ? (
-                  <select value={unitKey} onChange={e => setUnitKey(e.target.value)} className={inputCls}>
-                    <option value="">— pick —</option>
-                    {dimUnitsForDropdown.map(u => <option key={u.key} value={u.key}>{u.label}</option>)}
-                    <option value="__custom">Custom…</option>
-                  </select>
+                  <AdminSelect
+                    value={unitKey}
+                    onChange={setUnitKey}
+                    placeholder="— pick —"
+                    options={[
+                      ...dimUnitsForDropdown.map(u => ({ value: u.key, label: u.label })),
+                      { value: '__custom', label: 'Custom…' },
+                    ]}
+                    sm
+                  />
                 ) : (
                   <input value={unitKey} onChange={e => setUnitKey(e.target.value)} className={inputCls} placeholder="e.g. bundle" />
                 )}
@@ -324,10 +333,13 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
             <>
               <div>
                 <label className="block text-[10px] text-foreground-muted mb-0.5">Unit *</label>
-                <select value={unitKey} onChange={e => setUnitKey(e.target.value)} className={inputCls}>
-                  <option value="">— pick —</option>
-                  {dimUnitsForDropdown.map(u => <option key={u.key} value={u.key}>{u.label}</option>)}
-                </select>
+                <AdminSelect
+                  value={unitKey}
+                  onChange={setUnitKey}
+                  placeholder="— pick —"
+                  options={dimUnitsForDropdown.map(u => ({ value: u.key, label: u.label }))}
+                  sm
+                />
               </div>
               <div>
                 <label className="block text-[10px] text-foreground-muted mb-0.5">Factor (auto)</label>
@@ -353,9 +365,12 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
                 </div>
                 <div>
                   <label className="block text-[10px] text-foreground-muted mb-0.5">In</label>
-                  <select value={areaDimUnit} onChange={e => setAreaDimUnit(e.target.value)} className={inputCls}>
-                    {UNITS.length.map(u => <option key={u.key} value={u.key}>{u.label}</option>)}
-                  </select>
+                  <AdminSelect
+                    value={areaDimUnit}
+                    onChange={setAreaDimUnit}
+                    options={UNITS.length.map(u => ({ value: u.key, label: u.label }))}
+                    sm
+                  />
                 </div>
               </div>
             </>
@@ -382,9 +397,12 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
                 </div>
                 <div>
                   <label className="block text-[10px] text-foreground-muted mb-0.5">In</label>
-                  <select value={volDimUnit} onChange={e => setVolDimUnit(e.target.value)} className={inputCls}>
-                    {UNITS.length.map(u => <option key={u.key} value={u.key}>{u.label}</option>)}
-                  </select>
+                  <AdminSelect
+                    value={volDimUnit}
+                    onChange={setVolDimUnit}
+                    options={UNITS.length.map(u => ({ value: u.key, label: u.label }))}
+                    sm
+                  />
                 </div>
               </div>
             </>
@@ -397,7 +415,7 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
           </p>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 items-end">
           <div>
             <label className="block text-[10px] text-foreground-muted mb-0.5">Label (UI)</label>
             <input value={unitLabel} onChange={e => setUnitLabel(e.target.value)} className={inputCls} placeholder="e.g. Sheet 4'×8'" />
@@ -406,14 +424,10 @@ export default function UnitsManager({ productId, baseUnitName }: Props) {
             <label className="block text-[10px] text-foreground-muted mb-0.5">Price override</label>
             <input type="number" step="0.01" value={priceOverride} onChange={e => setPriceOverride(e.target.value)} className={inputCls} placeholder="optional" />
           </div>
-          <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-foreground-secondary">
-            <input type="checkbox" checked={isSellDefault} onChange={e => setIsSellDefault(e.target.checked)} />
-            Sell default
-          </label>
-          <label className="inline-flex items-center gap-1.5 cursor-pointer text-[11px] text-foreground-secondary">
-            <input type="checkbox" checked={isPurchaseDefault} onChange={e => setIsPurchaseDefault(e.target.checked)} />
-            Purchase default
-          </label>
+          <div className="flex items-center gap-4 pb-1.5">
+            <Toggle checked={isSellDefault} onChange={setIsSellDefault} label="Sell default" size="sm" />
+            <Toggle checked={isPurchaseDefault} onChange={setIsPurchaseDefault} label="Purchase default" size="sm" />
+          </div>
         </div>
 
         <div className="flex justify-end">

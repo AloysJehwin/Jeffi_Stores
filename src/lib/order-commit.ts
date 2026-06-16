@@ -57,8 +57,7 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
 }
 
 export function cartLineUnitPrice(item: CartLine): number {
-  const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-  if (isCustomQty) return Number(item.price_at_addition)
+  // Legacy weight/length sales removed — new orders are always 'unit'.
   return Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
 }
 
@@ -100,24 +99,23 @@ export async function resolveBuyNowItem(input: {
   if (!input.productId) return { ok: false, error: 'productId required' }
   const qty = Number(input.qty)
   if (!Number.isFinite(qty) || qty <= 0 || qty > 10_000) return { ok: false, error: 'Invalid qty' }
-  const buyMode = ['unit', 'weight', 'length'].includes(String(input.buyMode || 'unit')) ? String(input.buyMode || 'unit') : 'unit'
+  // Legacy 'weight'/'length' buy modes removed — new orders are always 'unit'.
+  const buyMode = 'unit'
 
   const product = await queryOne<{
     id: string
     is_active: boolean
     base_price: string | number | null
-    weight_rate: string | number | null
-    length_rate: string | number | null
   }>(
-    `SELECT id, is_active, base_price, weight_rate, length_rate FROM products WHERE id = $1`,
+    `SELECT id, is_active, base_price FROM products WHERE id = $1`,
     [input.productId]
   )
   if (!product || !product.is_active) return { ok: false, error: 'Product not found or inactive' }
 
-  let variant: { id: string; price: string | number | null; weight_rate: string | number | null; length_rate: string | number | null } | null = null
+  let variant: { id: string; price: string | number | null } | null = null
   if (input.variantId) {
     variant = await queryOne(
-      `SELECT id, price, weight_rate, length_rate
+      `SELECT id, price
          FROM product_variants
         WHERE id = $1 AND product_id = $2 AND is_active = TRUE`,
       [input.variantId, input.productId]
@@ -136,14 +134,7 @@ export async function resolveBuyNowItem(input: {
     if (!subVariant) return { ok: false, error: 'Sub-variant not found' }
   }
 
-  let price: number
-  if (buyMode === 'weight') {
-    price = Number(variant?.weight_rate ?? product.weight_rate ?? 0)
-  } else if (buyMode === 'length') {
-    price = Number(variant?.length_rate ?? product.length_rate ?? 0)
-  } else {
-    price = Number(subVariant?.price ?? variant?.price ?? product.base_price ?? 0)
-  }
+  let price: number = Number(subVariant?.price ?? variant?.price ?? product.base_price ?? 0)
   if (!Number.isFinite(price) || price <= 0) return { ok: false, error: 'Could not resolve price for this product' }
   price = Math.round(price * 100) / 100
 
@@ -378,10 +369,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
 
     if (input.mode === 'cart') {
       itemRows = input.cartItems.map(item => {
-        const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-        const unitPrice = isCustomQty
-          ? Number(item.price_at_addition)
-          : Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        // Legacy weight/length sales removed — new orders always use the unit price path.
+        const unitPrice = Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
         const qty = Number(item.quantity)
         const gstRate = parseFloat(String(item.products.gst_percentage || '0'))
         const itemTotal = unitPrice * qty
@@ -411,8 +400,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           gstRate,
           hsn: isGSTEnabled ? (item.products.hsn_code || null) : null,
           gst,
-          buyMode: item.buy_mode || 'unit',
-          buyUnit: item.buy_unit || null,
+          buyMode: 'unit',
+          buyUnit: null,
         }
       })
     } else {
@@ -445,8 +434,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         gstRate,
         hsn: isGSTEnabled ? (input.product.hsn_code || null) : null,
         gst,
-        buyMode: i.buyMode || 'unit',
-        buyUnit: i.buyUnit || null,
+        buyMode: 'unit',
+        buyUnit: null,
       }]
     }
 

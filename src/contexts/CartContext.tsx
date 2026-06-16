@@ -43,10 +43,6 @@ interface CartItem {
     pricing_type?: string
     unit?: string | null
     numeric_value?: number | null
-    weight_rate?: number | null
-    weight_unit?: string | null
-    length_rate?: number | null
-    length_unit?: string | null
   } | null
   sub_variant: {
     id: string

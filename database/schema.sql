@@ -297,10 +297,6 @@ CREATE TABLE public.product_variants (
     pricing_type character varying(20) DEFAULT 'unit'::character varying NOT NULL,
     unit character varying(20),
     numeric_value numeric(10,3),
-    weight_rate numeric(12,2),
-    weight_unit character varying(10),
-    length_rate numeric(12,2),
-    length_unit character varying(10),
     updated_at timestamp with time zone DEFAULT now(),
     weight_grams integer DEFAULT 500,
     length_cm numeric(6,2) DEFAULT 10,
@@ -313,8 +309,6 @@ CREATE TABLE public.product_variants (
     variant_type character varying(100),
     sub_variant_type text,
     sub_variant_type_on boolean DEFAULT false NOT NULL,
-    weight_rate_on boolean DEFAULT false NOT NULL,
-    length_rate_on boolean DEFAULT false NOT NULL,
     use_own_images boolean DEFAULT false NOT NULL
 );
 
@@ -358,10 +352,6 @@ CREATE TABLE public.products (
     variant_type character varying(50),
     mpn character varying(100),
     gtin character varying(50),
-    weight_rate numeric(12,2),
-    weight_unit character varying(10),
-    length_rate numeric(12,2),
-    length_unit character varying(10),
     weight_grams integer DEFAULT 500,
     length_cm numeric(6,2) DEFAULT 10,
     breadth_cm numeric(6,2) DEFAULT 10,

@@ -38,8 +38,6 @@ const getProductBySlug = cache(async (slug: string) => {
              'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
              'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'stock_quantity', pv.stock_quantity,
              'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value,
-             'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
-             'length_rate', pv.length_rate, 'length_unit', pv.length_unit,
              'sub_variant_type', pv.sub_variant_type,
              'variant_type', pv.variant_type,
              'variant_images', COALESCE(

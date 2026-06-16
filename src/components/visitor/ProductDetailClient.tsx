@@ -40,10 +40,6 @@ interface Variant {
   pricing_type?: string
   unit?: string
   numeric_value?: number | null
-  weight_rate?: number | null
-  weight_unit?: string | null
-  length_rate?: number | null
-  length_unit?: string | null
   sub_variant_type?: string | null
   variant_images?: ProductImage[]
   sub_variants?: SubVariant[]
@@ -64,10 +60,6 @@ interface ProductDetailClientProps {
     stock_quantity: number
     has_variants: boolean
     variant_type?: string | null
-    weight_rate?: number | null
-    weight_unit?: string | null
-    length_rate?: number | null
-    length_unit?: string | null
     weight?: number | null
     dimensions?: string | null
     brands?: {
@@ -402,10 +394,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           variants={hasVariants ? product.product_variants : []}
           variantType={product.variant_type || 'Variant'}
           initialSkuParam={initialSkuParam}
-          weightRate={product.weight_rate ? Number(product.weight_rate) : null}
-          weightUnit={product.weight_unit || null}
-          lengthRate={product.length_rate ? Number(product.length_rate) : null}
-          lengthUnit={product.length_unit || null}
           onVariantChange={handleVariantChange}
         />
 
