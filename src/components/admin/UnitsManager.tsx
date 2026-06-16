@@ -188,12 +188,12 @@ export default function UnitsManager({ productId, variantId }: Props) {
       {!editing ? (
         unit ? (
           <div className="flex items-center justify-between bg-surface-elevated border border-border-default rounded-lg px-4 py-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="text-sm font-semibold text-foreground">{unit.unit}</span>
               <span className="text-[11px] text-foreground-muted capitalize">{unit.dimension}</span>
-              {Number(unit.factor) !== 1 && (
-                <span className="text-[11px] text-foreground-muted">× {Number(unit.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })}</span>
-              )}
+              <span className="text-[11px] text-foreground-muted">
+                1 {unit.unit} = {Number(unit.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })} pc
+              </span>
               {unit.display_label && (
                 <span className="text-[11px] text-foreground-muted">· {unit.display_label}</span>
               )}
@@ -241,7 +241,7 @@ export default function UnitsManager({ productId, variantId }: Props) {
                     onChange={handleUnitChange}
                     placeholder="— pick —"
                     options={[
-                      ...dimUnits.map(u => ({ value: u.key, label: u.multiplier != null ? `${u.label} — ${u.multiplier}` : u.label })),
+                      ...dimUnits.map(u => ({ value: u.key, label: u.label })),
                       { value: '__custom', label: 'Custom…' },
                     ]}
                     sm

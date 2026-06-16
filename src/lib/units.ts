@@ -28,8 +28,8 @@ export const UNITS: Record<Dimension, UnitDef[]> = {
   count: [
     { key: 'pc', label: 'pc / pcs', isSiBase: true, multiplier: 1 },
     { key: 'pair', label: 'pair', multiplier: 2 },
-    { key: 'set', label: 'set', multiplier: 1 },
-    { key: 'box', label: 'box', multiplier: 1 },
+    { key: 'set', label: 'set' },
+    { key: 'box', label: 'box' },
     { key: 'pack', label: 'pack', multiplier: 1 },
     { key: 'roll', label: 'roll', multiplier: 1 },
     { key: 'sheet', label: 'sheet', multiplier: 1 },
