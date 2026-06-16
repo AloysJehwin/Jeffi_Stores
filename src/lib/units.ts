@@ -20,12 +20,14 @@ export interface UnitDef {
   toSi?: number
   /** for length/weight/volume — the "natural" SI unit for that dimension */
   isSiBase?: boolean
+  /** for count dimension: known fixed multiplier vs. pc (e.g. pair=2, dozen=12) */
+  multiplier?: number
 }
 
 export const UNITS: Record<Dimension, UnitDef[]> = {
   count: [
-    { key: 'pc', label: 'pc / pcs', isSiBase: true },
-    { key: 'pair', label: 'pair' },
+    { key: 'pc', label: 'pc / pcs', isSiBase: true, multiplier: 1 },
+    { key: 'pair', label: 'pair', multiplier: 2 },
     { key: 'set', label: 'set' },
     { key: 'box', label: 'box' },
     { key: 'pack', label: 'pack' },
@@ -34,7 +36,7 @@ export const UNITS: Record<Dimension, UnitDef[]> = {
     { key: 'bundle', label: 'bundle' },
     { key: 'case', label: 'case' },
     { key: 'kit', label: 'kit' },
-    { key: 'dozen', label: 'dozen' },
+    { key: 'dozen', label: 'dozen', multiplier: 12 },
   ],
   length: [
     { key: 'm', label: 'm', toSi: 1, isSiBase: true },
