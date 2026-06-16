@@ -34,10 +34,6 @@ interface Variant {
   pricing_type?: string
   unit?: string
   numeric_value?: number | null
-  weight_rate?: number | null
-  weight_unit?: string | null
-  length_rate?: number | null
-  length_unit?: string | null
   variant_type?: string | null
   sub_variant_type?: string | null
   variant_images?: VariantImage[]
@@ -57,17 +53,11 @@ interface ProductActionsProps {
   variants: Variant[]
   variantType: string
   initialSkuParam?: string
-  weightRate?: number | null
-  weightUnit?: string | null
-  lengthRate?: number | null
-  lengthUnit?: string | null
   onVariantChange?: (variant: Variant | null) => void
 }
 
 const MODE_LABELS: Record<string, string> = {
   unit: 'By Piece',
-  weight: 'By Weight',
-  length: 'By Length',
 }
 
 function getPerUnitRate(price: number, numeric_value: number, unit: string): string {
@@ -85,7 +75,6 @@ export default function ProductActions({
   productId, productName, sku, stockQuantity,
   basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
   variants, variantType, initialSkuParam,
-  weightRate, weightUnit, lengthRate, lengthUnit,
   onVariantChange,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
@@ -96,7 +85,6 @@ export default function ProductActions({
   const [quantity, setQuantity] = useState(1)
   const [quantityRaw, setQuantityRaw] = useState('1')
   useEffect(() => { setQuantityRaw(String(quantity)) }, [quantity])
-  const [customQty, setCustomQty] = useState('1')
 
   const pricingTypes = Array.from(new Set(variants.map(v => v.pricing_type || 'unit')))
   const hasMultipleModes = pricingTypes.length > 1
@@ -217,64 +205,6 @@ export default function ProductActions({
     ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
     : null
 
-  const activeWeightRate = hasVariants
-    ? (selectedVariant?.weight_rate ?? null)
-    : (weightRate ?? null)
-  const activeWeightUnit = hasVariants
-    ? (selectedVariant?.weight_unit ?? weightUnit ?? 'kg')
-    : (weightUnit ?? 'kg')
-  const activeLengthRate = hasVariants
-    ? (selectedVariant?.length_rate ?? null)
-    : (lengthRate ?? null)
-  const activeLengthUnit = hasVariants
-    ? (selectedVariant?.length_unit ?? lengthUnit ?? 'm')
-    : (lengthUnit ?? 'm')
-
-  const nonVariantBuyModes: string[] = ['unit']
-  if (!hasVariants) {
-    if (activeWeightRate) nonVariantBuyModes.push('weight')
-    if (activeLengthRate) nonVariantBuyModes.push('length')
-  }
-  const hasNonVariantCustomModes = !hasVariants && nonVariantBuyModes.length > 1
-
-  const [buyMode, setBuyMode] = useState<string>('unit')
-
-  useEffect(() => {
-    setBuyMode('unit')
-    setCustomQty('1')
-    setQuantity(1)
-  }, [selectedVariantId])
-
-  const currentRate = buyMode === 'weight' ? activeWeightRate : buyMode === 'length' ? activeLengthRate : null
-  const currentUnit = buyMode === 'weight' ? activeWeightUnit : buyMode === 'length' ? activeLengthUnit : null
-
-  const variantHasCustomWeight = hasVariants && (activeWeightRate != null)
-  const variantHasCustomLength = hasVariants && (activeLengthRate != null)
-  const variantCustomModes: string[] = hasVariants
-    ? ['unit', ...(variantHasCustomWeight ? ['weight'] : []), ...(variantHasCustomLength ? ['length'] : [])]
-    : []
-  const variantHasMultipleBuyModes = variantCustomModes.length > 1
-
-  const parsedCustomQty = parseFloat(customQty) || 0
-  const customTotal = currentRate ? parsedCustomQty * currentRate : 0
-
-  useEffect(() => {
-    if (buyMode !== 'unit') return
-    setCustomQty('1')
-  }, [buyMode])
-
-  useEffect(() => {
-    if (hasNonVariantCustomModes && !nonVariantBuyModes.includes(buyMode)) {
-      setBuyMode('unit')
-    }
-  }, [weightRate, lengthRate])
-
-  useEffect(() => {
-    if (hasVariants && !variantCustomModes.includes(buyMode)) {
-      setBuyMode('unit')
-    }
-  }, [selectedVariantId])
-
   useEffect(() => {
     setQuantity(1)
   }, [selectedVariantId])
@@ -282,16 +212,11 @@ export default function ProductActions({
   const handleAddToCart = async () => {
     setIsAddingToCart(true)
     try {
-      const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
-      if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
-        showToast('Enter a valid quantity', 'error')
-        return
-      }
       if (selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && !selectedSubVariantId) {
         showToast(`Please select a ${selectedVariant.sub_variant_type || 'sub-variant'}`, 'error')
         return
       }
-      await addToCart(productId, finalQty, selectedVariantId || undefined, buyMode, currentUnit || undefined, selectedSubVariantId || undefined)
+      await addToCart(productId, quantity, selectedVariantId || undefined, 'unit', undefined, selectedSubVariantId || undefined)
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')
@@ -302,12 +227,6 @@ export default function ProductActions({
 
   const handleBuyNow = async () => {
     setIsBuyingNow(true)
-    const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
-    if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
-      showToast('Enter a valid quantity', 'error')
-      setIsBuyingNow(false)
-      return
-    }
     if (selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && !selectedSubVariantId) {
       showToast(`Please select a ${selectedVariant.sub_variant_type || 'sub-variant'}`, 'error')
       setIsBuyingNow(false)
@@ -322,9 +241,9 @@ export default function ProductActions({
           productId,
           variantId: selectedVariantId || null,
           subVariantId: selectedSubVariantId || null,
-          qty: finalQty,
-          buyMode,
-          buyUnit: currentUnit || null,
+          qty: quantity,
+          buyMode: 'unit',
+          buyUnit: null,
         }),
       })
       const data = await res.json()
@@ -536,102 +455,49 @@ export default function ProductActions({
         </>
       )}
 
-      {(hasNonVariantCustomModes || variantHasMultipleBuyModes) && (
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-2">How to buy</label>
-          <div className="flex flex-wrap gap-2">
-            {(hasVariants ? variantCustomModes : nonVariantBuyModes).map(mode => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setBuyMode(mode)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
-                  buyMode === mode
-                    ? 'bg-primary-600 text-white border-primary-600'
-                    : 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-primary-400'
-                }`}
-              >
-                {MODE_LABELS[mode] || mode}
-              </button>
-            ))}
-          </div>
+      <div>
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">Quantity</label>
+        <div className="flex items-center border border-border-secondary rounded-lg w-fit overflow-hidden">
+          <button
+            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+            disabled={quantity <= 1}
+            className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            </svg>
+          </button>
+          <input
+            type="number"
+            min={1}
+            max={effectiveStock}
+            value={quantityRaw}
+            onChange={e => {
+              const raw = e.target.value
+              setQuantityRaw(raw)
+              if (raw === '' || raw === '0') return
+              const v = parseInt(raw, 10)
+              if (!isNaN(v)) setQuantity(Math.min(effectiveStock, Math.max(1, v)))
+            }}
+            onBlur={e => {
+              const v = parseInt(e.target.value, 10)
+              const clamped = isNaN(v) || v < 1 ? 1 : Math.min(effectiveStock, v)
+              setQuantity(clamped)
+              setQuantityRaw(String(clamped))
+            }}
+            className="w-16 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none animate-fade-in [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          <button
+            onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
+            disabled={quantity >= effectiveStock}
+            className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
         </div>
-      )}
-
-      {(buyMode === 'weight' || buyMode === 'length') && currentRate ? (
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-2">
-            Enter quantity ({currentUnit})
-          </label>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden">
-              <input
-                type="number"
-                min="0.001"
-                step="0.001"
-                value={customQty}
-                onChange={e => setCustomQty(e.target.value)}
-                className="w-28 px-3 py-2 text-center font-semibold bg-surface text-foreground focus:outline-none"
-              />
-              <span className="px-3 py-2 bg-surface-secondary text-foreground-secondary text-sm font-medium border-l border-border-secondary">
-                {currentUnit}
-              </span>
-            </div>
-            {parsedCustomQty > 0 && (
-              <div className="text-sm text-foreground-secondary">
-                = <span className="font-semibold text-primary-600 dark:text-primary-400">
-                  Rs. {customTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-                <span className="text-xs ml-1">({parsedCustomQty} {currentUnit} × Rs. {currentRate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{currentUnit})</span>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-2">Quantity</label>
-          <div className="flex items-center border border-border-secondary rounded-lg w-fit overflow-hidden">
-            <button
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              disabled={quantity <= 1}
-              className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-              </svg>
-            </button>
-            <input
-              type="number"
-              min={1}
-              max={effectiveStock}
-              value={quantityRaw}
-              onChange={e => {
-                const raw = e.target.value
-                setQuantityRaw(raw)
-                if (raw === '' || raw === '0') return
-                const v = parseInt(raw, 10)
-                if (!isNaN(v)) setQuantity(Math.min(effectiveStock, Math.max(1, v)))
-              }}
-              onBlur={e => {
-                const v = parseInt(e.target.value, 10)
-                const clamped = isNaN(v) || v < 1 ? 1 : Math.min(effectiveStock, v)
-                setQuantity(clamped)
-                setQuantityRaw(String(clamped))
-              }}
-              className="w-16 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none animate-fade-in [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
-            <button
-              onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
-              disabled={quantity >= effectiveStock}
-              className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
 
       <div className="space-y-3">
         <button

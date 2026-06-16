@@ -380,6 +380,7 @@ export async function generateInvoicePDF(
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       const unitExcl = item.taxable_amount / item.quantity
+      // historical: legacy weight/length sales — new orders are always 'unit'
       const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
       const qtyLabel = isCustomQty && item.buy_unit
         ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit}`

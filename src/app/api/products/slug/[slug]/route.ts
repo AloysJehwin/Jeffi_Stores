@@ -24,8 +24,6 @@ export async function GET(
                'mrp_ex_gst', pv.mrp_ex_gst, 'wholeprice_ex_gst', pv.wholeprice_ex_gst,
                'stock_quantity', pv.stock_quantity, 'pricing_type', pv.pricing_type,
                'unit', pv.unit, 'numeric_value', pv.numeric_value,
-               'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
-               'length_rate', pv.length_rate, 'length_unit', pv.length_unit,
                'attributes', pv.attributes, 'is_active', pv.is_active,
                'variant_images', COALESCE(
                  (SELECT json_agg(vi ORDER BY vi.display_order ASC)

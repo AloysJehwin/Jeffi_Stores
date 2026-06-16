@@ -14,7 +14,7 @@ const AddCartSchema = z
     variantId: zUuid.nullish(),
     subVariantId: zUuid.nullish(),
     quantity: z.number().positive().optional(),
-    buyMode: z.enum(['unit', 'weight', 'length']).nullish(),
+    buyMode: z.enum(['unit']).nullish(),
     buyUnit: z.string().nullish(),
   })
   .refine(
@@ -68,9 +68,7 @@ export async function GET(request: NextRequest) {
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
             'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'stock_quantity', pv.stock_quantity,
-            'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value,
-            'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
-            'length_rate', pv.length_rate, 'length_unit', pv.length_unit
+            'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value
           )
         ELSE NULL END AS variant,
         CASE WHEN ci.sub_variant_id IS NOT NULL THEN
@@ -105,7 +103,7 @@ export async function POST(request: NextRequest) {
     const { userId } = await resolveUserId(request)
 
     const product = await queryOne(
-      'SELECT id, name, base_price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
+      'SELECT id, name, base_price, price_ex_gst FROM products WHERE id = $1',
       [productId]
     )
     if (!productId || !product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -130,25 +128,13 @@ export async function POST(request: NextRequest) {
       }
     } else if (variantId) {
       const variant = await queryOne(
-        'SELECT id, price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
+        'SELECT id, price, price_ex_gst FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
         [variantId, productId]
       )
       if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
-      if (buyMode === 'weight') {
-        priceAtAddition = variant.weight_rate ?? product.weight_rate ?? 0
-      } else if (buyMode === 'length') {
-        priceAtAddition = variant.length_rate ?? product.length_rate ?? 0
-      } else {
-        priceAtAddition = variant.price ?? product.base_price
-      }
+      priceAtAddition = variant.price ?? product.base_price
     } else {
-      if (buyMode === 'weight') {
-        priceAtAddition = product.weight_rate ?? 0
-      } else if (buyMode === 'length') {
-        priceAtAddition = product.length_rate ?? 0
-      } else {
-        priceAtAddition = product.price_ex_gst || product.base_price
-      }
+      priceAtAddition = product.price_ex_gst || product.base_price
     }
 
     const existingItem = await queryOne(
