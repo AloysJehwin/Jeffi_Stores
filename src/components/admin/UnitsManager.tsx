@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import UnitRulesPanel, { ProductUnitRule } from '@/components/admin/UnitRulesPanel'
 import {
-  ALL_DIMENSIONS,
   Dimension,
   DIMENSION_LABEL,
   UNITS,
+  computeAreaFactor,
+  computeVolumeFactor,
 } from '@/lib/units'
 
 interface ProductUnit {
@@ -21,23 +23,36 @@ interface ProductUnit {
   is_base: boolean
   is_purchase_default: boolean
   is_sell_default: boolean
-  price_override: number | string | null
   display_label: string | null
   notes: string | null
+}
+
+export interface UnitLoadedInfo {
+  unitKey: string
+  displayLabel: string | null
+  dimension: Dimension | null
+  inherited: boolean
 }
 
 interface Props {
   productId: string
   variantId?: string | null
+  /** Variant selling price including GST — shown beside the saved unit row. */
+  basePrice?: number | string | null
+  onUnitLoaded?: (info: UnitLoadedInfo) => void
 }
+
+// Dimensions shown in the picker — no 'custom'
+const DIMENSIONS: Dimension[] = ['count', 'length', 'area', 'volume', 'weight']
 
 const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]"
 const lockedCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface-secondary text-foreground-muted text-sm w-full h-[34px] cursor-not-allowed select-none"
 
-export default function UnitsManager({ productId, variantId }: Props) {
+export default function UnitsManager({ productId, variantId, basePrice, onUnitLoaded }: Props) {
   const { showToast } = useToast()
   const [unit, setUnit] = useState<ProductUnit | null>(null)
   const [inherited, setInherited] = useState(false)
+  const [rules, setRules] = useState<ProductUnitRule[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -52,6 +67,13 @@ export default function UnitsManager({ productId, variantId }: Props) {
   const [draftLabel, setDraftLabel] = useState('')
   const [draftFactor, setDraftFactor] = useState('')
 
+  // custom unit fields (typed dimensions only)
+  const [isCustomUnit, setIsCustomUnit] = useState(false)
+  const [customDimUnit, setCustomDimUnit] = useState('m')   // the SI unit used for measurement
+  const [customLength, setCustomLength] = useState('')
+  const [customWidth, setCustomWidth] = useState('')
+  const [customHeight, setCustomHeight] = useState('')
+
   async function load() {
     setLoading(true)
     try {
@@ -59,8 +81,17 @@ export default function UnitsManager({ productId, variantId }: Props) {
       if (res.ok) {
         const data = await res.json()
         const units: ProductUnit[] = data.units || []
-        setUnit(units[0] ?? null)
-        setInherited(data.inherited ?? false)
+        const first = units[0] ?? null
+        const isInherited = data.inherited ?? false
+        setUnit(first)
+        setInherited(isInherited)
+        setRules(data.rules || [])
+        onUnitLoaded?.({
+          unitKey: first?.unit ?? '',
+          displayLabel: first?.display_label ?? null,
+          dimension: (first?.dimension as Dimension) ?? null,
+          inherited: isInherited,
+        })
       }
     } finally {
       setLoading(false)
@@ -69,28 +100,66 @@ export default function UnitsManager({ productId, variantId }: Props) {
 
   useEffect(() => { load() }, [productId, variantId])
 
+  function resetCustomFields(dimUnit?: string) {
+    setIsCustomUnit(false)
+    setCustomDimUnit(dimUnit ?? 'm')
+    setCustomLength('')
+    setCustomWidth('')
+    setCustomHeight('')
+  }
+
   function openEdit(u?: ProductUnit) {
     if (u) {
-      setDraftUnit(u.unit)
       setDraftDimension(u.dimension)
+      setDraftUnit(u.unit)
       setDraftLabel(u.display_label || '')
       setDraftFactor(String(parseFloat(String(u.factor)) || ''))
+      // restore custom unit fields if previously set
+      if (u.conversion_meta?.custom_unit) {
+        const m = u.conversion_meta
+        setIsCustomUnit(true)
+        setCustomDimUnit(m.dim_unit || defaultDimUnit(u.dimension))
+        setCustomLength(m.length != null ? String(m.length) : '')
+        setCustomWidth(m.width != null ? String(m.width) : '')
+        setCustomHeight(m.height != null ? String(m.height) : '')
+      } else {
+        resetCustomFields(defaultDimUnit(u.dimension))
+      }
     } else {
       setDraftUnit('')
       setDraftDimension('count')
       setDraftLabel('')
       setDraftFactor('')
+      resetCustomFields()
     }
     setEditing(true)
   }
 
-  // When unit selection changes, auto-fill factor for predefined units
+  function defaultDimUnit(dim: Dimension): string {
+    if (dim === 'weight') return 'kg'
+    if (dim === 'volume') return 'L'
+    return 'm'
+  }
+
+  function handleDimensionChange(v: string) {
+    const dim = v as Dimension
+    setDraftDimension(dim)
+    setDraftUnit('')
+    setDraftFactor('')
+    resetCustomFields(defaultDimUnit(dim))
+  }
+
   function handleUnitChange(v: string) {
     if (v === '__custom') {
       setDraftUnit('')
+      setIsCustomUnit(true)
       setDraftFactor('')
       return
     }
+    setIsCustomUnit(false)
+    setCustomLength('')
+    setCustomWidth('')
+    setCustomHeight('')
     setDraftUnit(v)
     const def = (UNITS[draftDimension] || []).find(u => u.key === v)
     if (def?.multiplier != null) {
@@ -100,21 +169,83 @@ export default function UnitsManager({ productId, variantId }: Props) {
     }
   }
 
-  // When dimension changes, reset unit + factor
-  function handleDimensionChange(v: string) {
-    setDraftDimension(v as Dimension)
-    setDraftUnit('')
-    setDraftFactor('')
+  // Compute factor + meta for a custom unit in a typed dimension
+  function computeCustomFactor(): { factor: number; meta: object } | null {
+    try {
+      if (draftDimension === 'area') {
+        const l = parseFloat(customLength)
+        const w = parseFloat(customWidth)
+        if (!Number.isFinite(l) || l <= 0 || !Number.isFinite(w) || w <= 0) return null
+        const baseUnit = UNITS.area.find(u => u.isSiBase)!
+        const factor = computeAreaFactor({ length: l, width: w, dim_unit: customDimUnit }, baseUnit.key)
+        return { factor, meta: { custom_unit: true, dim_unit: customDimUnit, length: l, width: w } }
+      }
+      if (draftDimension === 'volume') {
+        const l = parseFloat(customLength)
+        const w = parseFloat(customWidth)
+        const h = parseFloat(customHeight)
+        if (!Number.isFinite(l) || l <= 0 || !Number.isFinite(w) || w <= 0 || !Number.isFinite(h) || h <= 0) return null
+        const baseUnit = UNITS.volume.find(u => u.isSiBase)!
+        const factor = computeVolumeFactor({ length: l, width: w, height: h, dim_unit: customDimUnit }, baseUnit.key)
+        return { factor, meta: { custom_unit: true, dim_unit: customDimUnit, length: l, width: w, height: h } }
+      }
+      if (draftDimension === 'length') {
+        const val = parseFloat(customLength)
+        if (!Number.isFinite(val) || val <= 0) return null
+        const srcUnit = UNITS.length.find(u => u.key === customDimUnit)!
+        const factor = val * (srcUnit.toSi ?? 1)
+        return { factor, meta: { custom_unit: true, dim_unit: customDimUnit, length: val } }
+      }
+      if (draftDimension === 'weight') {
+        const val = parseFloat(customLength)
+        if (!Number.isFinite(val) || val <= 0) return null
+        const srcUnit = UNITS.weight.find(u => u.key === customDimUnit)!
+        const factor = val * (srcUnit.toSi ?? 1)
+        return { factor, meta: { custom_unit: true, dim_unit: customDimUnit, length: val } }
+      }
+    } catch { /* fall through */ }
+    return null
+  }
+
+  async function handleReset() {
+    if (!unit) return
+    setSaving(true)
+    try {
+      const res = await fetch(`${baseUrl}/${unit.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        showToast(data.error || 'Failed to reset', 'error')
+        return
+      }
+      await load()
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleSave() {
     const key = draftUnit.trim()
     if (!key) { showToast('Unit name is required', 'error'); return }
 
-    const factorNum = parseFloat(draftFactor)
-    if (!Number.isFinite(factorNum) || factorNum <= 0) {
-      showToast('Enter a valid factor (e.g. 12 for dozen)', 'error')
-      return
+    let factorNum: number
+    let conversionMeta: object | null = null
+
+    if (isCustomUnit && draftDimension !== 'count') {
+      const result = computeCustomFactor()
+      if (!result) { showToast('Enter valid measurement values', 'error'); return }
+      factorNum = result.factor
+      conversionMeta = result.meta
+    } else if (draftDimension === 'count') {
+      factorNum = parseFloat(draftFactor)
+      if (!Number.isFinite(factorNum) || factorNum <= 0) {
+        showToast('Enter a valid factor (e.g. 12 for dozen)', 'error')
+        return
+      }
+    } else {
+      factorNum = 1
     }
 
     setSaving(true)
@@ -129,6 +260,7 @@ export default function UnitsManager({ productId, variantId }: Props) {
             factor: factorNum,
             dimension: draftDimension,
             display_label: draftLabel || null,
+            conversion_meta: conversionMeta,
           }),
         })
         const data = await res.json()
@@ -143,6 +275,7 @@ export default function UnitsManager({ productId, variantId }: Props) {
             factor: factorNum,
             dimension: draftDimension,
             display_label: draftLabel || null,
+            conversion_meta: conversionMeta,
             is_base: true,
             is_sell_default: false,
             is_purchase_default: false,
@@ -163,7 +296,20 @@ export default function UnitsManager({ productId, variantId }: Props) {
   const dimUnits = UNITS[draftDimension] || []
   const selectedDef = dimUnits.find(u => u.key === draftUnit)
   const isPredefined = selectedDef?.multiplier != null
-  const isCustomName = draftUnit !== '' && !dimUnits.some(u => u.key === draftUnit)
+  const showFactor = draftDimension === 'count' && !isCustomUnit
+
+  // Length units used for area/length custom inputs; weight units for weight
+  const customMeasureUnits =
+    draftDimension === 'weight' ? UNITS.weight :
+    draftDimension === 'volume' ? UNITS.length :
+    UNITS.length  // area, length
+
+  // Live preview for custom unit
+  const customPreview = isCustomUnit && draftDimension !== 'count' ? computeCustomFactor() : null
+  const customPreviewLabel =
+    draftDimension === 'area' ? 'm²' :
+    draftDimension === 'volume' ? 'L' :
+    draftDimension === 'weight' ? 'kg' : 'm'
 
   return (
     <div className="border-t border-border-default pt-4 mt-4 space-y-3">
@@ -187,25 +333,94 @@ export default function UnitsManager({ productId, variantId }: Props) {
 
       {!editing ? (
         unit ? (
+          <div className="space-y-2">
           <div className="flex items-center justify-between bg-surface-elevated border border-border-default rounded-lg px-4 py-3">
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-foreground">{unit.unit}</span>
-              <span className="text-[11px] text-foreground-muted capitalize">{unit.dimension}</span>
-              <span className="text-[11px] text-foreground-muted">
-                1 {unit.unit} = {Number(unit.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })} pc
-              </span>
-              {unit.display_label && (
-                <span className="text-[11px] text-foreground-muted">· {unit.display_label}</span>
+              <span className="text-border-secondary">|</span>
+              <span className="text-[11px] text-foreground-muted">Dimension: <span className="text-foreground">{DIMENSION_LABEL[unit.dimension as Dimension] ?? unit.dimension}</span></span>
+              {unit.dimension === 'count' && Number(unit.factor) !== 1 && (
+                <>
+                  <span className="text-border-secondary">·</span>
+                  <span className="text-[11px] text-foreground-muted">Factor: <span className="text-foreground">{Number(unit.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })} pc</span></span>
+                </>
               )}
-              <span className="text-[10px] font-bold text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded-full">BASE</span>
+              {unit.dimension !== 'count' && !unit.conversion_meta?.custom_unit && (() => {
+                const siLabel = unit.dimension === 'area' ? 'm²' : unit.dimension === 'volume' ? 'L' : unit.dimension === 'weight' ? 'kg' : 'm'
+                const f = Number(unit.factor)
+                return (
+                  <>
+                    <span className="text-border-secondary">·</span>
+                    <span className="text-[11px] text-foreground-muted">SI factor: <span className="text-foreground">{f.toLocaleString('en-IN', { maximumFractionDigits: 6 })} {siLabel}</span></span>
+                  </>
+                )
+              })()}
+              {unit.conversion_meta?.custom_unit && (() => {
+                const m = unit.conversion_meta
+                const siLabel = unit.dimension === 'area' ? 'm²' : unit.dimension === 'volume' ? 'L' : unit.dimension === 'weight' ? 'kg' : 'm'
+                let dims = ''
+                if (m.width && m.height) dims = `${m.length} × ${m.width} × ${m.height} ${m.dim_unit}`
+                else if (m.width) dims = `${m.length} × ${m.width} ${m.dim_unit}`
+                else dims = `${m.length} ${m.dim_unit}`
+                return (
+                  <>
+                    <span className="text-border-secondary">·</span>
+                    <span className="text-[11px] text-foreground-muted">Size: <span className="text-foreground">{dims} = {Number(unit.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })} {siLabel}</span></span>
+                  </>
+                )
+              })()}
+              {unit.display_label && (
+                <>
+                  <span className="text-border-secondary">·</span>
+                  <span className="text-[11px] text-foreground-muted">Label: <span className="text-foreground">{unit.display_label}</span></span>
+                </>
+              )}
+              <span className="text-[10px] font-bold text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded-full ml-1">BASE</span>
+              {basePrice != null && basePrice !== '' && !isNaN(Number(basePrice)) && (
+                <>
+                  <span className="text-border-secondary">·</span>
+                  <span
+                    className="text-[11px] text-foreground-muted"
+                    title={isVariantScope ? "Variant selling price (incl. GST) per BASE unit" : "Product selling price (incl. GST) per BASE unit"}
+                  >
+                    Price (incl. GST):{' '}
+                    <span className="text-foreground font-medium">
+                      ₹{Number(basePrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {unit.unit}
+                    </span>
+                  </span>
+                </>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => openEdit(inherited ? undefined : unit)}
-              className="text-xs text-accent-600 hover:underline"
-            >
-              {inherited ? 'Override' : 'Edit'}
-            </button>
+            <div className="flex items-center gap-2">
+              {isVariantScope && !inherited && (
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  disabled={saving}
+                  className="text-xs text-foreground-muted hover:text-red-500 border border-border-secondary rounded px-2 py-1 disabled:opacity-50"
+                >
+                  Reset to product default
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => openEdit(inherited ? undefined : unit)}
+                className="text-xs text-accent-600 hover:underline"
+              >
+                {inherited ? 'Override' : 'Edit'}
+              </button>
+            </div>
+          </div>
+            {!inherited && (
+              <UnitRulesPanel
+                productId={productId}
+                unitId={unit.id}
+                unitVariantId={unit.variant_id}
+                rules={rules.filter(r => r.product_unit_id === unit.id)}
+                unitLabel={unit.unit}
+                onChanged={load}
+              />
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-between bg-surface border border-dashed border-border-default rounded-lg px-4 py-3">
@@ -221,72 +436,75 @@ export default function UnitsManager({ productId, variantId }: Props) {
             {unit && !inherited ? 'Edit unit' : isVariantScope ? 'Override unit for this variant' : 'Set unit'}
           </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+          {/* Top row: always 4 cols — Dimension | Unit name | Factor (count) or empty | Label */}
+          <div className="grid grid-cols-4 gap-x-2 items-end">
             <div>
               <label className="block text-[10px] text-foreground-muted mb-0.5">Dimension</label>
               <AdminSelect
                 value={draftDimension}
                 onChange={handleDimensionChange}
-                options={ALL_DIMENSIONS.map(d => ({ value: d, label: DIMENSION_LABEL[d] }))}
+                options={DIMENSIONS.map(d => ({ value: d, label: DIMENSION_LABEL[d] }))}
                 sm
               />
             </div>
 
             <div>
               <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
-              {dimUnits.length > 0 ? (
-                <>
-                  <AdminSelect
-                    value={isCustomName ? '__custom' : draftUnit}
-                    onChange={handleUnitChange}
-                    placeholder="— pick —"
-                    options={[
-                      ...dimUnits.map(u => ({ value: u.key, label: u.label })),
-                      { value: '__custom', label: 'Custom…' },
-                    ]}
-                    sm
+              {isCustomUnit ? (
+                <div className="flex gap-1">
+                  <input
+                    value={draftUnit}
+                    onChange={e => setDraftUnit(e.target.value)}
+                    className={`${inputCls} flex-1`}
+                    placeholder="e.g. roll, pallet"
+                    autoFocus
                   />
-                  {isCustomName && (
-                    <input
-                      value={draftUnit}
-                      onChange={e => setDraftUnit(e.target.value)}
-                      className={`${inputCls} mt-1`}
-                      placeholder="custom unit name"
-                      autoFocus
-                    />
-                  )}
-                </>
+                  <button
+                    type="button"
+                    onClick={() => { setIsCustomUnit(false); setDraftUnit('') }}
+                    className="px-2 text-[10px] text-foreground-muted hover:text-foreground border border-border-secondary rounded shrink-0"
+                    title="Pick from list"
+                  >
+                    &#x25C4;
+                  </button>
+                </div>
               ) : (
-                <input
+                <AdminSelect
                   value={draftUnit}
-                  onChange={e => setDraftUnit(e.target.value)}
-                  className={inputCls}
-                  placeholder="e.g. roll, bundle"
+                  onChange={handleUnitChange}
+                  placeholder="— pick —"
+                  options={[
+                    ...dimUnits.map(u => ({ value: u.key, label: u.label })),
+                    { value: '__custom', label: 'Custom…' },
+                  ]}
+                  sm
                 />
               )}
             </div>
 
-            <div>
-              <label className="block text-[10px] text-foreground-muted mb-0.5">
-                {isPredefined ? 'Units per pc (locked)' : 'Units per pc *'}
-              </label>
-              {isPredefined ? (
-                <div className={lockedCls} title="Predefined — value is fixed">
-                  <span className="text-foreground font-mono">{draftFactor}</span>
-                  <span className="ml-2 text-[10px] text-foreground-muted">(fixed)</span>
-                </div>
-              ) : (
-                <input
-                  type="number"
-                  step="0.0001"
-                  min="0.0001"
-                  value={draftFactor}
-                  onChange={e => setDraftFactor(e.target.value)}
-                  className={inputCls}
-                  placeholder="e.g. 12"
-                />
-              )}
-            </div>
+            {showFactor ? (
+              <div>
+                <label className="block text-[10px] text-foreground-muted mb-0.5">
+                  {isPredefined ? 'Units per pc (locked)' : 'Units per pc *'}
+                </label>
+                {isPredefined ? (
+                  <div className={lockedCls} title="Predefined — value is fixed">
+                    <span className="text-foreground font-mono">{draftFactor}</span>
+                    <span className="ml-2 text-[10px] text-foreground-muted">(fixed)</span>
+                  </div>
+                ) : (
+                  <input
+                    type="number" step="0.0001" min="0.0001"
+                    value={draftFactor}
+                    onChange={e => setDraftFactor(e.target.value)}
+                    className={inputCls}
+                    placeholder="e.g. 12"
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="invisible" aria-hidden>{/* spacer */}</div>
+            )}
 
             <div>
               <label className="block text-[10px] text-foreground-muted mb-0.5">Label (UI)</label>
@@ -298,6 +516,66 @@ export default function UnitsManager({ productId, variantId }: Props) {
               />
             </div>
           </div>
+
+          {/* Custom measurement panel — shown below when Custom… picked for typed dimension */}
+          {isCustomUnit && draftDimension !== 'count' && (
+            <div className="border border-dashed border-border-secondary rounded p-2 space-y-1">
+              <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Measurements</p>
+              <div className="grid grid-cols-4 gap-2 items-end">
+                <div>
+                  <label className="block text-[10px] text-foreground-muted mb-0.5">Unit</label>
+                  <AdminSelect
+                    value={customDimUnit}
+                    onChange={v => setCustomDimUnit(v)}
+                    options={customMeasureUnits.map(u => ({ value: u.key, label: u.label }))}
+                    sm
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-foreground-muted mb-0.5">
+                    {draftDimension === 'weight' ? 'Weight *' : 'Length *'}
+                  </label>
+                  <input
+                    type="number" step="0.001" min="0.001"
+                    value={customLength}
+                    onChange={e => setCustomLength(e.target.value)}
+                    className={inputCls}
+                    placeholder="e.g. 3"
+                  />
+                </div>
+                {(draftDimension === 'area' || draftDimension === 'volume') && (
+                  <div>
+                    <label className="block text-[10px] text-foreground-muted mb-0.5">Width *</label>
+                    <input
+                      type="number" step="0.001" min="0.001"
+                      value={customWidth}
+                      onChange={e => setCustomWidth(e.target.value)}
+                      className={inputCls}
+                      placeholder="e.g. 2"
+                    />
+                  </div>
+                )}
+                {draftDimension === 'volume' && (
+                  <div>
+                    <label className="block text-[10px] text-foreground-muted mb-0.5">Height *</label>
+                    <input
+                      type="number" step="0.001" min="0.001"
+                      value={customHeight}
+                      onChange={e => setCustomHeight(e.target.value)}
+                      className={inputCls}
+                      placeholder="e.g. 1"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {customPreview && (
+            <p className="text-[11px] text-accent-600 font-medium">
+              1 {draftUnit || 'unit'} = {customPreview.factor.toLocaleString('en-IN', { maximumFractionDigits: 4 })} {customPreviewLabel}
+            </p>
+          )}
 
           <div className="flex justify-end gap-2">
             <button

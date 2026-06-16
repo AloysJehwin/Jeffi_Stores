@@ -28,16 +28,31 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
   }
 
-  const units = await queryMany(
+  const variantUnits = await queryMany(
     `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
             is_base, is_purchase_default, is_sell_default,
-            price_override, display_label, notes,
+            display_label, notes,
             created_at, updated_at
      FROM product_units
      WHERE variant_id = $1
      ORDER BY is_base DESC, unit ASC`,
     [params.variantId]
   )
+
+  // If no variant-specific rows, fall back to product-level units (inherited)
+  const inherited = variantUnits.length === 0
+  const units = inherited
+    ? await queryMany(
+        `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
+                is_base, is_purchase_default, is_sell_default,
+                display_label, notes,
+                created_at, updated_at
+         FROM product_units
+         WHERE product_id = $1 AND variant_id IS NULL
+         ORDER BY is_base DESC, unit ASC`,
+        [params.id]
+      )
+    : variantUnits
 
   const unitIds = units.map(u => u.id)
   const rules = unitIds.length
@@ -50,7 +65,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       )
     : []
 
-  return NextResponse.json({ units, rules })
+  return NextResponse.json({ units, rules, inherited })
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -77,12 +92,6 @@ export async function POST(request: NextRequest, { params }: Params) {
   const isBase = !!body.is_base
   const isSellDefault = !!body.is_sell_default
   const isPurchaseDefault = !!body.is_purchase_default
-  const priceOverride = body.price_override == null || body.price_override === ''
-    ? null
-    : Number(body.price_override)
-  if (priceOverride != null && !Number.isFinite(priceOverride)) {
-    return NextResponse.json({ error: 'price_override must be a number' }, { status: 400 })
-  }
   const displayLabel = body.display_label ? String(body.display_label).slice(0, 80) : null
   const notes = body.notes ? String(body.notes).slice(0, 500) : null
   const allowedDimensions = ['count', 'length', 'area', 'volume', 'weight', 'custom']
@@ -104,8 +113,8 @@ export async function POST(request: NextRequest, { params }: Params) {
         `INSERT INTO product_units (
            product_id, variant_id, unit, factor, dimension, conversion_meta,
            is_base, is_sell_default, is_purchase_default,
-           price_override, display_label, notes
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+           display_label, notes
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
         [
           params.id,
           params.variantId,
@@ -116,7 +125,6 @@ export async function POST(request: NextRequest, { params }: Params) {
           isBase,
           isSellDefault,
           isPurchaseDefault,
-          priceOverride,
           displayLabel,
           notes,
         ]

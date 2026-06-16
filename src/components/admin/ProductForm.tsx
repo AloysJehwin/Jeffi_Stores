@@ -9,7 +9,7 @@ import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
-import UnitsManager from './UnitsManager'
+import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
 import { applyDiscount } from '@/lib/pricing'
 
 interface Category {
@@ -213,6 +213,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [tempProductId] = useState<string>(productId || `temp-${Date.now()}`)
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantPopupId, setVariantPopupId] = useState<string | null>(null)
+  const [popupUnitKey, setPopupUnitKey] = useState<string>('')
+  const [popupUnitInfo, setPopupUnitInfo] = useState<UnitLoadedInfo | null>(null)
   const [variantImagesMap, setVariantImagesMap] = useState<Record<string, any[]>>(() => {
     const init: Record<string, any[]> = {}
     if (product?.product_variants) {
@@ -390,6 +392,12 @@ export default function ProductForm({ categories, brands, action, product, produ
     const saved = localStorage.getItem(draftKey)
     if (saved) setHasDraft(true)
   }, [draftKey])
+
+  // Reset cached popup unit when switching variants in the popup
+  useEffect(() => {
+    setPopupUnitKey('')
+    setPopupUnitInfo(null)
+  }, [variantPopupId])
 
   // Auto-regenerate SKU when name/brand/category change (only if not manually edited)
   useEffect(() => {
@@ -1782,13 +1790,14 @@ export default function ProductForm({ categories, brands, action, product, produ
         <div className="px-4 sm:px-6 py-4 border-t border-border-default">
           <h3 className="text-sm font-semibold text-foreground mb-3">Selling Units &amp; Conversions</h3>
           <p className="text-xs text-foreground-muted mb-4">
-            Configure alternate units (e.g. box of 100, sheet of 4'×8', tin of 5 L). The pricing engine
+            Configure alternate units (e.g. box of 100, sheet of 4&apos;×8&apos;, tin of 5 L). The pricing engine
             multiplies the base price by the factor automatically. Stock always lives in the BASE unit.
             Units configured here apply to <strong>every variant</strong> by default — open a variant to override per-variant.
             For bulk discounts, attach a tiered_price rule to the unit instead of overriding the price.
           </p>
           <UnitsManager
             productId={productId}
+            basePrice={basePrice}
           />
         </div>
       )}
@@ -1853,8 +1862,36 @@ export default function ProductForm({ categories, brands, action, product, produ
                 <div>
                   <div className="flex items-baseline justify-between mb-3">
                     <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Pricing & Identifiers</p>
-                    <span className="text-[10px] text-foreground-muted">Per BASE unit. Other units convert via factor — configure in Variant Units below.</span>
+                    <span className="text-[10px] text-foreground-muted">Per BASE unit{popupUnitKey ? ` (${popupUnitKey})` : ''}. Other units convert via factor — configure in Variant Units below.</span>
                   </div>
+                  {popupUnitInfo && popupUnitInfo.unitKey && !popupVariant.sub_variant_type_on && (
+                    <div className={`flex items-center gap-2 flex-wrap mb-3 px-3 py-2 rounded-lg border text-[11px] ${
+                      popupUnitInfo.inherited
+                        ? 'border-border-default bg-surface-secondary/60 text-foreground-secondary'
+                        : 'border-accent-300/50 bg-accent-50 dark:bg-accent-900/20 text-foreground'
+                    }`}>
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">Prices apply to</span>
+                      <span className="font-semibold text-foreground">1 {popupUnitKey}</span>
+                      {popupUnitInfo.displayLabel && (
+                        <span className="text-foreground-muted">({popupUnitInfo.displayLabel})</span>
+                      )}
+                      <span className="text-border-secondary">·</span>
+                      {popupUnitInfo.inherited ? (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface border border-border-default text-foreground-muted">
+                          Inherited from product
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent-500/10 border border-accent-300/40 text-accent-700 dark:text-accent-300">
+                          Variant override
+                        </span>
+                      )}
+                      <span className="ml-auto text-[10px] text-foreground-muted italic">
+                        {popupUnitInfo.inherited
+                          ? "Change product's Selling Unit, or click Override below to set a variant-specific unit."
+                          : 'Reset below to inherit the product’s unit.'}
+                      </span>
+                    </div>
+                  )}
                   {popupVariant.sub_variant_type_on ? (
                     <div className="rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-3 space-y-3">
                       <p className="text-xs text-foreground-secondary">Pricing is managed at the sub-variant level for this variant. Use the Sub-variants section below to set prices.</p>
@@ -2218,9 +2255,22 @@ export default function ProductForm({ categories, brands, action, product, produ
                 {/* Sub-Variants */}
                 {popupVariant.sub_variant_type_on && (
                   <div>
-                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
-                      Sub-Variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''}
-                    </p>
+                    <div className="flex items-center gap-2 mb-3 flex-wrap">
+                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+                        Sub-Variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''}
+                      </p>
+                      {popupUnitKey && (
+                        <span
+                          className="text-[10px] font-semibold uppercase tracking-wide bg-accent-500/10 text-accent-600 px-1.5 py-0.5 rounded border border-accent-500/30"
+                          title={`All sub-variant prices are per this base unit${popupUnitInfo?.inherited ? ' (inherited from product)' : ''}. Configure other units in Variant Units below.`}
+                        >
+                          per {popupUnitInfo?.displayLabel || popupUnitKey}
+                          {popupUnitInfo?.inherited && (
+                            <span className="ml-1 normal-case font-normal text-foreground-muted">(inherited)</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
                     {variantPopupId.startsWith('temp-') && (
                       <div className="mb-3 rounded-lg border border-dashed border-amber-400/60 bg-amber-50 dark:bg-amber-900/20 p-3">
                         <p className="text-xs text-amber-700 dark:text-amber-300">Save the product first to add sub-variants for this variant.</p>
@@ -2232,13 +2282,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                         <thead>
                           <tr className="text-left text-foreground-muted border-b border-border-default">
                             <th className="pb-1 pr-2 font-medium">Name</th>
-                            <th className="pb-1 pr-2 font-medium">MRP (Ex)</th>
+                            <th className="pb-1 pr-2 font-medium">MRP (Ex){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
                             <th className="pb-1 pr-2 font-medium">Disc %</th>
-                            <th className="pb-1 pr-2 font-medium">MRP (incl)</th>
-                            <th className="pb-1 pr-2 font-medium">Price (incl)</th>
-                            <th className="pb-1 pr-2 font-medium">Price (Ex)</th>
-                            <th className="pb-1 pr-2 font-medium">Wholesale (incl)</th>
-                            <th className="pb-1 pr-2 font-medium">Wholesale (Ex) ✎</th>
+                            <th className="pb-1 pr-2 font-medium">MRP (incl){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
+                            <th className="pb-1 pr-2 font-medium">Price (incl){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
+                            <th className="pb-1 pr-2 font-medium">Price (Ex){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
+                            <th className="pb-1 pr-2 font-medium">Wholesale (incl){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
+                            <th className="pb-1 pr-2 font-medium">Wholesale (Ex) ✎{popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
                             <th className="pb-1 pr-2 font-medium">Stock</th>
                             <th className="pb-1 pr-2 font-medium">SKU</th>
                             <th className="pb-1"></th>
@@ -2342,7 +2392,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                             <input type="text" placeholder="e.g. Red" value={d.name} onChange={(e) => setD('name', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">MRP (Ex. GST) *</label>
+                            <label className="block text-xs text-foreground-muted mb-0.5">MRP (Ex. GST) *{popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
                             <input type="number" step="0.01" placeholder="From catalog" value={d.mrp_ex_gst} onChange={(e) => {
                               const v = e.target.value; const mrpExN = parseFloat(v)
                               const disc = parseFloat(discountPct || '0')
@@ -2367,23 +2417,23 @@ export default function ProductForm({ categories, brands, action, product, produ
                             <input type="number" step="0.01" min="0" max="100" readOnly value={discountPct || '0'} className={`${lockedCls} w-full`} />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">MRP (incl. GST)</label>
+                            <label className="block text-xs text-foreground-muted mb-0.5">MRP (incl. GST){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
                             <input type="number" step="0.01" value={d.mrp} readOnly className={`${lockedCls} w-full`} placeholder="Auto-calculated" />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Price (incl. GST)</label>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Price (incl. GST){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
                             <input type="number" step="0.01" value={d.price} readOnly className={`${lockedCls} w-full`} placeholder="Auto-calculated" />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Price (Ex. GST)</label>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Price (Ex. GST){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
                             <input type="number" step="0.01" value={d.price_ex_gst} readOnly className={`${lockedCls} w-full`} placeholder="Auto-calculated" />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale (incl. GST)</label>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale (incl. GST){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
                             <input type="number" step="0.01" value={d.wholeprice_incl} readOnly className={`${lockedCls} w-full`} placeholder="= selling price" />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale (Ex. GST) ✎</label>
+                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale (Ex. GST) ✎{popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
                             <input type="number" step="0.01" placeholder="Override" value={d.wholeprice_ex_gst} onChange={(e) => {
                               const v = e.target.value
                               setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, wholeprice_ex_gst: v !== '' ? v : (d.price_ex_gst || ''), wholeprice_incl: v ? exToIncl(v, gstRate) : (d.price || ''), wholesaleManuallySet: v !== '' } }))
@@ -2409,7 +2459,12 @@ export default function ProductForm({ categories, brands, action, product, produ
 
               {productId && variantPopupId && !variantPopupId.startsWith('temp-') && (
                 <div className="px-5 pb-4">
-                  <UnitsManager productId={productId} variantId={variantPopupId} />
+                  <UnitsManager
+                    productId={productId}
+                    variantId={variantPopupId}
+                    basePrice={popupVariant?.price || (popupVariant?.price_ex_gst ? exToIncl(popupVariant.price_ex_gst, gstRate) : null)}
+                    onUnitLoaded={(info) => { setPopupUnitKey(info.unitKey); setPopupUnitInfo(info) }}
+                  />
                 </div>
               )}
 

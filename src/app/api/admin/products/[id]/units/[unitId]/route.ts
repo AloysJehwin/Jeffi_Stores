@@ -40,14 +40,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (!Number.isFinite(f) || f <= 0) return NextResponse.json({ error: 'factor must be positive' }, { status: 400 })
     updates.push(`factor = $${i++}`); vals.push(f)
   }
-  if (body.price_override !== undefined) {
-    if (body.price_override === null || body.price_override === '') updates.push(`price_override = NULL`)
-    else {
-      const p = Number(body.price_override)
-      if (!Number.isFinite(p)) return NextResponse.json({ error: 'price_override must be a number' }, { status: 400 })
-      updates.push(`price_override = $${i++}`); vals.push(p)
-    }
-  }
   if (body.display_label !== undefined) {
     updates.push(`display_label = $${i++}`)
     vals.push(body.display_label ? String(body.display_label).slice(0, 80) : null)

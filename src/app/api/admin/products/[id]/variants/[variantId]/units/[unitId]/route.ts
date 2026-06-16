@@ -58,16 +58,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     updates.push(`factor = $${i++}`)
     vals.push(f)
   }
-  if (body.price_override !== undefined) {
-    if (body.price_override === null || body.price_override === '') {
-      updates.push(`price_override = NULL`)
-    } else {
-      const p = Number(body.price_override)
-      if (!Number.isFinite(p)) return NextResponse.json({ error: 'price_override must be a number' }, { status: 400 })
-      updates.push(`price_override = $${i++}`)
-      vals.push(p)
-    }
-  }
   if (body.display_label !== undefined) {
     updates.push(`display_label = $${i++}`)
     vals.push(body.display_label ? String(body.display_label).slice(0, 80) : null)
@@ -148,8 +138,17 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   }
   const existing = await ensureUnitOwnership(params.unitId, params.variantId)
   if (!existing) return NextResponse.json({ error: 'Unit not found' }, { status: 404 })
+
+  // For the base unit, only allow deletion when it's the sole variant unit —
+  // deleting it falls back to inheriting the product-level unit.
   if (existing.is_base) {
-    return NextResponse.json({ error: 'Cannot delete the base unit. Make another unit the base first.' }, { status: 400 })
+    const sibling = await queryOne<{ id: string }>(
+      `SELECT id FROM product_units WHERE variant_id = $1 AND id <> $2 LIMIT 1`,
+      [params.variantId, params.unitId]
+    )
+    if (sibling) {
+      return NextResponse.json({ error: 'Cannot delete the base unit. Make another unit the base first.' }, { status: 400 })
+    }
   }
 
   await queryOne(`DELETE FROM product_units WHERE id = $1`, [params.unitId])

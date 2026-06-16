@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const units = await queryMany(
     `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
             is_base, is_purchase_default, is_sell_default,
-            price_override, display_label, notes, created_at, updated_at
+            display_label, notes, created_at, updated_at
      FROM product_units
      WHERE product_id = $1 AND variant_id IS NULL
      ORDER BY is_base DESC, unit ASC`,
@@ -71,11 +71,6 @@ export async function POST(request: NextRequest, { params }: Params) {
   const isBase = !!body.is_base
   const isSellDefault = !!body.is_sell_default
   const isPurchaseDefault = !!body.is_purchase_default
-  const priceOverride = body.price_override == null || body.price_override === ''
-    ? null : Number(body.price_override)
-  if (priceOverride != null && !Number.isFinite(priceOverride)) {
-    return NextResponse.json({ error: 'price_override must be a number' }, { status: 400 })
-  }
   const displayLabel = body.display_label ? String(body.display_label).slice(0, 80) : null
   const notes = body.notes ? String(body.notes).slice(0, 500) : null
   const allowed = ['count', 'length', 'area', 'volume', 'weight', 'custom']
@@ -108,14 +103,14 @@ export async function POST(request: NextRequest, { params }: Params) {
         `INSERT INTO product_units (
            product_id, variant_id, unit, factor, dimension, conversion_meta,
            is_base, is_sell_default, is_purchase_default,
-           price_override, display_label, notes
-         ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+           display_label, notes
+         ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
         [
           params.id,
           unit, factor, dimension,
           conversionMeta ? JSON.stringify(conversionMeta) : null,
           isBase, isSellDefault, isPurchaseDefault,
-          priceOverride, displayLabel, notes,
+          displayLabel, notes,
         ]
       )
       return res.rows[0]

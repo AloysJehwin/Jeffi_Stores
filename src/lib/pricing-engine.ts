@@ -25,7 +25,6 @@ export interface ProductUnit {
   is_base: boolean
   is_purchase_default: boolean
   is_sell_default: boolean
-  price_override: number | null
   display_label: string | null
 }
 
@@ -87,10 +86,9 @@ export function priceLine(ctx: PricingContext): PricingResult {
     throw new PricingError('BAD_QTY', `Quantity must be positive`)
   }
 
-  // Default unit price: base × factor, unless override is set.
-  let unitPriceExGst = selectedUnit.price_override != null
-    ? Number(selectedUnit.price_override)
-    : ctx.basePriceExGst * Number(selectedUnit.factor)
+  // Default unit price: base × factor. Bulk/discount overrides apply via
+  // tiered_price rules below.
+  let unitPriceExGst = ctx.basePriceExGst * Number(selectedUnit.factor)
   let gstRate = ctx.baseGstRate
   let effectiveFactor = Number(selectedUnit.factor)
 
