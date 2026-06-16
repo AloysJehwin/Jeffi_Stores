@@ -55,6 +55,19 @@ const getProductBySlug = cache(async (slug: string) => {
          FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
         '[]'::json
       ) AS product_variants,
+      COALESCE(
+        (SELECT json_agg(
+           json_build_object(
+             'id', pu.id, 'variant_id', pu.variant_id, 'unit', pu.unit,
+             'factor', pu.factor, 'is_base', pu.is_base, 'is_sell_default', pu.is_sell_default,
+             'is_purchase_default', pu.is_purchase_default, 'display_label', pu.display_label,
+             'dimension', pu.dimension
+           ) ORDER BY pu.is_sell_default DESC, pu.is_base DESC
+         )
+         FROM product_units pu WHERE pu.product_id = p.id
+        ),
+        '[]'::json
+      ) AS product_units,
       ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total

@@ -40,6 +40,18 @@ interface Variant {
   sub_variants?: SubVariant[]
 }
 
+interface ProductUnit {
+  id: string
+  variant_id: string | null
+  unit: string
+  factor: number
+  is_base: boolean
+  is_sell_default: boolean
+  is_purchase_default: boolean
+  display_label: string | null
+  dimension: string
+}
+
 interface ProductActionsProps {
   productId: string
   productName: string
@@ -54,6 +66,7 @@ interface ProductActionsProps {
   variantType: string
   initialSkuParam?: string
   onVariantChange?: (variant: Variant | null) => void
+  productUnits?: ProductUnit[]
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -75,7 +88,7 @@ export default function ProductActions({
   productId, productName, sku, stockQuantity,
   basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
   variants, variantType, initialSkuParam,
-  onVariantChange,
+  onVariantChange, productUnits: productUnitsProp,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -205,6 +218,21 @@ export default function ProductActions({
     ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
     : null
 
+  const productUnits = productUnitsProp ?? []
+  const sellUnit = (() => {
+    if (!selectedVariantId) {
+      return productUnits.find(u => u.variant_id === null && u.is_sell_default)
+        ?? productUnits.find(u => u.variant_id === null && u.is_base)
+        ?? null
+    }
+    return productUnits.find(u => u.variant_id === selectedVariantId && u.is_sell_default)
+      ?? productUnits.find(u => u.variant_id === null && u.is_sell_default)
+      ?? productUnits.find(u => u.variant_id === null && u.is_base)
+      ?? null
+  })()
+  const effectiveUnitKey = sellUnit?.unit ?? 'unit'
+  const effectiveUnitLabel = sellUnit?.display_label ?? sellUnit?.unit ?? null
+
   useEffect(() => {
     setQuantity(1)
   }, [selectedVariantId])
@@ -216,7 +244,7 @@ export default function ProductActions({
         showToast(`Please select a ${selectedVariant.sub_variant_type || 'sub-variant'}`, 'error')
         return
       }
-      await addToCart(productId, quantity, selectedVariantId || undefined, 'unit', undefined, selectedSubVariantId || undefined)
+      await addToCart(productId, quantity, selectedVariantId || undefined, effectiveUnitKey, effectiveUnitKey, selectedSubVariantId || undefined)
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')
@@ -242,8 +270,8 @@ export default function ProductActions({
           variantId: selectedVariantId || null,
           subVariantId: selectedSubVariantId || null,
           qty: quantity,
-          buyMode: 'unit',
-          buyUnit: null,
+          buyMode: effectiveUnitKey,
+          buyUnit: effectiveUnitKey,
         }),
       })
       const data = await res.json()
@@ -413,6 +441,11 @@ export default function ProductActions({
                 {perUnitRate}
               </p>
             )}
+            {effectiveUnitLabel && effectiveUnitKey !== 'unit' && (
+              <p className="text-sm font-medium text-accent-600 dark:text-accent-400 mb-2">
+                ₹{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
+              </p>
+            )}
             {mrpDiscount > 0 && (
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
@@ -441,7 +474,7 @@ export default function ProductActions({
                 <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock{effectiveStock < 10 ? ` (${effectiveStock} left)` : ''}</span>
+                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock{effectiveStock < 10 ? ` (${effectiveStock}${effectiveUnitLabel ? ' ' + effectiveUnitLabel : ''} left)` : ''}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">

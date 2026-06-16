@@ -376,7 +376,7 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
                 </>
               )}
               <span className="text-[10px] font-bold text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 rounded-full ml-1">BASE</span>
-              {basePrice != null && basePrice !== '' && !isNaN(Number(basePrice)) && (
+              {basePrice != null && basePrice !== '' && !isNaN(Number(basePrice)) && Number(basePrice) > 0 && (
                 <>
                   <span className="text-border-secondary">·</span>
                   <span

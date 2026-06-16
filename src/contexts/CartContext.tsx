@@ -12,6 +12,13 @@ interface CartItem {
   price_at_addition: number
   buy_mode: string
   buy_unit: string | null
+  cart_item_unit?: {
+    unit: string
+    display_label: string | null
+    factor: number
+    is_base: boolean
+    is_sell_default: boolean
+  } | null
   products: {
     id: string
     name: string
@@ -225,10 +232,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getCartTotal = () => {
     return cartItems.reduce((total, item) => {
-      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
-        return total + item.price_at_addition * item.quantity
-      }
-      const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
+      const price = item.price_at_addition > 0
+        ? item.price_at_addition
+        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
       const categoryId = item.products.category_id
       const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
         ? (user.businessDiscountMap?.[categoryId] ?? 0)
@@ -240,12 +246,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getCartTax = () => {
     return cartItems.reduce((tax, item) => {
-      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
-        const gstRate = item.products.gst_percentage || 0
-        const itemTotal = item.price_at_addition * item.quantity
-        return tax + (itemTotal - itemTotal / (1 + gstRate / 100))
-      }
-      const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
+      const price = item.price_at_addition > 0
+        ? item.price_at_addition
+        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
       const categoryId = item.products.category_id
       const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
         ? (user.businessDiscountMap?.[categoryId] ?? 0)

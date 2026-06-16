@@ -119,17 +119,27 @@ function OrderConfirmationPage() {
           <h2 className="text-xl font-bold text-foreground mb-4">Order Summary</h2>
 
           <div className="space-y-4 mb-6">
-            {order.items.map((item) => (
+            {order.items.map((item) => {
+              const isFractional = item.buyMode === 'weight' || item.buyMode === 'length'
+              const qtyDisplay = isFractional
+                ? `${Number(item.quantity).toFixed(3)}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
+                : `${Math.round(Number(item.quantity))}${item.buyUnit && item.buyUnit !== 'unit' ? ` ${item.buyUnit}` : ''}`
+              const priceUnitSuffix = item.buyUnit && item.buyUnit !== 'unit' ? ` / ${item.buyUnit}` : ''
+              return (
               <div key={item.id} className="flex justify-between items-center pb-4 border-b border-border-default last:border-b-0">
                 <div className="flex-1">
                   <p className="font-medium text-foreground">{item.productName}</p>
-                  <p className="text-sm text-foreground-secondary">Quantity: {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))}</p>
+                  <p className="text-sm text-foreground-secondary">Quantity: {qtyDisplay}</p>
+                  <p className="text-sm text-foreground-secondary">
+                    ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{priceUnitSuffix} × {qtyDisplay}
+                  </p>
                 </div>
                 <p className="font-semibold text-foreground">
                   ₹{(item.unitPrice * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </p>
               </div>
-            ))}
+              )
+            })}
           </div>
 
           <div className="border-t-2 border-border-default pt-4">

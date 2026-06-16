@@ -187,6 +187,8 @@ export default function CartPage() {
                 const showMrp = !isCustomQty && mrp !== null && Number(mrp) > Number(price)
                 const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
                 const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
+                const unitLabel = (item.cart_item_unit?.display_label ?? item.buy_unit) || ''
+                const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
 
                 return (
                   <div key={item.id} className="p-4 sm:p-6 border-b border-border-default last:border-b-0">
@@ -240,7 +242,7 @@ export default function CartPage() {
 
                         <div className="mt-2 flex items-center gap-3 flex-wrap">
                           <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel || item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
                           </span>
                           {showMrp && (
                             <>
@@ -282,8 +284,8 @@ export default function CartPage() {
                                 disabled={isUpdating}
                                 className="w-24 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground font-semibold text-sm text-center focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
                               />
-                              <span className="text-sm text-foreground-muted">{item.buy_unit}</span>
-                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{item.buy_unit}</span>
+                              <span className="text-sm text-foreground-muted">{unitLabel || item.buy_unit}</span>
+                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{unitLabel || item.buy_unit}</span>
                             </div>
                           ) : (
                             <div className="flex items-center border border-border-secondary rounded-lg">
@@ -328,6 +330,10 @@ export default function CartPage() {
                                 </svg>
                               </button>
                             </div>
+                          )}
+
+                          {!isCustomQty && showUnitLabel && (
+                            <span className="text-sm text-foreground-muted">{unitLabel}</span>
                           )}
 
                           <button

@@ -82,6 +82,17 @@ interface ProductDetailClientProps {
     } | null
     product_images: ProductImage[]
     product_variants: Variant[]
+    product_units?: Array<{
+      id: string
+      variant_id: string | null
+      unit: string
+      factor: number
+      is_base: boolean
+      is_sell_default: boolean
+      is_purchase_default: boolean
+      display_label: string | null
+      dimension: string
+    }>
   }
   initialSkuParam?: string
 }
@@ -394,6 +405,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           onVariantChange={handleVariantChange}
           onSelectionChange={(vId, svId) => { setSelectedVariantId(vId); setSelectedSubVariantId(svId) }}
           categoryId={categoryId ?? null}
+          productUnits={product.product_units ?? []}
         />
 
         {(() => {

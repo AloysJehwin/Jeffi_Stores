@@ -583,6 +583,9 @@ function CheckoutPage() {
                       const discountPct = showMrp ? mrpDiscountPct(Number(mrp), Number(price)) : 0
                       const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
                       const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
+                      const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                      const unitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
+                      const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
                       return (
                         <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
                           <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
@@ -619,7 +622,7 @@ function CheckoutPage() {
                               )}
                             </div>
                             <p className="text-sm text-foreground-secondary mt-1">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')} × {isCustomQty ? `${Number(item.quantity).toFixed(3)} ${unitLabel ?? item.buy_unit ?? ''}` : `${Math.round(Number(item.quantity))}${showUnitLabel ? ` ${unitLabel}` : ''}`}
                               {showMrp && (
                                 <>
                                   {' '}<span className="line-through text-foreground-muted">₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>

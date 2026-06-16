@@ -866,10 +866,21 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                             {item.subVariantName}
                           </span>
                         )}
-                        <p className="text-sm text-foreground-secondary mt-1">Quantity: {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))}</p>
-                        <p className="text-sm font-semibold text-foreground mt-1">
-                          {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })} x {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-                        </p>
+                        {(() => {
+                          const isFractional = item.buyMode === 'weight' || item.buyMode === 'length'
+                          const qtyDisplay = isFractional
+                            ? `${Number(item.quantity).toFixed(3)}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
+                            : `${Math.round(Number(item.quantity))}${item.buyUnit && item.buyUnit !== 'unit' ? ` ${item.buyUnit}` : ''}`
+                          const priceUnitSuffix = item.buyUnit && item.buyUnit !== 'unit' ? ` / ${item.buyUnit}` : ''
+                          return (
+                            <>
+                              <p className="text-sm text-foreground-secondary mt-1">Quantity: {qtyDisplay}</p>
+                              <p className="text-sm font-semibold text-foreground mt-1">
+                                {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}{priceUnitSuffix} x {qtyDisplay} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                              </p>
+                            </>
+                          )
+                        })()}
                       </div>
                     </div>
                   )

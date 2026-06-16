@@ -195,6 +195,8 @@ export default function CartPage() {
                 const showMrp = !isCustomQty && mrp !== null && Number(mrp) > discountedPrice
                 const discountPct = showMrp ? mrpDiscountPct(Number(mrp), discountedPrice) : 0
                 const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
+                const unitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
+                const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
 
                 return (
                   <div key={item.id} className="p-4 sm:p-6 border-b border-border-default last:border-b-0">
@@ -252,13 +254,13 @@ export default function CartPage() {
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-foreground-muted">Regular:</span>
                                 <span className="text-sm text-foreground-muted line-through">
-                                  ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                                  ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-semibold text-accent-600 dark:text-accent-400">Business price:</span>
                                 <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                                  ₹{discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{showUnitLabel ? `/${unitLabel}` : ''}
                                 </span>
                                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 whitespace-nowrap">
                                   ✦ {itemDiscountPct}% extra off
@@ -268,7 +270,7 @@ export default function CartPage() {
                           ) : (
                             <div className="flex items-center gap-3 flex-wrap">
                               <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                                ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                                ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
                               </span>
                               {showMrp && (
                                 <>
@@ -312,8 +314,8 @@ export default function CartPage() {
                                 disabled={isUpdating}
                                 className="w-24 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground font-semibold text-sm text-center focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
                               />
-                              <span className="text-sm text-foreground-muted">{item.buy_unit}</span>
-                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{item.buy_unit}</span>
+                              <span className="text-sm text-foreground-muted">{unitLabel ?? item.buy_unit}</span>
+                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{unitLabel ?? item.buy_unit}</span>
                             </div>
                           ) : (
                             <div className="flex items-center border border-border-secondary rounded-lg">
@@ -360,6 +362,10 @@ export default function CartPage() {
                             </div>
                           )}
 
+                          {!isCustomQty && showUnitLabel && (
+                            <span className="text-sm text-foreground-muted">{unitLabel}</span>
+                          )}
+
                           <button
                             onClick={async () => {
                               try {
@@ -390,7 +396,7 @@ export default function CartPage() {
                           </span>
                           {itemDiscountPct > 0 && (
                             <span className="text-xs text-foreground-muted ml-2">
-                              ({item.quantity} × ₹{discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                              ({item.quantity}{unitLabel ? ` ${unitLabel}` : ''} × ₹{discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                             </span>
                           )}
                         </div>
@@ -418,6 +424,8 @@ export default function CartPage() {
                       : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
                     const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
                     const isUpdating = updatingItems.has(item.id)
+                    const savedUnitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
+                    const savedShowUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
                     return (
                       <div key={item.id} className="p-4 sm:p-6 flex gap-4">
                         <Link href={bp(`/business/products/${item.products.slug}`)} className="shrink-0">
@@ -462,7 +470,7 @@ export default function CartPage() {
                             )}
                           </div>
                           <p className="text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">
-                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${savedUnitLabel ?? item.buy_unit}` : (savedShowUnitLabel ? `/${savedUnitLabel}` : '')}
                           </p>
                           <div className="flex items-center gap-3 mt-2">
                             <button
