@@ -876,8 +876,10 @@ function StockTab() {
       sub_variant_id: p.sub_variant_id || null,
       notes: editNotes || undefined,
     }
-    if (selectedUnit && selectedUnit.factor !== 1) {
-      body.unit_id = selectedUnit.id
+    // Count-dimension units are always stored as raw pcs — never multiply via unit_id path
+    const isCountUnit = !selectedUnit || selectedUnit.dimension === 'count' || selectedUnit.factor === 1
+    if (!isCountUnit) {
+      body.unit_id = selectedUnit!.id
       body.quantity_in_unit = parseFloat(editQty)
     } else {
       body.new_quantity = parseFloat(editQty)
