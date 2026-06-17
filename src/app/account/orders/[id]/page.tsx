@@ -874,8 +874,8 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                           </span>
                         )}
                         {(() => {
-                          const isFractional = item.buyMode && item.buyMode !== 'unit'
-                          const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : null
+                          const isFractional = (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
+                          const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : (item.buyMode && item.buyMode !== 'unit' ? item.buyMode : null)
                           const qtyDisplay = isFractional
                             ? Number(Number(item.quantity).toFixed(6)).toString()
                             : String(Math.round(Number(item.quantity)))

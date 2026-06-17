@@ -202,10 +202,16 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                           </span>
                         )}
                         <p className="text-sm text-foreground-secondary mt-1">
-                          {item.buy_mode === 'weight' || item.buy_mode === 'length'
-                            ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''} × Rs. ${Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/${item.buy_unit}`
-                            : `Quantity: ${Math.round(Number(item.quantity))} × Rs. ${Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                          }
+                          {(() => {
+                            const isFractional = (item.buy_mode && item.buy_mode !== 'unit') || (item.buy_unit && item.buy_unit !== 'unit')
+                            const displayUnit = (item.buy_unit && item.buy_unit !== 'unit') ? item.buy_unit : (item.buy_mode !== 'unit' ? item.buy_mode : null)
+                            const qty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
+                            const qtyStr = isFractional ? qty.toFixed(qty % 1 === 0 ? 0 : 3).replace(/\.?0+$/, '') : String(qty)
+                            const priceStr = Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                            return displayUnit
+                              ? `${qtyStr} ${displayUnit} × Rs. ${priceStr}/${displayUnit}`
+                              : `Quantity: ${qtyStr} × Rs. ${priceStr}`
+                          })()}
                         </p>
                       </div>
                       <div className="text-right">
