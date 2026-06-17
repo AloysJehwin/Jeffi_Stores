@@ -86,7 +86,9 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
 const PX_PER_UNIT = 80
 
 function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyStep, onChange }: QuantityInputProps) {
-  const max = Math.max(Math.min(effectiveStock, qtyMax ?? effectiveStock), qtyMin)
+  // Cap ruler range: use explicit qtyMax if set, otherwise show at most 20 steps beyond qtyMin
+  const rulerMax = qtyMax ?? Math.min(effectiveStock, qtyMin + 20 * qtyStep)
+  const max = Math.max(Math.min(effectiveStock, rulerMax), qtyMin)
 
   const trackRef    = useRef<HTMLDivElement>(null)
   const fillRef     = useRef<HTMLDivElement>(null)
