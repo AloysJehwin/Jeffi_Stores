@@ -189,7 +189,7 @@ export async function getStockValuation() {
       c.name AS category_name,
       b.name AS brand_name,
       su.unit AS sell_unit,
-      su.unit_label AS sell_unit_label,
+      su.display_label AS sell_unit_label,
       su.dimension AS sell_unit_dimension
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
@@ -213,7 +213,7 @@ export async function getStockValuation() {
       c.name AS category_name,
       b.name AS brand_name,
       su.unit AS sell_unit,
-      su.unit_label AS sell_unit_label,
+      su.display_label AS sell_unit_label,
       su.dimension AS sell_unit_dimension
     FROM product_variants pv
     JOIN products p ON p.id = pv.product_id
@@ -239,7 +239,7 @@ export async function getStockValuation() {
       c.name AS category_name,
       b.name AS brand_name,
       su.unit AS sell_unit,
-      su.unit_label AS sell_unit_label,
+      su.display_label AS sell_unit_label,
       su.dimension AS sell_unit_dimension
     FROM product_sub_variants sv
     JOIN product_variants pv ON pv.id = sv.variant_id
