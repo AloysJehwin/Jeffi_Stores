@@ -25,8 +25,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   // Product-level rows only (variant_id IS NULL).
   const units = await queryMany(
     `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
-            is_base, is_purchase_default, is_sell_default,
-            display_label, notes, min_qty, max_qty, qty_step, created_at, updated_at
+            is_base, display_label, notes, min_qty, max_qty, qty_step, created_at, updated_at
      FROM product_units
      WHERE product_id = $1 AND variant_id IS NULL
      ORDER BY is_base DESC, unit ASC`,
@@ -69,8 +68,6 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const isBase = !!body.is_base
-  const isSellDefault = !!body.is_sell_default
-  const isPurchaseDefault = !!body.is_purchase_default
   const displayLabel = body.display_label ? String(body.display_label).slice(0, 80) : null
   const notes = body.notes ? String(body.notes).slice(0, 500) : null
   const allowed = ['count', 'length', 'area', 'volume', 'weight', 'custom']
@@ -90,29 +87,16 @@ export async function POST(request: NextRequest, { params }: Params) {
           [params.id]
         )
       }
-      if (isSellDefault) {
-        await client.query(
-          `UPDATE product_units SET is_sell_default = FALSE WHERE product_id = $1 AND variant_id IS NULL`,
-          [params.id]
-        )
-      }
-      if (isPurchaseDefault) {
-        await client.query(
-          `UPDATE product_units SET is_purchase_default = FALSE WHERE product_id = $1 AND variant_id IS NULL`,
-          [params.id]
-        )
-      }
       const res = await client.query(
         `INSERT INTO product_units (
            product_id, variant_id, unit, factor, dimension, conversion_meta,
-           is_base, is_sell_default, is_purchase_default,
-           display_label, notes, min_qty, max_qty, qty_step
-         ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+           is_base, display_label, notes, min_qty, max_qty, qty_step
+         ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [
           params.id,
           unit, factor, dimension,
           conversionMeta ? JSON.stringify(conversionMeta) : null,
-          isBase, isSellDefault, isPurchaseDefault,
+          isBase,
           displayLabel, notes,
           minQty, maxQty, qtyStep,
         ]

@@ -21,8 +21,6 @@ interface ProductUnit {
   dimension: Dimension
   conversion_meta: any | null
   is_base: boolean
-  is_purchase_default: boolean
-  is_sell_default: boolean
   display_label: string | null
   notes: string | null
   min_qty: number | null
@@ -304,8 +302,6 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
             display_label: draftLabel || null,
             conversion_meta: conversionMeta,
             is_base: true,
-            is_sell_default: false,
-            is_purchase_default: false,
             min_qty: minQty,
             max_qty: maxQty,
             qty_step: qtyStep,

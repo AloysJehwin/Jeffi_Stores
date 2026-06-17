@@ -85,22 +85,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   const setBase = body.is_base === true
-  const setSellDefault = body.is_sell_default === true
-  const setPurchaseDefault = body.is_purchase_default === true
 
   try {
     const updated = await withTransaction(async (client) => {
       if (setBase) {
         await client.query(`UPDATE product_units SET is_base = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
         updates.push(`is_base = TRUE`)
-      }
-      if (setSellDefault) {
-        await client.query(`UPDATE product_units SET is_sell_default = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
-        updates.push(`is_sell_default = TRUE`)
-      }
-      if (setPurchaseDefault) {
-        await client.query(`UPDATE product_units SET is_purchase_default = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
-        updates.push(`is_purchase_default = TRUE`)
       }
       if (updates.length === 0) {
         const cur = await client.query(`SELECT * FROM product_units WHERE id = $1`, [params.unitId])

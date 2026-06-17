@@ -102,25 +102,12 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   const setBase = body.is_base === true
-  const setSellDefault = body.is_sell_default === true
-  const setPurchaseDefault = body.is_purchase_default === true
-  // Note: we don't allow flipping a flag to false directly — the flag moves
-  // to another row by setting it true on that row. This keeps "exactly one"
-  // invariants intact.
 
   try {
     const updated = await withTransaction(async (client) => {
       if (setBase) {
         await client.query(`UPDATE product_units SET is_base = FALSE WHERE variant_id = $1`, [params.variantId])
         updates.push(`is_base = TRUE`)
-      }
-      if (setSellDefault) {
-        await client.query(`UPDATE product_units SET is_sell_default = FALSE WHERE variant_id = $1`, [params.variantId])
-        updates.push(`is_sell_default = TRUE`)
-      }
-      if (setPurchaseDefault) {
-        await client.query(`UPDATE product_units SET is_purchase_default = FALSE WHERE variant_id = $1`, [params.variantId])
-        updates.push(`is_purchase_default = TRUE`)
       }
       if (updates.length === 0) {
         const cur = await client.query(`SELECT * FROM product_units WHERE id = $1`, [params.unitId])

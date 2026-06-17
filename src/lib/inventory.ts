@@ -194,8 +194,11 @@ export async function getStockValuation() {
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN brands b ON b.id = p.brand_id
-    LEFT JOIN product_units su ON su.product_id = p.id AND su.is_sell_default = TRUE
-      AND su.variant_id IS NULL AND su.sub_variant_id IS NULL
+    LEFT JOIN LATERAL (
+      SELECT unit, display_label, dimension FROM product_units
+      WHERE product_id = p.id AND variant_id IS NULL AND sub_variant_id IS NULL
+      ORDER BY is_base DESC LIMIT 1
+    ) su ON TRUE
     WHERE p.has_variants = FALSE AND p.is_active = TRUE
     UNION ALL
     SELECT
@@ -219,8 +222,11 @@ export async function getStockValuation() {
     JOIN products p ON p.id = pv.product_id
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN brands b ON b.id = p.brand_id
-    LEFT JOIN product_units su ON su.product_id = p.id AND su.is_sell_default = TRUE
-      AND su.variant_id = pv.id AND su.sub_variant_id IS NULL
+    LEFT JOIN LATERAL (
+      SELECT unit, display_label, dimension FROM product_units
+      WHERE product_id = p.id AND variant_id = pv.id AND sub_variant_id IS NULL
+      ORDER BY is_base DESC LIMIT 1
+    ) su ON TRUE
     WHERE p.is_active = TRUE AND pv.is_active = TRUE
       AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = TRUE)
     UNION ALL
@@ -248,16 +254,16 @@ export async function getStockValuation() {
     LEFT JOIN brands b ON b.id = p.brand_id
     LEFT JOIN LATERAL (
       SELECT unit, display_label, dimension FROM product_units
-      WHERE product_id = p.id AND is_sell_default = TRUE AND sub_variant_id = sv.id
+      WHERE product_id = p.id AND sub_variant_id = sv.id
+      ORDER BY is_base DESC LIMIT 1
       UNION ALL
       SELECT unit, display_label, dimension FROM product_units
-      WHERE product_id = p.id AND is_sell_default = TRUE AND variant_id = pv.id AND sub_variant_id IS NULL
-        AND NOT EXISTS (SELECT 1 FROM product_units WHERE product_id = p.id AND is_sell_default = TRUE AND sub_variant_id = sv.id)
+      WHERE product_id = p.id AND variant_id = pv.id AND sub_variant_id IS NULL
+      ORDER BY is_base DESC LIMIT 1
       UNION ALL
       SELECT unit, display_label, dimension FROM product_units
-      WHERE product_id = p.id AND is_sell_default = TRUE AND variant_id IS NULL AND sub_variant_id IS NULL
-        AND NOT EXISTS (SELECT 1 FROM product_units WHERE product_id = p.id AND is_sell_default = TRUE AND (sub_variant_id = sv.id OR variant_id = pv.id))
-      LIMIT 1
+      WHERE product_id = p.id AND variant_id IS NULL AND sub_variant_id IS NULL
+      ORDER BY is_base DESC LIMIT 1
     ) su ON TRUE
     WHERE p.is_active = TRUE AND pv.is_active = TRUE AND sv.is_active = TRUE
     ORDER BY name, variant_name, sub_variant_name
