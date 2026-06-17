@@ -127,8 +127,8 @@ function OrderConfirmationPage() {
 
           <div className="space-y-4 mb-6">
             {order.items.map((item) => {
-              const isFractional = item.buyMode && item.buyMode !== 'unit'
-              const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : null
+              const isFractional = (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
+              const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : (item.buyMode && item.buyMode !== 'unit' ? item.buyMode : null)
               const qtyNum = isFractional
                 ? Number(Number(item.quantity).toFixed(6)).toString()
                 : String(Math.round(Number(item.quantity)))
