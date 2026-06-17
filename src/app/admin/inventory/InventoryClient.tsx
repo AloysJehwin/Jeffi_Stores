@@ -849,13 +849,17 @@ function StockTab() {
         }))
         // For sub-variants, also try sub-variant-specific units if present; fall back to variant/product
         setEditUnits(fetched)
-        // Pre-select the sell unit that matches the valuation row
-        const match = fetched.find((u: any) => Math.abs(u.factor - sellFactor) < 0.0001)
-          || fetched[0]
+        // For count-dimension, always pre-select the base (pc, factor=1) unit so
+        // the operator enters raw piece count — no unwanted multiplication.
+        // For other dimensions, match by factor to the valuation row's sell unit.
+        const isCount = p.sell_unit_dimension === 'count'
+        const match = isCount
+          ? (fetched.find((u: any) => u.factor === 1 && u.dimension === 'count') || fetched.find((u: any) => u.dimension === 'count') || fetched[0])
+          : (fetched.find((u: any) => Math.abs(u.factor - sellFactor) < 0.0001) || fetched[0])
         if (match) {
           setEditUnitId(match.id)
-          // Pre-fill qty as sell-unit qty when factor > 1
-          if (match.factor > 1) {
+          // Pre-fill qty as sell-unit qty only for non-count units with factor > 1
+          if (!isCount && match.factor > 1) {
             setEditQty(String(Math.round(currentBase / match.factor * 1000) / 1000))
           }
         }
@@ -1289,9 +1293,9 @@ function StockTab() {
                                   />
                                   {(() => {
                                     const u = editUnits.find(u => u.id === editUnitId)
-                                    if (!u || u.factor === 1) return null
+                                    if (!u || u.factor === 1 || u.dimension === 'count') return null
                                     const base = Math.round(parseFloat(editQty || '0') * u.factor * 1000) / 1000
-                                    return <span className="text-xs text-foreground-muted">= {base} pcs</span>
+                                    return <span className="text-xs text-foreground-muted">= {base} {u.dimension === 'count' ? 'pcs' : 'base units'}</span>
                                   })()}
                                 </div>
                               ) : (
