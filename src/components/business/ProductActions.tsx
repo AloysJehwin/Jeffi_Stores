@@ -85,6 +85,13 @@ const MODE_LABELS: Record<string, string> = {
   unit: 'By Piece',
 }
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 function getPerUnitRate(price: number, numeric_value: number, unit: string): string {
   if (!price || !numeric_value || numeric_value === 0) return ''
   let rate = price / numeric_value
@@ -501,7 +508,7 @@ export default function ProductActions({
                   <div className="flex items-center gap-2 flex-wrap justify-end">
                     <span className="text-base text-foreground-muted line-through tabular-nums">
                       Rs.&nbsp;{rawEffectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      {` / ${showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel}`}
+                      {` / `}<UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} />
                     </span>
                     {effectiveMrp && effectiveMrp > rawEffectivePrice && (
                       <span className="text-sm text-foreground-muted line-through tabular-nums">
@@ -515,10 +522,10 @@ export default function ProductActions({
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-sm text-foreground-secondary">/ {showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel}</span>
+                  <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
                   {showPerBasePrice && (
                     <span className="text-base font-semibold text-foreground tabular-nums">
-                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
+                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                     </span>
                   )}
                   <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap shrink-0">
@@ -528,7 +535,7 @@ export default function ProductActions({
                 {/* Total price */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm text-foreground-secondary">
-                    Total ({quantity} {effectiveUnitLabel ?? 'pc'}):
+                    Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
                   </span>
                   <span className="text-base font-semibold text-foreground tabular-nums">
                     Rs.&nbsp;{(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -542,11 +549,11 @@ export default function ProductActions({
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-sm text-foreground-secondary">/ {showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel}</span>
+                  <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
                   {/* Selling unit price in white next to it */}
                   {showPerBasePrice && (
                     <span className="text-base font-semibold text-foreground tabular-nums">
-                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
+                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                     </span>
                   )}
                   {effectiveMrp && effectiveMrp > effectivePrice && (
@@ -558,7 +565,7 @@ export default function ProductActions({
                 {/* Total = selling unit price × qty */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm text-foreground-secondary">
-                    Total ({quantity} {effectiveUnitLabel ?? 'pc'}):
+                    Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
                   </span>
                   <span className="text-base font-semibold text-foreground tabular-nums">
                     Rs.&nbsp;{(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -587,7 +594,7 @@ export default function ProductActions({
             {effectiveWholesalePrice && (
               <div className="mt-3 pt-3 border-t border-border-default">
                 <span className="text-sm text-foreground-secondary">
-                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel ?? 'pc'}</span>
+                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel ?? 'pc'} /></span>
                 </span>
               </div>
             )}
@@ -615,7 +622,7 @@ export default function ProductActions({
 
       <div>
         <label className="block text-sm font-medium text-foreground-secondary mb-2">
-          Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? ` (${effectiveUnitLabel})` : ''}
+          Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
         </label>
         <QuantityInput
           dimension={sellUnit?.dimension ?? 'count'}
