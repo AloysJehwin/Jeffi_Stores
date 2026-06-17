@@ -25,6 +25,9 @@ interface ProductUnit {
   is_sell_default: boolean
   display_label: string | null
   notes: string | null
+  min_qty: number | null
+  max_qty: number | null
+  qty_step: number | null
 }
 
 export interface UnitLoadedInfo {
@@ -66,6 +69,9 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
   const [draftDimension, setDraftDimension] = useState<Dimension>('count')
   const [draftLabel, setDraftLabel] = useState('')
   const [draftFactor, setDraftFactor] = useState('')
+  const [draftMinQty, setDraftMinQty] = useState('1')
+  const [draftMaxQty, setDraftMaxQty] = useState('')
+  const [draftQtyStep, setDraftQtyStep] = useState('1')
 
   // custom unit fields (typed dimensions only)
   const [isCustomUnit, setIsCustomUnit] = useState(false)
@@ -114,6 +120,9 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
       setDraftUnit(u.unit)
       setDraftLabel(u.display_label || '')
       setDraftFactor(String(parseFloat(String(u.factor)) || ''))
+      setDraftMinQty(u.min_qty != null ? String(u.min_qty) : '1')
+      setDraftMaxQty(u.max_qty != null ? String(u.max_qty) : '')
+      setDraftQtyStep(u.qty_step != null ? String(u.qty_step) : '1')
       // restore custom unit fields if previously set
       if (u.conversion_meta?.custom_unit) {
         const m = u.conversion_meta
@@ -130,6 +139,9 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
       setDraftDimension('count')
       setDraftLabel('')
       setDraftFactor('')
+      setDraftMinQty('1')
+      setDraftMaxQty('')
+      setDraftQtyStep('1')
       resetCustomFields()
     }
     setEditing(true)
@@ -146,6 +158,7 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
     setDraftDimension(dim)
     setDraftUnit('')
     setDraftFactor('')
+    if (dim === 'count') setDraftQtyStep('1')
     resetCustomFields(defaultDimUnit(dim))
   }
 
@@ -250,6 +263,13 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
 
     setSaving(true)
     try {
+      const minQty = parseFloat(draftMinQty)
+      const maxQty = draftMaxQty.trim() ? parseFloat(draftMaxQty) : null
+      const qtyStep = draftDimension === 'count' ? 1 : parseFloat(draftQtyStep)
+      if (!Number.isFinite(minQty) || minQty <= 0) { showToast('Min qty must be a positive number', 'error'); return }
+      if (maxQty !== null && (!Number.isFinite(maxQty) || maxQty < minQty)) { showToast('Max qty must be ≥ min qty', 'error'); return }
+      if (!Number.isFinite(qtyStep) || qtyStep <= 0) { showToast('Qty step must be a positive number', 'error'); return }
+
       if (unit && !inherited) {
         const res = await fetch(`${baseUrl}/${unit.id}`, {
           method: 'PATCH',
@@ -261,6 +281,9 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
             dimension: draftDimension,
             display_label: draftLabel || null,
             conversion_meta: conversionMeta,
+            min_qty: minQty,
+            max_qty: maxQty,
+            qty_step: qtyStep,
           }),
         })
         const data = await res.json()
@@ -279,6 +302,9 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
             is_base: true,
             is_sell_default: false,
             is_purchase_default: false,
+            min_qty: minQty,
+            max_qty: maxQty,
+            qty_step: qtyStep,
           }),
         })
         const data = await res.json()
@@ -514,6 +540,49 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
                 className={inputCls}
                 placeholder="e.g. Box of 12"
               />
+            </div>
+          </div>
+
+          {/* Qty constraints row */}
+          <div className="grid grid-cols-3 gap-x-2 items-end">
+            <div>
+              <label className="block text-[10px] text-foreground-muted mb-0.5">Min qty *</label>
+              <input
+                type="number" step="any" min="0.000001"
+                value={draftMinQty}
+                onChange={e => setDraftMinQty(e.target.value)}
+                className={inputCls}
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-foreground-muted mb-0.5">Max qty (blank = stock limit)</label>
+              <input
+                type="number" step="any" min="0.000001"
+                value={draftMaxQty}
+                onChange={e => setDraftMaxQty(e.target.value)}
+                className={inputCls}
+                placeholder="e.g. 200"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-foreground-muted mb-0.5">
+                {draftDimension === 'count' ? 'Qty step (locked to 1)' : 'Qty step *'}
+              </label>
+              {draftDimension === 'count' ? (
+                <div className={lockedCls}>
+                  <span className="text-foreground font-mono">1</span>
+                  <span className="ml-2 text-[10px] text-foreground-muted">(fixed)</span>
+                </div>
+              ) : (
+                <input
+                  type="number" step="any" min="0.000001"
+                  value={draftQtyStep}
+                  onChange={e => setDraftQtyStep(e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. 0.25"
+                />
+              )}
             </div>
           </div>
 
