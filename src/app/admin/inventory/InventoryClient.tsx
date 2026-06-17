@@ -957,7 +957,7 @@ function StockTab() {
                     {ledgerGroups.map(group => {
                       const multi = group.txs.length > 1
                       const expanded = expandedGroups.has(group.refId)
-                      const totalChange = group.txs.reduce((s, t) => s + t.quantity_change, 0)
+                      const totalChange = Math.round(group.txs.reduce((s, t) => s + Number(t.quantity_change), 0) * 1000) / 1000
                       const txType = group.txs[0].transaction_type
 
                       const refLink = group.refType === 'order' ? (
@@ -973,11 +973,17 @@ function StockTab() {
                           {group.refLabel || group.refId.slice(0, 8) + '…'}
                         </Link>
                       ) : (
-                        <span className="font-mono text-foreground-secondary">{group.refType}/{group.refId.slice(0, 8)}…</span>
+                        <span className="font-mono text-foreground-secondary">{group.refType} / {group.refId.slice(0, 8)}…</span>
                       )
+
+                      function fmtChange(n: number) {
+                        const sign = n > 0 ? '+' : n < 0 ? '−' : ''
+                        return `${sign}${Math.abs(n)}`
+                      }
 
                       if (!multi) {
                         const tx = group.txs[0]
+                        const chg = Number(tx.quantity_change)
                         return (
                           <tr key={tx.id} className="hover:bg-surface-secondary/50 transition-colors">
                             <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-xs">
@@ -1003,13 +1009,13 @@ function StockTab() {
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Change</span>
-                                      <span className={`font-mono font-semibold ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                        {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
+                                      <span className={`font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                                        {fmtChange(chg)}
                                       </span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Balance after</span>
-                                      <span className="font-mono font-medium text-foreground">{tx.quantity_after}</span>
+                                      <span className="font-mono font-medium text-foreground">{Number(tx.quantity_after)}</span>
                                     </div>
                                     {tx.notes && <div className="pt-1 border-t border-border-default"><p className="text-foreground-secondary leading-snug">{tx.notes}</p></div>}
                                   </div>
@@ -1018,17 +1024,17 @@ function StockTab() {
                               {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
                             </td>
                             <td className="px-4 py-3">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
                             </td>
-                            <td className={`px-4 py-3 text-right font-mono font-semibold ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
+                            <td className={`px-4 py-3 text-right font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                              {fmtChange(chg)}
                               {tx.quantity_in_unit != null && tx.unit_label && (
                                 <span className="block text-xs font-normal text-foreground-muted">
-                                  {tx.quantity_in_unit > 0 ? '+' : ''}{tx.quantity_in_unit} {tx.unit_label}
+                                  ({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{tx.quantity_after}</td>
+                            <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{Number(tx.quantity_after)}</td>
                             <td className="px-4 py-3 text-xs hidden md:table-cell">{refLink}</td>
                           </tr>
                         )
@@ -1039,7 +1045,7 @@ function StockTab() {
                           {/* Group header row */}
                           <tr
                             key={`group-${group.refId}`}
-                            className="bg-surface-secondary/60 hover:bg-surface-secondary cursor-pointer transition-colors"
+                            className="bg-surface-secondary/60 hover:bg-surface-secondary cursor-pointer transition-colors select-none"
                             onClick={() => toggleGroup(group.refId)}
                           >
                             <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs">
@@ -1054,45 +1060,50 @@ function StockTab() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                                 <span className="text-sm font-medium text-foreground">
-                                  {group.txs.length} products
+                                  {group.txs.length} items
                                 </span>
                                 <span className="text-xs text-foreground-muted">
-                                  {expanded ? 'click to collapse' : 'click to expand'}
+                                  {expanded ? '(collapse)' : '(expand)'}
                                 </span>
                               </div>
                             </td>
                             <td className="px-4 py-2.5">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[txType] || ''}`}>{txType}</span>
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[txType] || ''}`}>{txType}</span>
                             </td>
-                            <td className={`px-4 py-2.5 text-right font-mono font-semibold ${totalChange > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {totalChange > 0 ? '+' : ''}{totalChange}
+                            <td className={`px-4 py-2.5 text-right font-mono font-semibold ${totalChange > 0 ? 'text-green-600 dark:text-green-400' : totalChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                              {fmtChange(totalChange)}
+                              <span className="block text-xs font-normal text-foreground-muted">net total</span>
                             </td>
                             <td className="px-4 py-2.5 text-right text-foreground-muted text-xs font-mono">—</td>
                             <td className="px-4 py-2.5 text-xs hidden md:table-cell">{refLink}</td>
                           </tr>
 
                           {/* Expanded product rows */}
-                          {expanded && group.txs.map(tx => (
-                            <tr key={tx.id} className="bg-surface/40 hover:bg-surface-secondary/30 transition-colors border-l-2 border-accent-500/30">
-                              <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8">
-                                {new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                              </td>
-                              <td className="px-4 py-2.5 pl-8 text-foreground">
-                                <Link href={ap(`/admin/products/${tx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2">
-                                  {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
-                                </Link>
-                                {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
-                              </td>
-                              <td className="px-4 py-2.5">
-                                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
-                              </td>
-                              <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
-                              </td>
-                              <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">{tx.quantity_after}</td>
-                              <td className="px-4 py-2.5 text-xs hidden md:table-cell text-foreground-muted font-mono">↳</td>
-                            </tr>
-                          ))}
+                          {expanded && group.txs.map(tx => {
+                            const chg = Number(tx.quantity_change)
+                            return (
+                              <tr key={tx.id} className="bg-surface/40 hover:bg-surface-secondary/30 transition-colors border-l-2 border-accent-500/30">
+                                <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8" />
+                                <td className="px-4 py-2.5 pl-8 text-foreground">
+                                  <Link href={ap(`/admin/products/${tx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2">
+                                    {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
+                                  </Link>
+                                  {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
+                                </td>
+                                <td className="px-4 py-2.5" />
+                                <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                                  {fmtChange(chg)}
+                                  {tx.quantity_in_unit != null && tx.unit_label && (
+                                    <span className="block text-xs font-normal text-foreground-muted">
+                                      ({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">{Number(tx.quantity_after)}</td>
+                                <td className="px-4 py-2.5 text-xs hidden md:table-cell" />
+                              </tr>
+                            )
+                          })}
                         </>
                       )
                     })}
