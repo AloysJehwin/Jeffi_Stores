@@ -271,13 +271,13 @@ export default function CartPage() {
                                 type="number"
                                 min="0.001"
                                 step="0.001"
-                                defaultValue={Number(item.quantity).toFixed(3)}
+                                defaultValue={Number(Number(item.quantity).toFixed(6)).toString()}
                                 onBlur={(e) => {
                                   const val = parseFloat(e.target.value)
                                   if (!isNaN(val) && val > 0 && val !== Number(item.quantity)) {
                                     handleQuantityChange(item.id, val)
                                   } else {
-                                    e.target.value = Number(item.quantity).toFixed(3)
+                                    e.target.value = Number(Number(item.quantity).toFixed(6)).toString()
                                   }
                                 }}
                                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}

@@ -2,6 +2,11 @@
 
 import { useRef, useCallback, useEffect, useState } from 'react'
 
+/** Round to up to 6 decimal places, then strip trailing zeros. */
+function fmtQty(v: number, maxDecimals = 6): string {
+  return Number(v.toFixed(maxDecimals)).toString()
+}
+
 interface QuantityInputProps {
   dimension: string // 'count' | 'length' | 'weight' | 'area' | 'volume' | other
   quantity: number
@@ -113,12 +118,12 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   const updateDOM = (v: number) => {
     liveValue.current = v
     if (readoutRef.current)
-      readoutRef.current.textContent = v % 1 === 0 ? String(v) : v.toFixed(2)
+      readoutRef.current.textContent = fmtQty(v)
     if (fillRef.current)
       fillRef.current.style.width = `${(v - qtyMin) * pxPerUnit}px`
   }
 
-  const commit = (v: number) => onChange(v, v % 1 === 0 ? String(v) : v.toFixed(2))
+  const commit = (v: number) => onChange(v, fmtQty(v))
 
   const scrollToValue = (v: number, smooth = false) => {
     const el = trackRef.current
@@ -256,7 +261,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
       {/* readout */}
       <div className="flex items-baseline gap-1.5">
         <span ref={readoutRef} className="text-2xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-          {quantity % 1 === 0 ? String(quantity) : quantity.toFixed(2)}
+          {fmtQty(quantity)}
         </span>
         {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
       </div>
@@ -351,11 +356,11 @@ function SliderInput({ quantity, quantityRaw, unitLabel, effectiveStock, qtyMax,
 
   function dec() {
     const next = Math.max(qtyMin, Math.round((quantity - qtyStep) * 1000) / 1000)
-    onChange(next, next % 1 === 0 ? String(next) : next.toFixed(3))
+    onChange(next, next % 1 === 0 ? String(next) : fmtQty(next))
   }
   function inc() {
     const next = Math.min(ceiling, Math.round((quantity + qtyStep) * 1000) / 1000)
-    onChange(next, next % 1 === 0 ? String(next) : next.toFixed(3))
+    onChange(next, next % 1 === 0 ? String(next) : fmtQty(next))
   }
 
   return (
@@ -379,7 +384,7 @@ function SliderInput({ quantity, quantityRaw, unitLabel, effectiveStock, qtyMax,
           onBlur={e => {
             const v = parseFloat(e.target.value)
             const clamped = isNaN(v) || v < qtyMin ? qtyMin : Math.min(ceiling, v)
-            onChange(clamped, clamped.toFixed(3))
+            onChange(clamped, fmtQty(clamped))
           }}
           className="w-20 sm:w-24 min-h-[44px] border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none text-base"
         />
@@ -410,9 +415,9 @@ function DimStepper({ label, value, step, min, max, onChange }: {
   label: string; value: number; step: number; min: number; max: number
   onChange: (v: number) => void
 }) {
-  const [raw, setRaw] = useState(value.toFixed(2))
+  const [raw, setRaw] = useState(fmtQty(value))
 
-  useEffect(() => { setRaw(value.toFixed(2)) }, [value])
+  useEffect(() => { setRaw(fmtQty(value)) }, [value])
 
   function snap(v: number) {
     const snapped = Math.round(v / step) * step
@@ -423,10 +428,10 @@ function DimStepper({ label, value, step, min, max, onChange }: {
     const parsed = parseFloat(s)
     if (!isNaN(parsed) && parsed > 0) {
       const snapped = snap(parsed)
-      setRaw(snapped.toFixed(2))
+      setRaw(fmtQty(snapped))
       onChange(snapped)
     } else {
-      setRaw(value.toFixed(2))
+      setRaw(fmtQty(value))
     }
   }
 
@@ -502,7 +507,7 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
         </div>
       </div>
       <p className="text-sm text-foreground-secondary">
-        Area: <span className="font-semibold text-foreground">{quantity.toFixed(3)} {unitLabel}²</span>
+        Area: <span className="font-semibold text-foreground">{fmtQty(quantity)} {unitLabel}²</span>
       </p>
     </div>
   )

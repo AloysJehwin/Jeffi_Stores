@@ -120,9 +120,9 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
       setDraftUnit(u.unit)
       setDraftLabel(u.display_label || '')
       setDraftFactor(String(parseFloat(String(u.factor)) || ''))
-      setDraftMinQty(u.min_qty != null ? String(u.min_qty) : '1')
-      setDraftMaxQty(u.max_qty != null ? String(u.max_qty) : '')
-      setDraftQtyStep(u.qty_step != null ? String(u.qty_step) : '1')
+      setDraftMinQty(u.min_qty != null ? String(Number(u.min_qty)) : '1')
+      setDraftMaxQty(u.max_qty != null ? String(Number(u.max_qty)) : '')
+      setDraftQtyStep(u.qty_step != null ? String(Number(u.qty_step)) : '1')
       // restore custom unit fields if previously set
       if (u.conversion_meta?.custom_unit) {
         const m = u.conversion_meta
