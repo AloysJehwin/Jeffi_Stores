@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const units = await queryMany(
     `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
             is_base, is_purchase_default, is_sell_default,
-            display_label, notes, created_at, updated_at
+            display_label, notes, min_qty, max_qty, qty_step, created_at, updated_at
      FROM product_units
      WHERE product_id = $1 AND variant_id IS NULL
      ORDER BY is_base DESC, unit ASC`,
@@ -76,6 +76,9 @@ export async function POST(request: NextRequest, { params }: Params) {
   const allowed = ['count', 'length', 'area', 'volume', 'weight', 'custom']
   const dimension = allowed.includes(body.dimension) ? body.dimension : 'count'
   const conversionMeta = body.conversion_meta != null ? body.conversion_meta : null
+  const minQty = body.min_qty != null && Number.isFinite(Number(body.min_qty)) && Number(body.min_qty) > 0 ? Number(body.min_qty) : 1
+  const maxQty = body.max_qty != null && Number.isFinite(Number(body.max_qty)) && Number(body.max_qty) >= minQty ? Number(body.max_qty) : null
+  const qtyStep = body.qty_step != null && Number.isFinite(Number(body.qty_step)) && Number(body.qty_step) > 0 ? Number(body.qty_step) : 1
 
   try {
     const inserted = await withTransaction(async (client) => {
@@ -103,14 +106,15 @@ export async function POST(request: NextRequest, { params }: Params) {
         `INSERT INTO product_units (
            product_id, variant_id, unit, factor, dimension, conversion_meta,
            is_base, is_sell_default, is_purchase_default,
-           display_label, notes
-         ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+           display_label, notes, min_qty, max_qty, qty_step
+         ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
         [
           params.id,
           unit, factor, dimension,
           conversionMeta ? JSON.stringify(conversionMeta) : null,
           isBase, isSellDefault, isPurchaseDefault,
           displayLabel, notes,
+          minQty, maxQty, qtyStep,
         ]
       )
       return res.rows[0]
