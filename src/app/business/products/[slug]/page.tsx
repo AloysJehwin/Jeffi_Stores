@@ -58,7 +58,7 @@ const getProductBySlug = cache(async (slug: string) => {
       COALESCE(
         (SELECT json_agg(
            json_build_object(
-             'id', pu.id, 'variant_id', pu.variant_id, 'unit', pu.unit,
+             'id', pu.id, 'variant_id', pu.variant_id, 'sub_variant_id', pu.sub_variant_id, 'unit', pu.unit,
              'factor', pu.factor, 'is_base', pu.is_base, 'is_sell_default', pu.is_sell_default,
              'is_purchase_default', pu.is_purchase_default, 'display_label', pu.display_label,
              'dimension', pu.dimension, 'min_qty', pu.min_qty, 'max_qty', pu.max_qty, 'qty_step', pu.qty_step

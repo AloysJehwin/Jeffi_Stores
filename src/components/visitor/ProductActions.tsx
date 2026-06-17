@@ -46,6 +46,7 @@ interface Variant {
 interface ProductUnit {
   id: string
   variant_id: string | null
+  sub_variant_id: string | null
   unit: string
   factor: number
   is_base: boolean
@@ -239,15 +240,21 @@ export default function ProductActions({
   const productUnits = productUnitsProp ?? []
   const sellUnit = (() => {
     if (!selectedVariantId) {
-      return productUnits.find(u => u.variant_id === null && u.is_sell_default)
-        ?? productUnits.find(u => u.variant_id === null && u.is_base)
+      return productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_sell_default)
+        ?? productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
         ?? null
     }
-    return productUnits.find(u => u.variant_id === selectedVariantId && u.is_sell_default)
-      ?? productUnits.find(u => u.variant_id === selectedVariantId && u.is_base)
-      ?? productUnits.find(u => u.variant_id === selectedVariantId)
-      ?? productUnits.find(u => u.variant_id === null && u.is_sell_default)
-      ?? productUnits.find(u => u.variant_id === null && u.is_base)
+    if (selectedSubVariantId) {
+      const svUnit = productUnits.find(u => u.sub_variant_id === selectedSubVariantId && u.is_sell_default)
+        ?? productUnits.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base)
+        ?? productUnits.find(u => u.sub_variant_id === selectedSubVariantId)
+      if (svUnit) return svUnit
+    }
+    return productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_sell_default)
+      ?? productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base)
+      ?? productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
+      ?? productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_sell_default)
+      ?? productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
       ?? null
   })()
   const effectiveUnitKey = sellUnit?.unit ?? 'unit'

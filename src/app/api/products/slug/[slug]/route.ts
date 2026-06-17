@@ -47,6 +47,7 @@ export async function GET(
              json_build_object(
                'id', pu.id,
                'variant_id', pu.variant_id,
+               'sub_variant_id', pu.sub_variant_id,
                'unit', pu.unit,
                'factor', pu.factor,
                'is_base', pu.is_base,

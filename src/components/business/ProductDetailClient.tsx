@@ -88,6 +88,7 @@ interface ProductDetailClientProps {
     product_units?: Array<{
       id: string
       variant_id: string | null
+      sub_variant_id: string | null
       unit: string
       factor: number
       is_base: boolean

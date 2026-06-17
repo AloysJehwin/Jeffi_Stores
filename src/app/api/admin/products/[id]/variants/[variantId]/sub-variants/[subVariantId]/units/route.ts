@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, query, withTransaction } from '@/lib/db'
+import { queryMany, queryOne, withTransaction } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
 interface Params {
-  params: { id: string; variantId: string }
+  params: { id: string; variantId: string; subVariantId: string }
 }
 
-async function ensureVariant(productId: string, variantId: string) {
+async function ensureSubVariant(productId: string, variantId: string, subVariantId: string) {
   const row = await queryOne<{ id: string }>(
-    `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`,
-    [variantId, productId]
+    `SELECT id FROM product_sub_variants
+     WHERE id = $1 AND variant_id = $2 AND product_id = $3`,
+    [subVariantId, variantId, productId]
   )
   return !!row
 }
@@ -24,48 +25,22 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  if (!(await ensureVariant(params.id, params.variantId))) {
-    return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
+  if (!(await ensureSubVariant(params.id, params.variantId, params.subVariantId))) {
+    return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
   }
 
-  const variantUnits = await queryMany(
+  const units = await queryMany(
     `SELECT id, product_id, variant_id, sub_variant_id, unit, factor, dimension, conversion_meta,
             is_base, is_purchase_default, is_sell_default,
             display_label, notes, min_qty, max_qty, qty_step,
             created_at, updated_at
      FROM product_units
-     WHERE variant_id = $1
+     WHERE sub_variant_id = $1
      ORDER BY is_base DESC, unit ASC`,
-    [params.variantId]
+    [params.subVariantId]
   )
 
-  // If no variant-specific rows, fall back to product-level units (inherited)
-  const inherited = variantUnits.length === 0
-  const units = inherited
-    ? await queryMany(
-        `SELECT id, product_id, variant_id, sub_variant_id, unit, factor, dimension, conversion_meta,
-                is_base, is_purchase_default, is_sell_default,
-                display_label, notes, min_qty, max_qty, qty_step,
-                created_at, updated_at
-         FROM product_units
-         WHERE product_id = $1 AND variant_id IS NULL
-         ORDER BY is_base DESC, unit ASC`,
-        [params.id]
-      )
-    : variantUnits
-
-  const unitIds = units.map(u => u.id)
-  const rules = unitIds.length
-    ? await queryMany(
-        `SELECT id, product_unit_id, rule_type, config, is_active, priority, created_at
-         FROM product_unit_rules
-         WHERE product_unit_id = ANY($1::uuid[])
-         ORDER BY priority ASC`,
-        [unitIds]
-      )
-    : []
-
-  return NextResponse.json({ units, rules, inherited })
+  return NextResponse.json({ units })
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -73,6 +48,10 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  if (!(await ensureSubVariant(params.id, params.variantId, params.subVariantId))) {
+    return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
   }
 
   const body = await request.json().catch(() => null)
@@ -83,10 +62,6 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!unit) return NextResponse.json({ error: 'unit is required' }, { status: 400 })
   if (!Number.isFinite(factor) || factor <= 0) {
     return NextResponse.json({ error: 'factor must be a positive number' }, { status: 400 })
-  }
-
-  if (!(await ensureVariant(params.id, params.variantId))) {
-    return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
   }
 
   const isBase = !!body.is_base
@@ -104,21 +79,21 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const upserted = await withTransaction(async (client) => {
       if (isBase) {
-        await client.query(`UPDATE product_units SET is_base = FALSE WHERE variant_id = $1`, [params.variantId])
+        await client.query(`UPDATE product_units SET is_base = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
       }
       if (isSellDefault) {
-        await client.query(`UPDATE product_units SET is_sell_default = FALSE WHERE variant_id = $1`, [params.variantId])
+        await client.query(`UPDATE product_units SET is_sell_default = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
       }
       if (isPurchaseDefault) {
-        await client.query(`UPDATE product_units SET is_purchase_default = FALSE WHERE variant_id = $1`, [params.variantId])
+        await client.query(`UPDATE product_units SET is_purchase_default = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
       }
       const res = await client.query(
         `INSERT INTO product_units (
-           product_id, variant_id, unit, factor, dimension, conversion_meta,
+           product_id, variant_id, sub_variant_id, unit, factor, dimension, conversion_meta,
            is_base, is_sell_default, is_purchase_default,
            display_label, notes, min_qty, max_qty, qty_step
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-         ON CONFLICT (variant_id, unit) WHERE variant_id IS NOT NULL
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         ON CONFLICT (sub_variant_id, unit) WHERE sub_variant_id IS NOT NULL
          DO UPDATE SET
            factor = EXCLUDED.factor,
            dimension = EXCLUDED.dimension,
@@ -136,27 +111,21 @@ export async function POST(request: NextRequest, { params }: Params) {
         [
           params.id,
           params.variantId,
-          unit,
-          factor,
-          dimension,
+          params.subVariantId,
+          unit, factor, dimension,
           conversionMeta ? JSON.stringify(conversionMeta) : null,
-          isBase,
-          isSellDefault,
-          isPurchaseDefault,
-          displayLabel,
-          notes,
-          minQty,
-          maxQty,
-          qtyStep,
+          isBase, isSellDefault, isPurchaseDefault,
+          displayLabel, notes,
+          minQty, maxQty, qtyStep,
         ]
       )
       return res.rows[0]
     })
-    return NextResponse.json({ unit: upserted })
+    return NextResponse.json({ unit: upserted }, { status: 201 })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    if (msg.includes('uniq_product_units_one_base_per_variant')) {
-      return NextResponse.json({ error: 'A base unit already exists for this variant' }, { status: 409 })
+    if (msg.includes('duplicate key')) {
+      return NextResponse.json({ error: 'A unit with this name already exists for this sub-variant' }, { status: 409 })
     }
     return NextResponse.json({ error: 'Failed to create unit' }, { status: 500 })
   }

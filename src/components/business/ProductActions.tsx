@@ -48,6 +48,7 @@ interface Variant {
 interface ProductUnit {
   id: string
   variant_id: string | null
+  sub_variant_id: string | null
   unit: string
   factor: number
   is_base: boolean
@@ -256,15 +257,21 @@ export default function ProductActions({
   const units = productUnitsProp ?? []
   const sellUnit = (() => {
     if (!selectedVariantId) {
-      return units.find(u => u.variant_id === null && u.is_sell_default)
-        ?? units.find(u => u.variant_id === null && u.is_base)
+      return units.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_sell_default)
+        ?? units.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
         ?? null
     }
-    return units.find(u => u.variant_id === selectedVariantId && u.is_sell_default)
-      ?? units.find(u => u.variant_id === selectedVariantId && u.is_base)
-      ?? units.find(u => u.variant_id === selectedVariantId)
-      ?? units.find(u => u.variant_id === null && u.is_sell_default)
-      ?? units.find(u => u.variant_id === null && u.is_base)
+    if (selectedSubVariantId) {
+      const svUnit = units.find(u => u.sub_variant_id === selectedSubVariantId && u.is_sell_default)
+        ?? units.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base)
+        ?? units.find(u => u.sub_variant_id === selectedSubVariantId)
+      if (svUnit) return svUnit
+    }
+    return units.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_sell_default)
+      ?? units.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base)
+      ?? units.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
+      ?? units.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_sell_default)
+      ?? units.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
       ?? null
   })()
   const effectiveUnitKey = sellUnit?.unit ?? 'unit'
