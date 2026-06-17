@@ -53,7 +53,10 @@ export async function GET(
                'is_sell_default', pu.is_sell_default,
                'is_purchase_default', pu.is_purchase_default,
                'display_label', pu.display_label,
-               'dimension', pu.dimension
+               'dimension', pu.dimension,
+               'min_qty', pu.min_qty,
+               'max_qty', pu.max_qty,
+               'qty_step', pu.qty_step
              ) ORDER BY pu.is_sell_default DESC, pu.is_base DESC
            )
            FROM product_units pu WHERE pu.product_id = p.id
