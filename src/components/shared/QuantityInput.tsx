@@ -29,7 +29,7 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
               onChange(next, String(next))
             }}
             disabled={quantity <= qtyMin}
-            className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -48,7 +48,7 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
               const clamped = isNaN(v) || v < qtyMin ? qtyMin : Math.min(ceiling, v)
               onChange(clamped, String(clamped))
             }}
-            className="w-16 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none"
+            className="w-14 sm:w-16 min-h-[44px] border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none text-base"
           />
           <button
             type="button"
@@ -57,7 +57,7 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
               onChange(next, String(next))
             }}
             disabled={quantity >= ceiling}
-            className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -88,21 +88,18 @@ const PX_PER_UNIT = 80
 function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyStep, onChange }: QuantityInputProps) {
   const max = Math.max(Math.min(effectiveStock, qtyMax ?? effectiveStock), qtyMin)
 
-  const trackRef = useRef<HTMLDivElement>(null)
-  const fillRef  = useRef<HTMLDivElement>(null)
-  const readoutRef = useRef<HTMLSpanElement>(null)
+  const trackRef    = useRef<HTMLDivElement>(null)
+  const fillRef     = useRef<HTMLDivElement>(null)
+  const readoutRef  = useRef<HTMLSpanElement>(null)
 
-  const isDragging  = useRef(false)
-  const lastX       = useRef(0)
-  const liveValue   = useRef(quantity)
-  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isDragging        = useRef(false)
+  const lastX             = useRef(0)
+  const liveValue         = useRef(quantity)
+  const commitTimer       = useRef<ReturnType<typeof setTimeout> | null>(null)
   const programmatic      = useRef(false)
   const programmaticTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // snap v to the nearest valid step anchored at qtyMin
-  const snap = (v: number) => Math.round((v - qtyMin) / qtyStep) * qtyStep + qtyMin
-
-  // scrollLeft ↔ value — no container-width dependence
+  const snap         = (v: number) => Math.round((v - qtyMin) / qtyStep) * qtyStep + qtyMin
   const toScrollLeft = (v: number) => (v - qtyMin) * PX_PER_UNIT
   const fromScrollLeft = (sl: number) => qtyMin + sl / PX_PER_UNIT
 
@@ -125,14 +122,14 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     programmaticTimer.current = setTimeout(() => { programmatic.current = false }, smooth ? 600 : 30)
   }
 
-  // initial scroll — runs once after mount
+  // initial scroll
   useEffect(() => {
     updateDOM(quantity)
     scrollToValue(quantity, false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // external quantity change (e.g. variant switch) — re-centre
+  // external quantity change (e.g. variant switch)
   const prevQty = useRef(quantity)
   useEffect(() => {
     if (isDragging.current) return
@@ -162,6 +159,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [max, qtyMin, qtyStep])
 
+  // Mouse-only drag (touch uses native scroll)
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return
     isDragging.current = true
@@ -201,10 +199,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     ticks.push({ pos, label, kind: isMajor ? 'major' : isMid ? 'mid' : 'minor' })
   }
 
-  // tape inner width: the ticks span (max-qtyMin)*PX_PER_UNIT.
-  // We add half-container padding on each side via paddingInline so the user
-  // can scroll qtyMin and qtyMax under the centre needle. This is set as a
-  // CSS variable updated by ResizeObserver so it stays correct after resize.
+  // ResizeObserver sets paddingInline = clientWidth/2 so qtyMin/qtyMax reach the needle
   const innerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = trackRef.current
@@ -213,7 +208,6 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     const ro = new ResizeObserver(() => {
       const half = el.clientWidth / 2
       inner.style.paddingInline = `${half}px`
-      // re-scroll to keep current value under needle after resize
       el.scrollLeft = toScrollLeft(liveValue.current)
     })
     ro.observe(el)
@@ -221,6 +215,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Long-press step buttons
   const stepInterval = useRef<ReturnType<typeof setInterval> | null>(null)
   const stepTimeout  = useRef<ReturnType<typeof setTimeout>  | null>(null)
 
@@ -251,6 +246,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
 
   return (
     <div className="space-y-3">
+      {/* readout */}
       <div className="flex items-baseline gap-1.5">
         <span ref={readoutRef} className="text-2xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
           {quantity % 1 === 0 ? String(quantity) : quantity.toFixed(2)}
@@ -258,85 +254,86 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
       </div>
 
-      <div className="relative rounded-xl border border-border-secondary overflow-hidden bg-amber-50 dark:bg-amber-950/20 select-none" style={{ height: 72 }}>
-          {/* fixed centre needle */}
-          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 z-10 pointer-events-none flex flex-col items-center">
-            <div className="w-0.5 h-full bg-primary-600 dark:bg-primary-400 opacity-80" />
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0"
-              style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid var(--color-primary-600, #2563eb)' }} />
-          </div>
+      {/* tape box */}
+      <div className="relative rounded-xl border border-border-secondary overflow-hidden bg-amber-50 dark:bg-amber-950/20 select-none" style={{ height: 80 }}>
 
-          {/* scrollable track */}
-          <div
-            ref={trackRef}
-            onScroll={onScroll}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            className="absolute inset-0 overflow-x-scroll cursor-grab active:cursor-grabbing"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
-          >
-            {/* inner: padding added by ResizeObserver so qtyMin/qtyMax reach the needle */}
-            <div ref={innerRef} style={{ display: 'inline-block', height: '100%' }}>
-              <div style={{ width: ticksWidth, height: '100%', position: 'relative' }}>
-                {/* fill bar */}
-                <div
-                  ref={fillRef}
-                  className="absolute top-0 bottom-0 left-0 bg-primary-100 dark:bg-primary-900/30"
-                  style={{ width: (quantity - qtyMin) * PX_PER_UNIT }}
-                />
-                {/* ticks */}
-                {ticks.map((t, i) => (
-                  <div key={i} style={{ position: 'absolute', left: t.pos, top: 0, width: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{
-                      width: 1,
-                      height: t.kind === 'major' ? 28 : t.kind === 'mid' ? 18 : 10,
-                      background: t.kind === 'major' ? '#92400e' : '#d97706',
-                      opacity: t.kind === 'minor' ? 0.4 : 0.7,
-                      marginTop: t.kind === 'major' ? 0 : t.kind === 'mid' ? 5 : 8,
-                    }} />
-                    {t.label && (
-                      <span style={{ position: 'absolute', top: 30, fontSize: 11, fontWeight: 700, color: '#92400e', transform: 'translateX(-50%)', whiteSpace: 'nowrap', userSelect: 'none', fontFamily: 'monospace' }}>
-                        {t.label}
-                      </span>
-                    )}
-                  </div>
-                ))}
-                {/* max label */}
-                <span style={{ position: 'absolute', left: ticksWidth + 8, top: 34, fontSize: 11, color: '#b45309', fontWeight: 600, userSelect: 'none' }}>
-                  {unitLabel} max
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* ‹ button — left overlay */}
-          <button
-            type="button"
-            onPointerDown={e => { e.stopPropagation(); startLongPress(-1) }}
-            onPointerUp={stopLongPress}
-            onPointerLeave={stopLongPress}
-            onPointerCancel={stopLongPress}
-            disabled={quantity <= qtyMin}
-            className="absolute left-0 inset-y-0 z-20 w-9 flex items-center justify-center bg-amber-100/80 dark:bg-amber-900/40 hover:bg-amber-200/90 dark:hover:bg-amber-800/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-amber-900 dark:text-amber-200 text-lg font-bold"
-            style={{ backdropFilter: 'blur(2px)' }}
-          >‹</button>
-
-          {/* › button — right overlay */}
-          <button
-            type="button"
-            onPointerDown={e => { e.stopPropagation(); startLongPress(1) }}
-            onPointerUp={stopLongPress}
-            onPointerLeave={stopLongPress}
-            onPointerCancel={stopLongPress}
-            disabled={quantity >= max}
-            className="absolute right-0 inset-y-0 z-20 w-9 flex items-center justify-center bg-amber-100/80 dark:bg-amber-900/40 hover:bg-amber-200/90 dark:hover:bg-amber-800/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-amber-900 dark:text-amber-200 text-lg font-bold"
-            style={{ backdropFilter: 'blur(2px)' }}
-          >›</button>
+        {/* fixed centre needle */}
+        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 z-10 pointer-events-none flex flex-col items-center">
+          <div className="w-0.5 h-full bg-primary-600 dark:bg-primary-400 opacity-80" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0"
+            style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid var(--color-primary-600, #2563eb)' }} />
         </div>
 
-      <p className="text-xs text-foreground-muted">Drag the tape or hold ‹ › to set length</p>
+        {/* scrollable track — touch scrolls natively; mouse uses pointer drag */}
+        <div
+          ref={trackRef}
+          onScroll={onScroll}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          className="absolute inset-0 overflow-x-scroll cursor-grab active:cursor-grabbing touch-pan-x"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+        >
+          <div ref={innerRef} style={{ display: 'inline-block', height: '100%' }}>
+            <div style={{ width: ticksWidth, height: '100%', position: 'relative' }}>
+              {/* fill bar */}
+              <div
+                ref={fillRef}
+                className="absolute top-0 bottom-0 left-0 bg-primary-100 dark:bg-primary-900/30"
+                style={{ width: (quantity - qtyMin) * PX_PER_UNIT }}
+              />
+              {/* ticks */}
+              {ticks.map((t, i) => (
+                <div key={i} style={{ position: 'absolute', left: t.pos, top: 0, width: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{
+                    width: 1,
+                    height: t.kind === 'major' ? 30 : t.kind === 'mid' ? 20 : 12,
+                    background: t.kind === 'major' ? '#92400e' : '#d97706',
+                    opacity: t.kind === 'minor' ? 0.4 : 0.7,
+                    marginTop: t.kind === 'major' ? 0 : t.kind === 'mid' ? 5 : 8,
+                  }} />
+                  {t.label && (
+                    <span style={{ position: 'absolute', top: 33, fontSize: 12, fontWeight: 700, color: '#92400e', transform: 'translateX(-50%)', whiteSpace: 'nowrap', userSelect: 'none', fontFamily: 'monospace' }}>
+                      {t.label}
+                    </span>
+                  )}
+                </div>
+              ))}
+              {/* max label */}
+              <span style={{ position: 'absolute', left: ticksWidth + 8, top: 36, fontSize: 11, color: '#b45309', fontWeight: 600, userSelect: 'none' }}>
+                {unitLabel} max
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ‹ — left overlay, full height for easy tap */}
+        <button
+          type="button"
+          onPointerDown={e => { e.stopPropagation(); startLongPress(-1) }}
+          onPointerUp={stopLongPress}
+          onPointerLeave={stopLongPress}
+          onPointerCancel={stopLongPress}
+          disabled={quantity <= qtyMin}
+          className="absolute left-0 inset-y-0 z-20 w-11 flex items-center justify-center bg-amber-100/80 dark:bg-amber-900/40 hover:bg-amber-200/90 dark:hover:bg-amber-800/60 active:bg-amber-300/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-amber-900 dark:text-amber-200 text-xl font-bold"
+          style={{ backdropFilter: 'blur(2px)', touchAction: 'none' }}
+        >‹</button>
+
+        {/* › — right overlay */}
+        <button
+          type="button"
+          onPointerDown={e => { e.stopPropagation(); startLongPress(1) }}
+          onPointerUp={stopLongPress}
+          onPointerLeave={stopLongPress}
+          onPointerCancel={stopLongPress}
+          disabled={quantity >= max}
+          className="absolute right-0 inset-y-0 z-20 w-11 flex items-center justify-center bg-amber-100/80 dark:bg-amber-900/40 hover:bg-amber-200/90 dark:hover:bg-amber-800/60 active:bg-amber-300/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-amber-900 dark:text-amber-200 text-xl font-bold"
+          style={{ backdropFilter: 'blur(2px)', touchAction: 'none' }}
+        >›</button>
+      </div>
+
+      <p className="text-xs text-foreground-muted">Swipe the tape or hold ‹ › to adjust</p>
     </div>
   )
 }
@@ -361,7 +358,7 @@ function SliderInput({ quantity, quantityRaw, unitLabel, effectiveStock, qtyMax,
           type="button"
           onClick={dec}
           disabled={quantity <= qtyMin}
-          className="px-3 py-1.5 text-sm hover:bg-surface-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >−</button>
         <input
           type="text"
@@ -377,13 +374,13 @@ function SliderInput({ quantity, quantityRaw, unitLabel, effectiveStock, qtyMax,
             const clamped = isNaN(v) || v < qtyMin ? qtyMin : Math.min(ceiling, v)
             onChange(clamped, clamped.toFixed(3))
           }}
-          className="w-24 py-1.5 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none text-sm"
+          className="w-20 sm:w-24 min-h-[44px] border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none text-base"
         />
         <button
           type="button"
           onClick={inc}
           disabled={quantity >= ceiling}
-          className="px-3 py-1.5 text-sm hover:bg-surface-secondary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >+</button>
       </div>
       {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
@@ -434,10 +431,8 @@ function DimStepper({ label, value, step, min, max, onChange }: {
           type="button"
           onClick={() => onChange(snap(value - step))}
           disabled={value <= min}
-          className="px-2.5 py-2 text-foreground-muted hover:text-foreground hover:bg-surface-elevated disabled:opacity-30 text-sm select-none"
-        >
-          −
-        </button>
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-elevated disabled:opacity-30 text-lg select-none"
+        >−</button>
         <input
           type="text"
           inputMode="decimal"
@@ -445,16 +440,14 @@ function DimStepper({ label, value, step, min, max, onChange }: {
           onChange={e => setRaw(e.target.value)}
           onBlur={e => commit(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') commit((e.target as HTMLInputElement).value) }}
-          className="flex-1 text-center font-semibold text-foreground bg-transparent text-sm py-2 focus:outline-none min-w-0"
+          className="flex-1 text-center font-semibold text-foreground bg-transparent text-base min-h-[44px] focus:outline-none min-w-0"
         />
         <button
           type="button"
           onClick={() => onChange(snap(value + step))}
           disabled={value >= max}
-          className="px-2.5 py-2 text-foreground-muted hover:text-foreground hover:bg-surface-elevated disabled:opacity-30 text-sm select-none"
-        >
-          +
-        </button>
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-elevated disabled:opacity-30 text-lg select-none"
+        >+</button>
       </div>
     </div>
   )
@@ -490,7 +483,7 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
           value={w} step={qtyStep} min={dimMin} max={dimMax}
           onChange={handleW}
         />
-        <span className="text-foreground-muted pb-2.5">×</span>
+        <span className="text-foreground-muted pb-3 text-lg">×</span>
         <DimStepper
           label={`Height (${unitLabel ?? ''})`}
           value={h} step={qtyStep} min={dimMin} max={dimMax}
