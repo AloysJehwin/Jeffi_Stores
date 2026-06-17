@@ -7,6 +7,13 @@ function fmtQty(v: number, maxDecimals = 6): string {
   return Number(v.toFixed(maxDecimals)).toString()
 }
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 interface QuantityInputProps {
   dimension: string // 'count' | 'length' | 'weight' | 'area' | 'volume' | other
   quantity: number
@@ -70,7 +77,7 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
           </button>
         </div>
         {unitLabel && unitKey !== 'unit' && (
-          <span className="text-sm text-foreground-secondary">{unitLabel}</span>
+          <span className="text-sm text-foreground-secondary"><UnitLabel label={unitLabel} /></span>
         )}
       </div>
     </div>
@@ -263,7 +270,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         <span ref={readoutRef} className="text-2xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
           {fmtQty(quantity)}
         </span>
-        {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
+        {unitLabel && <span className="text-sm text-foreground-secondary"><UnitLabel label={unitLabel} /></span>}
       </div>
 
       {/* tape box */}
@@ -314,7 +321,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
               ))}
               {/* max label */}
               <span style={{ position: 'absolute', left: ticksWidth + 8, top: 36, fontSize: 11, color: '#b45309', fontWeight: 600, userSelect: 'none' }}>
-                {unitLabel} max
+                <UnitLabel label={unitLabel} /> max
               </span>
             </div>
           </div>
