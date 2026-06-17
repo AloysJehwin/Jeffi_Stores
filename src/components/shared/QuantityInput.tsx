@@ -86,8 +86,9 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
 const PX_PER_UNIT = 80
 
 function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyStep, onChange }: QuantityInputProps) {
-  // Cap ruler range: use explicit qtyMax if set, otherwise show at most 20 steps beyond qtyMin
-  const rulerMax = qtyMax ?? Math.min(effectiveStock, qtyMin + 20 * qtyStep)
+  // Cap ruler range: use explicit qtyMax if set, otherwise cap to avoid thousands of tick DOM nodes.
+  // Show at least 10 units of range, and at most 200 steps worth.
+  const rulerMax = qtyMax ?? Math.min(effectiveStock, Math.max(qtyMin + 10, qtyMin + 200 * qtyStep))
   const max = Math.max(Math.min(effectiveStock, rulerMax), qtyMin)
 
   const trackRef    = useRef<HTMLDivElement>(null)
@@ -187,7 +188,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   // tick marks
   const ticks: { pos: number; label: string | null; kind: 'major' | 'mid' | 'minor' }[] = []
   const subStep = qtyStep <= 0.1 ? qtyStep : 0.1
-  const totalSteps = Math.round((max - qtyMin) / subStep)
+  const totalSteps = Math.min(Math.round((max - qtyMin) / subStep), 400)
   let lastMajorLabel: string | null = null
   for (let i = 0; i <= totalSteps; i++) {
     const v = Math.round((qtyMin + i * subStep) * 1000) / 1000
