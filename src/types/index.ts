@@ -10,7 +10,6 @@ export interface Product {
   base_price: number
   mrp?: number
   price_ex_gst?: number
-  wholeprice_ex_gst?: number
   gst_percentage?: number
   currency: string
   hsn_code?: string
@@ -47,7 +46,6 @@ export interface ProductVariant {
   price: number | null
   mrp?: number | null
   price_ex_gst?: number | null
-  wholeprice_ex_gst?: number | null
   stock_quantity: number
   mpn?: string
   gtin?: string

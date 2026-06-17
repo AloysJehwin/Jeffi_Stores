@@ -37,7 +37,6 @@ interface Variant {
   mrp: number | null
   mrp_ex_gst: number | null
   price_ex_gst: number | null
-  wholeprice_ex_gst: number | null
   stock_quantity: number
   pricing_type?: string
   unit?: string
@@ -57,7 +56,6 @@ interface ProductDetailClientProps {
     base_price: number
     mrp?: number | null
     price_ex_gst?: number | null
-    wholeprice_ex_gst?: number | null
     gst_percentage?: number | null
     stock_quantity: number
     has_variants: boolean
@@ -364,13 +362,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                 Inclusive of all taxes
                 {product.gst_percentage ? ` (${parseFloat(String(product.gst_percentage))}% GST)` : ''}
               </p>
-              {product.wholeprice_ex_gst && (
-                <div className="mt-3 pt-3 border-t border-border-default">
-                  <span className="text-sm text-foreground-secondary">
-                    Wholesale Price: <span className="font-semibold text-foreground">Rs. {(Number(product.wholeprice_ex_gst) * (1 + (parseFloat(String(product.gst_percentage)) || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </span>
-                </div>
-              )}
               <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />
             </div>
 
@@ -405,7 +396,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           salePrice={null}
           mrp={mrp}
           gstPercentage={product.gst_percentage ? Number(product.gst_percentage) : null}
-          wholesalePrice={product.wholeprice_ex_gst ? Number(product.wholeprice_ex_gst) : null}
           variants={hasVariants ? product.product_variants : []}
           variantType={product.variant_type || 'Variant'}
           initialSkuParam={initialSkuParam}

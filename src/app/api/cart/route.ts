@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
-            'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'stock_quantity', pv.stock_quantity,
+            'stock_quantity', pv.stock_quantity,
             'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value
           )
         ELSE NULL END AS variant,
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
           json_build_object(
             'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
             'price', psv.price, 'mrp', psv.mrp, 'price_ex_gst', psv.price_ex_gst,
-            'mrp_ex_gst', psv.mrp_ex_gst, 'wholeprice_ex_gst', psv.wholeprice_ex_gst,
+            'mrp_ex_gst', psv.mrp_ex_gst,
             'stock_quantity', psv.stock_quantity, 'inventory_quantity', psv.inventory_quantity
           )
         ELSE NULL END AS sub_variant,

@@ -33,7 +33,7 @@ const getProductBySlug = cache(async (slug: string) => {
            jsonb_build_object(
              'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
              'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
-             'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'stock_quantity', pv.stock_quantity,
+             'stock_quantity', pv.stock_quantity,
              'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value,
              'sub_variant_type', pv.sub_variant_type,
              'variant_type', pv.variant_type,
