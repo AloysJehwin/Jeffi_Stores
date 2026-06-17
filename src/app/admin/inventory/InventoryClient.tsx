@@ -1139,6 +1139,7 @@ function StockTab() {
                         <SortableHeader label="Variant" column="variant" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden sm:table-cell" />
                         <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden md:table-cell" />
                         <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Sell Unit</th>
                         <SortableHeader label="Price ex-GST" column="price" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
                         <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">GST %</th>
                         <SortableHeader label="Stock Value (ex-GST)" column="value" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
@@ -1148,7 +1149,7 @@ function StockTab() {
                     </thead>
                     <tbody className="divide-y divide-border-default">
                       {valSlice.length === 0 && (
-                        <tr><td colSpan={9} className="py-12 text-center text-foreground-secondary text-sm">
+                        <tr><td colSpan={10} className="py-12 text-center text-foreground-secondary text-sm">
                           {valSearch ? `No products match "${valSearch}"` : 'No products in stock'}
                         </td></tr>
                       )}
@@ -1212,6 +1213,13 @@ function StockTab() {
                                   {parseFloat(p.inventory_quantity || '0')}
                                 </span>
                               )}
+                            </td>
+                            <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
+                              {p.sell_unit_label || p.sell_unit
+                                ? <span className="inline-flex items-center px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium">
+                                    {p.sell_unit_label || p.sell_unit}
+                                  </span>
+                                : <span className="text-foreground-muted">unit</span>}
                             </td>
                             <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
                             <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>

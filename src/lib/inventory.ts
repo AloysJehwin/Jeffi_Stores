@@ -38,8 +38,8 @@ export async function logStockMovement(
     currentStockRaw = parseFloat(row?.inventory_quantity as any) || 0
   }
 
-  const qtyChange = Math.round(quantityChange)
-  const quantityAfter = Math.round(currentStockRaw + quantityChange)
+  const qtyChange = quantityChange
+  const quantityAfter = Math.round((currentStockRaw + quantityChange) * 1000) / 1000
 
   const sql = `INSERT INTO inventory_transactions
     (product_id, variant_id, sub_variant_id, transaction_type, quantity_change, quantity_after,
@@ -187,10 +187,15 @@ export async function getStockValuation() {
       FALSE AS has_variants,
       p.category_id,
       c.name AS category_name,
-      b.name AS brand_name
+      b.name AS brand_name,
+      su.unit AS sell_unit,
+      su.unit_label AS sell_unit_label,
+      su.dimension AS sell_unit_dimension
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN brands b ON b.id = p.brand_id
+    LEFT JOIN product_units su ON su.product_id = p.id AND su.is_sell_default = TRUE
+      AND su.variant_id IS NULL AND su.sub_variant_id IS NULL
     WHERE p.has_variants = FALSE AND p.is_active = TRUE
     UNION ALL
     SELECT
@@ -206,11 +211,16 @@ export async function getStockValuation() {
       TRUE AS has_variants,
       p.category_id,
       c.name AS category_name,
-      b.name AS brand_name
+      b.name AS brand_name,
+      su.unit AS sell_unit,
+      su.unit_label AS sell_unit_label,
+      su.dimension AS sell_unit_dimension
     FROM product_variants pv
     JOIN products p ON p.id = pv.product_id
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN brands b ON b.id = p.brand_id
+    LEFT JOIN product_units su ON su.product_id = p.id AND su.is_sell_default = TRUE
+      AND su.variant_id = pv.id AND su.sub_variant_id IS NULL
     WHERE p.is_active = TRUE AND pv.is_active = TRUE
       AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = TRUE)
     UNION ALL
@@ -227,12 +237,17 @@ export async function getStockValuation() {
       TRUE AS has_variants,
       p.category_id,
       c.name AS category_name,
-      b.name AS brand_name
+      b.name AS brand_name,
+      su.unit AS sell_unit,
+      su.unit_label AS sell_unit_label,
+      su.dimension AS sell_unit_dimension
     FROM product_sub_variants sv
     JOIN product_variants pv ON pv.id = sv.variant_id
     JOIN products p ON p.id = pv.product_id
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN brands b ON b.id = p.brand_id
+    LEFT JOIN product_units su ON su.product_id = p.id AND su.is_sell_default = TRUE
+      AND su.sub_variant_id = sv.id
     WHERE p.is_active = TRUE AND pv.is_active = TRUE AND sv.is_active = TRUE
     ORDER BY name, variant_name, sub_variant_name
   `)
