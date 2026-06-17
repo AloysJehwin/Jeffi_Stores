@@ -82,6 +82,24 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       vals.push(JSON.stringify(body.conversion_meta))
     }
   }
+  if (body.min_qty !== undefined) {
+    const v = Number(body.min_qty)
+    if (!Number.isFinite(v) || v <= 0) return NextResponse.json({ error: 'min_qty must be positive' }, { status: 400 })
+    updates.push(`min_qty = $${i++}`); vals.push(v)
+  }
+  if (body.max_qty !== undefined) {
+    if (body.max_qty === null) updates.push(`max_qty = NULL`)
+    else {
+      const v = Number(body.max_qty)
+      if (!Number.isFinite(v) || v <= 0) return NextResponse.json({ error: 'max_qty must be positive' }, { status: 400 })
+      updates.push(`max_qty = $${i++}`); vals.push(v)
+    }
+  }
+  if (body.qty_step !== undefined) {
+    const v = Number(body.qty_step)
+    if (!Number.isFinite(v) || v <= 0) return NextResponse.json({ error: 'qty_step must be positive' }, { status: 400 })
+    updates.push(`qty_step = $${i++}`); vals.push(v)
+  }
 
   const setBase = body.is_base === true
   const setSellDefault = body.is_sell_default === true
