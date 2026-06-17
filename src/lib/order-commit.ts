@@ -399,8 +399,9 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
 
     if (input.mode === 'cart') {
       itemRows = input.cartItems.map(item => {
+        const isFractional = item.buy_mode && item.buy_mode !== 'unit'
         const unitPrice = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-        const qty = Number(item.quantity)
+        const qty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
         const gstRate = parseFloat(String(item.products.gst_percentage || '0'))
         const itemTotal = unitPrice * qty
         const gst = isGSTEnabled ? calculateGST(itemTotal, gstRate, isIGST) : null
@@ -435,7 +436,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
       })
     } else {
       const i = input.item
-      const qty = Number(i.qty)
+      const isBuyNowFractional = i.buyMode && i.buyMode !== 'unit'
+      const qty = isBuyNowFractional ? Number(i.qty) : Math.round(Number(i.qty))
       const unitPrice = Number(i.price)
       const itemTotal = unitPrice * qty
       const gstRate = parseFloat(String(input.product.gst_percentage || '0'))

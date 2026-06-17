@@ -514,8 +514,10 @@ function CheckoutReviewPage() {
                 ) : (
                   cartItems.map((item) => {
                     const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
-                    const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
-                    const itemTotal = price * item.quantity
+                    const isFractional = item.buy_mode && item.buy_mode !== 'unit'
+                    const price = isFractional ? item.price_at_addition : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+                    const effectiveQty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
+                    const itemTotal = price * effectiveQty
                     const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
                     const showMrp = mrp !== null && Number(mrp) > Number(price)
                     const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
@@ -561,7 +563,7 @@ function CheckoutReviewPage() {
                           </div>
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-sm text-foreground-secondary">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode && item.buy_mode !== 'unit' ? <>{Number(Number(item.quantity).toFixed(6)).toString()}{item.buy_unit && item.buy_unit !== 'unit' ? <> <UnitLabel label={item.buy_unit} /></> : ''}</> : Math.round(Number(item.quantity))}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {isFractional ? <>{Number(Number(item.quantity).toFixed(6)).toString()}{item.buy_unit && item.buy_unit !== 'unit' ? <> <UnitLabel label={item.buy_unit} /></> : ''}</> : effectiveQty}
                               {showMrp && (
                                 <>
                                   {' '}<span className="line-through text-foreground-muted">₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>

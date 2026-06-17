@@ -181,15 +181,15 @@ export default function CartPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               {cartItems.map((item) => {
                 const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || item.buy_mode === 'weight' || item.buy_mode === 'length'
+                const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || !!(item.buy_mode && item.buy_mode !== 'unit')
                 const price = isCustomQty
                   ? item.price_at_addition
                   : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
                 const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
                 const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
                 const itemTotal = isCustomQty
-                  ? item.price_at_addition * item.quantity
-                  : price * item.quantity
+                  ? item.price_at_addition * Number(item.quantity)
+                  : price * Math.round(Number(item.quantity))
                 const isUpdating = updatingItems.has(item.id)
                 const showMrp = !isCustomQty && mrp !== null && Number(mrp) > Number(price)
                 const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
@@ -390,7 +390,7 @@ export default function CartPage() {
                 <div className="divide-y divide-border-default">
                   {savedItems.map((item) => {
                     const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                    const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || item.buy_mode === 'weight' || item.buy_mode === 'length'
+                    const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || !!(item.buy_mode && item.buy_mode !== 'unit')
                     const price = isCustomQty
                       ? item.price_at_addition
                       : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
