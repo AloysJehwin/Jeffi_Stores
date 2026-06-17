@@ -131,7 +131,9 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     programmatic.current = true
     if (programmaticTimer.current) clearTimeout(programmaticTimer.current)
     el.scrollTo({ left: Math.max(0, getScrollLeft(v)), behavior: smooth ? 'smooth' : 'instant' })
-    programmaticTimer.current = setTimeout(() => { programmatic.current = false }, smooth ? 700 : 50)
+    // Use 1200ms for smooth — browser smooth-scroll can take 800ms+; if the
+    // guard drops too early the scroll event is misread and causes snap-back.
+    programmaticTimer.current = setTimeout(() => { programmatic.current = false }, smooth ? 1200 : 50)
   }
 
   // mount: scroll to initial quantity
