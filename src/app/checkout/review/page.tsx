@@ -10,6 +10,13 @@ import AddressFormModal from '@/components/visitor/AddressFormModal'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 export default function CheckoutReviewPageWrapper() {
   return (
     <Suspense>
@@ -481,7 +488,7 @@ function CheckoutReviewPage() {
                       </div>
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-sm text-foreground-secondary">
-                          ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
+                          ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode && buyNowItem.buyMode !== 'unit' ? <>{Number(Number(buyNowItem.qty).toFixed(6)).toString()}{buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit' ? <> <UnitLabel label={buyNowItem.buyUnit} /></> : ''}</> : Math.round(buyNowItem.qty)}
                           {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
                             <>
                               {' '}<span className="line-through text-foreground-muted">₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -554,7 +561,7 @@ function CheckoutReviewPage() {
                           </div>
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-sm text-foreground-secondary">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {item.buy_mode && item.buy_mode !== 'unit' ? <>{Number(Number(item.quantity).toFixed(6)).toString()}{item.buy_unit && item.buy_unit !== 'unit' ? <> <UnitLabel label={item.buy_unit} /></> : ''}</> : Math.round(Number(item.quantity))}
                               {showMrp && (
                                 <>
                                   {' '}<span className="line-through text-foreground-muted">₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>

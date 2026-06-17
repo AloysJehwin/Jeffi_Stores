@@ -10,6 +10,13 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { mrpDiscountPct } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 
 export default function CheckoutPageWrapper() {
@@ -550,7 +557,7 @@ function CheckoutPage() {
                         </div>
                         <div className="flex items-center justify-between mt-2">
                           <p className="text-sm text-foreground-secondary">
-                            ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
+                            ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode && buyNowItem.buyMode !== 'unit' ? <>{Number(Number(buyNowItem.qty).toFixed(6)).toString()}{buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit' ? <> <UnitLabel label={buyNowItem.buyUnit} /></> : ''}</> : Math.round(buyNowItem.qty)}
                             {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
                               <>
                                 {' '}<span className="line-through text-foreground-muted">₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -583,7 +590,7 @@ function CheckoutPage() {
                       const discountPct = showMrp ? mrpDiscountPct(Number(mrp), Number(price)) : 0
                       const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
                       const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
-                      const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                      const isCustomQty = item.buy_mode && item.buy_mode !== 'unit'
                       const unitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
                       const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
                       return (
@@ -622,7 +629,7 @@ function CheckoutPage() {
                               )}
                             </div>
                             <p className="text-sm text-foreground-secondary mt-1">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')} × {isCustomQty ? `${Number(item.quantity).toFixed(3)} ${unitLabel ?? item.buy_unit ?? ''}` : `${Math.round(Number(item.quantity))}${showUnitLabel ? ` ${unitLabel}` : ''}`}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? <> / <UnitLabel label={unitLabel ?? item.buy_unit} /></> : (showUnitLabel ? <> / <UnitLabel label={unitLabel} /></> : '')} × {isCustomQty ? <>{Number(Number(item.quantity).toFixed(6)).toString()}{unitLabel || item.buy_unit ? <> <UnitLabel label={unitLabel ?? item.buy_unit} /></> : ''}</> : <>{Math.round(Number(item.quantity))}{showUnitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}</>}
                               {showMrp && (
                                 <>
                                   {' '}<span className="line-through text-foreground-muted">₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
