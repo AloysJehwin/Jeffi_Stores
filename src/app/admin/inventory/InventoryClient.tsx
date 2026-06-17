@@ -686,6 +686,8 @@ type StockTransaction = {
   id: string; created_at: string; transaction_type: string
   quantity_change: number; quantity_after: number
   reference_type: string; reference_id: string; notes: string | null
+  unit_id: string | null; unit_label: string | null
+  unit_factor: number | null; quantity_in_unit: number | null
   product_id: string; product_name: string; product_sku: string | null
   variant_id: string | null; variant_name: string | null
   sub_variant_id: string | null; sub_variant_name: string | null
@@ -699,7 +701,7 @@ function StockTab() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
-  const [valuation, setValuation] = useState<{ products: any[]; totalValue: number } | null>(null)
+  const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number } | null>(null)
   const [valPage, setValPage] = useState(1)
   const [valSearch, setValSearch] = useState(searchParams.get('val_search') || '')
   const [valCategory, setValCategory] = useState(searchParams.get('val_category') || '')
@@ -714,6 +716,8 @@ function StockTab() {
   const [editQty, setEditQty] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  const [editUnits, setEditUnits] = useState<{ id: string; unit: string; display_label: string | null; factor: number; dimension: string }[]>([])
+  const [editUnitId, setEditUnitId] = useState<string>('')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   function toggleGroup(refId: string) {
@@ -773,78 +777,123 @@ function StockTab() {
     setLoading(false)
   }, [search, from, to, txPage])
 
-  const loadValuation = useCallback(async () => {
+  const loadValuation = useCallback(async (pg = valPage) => {
     setLoading(true)
-    const res = await fetch('/api/admin/inventory/stock?view=valuation')
+    const params = new URLSearchParams({
+      view: 'valuation',
+      page: String(pg),
+      limit: String(VALUATION_PAGE_SIZE),
+    })
+    if (valSearch) params.set('search', valSearch)
+    if (valCategory) params.set('category', valCategory)
+    if (valBrand) params.set('brand', valBrand)
+    if (valStockStatus) params.set('stock_status', valStockStatus)
+    const res = await fetch(`/api/admin/inventory/stock?${params}`)
     const json = await res.json()
     setValuation(json)
     setLoading(false)
-  }, [])
+  }, [valSearch, valCategory, valBrand, valStockStatus, valPage])
 
   useEffect(() => {
     if (view === 'ledger') loadLedger(txPage)
-    else loadValuation()
-  }, [view, loadLedger, loadValuation, txPage])
+    else loadValuation(valPage)
+  }, [view, loadLedger, loadValuation, txPage, valPage])
 
   const allValRows = valuation?.products || []
-  const filteredValRows = allValRows.filter(p => {
-    if (valSearch.trim()) {
-      const q = valSearch.toLowerCase()
-      if (!(p.name || '').toLowerCase().includes(q) && !(p.sku || '').toLowerCase().includes(q) && !(p.row_sku || '').toLowerCase().includes(q) && !(p.variant_name || '').toLowerCase().includes(q) && !(p.sub_variant_name || '').toLowerCase().includes(q)) return false
-    }
-    if (valCategory && p.category_name !== valCategory) return false
-    if (valBrand && p.brand_name !== valBrand) return false
-    if (valStockStatus === 'in_stock' && parseFloat(p.inventory_quantity || '0') <= 0) return false
-    if (valStockStatus === 'out_of_stock' && parseFloat(p.inventory_quantity || '0') > 0) return false
-    if (valStockStatus === 'low_stock' && (parseFloat(p.inventory_quantity || '0') <= 0 || parseFloat(p.inventory_quantity || '0') > 5)) return false
-    return true
-  })
+  const valTotal = valuation?.total || 0
 
   const valCategories = [...new Set(allValRows.map(p => p.category_name).filter(Boolean))].sort() as string[]
   const valBrands = [...new Set(allValRows.map(p => p.brand_name).filter(Boolean))].sort() as string[]
-  const valTotalPages = Math.ceil(filteredValRows.length / VALUATION_PAGE_SIZE)
+
   const VAL_SORT_KEYS: Record<string, string> = {
     product: 'name', variant: 'variant_name', sku: 'sku',
     stock: 'inventory_quantity', price: 'cost_price', value: 'stock_value',
   }
   const sortedValRows = valSortCol && VAL_SORT_KEYS[valSortCol]
-    ? [...filteredValRows].sort((a, b) => {
+    ? [...allValRows].sort((a, b) => {
         const k = VAL_SORT_KEYS[valSortCol]
         const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
         return valSortDir === 'asc' ? cmp : -cmp
       })
-    : filteredValRows
-  const valSlice = sortedValRows.slice((valPage - 1) * VALUATION_PAGE_SIZE, valPage * VALUATION_PAGE_SIZE)
+    : allValRows
 
   function startEdit(p: any) {
     const rowId = p.sub_variant_id || p.variant_id || p.id
     setEditingId(rowId)
-    setEditQty(String(parseFloat(p.inventory_quantity || '0')))
     setEditNotes('')
+
+    // Build unit options from the valuation row data
+    const sellFactor = parseFloat(p.sell_unit_factor || '1') || 1
+    const units: { id: string; unit: string; display_label: string | null; factor: number; dimension: string }[] = []
+
+    // We don't have unit IDs in the valuation row — fetch them from the units API
+    const apiPath = p.variant_id
+      ? `/api/admin/products/${p.id}/variants/${p.variant_id}/units`
+      : `/api/admin/products/${p.id}/units`
+
+    // Default: show base-unit qty while units load
+    const currentBase = parseFloat(p.inventory_quantity || '0')
+    setEditQty(String(currentBase))
+    setEditUnits([])
+    setEditUnitId('')
+
+    fetch(apiPath)
+      .then(r => r.json())
+      .then(json => {
+        const fetched = (json?.units || []).map((u: any) => ({
+          id: u.id,
+          unit: u.unit,
+          display_label: u.display_label,
+          factor: parseFloat(u.factor) || 1,
+          dimension: u.dimension,
+        }))
+        // For sub-variants, also try sub-variant-specific units if present; fall back to variant/product
+        setEditUnits(fetched)
+        // Pre-select the sell unit that matches the valuation row
+        const match = fetched.find((u: any) => Math.abs(u.factor - sellFactor) < 0.0001)
+          || fetched[0]
+        if (match) {
+          setEditUnitId(match.id)
+          // Pre-fill qty as sell-unit qty when factor > 1
+          if (match.factor > 1) {
+            setEditQty(String(Math.round(currentBase / match.factor * 1000) / 1000))
+          }
+        }
+      })
+      .catch(() => {})
   }
 
   async function saveEdit(p: any) {
     setEditSaving(true)
+    const selectedUnit = editUnits.find(u => u.id === editUnitId)
+    const body: Record<string, any> = {
+      product_id: p.id,
+      variant_id: p.variant_id || null,
+      sub_variant_id: p.sub_variant_id || null,
+      notes: editNotes || undefined,
+    }
+    if (selectedUnit && selectedUnit.factor !== 1) {
+      body.unit_id = selectedUnit.id
+      body.quantity_in_unit = parseFloat(editQty)
+    } else {
+      body.new_quantity = parseFloat(editQty)
+    }
     await fetch('/api/admin/inventory/stock', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        product_id: p.id,
-        variant_id: p.variant_id || null,
-        sub_variant_id: p.sub_variant_id || null,
-        new_quantity: parseFloat(editQty),
-        notes: editNotes || undefined,
-      }),
+      body: JSON.stringify(body),
     })
     setEditSaving(false)
     setEditingId(null)
-    loadValuation()
+    loadValuation(valPage)
   }
 
   function cancelEdit() {
     setEditingId(null)
     setEditQty('')
     setEditNotes('')
+    setEditUnits([])
+    setEditUnitId('')
   }
 
   return (
@@ -973,6 +1022,11 @@ function StockTab() {
                             </td>
                             <td className={`px-4 py-3 text-right font-mono font-semibold ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                               {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
+                              {tx.quantity_in_unit != null && tx.unit_label && (
+                                <span className="block text-xs font-normal text-foreground-muted">
+                                  {tx.quantity_in_unit > 0 ? '+' : ''}{tx.quantity_in_unit} {tx.unit_label}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{tx.quantity_after}</td>
                             <td className="px-4 py-3 text-xs hidden md:table-cell">{refLink}</td>
@@ -1125,10 +1179,10 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.stock_value || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'All products'} />
-                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'All products'} />
-                <SummaryCard label="Total SKUs" value={String(filteredValRows.length)} sub={filteredValRows.length !== allValRows.length ? `of ${allValRows.length} total` : 'across all products'} />
-                <SummaryCard label="In Stock" value={String(filteredValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="SKUs with stock > 0" />
+                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(valuation?.totalValue || 0)} accent sub={`${valTotal} SKUs`} />
+                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub="this page" />
+                <SummaryCard label="Total SKUs" value={String(valTotal)} sub="across all products" />
+                <SummaryCard label="In Stock" value={String(allValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="on this page" />
               </div>
               <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
                 <div className="overflow-x-auto">
@@ -1148,12 +1202,12 @@ function StockTab() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">
-                      {valSlice.length === 0 && (
+                      {sortedValRows.length === 0 && (
                         <tr><td colSpan={10} className="py-12 text-center text-foreground-secondary text-sm">
                           {valSearch ? `No products match "${valSearch}"` : 'No products in stock'}
                         </td></tr>
                       )}
-                      {valSlice.map((p) => {
+                      {sortedValRows.map((p) => {
                         const rowId = p.sub_variant_id || p.variant_id || p.id
                         const isEditing = editingId === rowId
                         return (
@@ -1198,16 +1252,37 @@ function StockTab() {
                             <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell">{p.row_sku || p.sku || '—'}</td>
                             <td className="px-4 py-3 text-right">
                               {isEditing ? (
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.001"
-                                  autoFocus
-                                  value={editQty}
-                                  onChange={e => setEditQty(e.target.value)}
-                                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
-                                  className="w-20 px-2 py-1 rounded border border-secondary-500 bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 text-right"
-                                />
+                                <div className="flex flex-col items-end gap-1">
+                                  {editUnits.length > 1 && (
+                                    <select
+                                      value={editUnitId}
+                                      onChange={e => setEditUnitId(e.target.value)}
+                                      className="w-28 px-2 py-1 rounded border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500"
+                                    >
+                                      {editUnits.map(u => (
+                                        <option key={u.id} value={u.id}>
+                                          {u.display_label || u.unit}{u.factor !== 1 ? ` (×${u.factor})` : ''}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.001"
+                                    autoFocus
+                                    value={editQty}
+                                    onChange={e => setEditQty(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
+                                    className="w-20 px-2 py-1 rounded border border-secondary-500 bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 text-right"
+                                  />
+                                  {(() => {
+                                    const u = editUnits.find(u => u.id === editUnitId)
+                                    if (!u || u.factor === 1) return null
+                                    const base = Math.round(parseFloat(editQty || '0') * u.factor * 1000) / 1000
+                                    return <span className="text-xs text-foreground-muted">= {base} pcs</span>
+                                  })()}
+                                </div>
                               ) : (
                                 <span className={`font-medium ${parseFloat(p.inventory_quantity || '0') === 0 ? 'text-red-600 dark:text-red-400' : parseFloat(p.inventory_quantity || '0') <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
                                   {parseFloat(p.inventory_quantity || '0')}
@@ -1216,10 +1291,13 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
                               {p.sell_unit_label || p.sell_unit
-                                ? <span className="inline-flex items-center px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium">
+                                ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium">
                                     {p.sell_unit_label || p.sell_unit}
+                                    {parseFloat(p.sell_unit_factor || '1') > 1 && p.base_unit_label && (
+                                      <span className="text-foreground-muted font-normal">({parseFloat(p.sell_unit_factor)} {p.base_unit_label})</span>
+                                    )}
                                   </span>
-                                : <span className="text-foreground-muted">unit</span>}
+                                : <span className="text-foreground-muted">—</span>}
                             </td>
                             <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
                             <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
@@ -1282,7 +1360,7 @@ function StockTab() {
                   </table>
                 </div>
                 <div className="px-4 pb-4">
-                  <ClientPagination page={valPage} total={filteredValRows.length} pageSize={VALUATION_PAGE_SIZE} onChange={p => { setValPage(p); cancelEdit() }} />
+                  <ClientPagination page={valPage} total={valTotal} pageSize={VALUATION_PAGE_SIZE} onChange={p => { setValPage(p); cancelEdit() }} />
                 </div>
               </div>
             </>
