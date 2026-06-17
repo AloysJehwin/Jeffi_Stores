@@ -295,7 +295,7 @@ export default function ProductActions({
   useEffect(() => {
     const initial = qtyMin
     setQuantity(initial)
-    setQuantityRaw(isContinuous ? initial.toFixed(3) : String(initial))
+    setQuantityRaw(isContinuous ? Number(initial.toFixed(6)).toString() : String(initial))
   }, [effectiveUnitKey])
 
   const handleAddToCart = async () => {

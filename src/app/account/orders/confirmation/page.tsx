@@ -122,7 +122,7 @@ function OrderConfirmationPage() {
             {order.items.map((item) => {
               const isFractional = item.buyMode === 'weight' || item.buyMode === 'length'
               const qtyDisplay = isFractional
-                ? `${Number(item.quantity).toFixed(3)}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
+                ? `${Number(Number(item.quantity).toFixed(6)).toString()}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
                 : `${Math.round(Number(item.quantity))}${item.buyUnit && item.buyUnit !== 'unit' ? ` ${item.buyUnit}` : ''}`
               const priceUnitSuffix = item.buyUnit && item.buyUnit !== 'unit' ? ` / ${item.buyUnit}` : ''
               return (
