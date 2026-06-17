@@ -525,7 +525,7 @@ export default function ProductActions({
                   <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
                   {showPerBasePrice && (
                     <span className="text-base font-semibold text-foreground tabular-nums">
-                      ₹{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                     </span>
                   )}
                   <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap shrink-0">
@@ -538,7 +538,7 @@ export default function ProductActions({
                     Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
                   </span>
                   <span className="text-base font-semibold text-foreground tabular-nums">
-                    Rs.&nbsp;{(effectivePrice * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;{(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </>
@@ -553,7 +553,7 @@ export default function ProductActions({
                   {/* Selling unit price in white next to it */}
                   {showPerBasePrice && (
                     <span className="text-base font-semibold text-foreground tabular-nums">
-                      ₹{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                     </span>
                   )}
                   {effectiveMrp && effectiveMrp > effectivePrice && (
@@ -568,7 +568,7 @@ export default function ProductActions({
                     Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
                   </span>
                   <span className="text-base font-semibold text-foreground tabular-nums">
-                    Rs.&nbsp;{(effectivePrice * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;{(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </>
@@ -584,7 +584,7 @@ export default function ProductActions({
                   {mrpDiscount}% off
                 </span>
                 <span className="text-sm text-foreground-secondary">
-                  You save Rs. {((effectiveMrp! - effectivePrice) * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  You save Rs. {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             )}
@@ -594,7 +594,7 @@ export default function ProductActions({
             {effectiveWholesalePrice && (
               <div className="mt-3 pt-3 border-t border-border-default">
                 <span className="text-sm text-foreground-secondary">
-                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel ?? 'pc'} /></span>
+                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel ?? 'pc'} /></span>
                 </span>
               </div>
             )}
