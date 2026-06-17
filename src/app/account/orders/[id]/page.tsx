@@ -73,6 +73,13 @@ interface OrderDetails {
   items: OrderItem[]
 }
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 function getStatusColor(status: string) {
   switch (status) {
     case 'pending':
@@ -867,16 +874,18 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                           </span>
                         )}
                         {(() => {
-                          const isFractional = item.buyMode === 'weight' || item.buyMode === 'length'
+                          const isFractional = item.buyMode && item.buyMode !== 'unit'
+                          const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : null
                           const qtyDisplay = isFractional
-                            ? `${Number(Number(item.quantity).toFixed(6)).toString()}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
-                            : `${Math.round(Number(item.quantity))}${item.buyUnit && item.buyUnit !== 'unit' ? ` ${item.buyUnit}` : ''}`
-                          const priceUnitSuffix = item.buyUnit && item.buyUnit !== 'unit' ? ` / ${item.buyUnit}` : ''
+                            ? Number(Number(item.quantity).toFixed(6)).toString()
+                            : String(Math.round(Number(item.quantity)))
                           return (
                             <>
-                              <p className="text-sm text-foreground-secondary mt-1">Quantity: {qtyDisplay}</p>
+                              <p className="text-sm text-foreground-secondary mt-1">
+                                Quantity: {qtyDisplay}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}
+                              </p>
                               <p className="text-sm font-semibold text-foreground mt-1">
-                                {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}{priceUnitSuffix} x {qtyDisplay} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                                {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}{unitLabel ? <> / <UnitLabel label={unitLabel} /></> : ''} x {qtyDisplay}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
                               </p>
                             </>
                           )

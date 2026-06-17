@@ -6,6 +6,13 @@ import Link from 'next/link'
 import { CheckCircle } from 'lucide-react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 interface OrderDetails {
   id: string
   orderNumber: string
@@ -120,18 +127,20 @@ function OrderConfirmationPage() {
 
           <div className="space-y-4 mb-6">
             {order.items.map((item) => {
-              const isFractional = item.buyMode === 'weight' || item.buyMode === 'length'
-              const qtyDisplay = isFractional
-                ? `${Number(Number(item.quantity).toFixed(6)).toString()}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
-                : `${Math.round(Number(item.quantity))}${item.buyUnit && item.buyUnit !== 'unit' ? ` ${item.buyUnit}` : ''}`
-              const priceUnitSuffix = item.buyUnit && item.buyUnit !== 'unit' ? ` / ${item.buyUnit}` : ''
+              const isFractional = item.buyMode && item.buyMode !== 'unit'
+              const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : null
+              const qtyNum = isFractional
+                ? Number(Number(item.quantity).toFixed(6)).toString()
+                : String(Math.round(Number(item.quantity)))
               return (
               <div key={item.id} className="flex justify-between items-center pb-4 border-b border-border-default last:border-b-0">
                 <div className="flex-1">
                   <p className="font-medium text-foreground">{item.productName}</p>
-                  <p className="text-sm text-foreground-secondary">Quantity: {qtyDisplay}</p>
                   <p className="text-sm text-foreground-secondary">
-                    ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{priceUnitSuffix} × {qtyDisplay}
+                    Quantity: {qtyNum}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}
+                  </p>
+                  <p className="text-sm text-foreground-secondary">
+                    ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{unitLabel ? <> / <UnitLabel label={unitLabel} /></> : ''} × {qtyNum}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}
                   </p>
                 </div>
                 <p className="font-semibold text-foreground">
