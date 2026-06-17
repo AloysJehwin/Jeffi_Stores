@@ -1301,14 +1301,12 @@ function StockTab() {
                               )}
                             </td>
                             <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
-                              {p.sell_unit_label || p.sell_unit
-                                ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium">
-                                    {p.sell_unit_label || p.sell_unit}
-                                    {parseFloat(p.sell_unit_factor || '1') > 1 && p.base_unit_label && (
-                                      <span className="text-foreground-muted font-normal">({parseFloat(p.sell_unit_factor)} {p.base_unit_label})</span>
-                                    )}
-                                  </span>
-                                : <span className="text-foreground-muted">—</span>}
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium">
+                                {p.sell_unit_label || p.sell_unit || 'Pc'}
+                                {parseFloat(p.sell_unit_factor || '1') > 1 && p.base_unit_label && (
+                                  <span className="text-foreground-muted font-normal">({parseFloat(p.sell_unit_factor)} {p.base_unit_label})</span>
+                                )}
+                              </span>
                             </td>
                             <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
                             <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
