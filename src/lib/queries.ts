@@ -187,7 +187,7 @@ export async function getProduct(id: string) {
           jsonb_build_object(
             'id', pv.id, 'sku', pv.sku, 'variant_name', pv.variant_name,
             'price', pv.price, 'mrp', pv.mrp, 'mrp_ex_gst', pv.mrp_ex_gst, 'price_ex_gst', pv.price_ex_gst,
-            'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'stock_quantity', pv.stock_quantity, 'inventory_quantity', pv.inventory_quantity,
+            'stock_quantity', pv.stock_quantity, 'inventory_quantity', pv.inventory_quantity,
             'mpn', pv.mpn, 'gtin', pv.gtin, 'pricing_type', pv.pricing_type,
             'unit', pv.unit, 'numeric_value', pv.numeric_value,
             'weight_grams', pv.weight_grams, 'package_type', pv.package_type,
@@ -204,7 +204,7 @@ export async function getProduct(id: string) {
                 jsonb_build_object(
                   'id', sv.id, 'sub_variant_name', sv.sub_variant_name, 'sku', sv.sku,
                   'price', sv.price, 'mrp', sv.mrp, 'mrp_ex_gst', sv.mrp_ex_gst,
-                  'price_ex_gst', sv.price_ex_gst, 'wholeprice_ex_gst', sv.wholeprice_ex_gst,
+                  'price_ex_gst', sv.price_ex_gst,
                   'stock_quantity', sv.stock_quantity, 'inventory_quantity', sv.inventory_quantity,
                   'is_active', sv.is_active
                 )

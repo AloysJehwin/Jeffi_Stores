@@ -46,7 +46,6 @@ interface CartItem {
     price: number | null
     mrp: number | null
     price_ex_gst: number | null
-    wholeprice_ex_gst: number | null
     stock_quantity: number
     pricing_type?: string
     unit?: string | null
@@ -60,7 +59,6 @@ interface CartItem {
     mrp: number | null
     price_ex_gst: number | null
     mrp_ex_gst: number | null
-    wholeprice_ex_gst: number | null
     stock_quantity: number
     inventory_quantity: number
   } | null

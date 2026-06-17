@@ -30,12 +30,9 @@ interface VariantRow {
   mrp: string
   mrp_ex_gst: string
   price_ex_gst: string
-  wholeprice_ex_gst: string
-  wholeprice_incl: string
   discount_pct: string
   priceLockSide?: 'incl' | 'excl' | null
   mrpLockSide?: 'incl' | 'excl' | null
-  wholesaleLockSide?: 'incl' | 'excl' | null
   stock_quantity: string
   mpn: string
   gtin: string
@@ -152,7 +149,7 @@ function defaultUnit(_pricing_type: string): string {
 function emptyVariant(pricing_type: 'unit', unit: string): VariantRow {
   return {
     id: `temp-${Math.random().toString(36).slice(2, 11)}`,
-    variant_name: '', price: '', mrp: '', mrp_ex_gst: '', price_ex_gst: '', wholeprice_ex_gst: '', wholeprice_incl: '', discount_pct: '',
+    variant_name: '', price: '', mrp: '', mrp_ex_gst: '', price_ex_gst: '', discount_pct: '',
     stock_quantity: '0', mpn: '', gtin: '',
     pricing_type, unit, numeric_value: '',
     weight_grams: '', package_type: '', length_cm: '', breadth_cm: '', height_cm: '',
@@ -250,9 +247,9 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
     return init
   })
-  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; wholeprice_ex_gst: string; discount_pct: string; wholesaleManuallySet: boolean; stock: string; sku: string }>>({})
+  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; discount_pct: string; stock: string; sku: string }>>({})
   const [subVariantEditId, setSubVariantEditId] = useState<string | null>(null)
-  const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; wholeprice_ex_gst: string; discount_pct: string; wholesaleManuallySet: boolean; stock: string; sku: string } | null>(null)
+  const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; discount_pct: string; stock: string; sku: string } | null>(null)
   const [expandedSvUnits, setExpandedSvUnits] = useState<Set<string>>(new Set())
   const [productPackageType, setProductPackageType] = useState<string>(product?.package_type || 'flat_poly_auto')
   const [gstRate, setGstRate] = useState<number>(product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18)
@@ -286,17 +283,6 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
     return ''
   })
-  const [wholesalePrice, setWholesalePrice] = useState(() => {
-    if (product?.wholeprice_ex_gst == null) return ''
-    const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
-    return String(Math.round(Number(product.wholeprice_ex_gst) * (1 + r / 100) * 100) / 100)
-  })
-  const [wholesalePriceEx, setWholesalePriceEx] = useState(product?.wholeprice_ex_gst != null ? String(product.wholeprice_ex_gst) : '')
-  const [topWholesaleLockSide, setTopWholesaleLockSide] = useState<'incl' | 'excl' | null>(
-    product?.wholeprice_ex_gst != null ? 'incl' : null
-  )
-  // true once the user manually types a wholesale value — stops auto-fill from overwriting it
-  const [wholesaleManuallySet, setWholesaleManuallySet] = useState(product?.wholeprice_ex_gst != null)
   const [topPriceLockSide, setTopPriceLockSide] = useState<'incl' | 'excl' | null>(
     product?.base_price != null ? 'excl' : (product?.price_ex_gst != null ? 'incl' : null)
   )
@@ -330,11 +316,6 @@ export default function ProductForm({ categories, brands, action, product, produ
         }
         const mrpInclStr = mrpEx != null ? String(Math.round(mrpEx * (1 + rate / 100) * 100) / 100) : (v.mrp != null ? String(v.mrp) : '')
         const mrpExStr = mrpEx != null ? String(mrpEx) : ''
-        // Wholesale: use stored value if explicitly set, otherwise follow selling price
-        const hasWholesale = v.wholeprice_ex_gst != null
-        const wholesaleEx = hasWholesale ? String(v.wholeprice_ex_gst) : priceEx
-        const wholesaleIncl = hasWholesale ? String(Math.round(parseFloat(wholesaleEx) * (1 + rate / 100) * 100) / 100) : price
-        const wholesaleLockSide: 'incl' | 'excl' | null = hasWholesale ? 'incl' : null
         return ({
         id: v.id,
         variant_name: v.variant_name,
@@ -342,12 +323,9 @@ export default function ProductForm({ categories, brands, action, product, produ
         mrp: mrpInclStr,
         mrp_ex_gst: mrpExStr,
         price_ex_gst: priceEx,
-        wholeprice_ex_gst: wholesaleEx,
-        wholeprice_incl: wholesaleIncl,
         discount_pct: product.discount_pct != null ? String(product.discount_pct) : '0',
         priceLockSide: null,
         mrpLockSide: null,
-        wholesaleLockSide,
         stock_quantity: String(v.stock_quantity || 0),
         mpn: v.mpn || '',
         gtin: v.gtin || '',
@@ -423,9 +401,9 @@ export default function ProductForm({ categories, brands, action, product, produ
       const snapshot = {
         uncontrolled,
         hasVariants, variants, groups,
-        basePrice, mrp, mrpExGst, salePrice, wholesalePrice, wholesalePriceEx, costPrice,
+        basePrice, mrp, mrpExGst, salePrice, costPrice,
         discountPct,
-        topPriceLockSide, topMrpLockSide, topWholesaleLockSide,
+        topPriceLockSide, topMrpLockSide,
         gstRate, isActive,
       }
       localStorage.setItem(draftKey, JSON.stringify(snapshot))
@@ -434,8 +412,8 @@ export default function ProductForm({ categories, brands, action, product, produ
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
   }, [
     hasVariants, variants, groups,
-    basePrice, mrp, mrpExGst, salePrice, wholesalePrice, wholesalePriceEx, costPrice, discountPct,
-    topPriceLockSide, topMrpLockSide, topWholesaleLockSide,
+    basePrice, mrp, mrpExGst, salePrice, costPrice, discountPct,
+    topPriceLockSide, topMrpLockSide,
     gstRate, isActive, draftKey,
   ])
 
@@ -458,13 +436,10 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (snap.mrp !== undefined) setMrp(snap.mrp)
       if (snap.mrpExGst !== undefined) setMrpExGst(snap.mrpExGst)
       if (snap.salePrice !== undefined) setSalePrice(snap.salePrice)
-      if (snap.wholesalePrice !== undefined) setWholesalePrice(snap.wholesalePrice)
-      if (snap.wholesalePriceEx !== undefined) setWholesalePriceEx(snap.wholesalePriceEx)
       if (snap.costPrice !== undefined) setCostPrice(snap.costPrice)
       if (snap.discountPct !== undefined) setDiscountPct(snap.discountPct)
       if (snap.topPriceLockSide !== undefined) setTopPriceLockSide(snap.topPriceLockSide)
       if (snap.topMrpLockSide !== undefined) setTopMrpLockSide(snap.topMrpLockSide)
-      if (snap.topWholesaleLockSide !== undefined) setTopWholesaleLockSide(snap.topWholesaleLockSide)
       if (snap.gstRate !== undefined) setGstRate(snap.gstRate)
       if (snap.isActive !== undefined) setIsActive(snap.isActive)
     } catch {}
@@ -703,7 +678,6 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
     const draft = subVariantDrafts[variantId]
     if (!draft?.name) return
-    const wholeEx = draft.wholeprice_ex_gst || (draft.wholeprice_incl ? inclToEx(draft.wholeprice_incl, gstRate) : '')
     const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -713,7 +687,6 @@ export default function ProductForm({ categories, brands, action, product, produ
         mrp: draft.mrp ? parseFloat(draft.mrp) : null,
         price_ex_gst: draft.price_ex_gst ? parseFloat(draft.price_ex_gst) : null,
         mrp_ex_gst: draft.mrp_ex_gst ? parseFloat(draft.mrp_ex_gst) : null,
-        wholeprice_ex_gst: wholeEx ? parseFloat(wholeEx) : null,
         discount_pct: parseFloat(discountPct) || 0,
         stock_quantity: draft.stock ? parseInt(draft.stock) : 0,
         sku: draft.sku || undefined,
@@ -722,7 +695,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (res.ok) {
       const data = await res.json()
       setSubVariantsMap(m => ({ ...m, [variantId]: [...(m[variantId] || []), data.sub_variant] }))
-      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', wholeprice_incl: '', wholeprice_ex_gst: '', discount_pct: '', wholesaleManuallySet: false, stock: '', sku: '' } }))
+      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', discount_pct: '', stock: '', sku: '' } }))
     }
   }
 
@@ -762,13 +735,11 @@ export default function ProductForm({ categories, brands, action, product, produ
         formData.set('mrp', mrp || '')
         formData.set('mrp_ex_gst', mrpExGst || '')
         formData.set('price_ex_gst', salePrice || '')
-        formData.set('wholeprice_ex_gst', wholesalePriceEx || inclToEx(wholesalePrice, gstRate))
         formData.set('discount_pct', discountPct || '0')
       } else {
         formData.set('mrp', mrp || '')
         formData.set('mrp_ex_gst', mrpExGst || '')
         formData.set('price_ex_gst', salePrice || '')
-        formData.set('wholeprice_ex_gst', wholesalePriceEx || inclToEx(wholesalePrice, gstRate))
         formData.set('discount_pct', discountPct || '0')
       }
       formData.set('cost_price', costPrice || '0')
@@ -785,7 +756,6 @@ export default function ProductForm({ categories, brands, action, product, produ
             mrp: v.mrp,
             mrp_ex_gst: v.mrp_ex_gst,
             price_ex_gst: v.price_ex_gst || (v.price ? inclToEx(v.price, gstRate) : ''),
-            wholeprice_ex_gst: v.wholeprice_ex_gst || (v.wholeprice_incl ? inclToEx(v.wholeprice_incl, gstRate) : ''),
           }
         })
         formData.set('variants_json', JSON.stringify(convertedVariants))
@@ -998,17 +968,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                       const newSaleIncl = exToIncl(newSaleEx, gstRate)
                       setSalePrice(newSaleEx)
                       setBasePrice(newSaleIncl)
-                      if (!wholesaleManuallySet) {
-                        setWholesalePriceEx(newSaleEx)
-                        setWholesalePrice(newSaleIncl)
-                      }
                     } else {
                       setSalePrice('')
                       setBasePrice('')
-                      if (!wholesaleManuallySet) {
-                        setWholesalePriceEx('')
-                        setWholesalePrice('')
-                      }
                     }
                   }}
                   className="w-full px-4 py-2 bg-surface text-foreground border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
@@ -1081,11 +1043,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                     setSalePrice(newSaleEx)
                     setBasePrice(newSaleIncl)
                     setTopPriceLockSide('incl')
-                    if (!wholesaleManuallySet) {
-                      setWholesalePriceEx(newSaleEx)
-                      setWholesalePrice(newSaleIncl)
-                      setTopWholesaleLockSide('incl')
-                    }
                     // cascade to all variant rows
                     if (hasVariants) {
                       setVariants(prev => prev.map(vr => {
@@ -1095,8 +1052,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                           const newPriceIncl = exToIncl(newPriceEx, gstRate)
                           return { ...vr, discount_pct: v,
                             price_ex_gst: newPriceEx, price: newPriceIncl,
-                            wholeprice_ex_gst: !vr.wholesaleLockSide ? vr.mrp_ex_gst : vr.wholeprice_ex_gst,
-                            wholeprice_incl: !vr.wholesaleLockSide ? vr.mrp : vr.wholeprice_incl,
                           }
                         }
                         return { ...vr, discount_pct: v }
@@ -1169,50 +1124,6 @@ export default function ProductForm({ categories, brands, action, product, produ
               className="w-full px-4 py-2 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
               placeholder="Auto-calculated"
             />
-          </div>
-          )}
-
-          {/* Wholesale Price — hidden when has variants */}
-          {!hasVariants && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="wholeprice_incl" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Wholesale (incl. GST)
-              </label>
-              <input
-                type="number"
-                id="wholeprice_incl"
-                name="wholeprice_incl"
-                step="0.01"
-                min="0"
-                value={wholesalePrice}
-                readOnly
-                className="w-full px-4 py-2 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
-                placeholder="= selling price"
-              />
-            </div>
-            <div>
-              <label htmlFor="wholeprice_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
-                Wholesale (Ex. GST)
-              </label>
-              <input
-                type="number"
-                id="wholeprice_ex_gst"
-                name="wholeprice_ex_gst"
-                step="0.01"
-                min="0"
-                value={wholesalePriceEx}
-                onChange={e => {
-                  const v = e.target.value
-                  setWholesalePriceEx(v !== '' ? v : (salePrice || ''))
-                  setWholesalePrice(v ? exToIncl(v, gstRate) : salePrice ? exToIncl(salePrice, gstRate) : '')
-                  setWholesaleManuallySet(v !== '')
-                }}
-                className="w-full px-4 py-2 bg-surface text-foreground border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                placeholder="Override wholesale"
-              />
-              <p className="text-xs text-foreground-muted mt-1">Only this field is overridable. Leave blank to use selling price.</p>
-            </div>
           </div>
           )}
 
@@ -1469,17 +1380,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       const newPriceIncl = exToIncl(newPriceEx, gstRate)
                                       updated[index].price_ex_gst = newPriceEx
                                       updated[index].price = newPriceIncl
-                                      if (!updated[index].wholesaleLockSide) {
-                                        updated[index].wholeprice_ex_gst = v
-                                        updated[index].wholeprice_incl = newMrpIncl
-                                      }
                                     } else {
                                       updated[index].price_ex_gst = ''
                                       updated[index].price = ''
-                                      if (!updated[index].wholesaleLockSide) {
-                                        updated[index].wholeprice_ex_gst = ''
-                                        updated[index].wholeprice_incl = ''
-                                      }
                                     }
                                     setVariants(updated)
                                   }} className={inputCls} placeholder="From catalog" />
@@ -1500,21 +1403,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Selling Price (Ex. GST)</label>
                                   <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="Auto-calculated" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (incl. GST)</label>
-                                  <input type="number" step="0.01" min="0" value={variant.wholeprice_incl} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="= selling price" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Wholesale (Ex. GST)</label>
-                                  <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => {
-                                    const v = e.target.value
-                                    const updated = [...variants]
-                                    updated[index] = { ...updated[index], wholeprice_ex_gst: v, wholesaleLockSide: v === '' ? null : 'excl' }
-                                    updated[index].wholeprice_incl = v ? exToIncl(v, gstRate) : (updated[index].price || '')
-                                    if (!v) updated[index].wholeprice_ex_gst = updated[index].price_ex_gst || ''
-                                    setVariants(updated)
-                                  }} className={inputCls} placeholder="Override wholesale" />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-medium text-foreground-secondary mb-1">{variant.sub_variant_type_on ? 'Listed Stock (sum)' : 'Listed Stock *'}</label>
@@ -1583,8 +1471,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         row.price_ex_gst = ''
                                         row.mrp = ''
                                         row.mrp_ex_gst = ''
-                                        row.wholeprice_ex_gst = ''
-                                        row.wholeprice_incl = ''
                                       }
                                       updated[index] = row
                                       setVariants(updated)
@@ -1643,8 +1529,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">MRP (incl)</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Price (incl) *</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Price (Ex)</th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Wholesale (incl)</th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Wholesale (Ex) ✎</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Listed Stock *</th>
                               <th className="py-2 px-3 w-16"></th>
                             </tr>
@@ -1661,7 +1545,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
                                   </td>
                                   {variant.sub_variant_type_on ? (
-                                    <td className="py-2 px-3" colSpan={6}>
+                                    <td className="py-2 px-3" colSpan={4}>
                                       <span className="text-xs text-foreground-muted italic">Pricing managed by sub-variants</span>
                                     </td>
                                   ) : (
@@ -1681,15 +1565,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         const newPriceIncl = exToIncl(newPriceEx, gstRate)
                                         updated[index].price_ex_gst = newPriceEx
                                         updated[index].price = newPriceIncl
-                                        if (!updated[index].wholesaleLockSide) {
-                                          updated[index].wholeprice_ex_gst = v
-                                          updated[index].wholeprice_incl = newMrpIncl
-                                        }
                                       } else {
                                         updated[index].price_ex_gst = ''; updated[index].price = ''
-                                        if (!updated[index].wholesaleLockSide) {
-                                          updated[index].wholeprice_ex_gst = ''; updated[index].wholeprice_incl = ''
-                                        }
                                       }
                                       setVariants(updated)
                                     }} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="From catalog" />
@@ -1712,21 +1589,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   {/* Selling Price (Ex. GST) — locked */}
                                   <td className="py-2 px-3">
                                     <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" />
-                                  </td>
-                                  {/* Wholesale (incl. GST) — locked */}
-                                  <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.wholeprice_incl} readOnly className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="= selling price" />
-                                  </td>
-                                  {/* Wholesale (Ex. GST) — only override */}
-                                  <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.wholeprice_ex_gst} onChange={(e) => {
-                                      const v = e.target.value
-                                      const updated = [...variants]
-                                      updated[index] = { ...updated[index], wholeprice_ex_gst: v, wholesaleLockSide: v === '' ? null : 'excl' }
-                                      updated[index].wholeprice_incl = v ? exToIncl(v, gstRate) : (updated[index].price || '')
-                                      if (!v) updated[index].wholeprice_ex_gst = updated[index].price_ex_gst || ''
-                                      setVariants(updated)
-                                    }} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="Override" />
                                   </td>
                                     </>
                                   )}
@@ -1925,15 +1787,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                           const newPriceIncl = exToIncl(newPriceEx, gstRate)
                           updated[popupIndex].price_ex_gst = newPriceEx
                           updated[popupIndex].price = newPriceIncl
-                          if (!updated[popupIndex].wholesaleLockSide) {
-                            updated[popupIndex].wholeprice_ex_gst = v
-                            updated[popupIndex].wholeprice_incl = newMrpIncl
-                          }
                         } else {
                           updated[popupIndex].price_ex_gst = ''; updated[popupIndex].price = ''
-                          if (!updated[popupIndex].wholesaleLockSide) {
-                            updated[popupIndex].wholeprice_ex_gst = ''; updated[popupIndex].wholeprice_incl = ''
-                          }
                         }
                         setVariants(updated)
                       }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="From catalog" />
@@ -1958,26 +1813,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                       <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Price (Ex. GST)</label>
                       <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} readOnly className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto-calculated" />
                     </div>
-                    {/* Wholesale (incl. GST) — locked */}
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Wholesale (incl)</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_incl} readOnly className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="= selling price" />
-                    </div>
-                    {/* Wholesale (Ex. GST) — only override */}
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Wholesale (Ex) ✎</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.wholeprice_ex_gst} onChange={(e) => {
-                        const v = e.target.value
-                        const updated = [...variants]
-                        updated[popupIndex] = {
-                          ...updated[popupIndex],
-                          wholeprice_ex_gst: v !== '' ? v : (updated[popupIndex].price_ex_gst || ''),
-                          wholesaleLockSide: v === '' ? null : 'excl',
-                        }
-                        updated[popupIndex].wholeprice_incl = v ? exToIncl(v, gstRate) : (updated[popupIndex].price || '')
-                        setVariants(updated)
-                      }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Override" />
-                    </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
                       <input type="text" value={popupVariant.mpn} onChange={(e) => updateVariant(popupIndex, 'mpn', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Part No." />
@@ -1991,7 +1826,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   {/* Sub-variants toggle */}
                   <div className="space-y-2 pt-3">
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) { row.use_own_images = true; row.price = ''; row.price_ex_gst = ''; row.mrp = ''; row.mrp_ex_gst = ''; row.wholeprice_ex_gst = ''; row.wholeprice_incl = '' } updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
+                      <button type="button" onClick={() => { const updated = [...variants]; const row = { ...updated[popupIndex] }; row.sub_variant_type_on = !row.sub_variant_type_on; if (!row.sub_variant_type_on) row.sub_variant_type = ''; if (row.sub_variant_type_on) { row.use_own_images = true; row.price = ''; row.price_ex_gst = ''; row.mrp = ''; row.mrp_ex_gst = '' } updated[popupIndex] = row; setVariants(updated) }} className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`} role="switch" aria-checked={popupVariant.sub_variant_type_on}>
                         <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
                       <span className="text-xs font-medium text-foreground-secondary">Has sub-variants</span>
@@ -2288,8 +2123,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                             <th className="pb-1 pr-2 font-medium">MRP (incl){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
                             <th className="pb-1 pr-2 font-medium">Price (incl){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
                             <th className="pb-1 pr-2 font-medium">Price (Ex){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
-                            <th className="pb-1 pr-2 font-medium">Wholesale (incl){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
-                            <th className="pb-1 pr-2 font-medium">Wholesale (Ex) ✎{popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</th>
                             <th className="pb-1 pr-2 font-medium">Stock</th>
                             <th className="pb-1 pr-2 font-medium">SKU</th>
                             <th className="pb-1"></th>
@@ -2313,15 +2146,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
                                       const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
                                       const newPriceIncl = exToIncl(newPriceEx, gstRate)
-                                      setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: newPriceEx, price: newPriceIncl,
-                                        wholeprice_ex_gst: d.wholesaleManuallySet ? d.wholeprice_ex_gst : v,
-                                        wholeprice_incl: d.wholesaleManuallySet ? d.wholeprice_incl : newMrpIncl,
-                                      }))
+                                      setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: newPriceEx, price: newPriceIncl }))
                                     } else {
-                                      setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: '', price: '',
-                                        wholeprice_ex_gst: d.wholesaleManuallySet ? d.wholeprice_ex_gst : '',
-                                        wholeprice_incl: d.wholesaleManuallySet ? d.wholeprice_incl : '',
-                                      }))
+                                      setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: '', price: '' }))
                                     }
                                   }} className={svInputCls} /></td>
                                   {/* Discount % — product-level read-only */}
@@ -2332,28 +2159,19 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
                                   {/* Price (Ex. GST) — locked */}
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price_ex_gst} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
-                                  {/* Wholesale (incl. GST) — locked */}
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.wholeprice_incl} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
-                                  {/* Wholesale (Ex. GST) — only override */}
-                                  <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.wholeprice_ex_gst} onChange={e => {
-                                    const v = e.target.value
-                                    setSubVariantEditDraft(d => d && ({ ...d, wholeprice_ex_gst: v !== '' ? v : (d.price_ex_gst || ''), wholeprice_incl: v ? exToIncl(v, gstRate) : (d.price || ''), wholesaleManuallySet: v !== '' }))
-                                  }} className={svInputCls} placeholder="Override" /></td>
                                   <td className="py-1 pr-1"><input type="number" step="1" min="0" value={ed.stock} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, stock: e.target.value }))} className={svInputCls} /></td>
                                   <td className="py-1 pr-1"><input type="text" value={ed.sku} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, sku: e.target.value }))} className={`${svInputCls} w-20`} /></td>
                                   <td className="py-1 pl-1 flex items-center gap-1">
                                     <button type="button" onClick={async () => {
                                       if (!ed) return
-                                      const wholeEx = ed.wholeprice_ex_gst || (ed.wholeprice_incl ? inclToEx(ed.wholeprice_incl, gstRate) : '')
-                                      const wholeExNum = wholeEx ? parseFloat(wholeEx) : null
                                       const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`, {
                                         method: 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: wholeExNum, discount_pct: parseFloat(discountPct) || 0, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || null }),
+                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, discount_pct: parseFloat(discountPct) || 0, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || null }),
                                       })
                                       if (res.ok) {
                                         const updated = await res.json()
-                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, wholeprice_ex_gst: wholeExNum, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || s.sku }) : s) }))
+                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || s.sku }) : s) }))
                                       }
                                       setSubVariantEditId(null); setSubVariantEditDraft(null)
                                     }} className="text-green-500 hover:text-green-700 leading-none" aria-label="Save"><Check className="w-3.5 h-3.5" /></button>
@@ -2366,12 +2184,10 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1.5 pr-2">{sv.mrp != null ? `₹${sv.mrp}` : '—'}</td>
                                   <td className="py-1.5 pr-2">{sv.price != null ? `₹${sv.price}` : '—'}</td>
                                   <td className="py-1.5 pr-2">{sv.price_ex_gst != null ? `₹${sv.price_ex_gst}` : '—'}</td>
-                                  <td className="py-1.5 pr-2">{sv.wholeprice_ex_gst != null ? `₹${exToIncl(String(sv.wholeprice_ex_gst), gstRate) || sv.wholeprice_ex_gst}` : '—'}</td>
-                                  <td className="py-1.5 pr-2">{sv.wholeprice_ex_gst != null ? `₹${sv.wholeprice_ex_gst}` : '—'}</td>
                                   <td className="py-1.5 pr-2">{sv.stock_quantity}</td>
                                   <td className="py-1.5 pr-2 font-mono text-foreground-muted">{sv.sku}</td>
                                   <td className="py-1.5 flex items-center gap-2">
-                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', wholeprice_incl: sv.wholeprice_ex_gst != null ? exToIncl(String(sv.wholeprice_ex_gst), gstRate) : '', wholeprice_ex_gst: sv.wholeprice_ex_gst != null ? String(sv.wholeprice_ex_gst) : '', discount_pct: sv.discount_pct != null ? String(sv.discount_pct) : '', wholesaleManuallySet: sv.wholeprice_ex_gst != null, stock: String(sv.stock_quantity ?? 0), sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
+                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', discount_pct: sv.discount_pct != null ? String(sv.discount_pct) : '', stock: String(sv.stock_quantity ?? 0), sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
                                     <button type="button" onClick={() => setExpandedSvUnits(s => { const n = new Set(s); n.has(sv.id) ? n.delete(sv.id) : n.add(sv.id); return n })} className="text-foreground-muted hover:text-accent-500 leading-none text-xs font-medium">Unit</button>
                                     <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none" aria-label="Delete"><X className="w-3.5 h-3.5" /></button>
                                   </td>
@@ -2379,7 +2195,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                               </tr>
                               {expandedSvUnits.has(sv.id) && productId && !variantPopupId.startsWith('temp-') && (
                                 <tr key={`${sv.id}-unit`}>
-                                  <td colSpan={11} className="px-2 pb-3 pt-1 bg-surface-secondary/50">
+                                  <td colSpan={9} className="px-2 pb-3 pt-1 bg-surface-secondary/50">
                                     <UnitsManager
                                       productId={productId}
                                       variantId={variantPopupId}
@@ -2397,7 +2213,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     {(() => {
-                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',wholeprice_incl:'',wholeprice_ex_gst:'',discount_pct:'',wholesaleManuallySet:false,stock:'',sku:'' }
+                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'' }
                       const setD = (field: string, val: string) => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, [field]: val } }))
                       const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-xs focus:ring-1 focus:ring-accent-500"
                       const lockedCls = `${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`
@@ -2416,15 +2232,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                               if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
                                 const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
                                 const newPriceIncl = exToIncl(newPriceEx, gstRate)
-                                setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: newPriceEx, price: newPriceIncl,
-                                  wholeprice_ex_gst: d.wholesaleManuallySet ? d.wholeprice_ex_gst : v,
-                                  wholeprice_incl: d.wholesaleManuallySet ? d.wholeprice_incl : newMrpIncl,
-                                } }))
+                                setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: newPriceEx, price: newPriceIncl } }))
                               } else {
-                                setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: '', price: '',
-                                  wholeprice_ex_gst: d.wholesaleManuallySet ? d.wholeprice_ex_gst : '',
-                                  wholeprice_incl: d.wholesaleManuallySet ? d.wholeprice_incl : '',
-                                } }))
+                                setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: '', price: '' } }))
                               }
                             }} className={`${inputCls} w-full`} />
                           </div>
@@ -2443,17 +2253,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">Price (Ex. GST){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
                             <input type="number" step="0.01" value={d.price_ex_gst} readOnly className={`${lockedCls} w-full`} placeholder="Auto-calculated" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale (incl. GST){popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
-                            <input type="number" step="0.01" value={d.wholeprice_incl} readOnly className={`${lockedCls} w-full`} placeholder="= selling price" />
-                          </div>
-                          <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Wholesale (Ex. GST) ✎{popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
-                            <input type="number" step="0.01" placeholder="Override" value={d.wholeprice_ex_gst} onChange={(e) => {
-                              const v = e.target.value
-                              setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, wholeprice_ex_gst: v !== '' ? v : (d.price_ex_gst || ''), wholeprice_incl: v ? exToIncl(v, gstRate) : (d.price || ''), wholesaleManuallySet: v !== '' } }))
-                            }} className={`${inputCls} w-full`} />
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">Listed Stock</label>

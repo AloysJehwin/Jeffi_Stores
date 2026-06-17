@@ -34,7 +34,6 @@ interface Variant {
   mrp: number | null
   mrp_ex_gst: number | null
   price_ex_gst: number | null
-  wholeprice_ex_gst: number | null
   stock_quantity: number
   pricing_type?: string
   unit?: string
@@ -70,7 +69,6 @@ interface ProductActionsProps {
   salePrice: number | null
   mrp: number | null
   gstPercentage: number | null
-  wholesalePrice: number | null
   variants: Variant[]
   variantType: string
   initialSkuParam?: string
@@ -105,7 +103,7 @@ function getPerUnitRate(price: number, numeric_value: number, unit: string): str
 
 export default function ProductActions({
   productId, productName, sku, stockQuantity,
-  basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
+  basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onSelectionChange, categoryId,
   productUnits: productUnitsProp,
@@ -245,9 +243,6 @@ export default function ProductActions({
   const effectiveMrp = hasVariants
     ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))
     : mrp
-  const effectiveWholesalePrice = hasVariants
-    ? (selectedVariant?.wholeprice_ex_gst != null ? Number(selectedVariant.wholeprice_ex_gst) : wholesalePrice)
-    : wholesalePrice
   const effectiveStock = hasVariants
     ? (selectedSubVariant ? selectedSubVariant.stock_quantity : (selectedVariant?.stock_quantity ?? 0))
     : stockQuantity
@@ -591,13 +586,6 @@ export default function ProductActions({
             <p className="text-xs text-foreground-muted">
               Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
             </p>
-            {effectiveWholesalePrice && (
-              <div className="mt-3 pt-3 border-t border-border-default">
-                <span className="text-sm text-foreground-secondary">
-                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel ?? 'pc'} /></span>
-                </span>
-              </div>
-            )}
           </div>
 
           <div>

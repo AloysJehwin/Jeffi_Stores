@@ -109,7 +109,6 @@ async function updateProduct(productId: string, formData: FormData) {
   const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
   const mrpExGst = formData.get('mrp_ex_gst') ? Math.round(parseFloat(formData.get('mrp_ex_gst') as string) * 100) / 100 : null
   const salePrice = formData.get('price_ex_gst') ? Math.round(parseFloat(formData.get('price_ex_gst') as string) * 100) / 100 : null
-  const wholesalePrice = formData.get('wholeprice_ex_gst') ? Math.round(parseFloat(formData.get('wholeprice_ex_gst') as string) * 100) / 100 : null
   const costPrice = formData.get('cost_price') ? Math.round(parseFloat(formData.get('cost_price') as string) * 100) / 100 : 0
   const discountPct = formData.get('discount_pct') ? Math.round(parseFloat(formData.get('discount_pct') as string) * 100) / 100 : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
@@ -145,17 +144,17 @@ async function updateProduct(productId: string, formData: FormData) {
     const setClauses: string[] = [
       'name = $1', 'slug = $2', 'description = $3', 'category_id = $4',
       'brand_id = $5', 'base_price = $6', 'mrp = $7', 'mrp_ex_gst = $8',
-      'price_ex_gst = $9', 'wholeprice_ex_gst = $10',
-      'gst_percentage = $11', 'hsn_code = $12',
-      'stock_quantity = $13', 'low_stock_threshold = $14', 'weight = $15',
-      'dimensions = $16', 'is_active = $17', 'is_featured = $18', 'has_variants = $19', 'variant_type = $20',
-      'sub_variant_type = $21',
-      'weight_grams = $22', 'package_type = $23', 'length_cm = $24', 'breadth_cm = $25', 'height_cm = $26',
-      'cost_price = $27', 'discount_pct = $28', 'updated_at = $29',
+      'price_ex_gst = $9',
+      'gst_percentage = $10', 'hsn_code = $11',
+      'stock_quantity = $12', 'low_stock_threshold = $13', 'weight = $14',
+      'dimensions = $15', 'is_active = $16', 'is_featured = $17', 'has_variants = $18', 'variant_type = $19',
+      'sub_variant_type = $20',
+      'weight_grams = $21', 'package_type = $22', 'length_cm = $23', 'breadth_cm = $24', 'height_cm = $25',
+      'cost_price = $26', 'discount_pct = $27', 'updated_at = $28',
     ]
     const params: any[] = [
       name, slug, description, categoryId,
-      brandId || null, basePrice, mrp, mrpExGst, salePrice, wholesalePrice,
+      brandId || null, basePrice, mrp, mrpExGst, salePrice,
       gstPercentage, hsnCode,
       stockQuantity, lowStockThreshold, weight,
       dimensions, isActive, isFeatured, hasVariants, variantType,
@@ -323,8 +322,8 @@ async function updateProduct(productId: string, formData: FormData) {
           } else if (isPersisted && !variant._isDeleted) {
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, wholeprice_ex_gst = $7, stock_quantity = $8, mpn = $9, gtin = $10, pricing_type = $11, unit = $12, numeric_value = $13, weight_grams = $14, package_type = $15, length_cm = $16, breadth_cm = $17, height_cm = $18, sub_variant_type = $19, variant_type = $20, discount_pct = $21
-               WHERE id = $22 AND product_id = $23`,
+              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, stock_quantity = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_grams = $13, package_type = $14, length_cm = $15, breadth_cm = $16, height_cm = $17, sub_variant_type = $18, variant_type = $19, discount_pct = $20
+               WHERE id = $21 AND product_id = $22`,
               [
                 variantSku, variant.variant_name,
                 variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
@@ -332,7 +331,6 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.mrp_ex_gst ? Math.round(parseFloat(variant.mrp_ex_gst) * 100) / 100 : null,
                 variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100
                   : variant.price ? Math.round(parseFloat(variant.price) / (1 + gstPercentage / 100) * 100) / 100 : null,
-                variant.wholeprice_ex_gst ? Math.round(parseFloat(variant.wholeprice_ex_gst) * 100) / 100 : null,
                 parseInt(variant.stock_quantity) || 0,
                 variant.mpn || null,
                 variant.gtin || null,
@@ -366,8 +364,8 @@ async function updateProduct(productId: string, formData: FormData) {
             if (!variant.variant_name) continue
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, wholeprice_ex_gst, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, is_active)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, true)`,
+              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, is_active)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, true)`,
               [
                 productId, variantSku, variant.variant_name,
                 variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
@@ -375,7 +373,6 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.mrp_ex_gst ? Math.round(parseFloat(variant.mrp_ex_gst) * 100) / 100 : null,
                 variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100
                   : variant.price ? Math.round(parseFloat(variant.price) / (1 + gstPercentage / 100) * 100) / 100 : null,
-                variant.wholeprice_ex_gst ? Math.round(parseFloat(variant.wholeprice_ex_gst) * 100) / 100 : null,
                 parseInt(variant.stock_quantity) || 0,
                 variant.mpn || null,
                 variant.gtin || null,

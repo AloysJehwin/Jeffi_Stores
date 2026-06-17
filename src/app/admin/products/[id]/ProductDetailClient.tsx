@@ -404,7 +404,6 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 { label: 'MRP', val: p.mrp },
                 { label: p.has_variants ? 'From' : 'Selling Price', val: p.has_variants ? p.variant_min_price : p.base_price },
                 { label: 'Ex-GST', val: p.has_variants ? null : p.price_ex_gst },
-                { label: 'Wholesale', val: p.wholeprice_ex_gst },
               ].map(({ label, val }) => val != null && (
                 <div key={label}>
                   <p className="text-xs text-foreground-secondary mb-0.5">{label}</p>

@@ -9,7 +9,6 @@ const COL_MAP: Record<string, string> = {
   mrp: 'mrp',
   price_ex_gst: 'price_ex_gst',
   base_price: 'price',
-  wholeprice_ex_gst: 'wholeprice_ex_gst',
 }
 
 export async function POST(request: NextRequest) {

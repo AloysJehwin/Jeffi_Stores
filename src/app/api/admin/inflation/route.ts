@@ -22,14 +22,13 @@ function deriveFromMrpEx(mrpEx: number, discPct: number, gstPct: number) {
     mrp: Math.round(mrpEx * gstMult * 100) / 100,
     price_ex_gst: priceEx,
     base_price: Math.round(priceEx * gstMult * 100) / 100,
-    wholeprice_ex_gst: priceEx,
   }
 }
 
-const PRODUCT_COLS = ['mrp_ex_gst', 'mrp', 'price_ex_gst', 'base_price', 'wholeprice_ex_gst'] as const
+const PRODUCT_COLS = ['mrp_ex_gst', 'mrp', 'price_ex_gst', 'base_price'] as const
 const VARIANT_COL_MAP: Record<string, string> = {
   mrp_ex_gst: 'mrp_ex_gst', mrp: 'mrp', price_ex_gst: 'price_ex_gst',
-  base_price: 'price', wholeprice_ex_gst: 'wholeprice_ex_gst',
+  base_price: 'price',
 }
 
 export async function GET(request: NextRequest) {
@@ -49,13 +48,13 @@ export async function GET(request: NextRequest) {
   const products = await queryMany(`
     SELECT
       p.id, p.name, p.has_variants,
-      p.mrp_ex_gst, p.mrp, p.price_ex_gst, p.base_price, p.wholeprice_ex_gst,
+      p.mrp_ex_gst, p.mrp, p.price_ex_gst, p.base_price,
       p.discount_pct, p.gst_percentage,
       COALESCE(
         (SELECT json_agg(json_build_object(
           'id', pv.id, 'variant_name', pv.variant_name,
           'mrp_ex_gst', pv.mrp_ex_gst, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
-          'price', pv.price, 'wholeprice_ex_gst', pv.wholeprice_ex_gst
+          'price', pv.price
         ) ORDER BY pv.variant_name)
         FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
         '[]'::json
@@ -81,11 +80,10 @@ export async function GET(request: NextRequest) {
       mrp: parseFloat(p.mrp) || null,
       price_ex_gst: parseFloat(p.price_ex_gst) || null,
       base_price: parseFloat(p.base_price) || null,
-      wholeprice_ex_gst: parseFloat(p.wholeprice_ex_gst) || null,
     }
     const projected = hasCurrent
       ? deriveFromMrpEx(applyPct(curMrpEx, pct), discPct, gstPct)
-      : { mrp_ex_gst: null, mrp: null, price_ex_gst: null, base_price: null, wholeprice_ex_gst: null }
+      : { mrp_ex_gst: null, mrp: null, price_ex_gst: null, base_price: null }
 
     const variantRows = (p.variants || []).map((v: any) => {
       const vMrpEx = parseFloat(v.mrp_ex_gst)
@@ -95,11 +93,10 @@ export async function GET(request: NextRequest) {
         mrp: parseFloat(v.mrp) || null,
         price_ex_gst: parseFloat(v.price_ex_gst) || null,
         base_price: parseFloat(v.price) || null,
-        wholeprice_ex_gst: parseFloat(v.wholeprice_ex_gst) || null,
       }
       const vProjected = hasV
         ? deriveFromMrpEx(applyPct(vMrpEx, pct), discPct, gstPct)
-        : { mrp_ex_gst: null, mrp: null, price_ex_gst: null, base_price: null, wholeprice_ex_gst: null }
+        : { mrp_ex_gst: null, mrp: null, price_ex_gst: null, base_price: null }
       return { id: v.id, variant_name: v.variant_name, current: vCurrent, projected: vProjected }
     })
     return { id: p.id, name: p.name, has_variants: p.has_variants, current, projected, variants: variantRows }
@@ -125,7 +122,7 @@ export async function POST(request: NextRequest) {
 
   const products = await queryMany(
     `SELECT p.id, p.name, p.has_variants,
-            p.mrp_ex_gst, p.mrp, p.price_ex_gst, p.base_price, p.wholeprice_ex_gst,
+            p.mrp_ex_gst, p.mrp, p.price_ex_gst, p.base_price,
             p.discount_pct, p.gst_percentage
      FROM products p
      WHERE p.category_id = ANY(
@@ -160,17 +157,16 @@ export async function POST(request: NextRequest) {
           mrp: parseFloat(p.mrp) || null,
           price_ex_gst: parseFloat(p.price_ex_gst) || null,
           base_price: parseFloat(p.base_price) || null,
-          wholeprice_ex_gst: parseFloat(p.wholeprice_ex_gst) || null,
         }
 
         if (!isNaN(curMrpEx) && curMrpEx > 0) {
           const derived = deriveFromMrpEx(applyPct(curMrpEx, percentage), discPct, gstPct)
           await client.query(
             `UPDATE products SET
-               mrp_ex_gst = $1, mrp = $2, price_ex_gst = $3, base_price = $4, wholeprice_ex_gst = $5,
+               mrp_ex_gst = $1, mrp = $2, price_ex_gst = $3, base_price = $4,
                updated_at = NOW()
-             WHERE id = $6`,
-            [derived.mrp_ex_gst, derived.mrp, derived.price_ex_gst, derived.base_price, derived.wholeprice_ex_gst, p.id]
+             WHERE id = $5`,
+            [derived.mrp_ex_gst, derived.mrp, derived.price_ex_gst, derived.base_price, p.id]
           )
           snapshotProducts.push({ id: p.id, name: p.name, has_variants: p.has_variants, before, after: derived, variants: [] })
         } else {
@@ -180,7 +176,7 @@ export async function POST(request: NextRequest) {
 
       const variants = await client.query(
         `SELECT pv.id, pv.product_id, pv.variant_name,
-                pv.mrp_ex_gst, pv.mrp, pv.price_ex_gst, pv.price, pv.wholeprice_ex_gst,
+                pv.mrp_ex_gst, pv.mrp, pv.price_ex_gst, pv.price,
                 p.discount_pct, p.gst_percentage
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
@@ -198,7 +194,6 @@ export async function POST(request: NextRequest) {
           mrp: parseFloat(v.mrp) || null,
           price_ex_gst: parseFloat(v.price_ex_gst) || null,
           base_price: parseFloat(v.price) || null,
-          wholeprice_ex_gst: parseFloat(v.wholeprice_ex_gst) || null,
         }
 
         const productRow = snapshotProducts.find((p: any) => p.id === v.product_id)
@@ -207,10 +202,10 @@ export async function POST(request: NextRequest) {
           const derived = deriveFromMrpEx(applyPct(curMrpEx, percentage), discPct, gstPct)
           await client.query(
             `UPDATE product_variants SET
-               mrp_ex_gst = $1, mrp = $2, price_ex_gst = $3, price = $4, wholeprice_ex_gst = $5,
+               mrp_ex_gst = $1, mrp = $2, price_ex_gst = $3, price = $4,
                updated_at = NOW()
-             WHERE id = $6`,
-            [derived.mrp_ex_gst, derived.mrp, derived.price_ex_gst, derived.base_price, derived.wholeprice_ex_gst, v.id]
+             WHERE id = $5`,
+            [derived.mrp_ex_gst, derived.mrp, derived.price_ex_gst, derived.base_price, v.id]
           )
           if (productRow) productRow.variants.push({ id: v.id, variant_name: v.variant_name, before, after: derived })
         } else {
@@ -221,7 +216,7 @@ export async function POST(request: NextRequest) {
       // Also inflate sub-variants
       const subVariants = await client.query(
         `SELECT psv.id, psv.variant_id, psv.sub_variant_name,
-                psv.mrp_ex_gst, psv.mrp, psv.price_ex_gst, psv.price, psv.wholeprice_ex_gst,
+                psv.mrp_ex_gst, psv.mrp, psv.price_ex_gst, psv.price,
                 p.discount_pct, p.gst_percentage
          FROM product_sub_variants psv
          JOIN product_variants pv ON pv.id = psv.variant_id
@@ -239,10 +234,10 @@ export async function POST(request: NextRequest) {
           const derived = deriveFromMrpEx(applyPct(curMrpEx, percentage), discPct, gstPct)
           await client.query(
             `UPDATE product_sub_variants SET
-               mrp_ex_gst = $1, mrp = $2, price_ex_gst = $3, price = $4, wholeprice_ex_gst = $5,
+               mrp_ex_gst = $1, mrp = $2, price_ex_gst = $3, price = $4,
                updated_at = NOW()
-             WHERE id = $6`,
-            [derived.mrp_ex_gst, derived.mrp, derived.price_ex_gst, derived.base_price, derived.wholeprice_ex_gst, sv.id]
+             WHERE id = $5`,
+            [derived.mrp_ex_gst, derived.mrp, derived.price_ex_gst, derived.base_price, sv.id]
           )
         }
       }
