@@ -10,7 +10,6 @@ type SuggestItem = {
   label: string
   sublabel?: string
   href?: string
-  extra?: unknown
 }
 
 async function suggestLineItems(q: string): Promise<SuggestItem[]> {
@@ -41,22 +40,15 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
     name: string; variant_name: string | null
     sku: string; base_price: number | null; mrp: number | null; gst_percentage: number; hsn_code: string | null
     inventory_quantity: number | null; discount_pct: number | null
-    pu_unit: string | null; pu_factor: number | null; pu_dimension: string | null
-    pu_min_qty: number | null; pu_max_qty: number | null; pu_qty_step: number | null; pu_display_label: string | null
   }>(
-    `SELECT product_id, variant_id, sub_variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code, inventory_quantity, discount_pct,
-            pu_unit, pu_factor, pu_dimension, pu_min_qty, pu_max_qty, pu_qty_step, pu_display_label
-     FROM (
+    `SELECT product_id, variant_id, sub_variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code, inventory_quantity, discount_pct FROM (
        SELECT p.id AS product_id, NULL::uuid AS variant_id, NULL::uuid AS sub_variant_id,
               p.name, NULL AS variant_name,
               p.sku, p.base_price, p.mrp, COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
               COALESCE(p.inventory_quantity,0)::numeric AS inventory_quantity,
               COALESCE(p.discount_pct,0)::numeric AS discount_pct,
-              p.search_vector,
-              pu.unit AS pu_unit, pu.factor AS pu_factor, pu.dimension AS pu_dimension,
-              pu.min_qty AS pu_min_qty, pu.max_qty AS pu_max_qty, pu.qty_step AS pu_qty_step, pu.display_label AS pu_display_label
+              p.search_vector
        FROM products p
-       LEFT JOIN product_units pu ON pu.product_id = p.id AND pu.variant_id IS NULL AND pu.is_sell_default = true
        WHERE p.is_active = true AND p.has_variants = false AND ${sc.clause}
        UNION ALL
        SELECT p.id AS product_id, pv.id AS variant_id, NULL::uuid AS sub_variant_id,
@@ -66,12 +58,9 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
               COALESCE(pv.inventory_quantity,0)::numeric AS inventory_quantity,
               COALESCE(pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
-              p.search_vector,
-              pu.unit AS pu_unit, pu.factor AS pu_factor, pu.dimension AS pu_dimension,
-              pu.min_qty AS pu_min_qty, pu.max_qty AS pu_max_qty, pu.qty_step AS pu_qty_step, pu.display_label AS pu_display_label
+              p.search_vector
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
-       LEFT JOIN product_units pu ON pu.variant_id = pv.id AND pu.is_sell_default = true
        WHERE pv.is_active = true AND p.is_active = true AND ${sc2.clause}
          AND NOT EXISTS (SELECT 1 FROM product_sub_variants WHERE variant_id = pv.id AND is_active = true)
        UNION ALL
@@ -82,13 +71,10 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
               COALESCE(ps.inventory_quantity,0)::numeric AS inventory_quantity,
               COALESCE(ps.discount_pct, pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
-              p.search_vector,
-              pu.unit AS pu_unit, pu.factor AS pu_factor, pu.dimension AS pu_dimension,
-              pu.min_qty AS pu_min_qty, pu.max_qty AS pu_max_qty, pu.qty_step AS pu_qty_step, pu.display_label AS pu_display_label
+              p.search_vector
        FROM product_sub_variants ps
        JOIN product_variants pv ON pv.id = ps.variant_id
        JOIN products p ON p.id = pv.product_id
-       LEFT JOIN product_units pu ON pu.variant_id = pv.id AND pu.is_sell_default = true
        WHERE ps.is_active = true AND pv.is_active = true AND p.is_active = true AND ${searchWhereSv}
      ) r
      ORDER BY ${rk.rank}, name ASC, variant_name ASC NULLS FIRST
@@ -109,20 +95,7 @@ async function suggestLineItems(q: string): Promise<SuggestItem[]> {
       r.discount_pct != null ? String(r.discount_pct) : '0',
     ].join('|')
     const priceStr = r.base_price != null ? ` · ₹${r.base_price}` : ''
-    const sell_unit = r.pu_unit ? {
-      unit: r.pu_unit, factor: r.pu_factor, dimension: r.pu_dimension,
-      min_qty: r.pu_min_qty, max_qty: r.pu_max_qty, qty_step: r.pu_qty_step, display_label: r.pu_display_label,
-    } : null
-    return {
-      id: encoded, label: displayName, sublabel: `${r.sku}${priceStr}`,
-      extra: {
-        product_id: r.product_id, variant_id: r.variant_id, sub_variant_id: r.sub_variant_id,
-        name: r.name, variant_name: r.variant_name, sku: r.sku,
-        base_price: r.base_price, mrp: r.mrp, gst_percentage: r.gst_percentage,
-        hsn_code: r.hsn_code, inventory_quantity: r.inventory_quantity, discount_pct: r.discount_pct,
-        sell_unit,
-      },
-    }
+    return { id: encoded, label: displayName, sublabel: `${r.sku}${priceStr}` }
   })
 }
 

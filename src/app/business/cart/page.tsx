@@ -177,10 +177,7 @@ export default function CartPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               {cartItems.map((item) => {
                 const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                const isCustomQty = item.cart_item_unit?.dimension === 'length' || item.cart_item_unit?.dimension === 'weight' || item.cart_item_unit?.dimension === 'area' || item.cart_item_unit?.dimension === 'volume'
-                const qtyStep = item.cart_item_unit?.qty_step ?? (isCustomQty ? 0.001 : 1)
-                const qtyMin = item.cart_item_unit?.min_qty ?? 1
-                const qtyMax = item.cart_item_unit?.max_qty ?? undefined
+                const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
                 const price = isCustomQty
                   ? item.price_at_addition
                   : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
@@ -302,9 +299,8 @@ export default function CartPage() {
                             <div className="flex items-center gap-2">
                               <input
                                 type="number"
-                                min={qtyMin}
-                                max={qtyMax}
-                                step={qtyStep}
+                                min="0.001"
+                                step="0.001"
                                 defaultValue={Number(item.quantity).toFixed(3)}
                                 onBlur={(e) => {
                                   const val = parseFloat(e.target.value)
@@ -324,8 +320,8 @@ export default function CartPage() {
                           ) : (
                             <div className="flex items-center border border-border-secondary rounded-lg">
                               <button
-                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) - qtyStep)}
-                                disabled={isUpdating || Number(item.quantity) <= qtyMin}
+                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) - 1)}
+                                disabled={isUpdating || Number(item.quantity) <= 1}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -339,13 +335,12 @@ export default function CartPage() {
                               ) : (
                                 <input
                                   type="number"
-                                  min={qtyMin}
-                                  max={qtyMax ?? stockQty}
-                                  step={qtyStep}
+                                  min="1"
+                                  max={stockQty}
                                   defaultValue={Math.round(Number(item.quantity))}
                                   onBlur={(e) => {
                                     const val = parseInt(e.target.value, 10)
-                                    const safe = !isNaN(val) && val >= qtyMin ? Math.min(qtyMax ?? stockQty, val) : qtyMin
+                                    const safe = !isNaN(val) && val >= 1 ? Math.min(stockQty, val) : 1
                                     e.target.value = String(safe)
                                     if (safe !== Math.round(Number(item.quantity))) {
                                       handleQuantityChange(item.id, safe)
@@ -356,8 +351,8 @@ export default function CartPage() {
                                 />
                               )}
                               <button
-                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) + qtyStep)}
-                                disabled={isUpdating || Number(item.quantity) >= (qtyMax ?? stockQty)}
+                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) + 1)}
+                                disabled={isUpdating || Number(item.quantity) >= stockQty}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

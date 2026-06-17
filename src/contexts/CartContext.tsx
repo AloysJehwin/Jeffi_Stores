@@ -18,10 +18,6 @@ interface CartItem {
     factor: number
     is_base: boolean
     is_sell_default: boolean
-    dimension?: string | null
-    min_qty: number | null
-    max_qty: number | null
-    qty_step: number | null
   } | null
   products: {
     id: string

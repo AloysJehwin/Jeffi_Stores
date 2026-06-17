@@ -4,18 +4,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
-import { mrpDiscountPct, lineItemInclGst } from '@/lib/pricing'
-
-export interface UnitOption {
-  unit: string
-  factor: number
-  dimension: string
-  min_qty: number
-  max_qty: number | null
-  qty_step: number
-  display_label: string | null
-  is_sell_default: boolean
-}
+import { applyDiscount, mrpDiscountPct, lineItemInclGst } from '@/lib/pricing'
 
 export interface LineItem {
   id: string
@@ -34,23 +23,6 @@ export interface LineItem {
   discount_pct: number
   mrp: number
   inventory_quantity: number | null
-  // Unit enforcement fields (optional for legacy items)
-  unit_factor?: number
-  unit_dimension?: string
-  unit_min_qty?: number
-  unit_max_qty?: number | null
-  unit_qty_step?: number
-  available_units?: UnitOption[]
-}
-
-interface SellUnit {
-  unit: string | null
-  factor: number | null
-  dimension: string | null
-  min_qty: number | null
-  max_qty: number | null
-  qty_step: number | null
-  display_label: string | null
 }
 
 interface Suggestion {
@@ -68,8 +40,6 @@ interface Suggestion {
   hsn_code: string | null
   inventory_quantity: number | null
   discount_pct?: number | null
-  sell_unit?: SellUnit | null
-  all_units?: UnitOption[]
 }
 
 interface Category {
@@ -79,6 +49,8 @@ interface Category {
 
 type SearchMode = 'name' | 'sku' | 'category'
 
+const UNITS = ['PCS', 'NOS', 'KG', 'MTR', 'LTR', 'BOX', 'SET', 'PKT', 'PAIR', 'RFT', 'SFT']
+
 export function newLineItem(): LineItem {
   return {
     id: Math.random().toString(36).slice(2),
@@ -86,9 +58,6 @@ export function newLineItem(): LineItem {
     variant_id: null, sub_variant_id: null, variant_name: '',
     hsn_code: '', gst_rate: '18', quantity: 1, unit: 'PCS', unit_price: 0,
     discount_pct: 0, mrp: 0, inventory_quantity: null,
-    unit_factor: 1, unit_dimension: 'count',
-    unit_min_qty: 1, unit_max_qty: null, unit_qty_step: 1,
-    available_units: [],
   }
 }
 
@@ -105,17 +74,12 @@ function fmt(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function recalcPriceForUnit(item: LineItem, newUnit: { factor: number }): number {
-  const oldFactor = item.unit_factor ?? 1
-  const baseUnitPrice = Number(item.unit_price) / oldFactor
-  return Math.round(baseUnitPrice * newUnit.factor * 100) / 100
-}
-
 function decodeLineItemId(encoded: string) {
   const parts = encoded.split('|')
   const [product_id, variant_id_raw, base_price_raw, gst_raw, hsn_raw, mrp_raw, inv_raw, sub_variant_id_raw, discount_pct_raw] = parts
   const mrp = parseFloat(mrp_raw) || 0
   const basePrice = parseFloat(base_price_raw) || 0
+  // unit_price = MRP incl. GST (anchor); fall back to base_price if no MRP
   const unit_price = mrp > 0 ? mrp : basePrice
   const discount_pct = discount_pct_raw !== undefined && discount_pct_raw !== ''
     ? parseFloat(discount_pct_raw)
@@ -146,7 +110,9 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
   const [nameInputs, setNameInputs] = useState<Record<string, string>>({})
   const [skuInputs, setSkuInputs] = useState<Record<string, string>>({})
   const [categoryIds, setCategoryIds] = useState<Record<string, string>>({})
+
   const [categories, setCategories] = useState<Category[]>([])
+
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerItemId, setPickerItemId] = useState<string | null>(null)
   const [pickerCatId, setPickerCatId] = useState('')
@@ -195,12 +161,10 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     const discount_pct = s.discount_pct != null
       ? Number(s.discount_pct)
       : mrpDiscountPct(mrp, basePrice)
-    // unit_price = MRP incl. GST (anchor); fall back to base_price if mrp not set
+    // unit_price = MRP incl. GST (anchor); discount_pct is applied on top
+    // Fall back to base_price if mrp is not set
     const unit_price = mrp > 0 ? mrp : Math.round(basePrice * (1 + gstRate / 100) * 100) / 100
-    const su = s.sell_unit ?? null
-    const unit_factor = su?.factor ?? 1
-    const unit_min_qty = su?.min_qty ?? 1
-    const built: LineItem = {
+    return {
       ...it,
       product_id: s.product_id,
       product_name: s.variant_name ? `${s.name} — ${s.variant_name}` : s.name,
@@ -215,16 +179,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       discount_pct,
       mrp,
       inventory_quantity: s.inventory_quantity ?? null,
-      unit: su?.unit ?? it.unit ?? 'PCS',
-      unit_factor,
-      unit_dimension: su?.dimension ?? 'count',
-      unit_min_qty,
-      unit_max_qty: su?.max_qty ?? null,
-      unit_qty_step: su?.qty_step ?? 1,
-      available_units: s.all_units ?? it.available_units ?? [],
     }
-    built.quantity = Math.max(Number(built.quantity) || 1, unit_min_qty)
-    return built
   }
 
   function mergeOrReplaceItem(targetItemId: string, populated: LineItem): LineItem[] {
@@ -242,9 +197,13 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     }
     const addQty = Number(populated.quantity) || 1
     return items
-      .map((it, i) => i === dupIdx
-        ? { ...it, quantity: String((Number(it.quantity) || 0) + addQty) }
-        : it)
+      .map((it, i) => {
+        if (i === dupIdx) {
+          const existing = Number(it.quantity) || 0
+          return { ...it, quantity: String(existing + addQty) }
+        }
+        return it
+      })
       .filter(it => it.id !== targetItemId)
   }
 
@@ -252,7 +211,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     if (!pickerItemId) return
     const target = items.find(it => it.id === pickerItemId)
     if (!target) return
-    onChange(mergeOrReplaceItem(pickerItemId, buildLineItemFromSuggestion(target, s)))
+    const populated = buildLineItemFromSuggestion(target, s)
+    onChange(mergeOrReplaceItem(pickerItemId, populated))
     setPickerOpen(false)
     setPickerItemId(null)
   }
@@ -272,10 +232,6 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     onChange(items.map(it => it.id === id ? { ...it, [field]: value } : it))
   }
 
-  function patchItem(id: string, patch: Partial<LineItem>) {
-    onChange(items.map(it => it.id === id ? { ...it, ...patch } : it))
-  }
-
   const rawTotal = items.reduce((s, it) => s + calcLine(it), 0)
   const taxableValue = items.reduce((s, it) => {
     const gstRate = Number(it.gst_rate) || 0
@@ -285,8 +241,10 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
   const cgst = items.reduce((s, it) => {
     const gstRate = Number(it.gst_rate) || 0
     const mrpEx = (Number(it.unit_price) || 0) / (1 + gstRate / 100)
-    return s + lineItemInclGst(Number(it.quantity) || 0, mrpEx, Number(it.discount_pct) || 0, 0) * gstRate / 200
+    const exAmt = lineItemInclGst(Number(it.quantity) || 0, mrpEx, Number(it.discount_pct) || 0, 0)
+    return s + exAmt * gstRate / 200
   }, 0)
+  const sgst = cgst
   const total = Math.round(rawTotal * 100) / 100
   const roundOff = Math.round((total - rawTotal) * 100) / 100
 
@@ -338,7 +296,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                         )}
                       </div>
                     </div>
-                    <button type="button" onClick={() => clearProduct(item.id)}
+                    <button type="button"
+                      onClick={() => clearProduct(item.id)}
                       className="shrink-0 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors">
                       Change
                     </button>
@@ -359,46 +318,62 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                       ))}
                     </div>
 
-                    {(mode === 'name' || mode === 'sku') && (
+                    {mode === 'name' && (
                       <AdminTypeahead
                         type="line_items"
-                        value={mode === 'name' ? (nameInputs[item.id] ?? '') : (skuInputs[item.id] ?? '')}
-                        onChange={v => mode === 'name'
-                          ? setNameInputs(p => ({ ...p, [item.id]: v }))
-                          : setSkuInputs(p => ({ ...p, [item.id]: v }))}
+                        value={nameInputs[item.id] ?? ''}
+                        onChange={v => setNameInputs(p => ({ ...p, [item.id]: v }))}
                         onSelect={s => {
-                          // If the suggestion carries full data (via extra), use buildLineItemFromSuggestion
-                          // so sell_unit / available_units are applied. Fall back to encoded id otherwise.
-                          const extra = s.extra as Suggestion | undefined
-                          let populated: LineItem
-                          if (extra?.product_id) {
-                            populated = buildLineItemFromSuggestion(item, {
-                              ...extra,
-                              id: s.id,
-                              name: extra.name ?? s.label,
-                            })
-                          } else {
-                            const d = decodeLineItemId(s.id)
-                            populated = {
-                              ...item,
-                              product_id: d.product_id,
-                              product_name: s.label,
-                              product_sku: s.sublabel?.split(' · ')[0] ?? '',
-                              variant_id: d.variant_id,
-                              sub_variant_id: d.sub_variant_id,
-                              variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : '',
-                              hsn_code: d.hsn_code,
-                              gst_rate: d.gst_percentage,
-                              unit_price: d.unit_price,
-                              discount_pct: d.discount_pct,
-                              mrp: d.mrp,
-                              inventory_quantity: d.inventory_quantity,
-                            }
+                          const d = decodeLineItemId(s.id)
+                          const populated: LineItem = {
+                            ...item,
+                            product_id: d.product_id,
+                            product_name: s.label,
+                            product_sku: s.sublabel?.split(' · ')[0] ?? '',
+                            variant_id: d.variant_id,
+                            sub_variant_id: d.sub_variant_id,
+                            variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : '',
+                            hsn_code: d.hsn_code,
+                            gst_rate: d.gst_percentage,
+                            unit_price: d.unit_price,
+                            discount_pct: d.discount_pct,
+                            mrp: d.mrp,
+                            inventory_quantity: d.inventory_quantity,
                           }
                           onChange(mergeOrReplaceItem(item.id, populated))
                         }}
-                        inputClassName={mode === 'sku' ? inputCls + ' font-mono' : inputCls}
-                        placeholder={mode === 'sku' ? 'e.g. JFS-1234' : 'Search by product name...'}
+                        inputClassName={inputCls}
+                        placeholder="Search by product name..."
+                      />
+                    )}
+
+                    {mode === 'sku' && (
+                      <AdminTypeahead
+                        type="line_items"
+                        value={skuInputs[item.id] ?? ''}
+                        onChange={v => setSkuInputs(p => ({ ...p, [item.id]: v }))}
+                        onSelect={s => {
+                          const d = decodeLineItemId(s.id)
+                          const sku = s.sublabel?.split(' · ')[0] ?? ''
+                          const populated: LineItem = {
+                            ...item,
+                            product_id: d.product_id,
+                            product_name: s.label,
+                            product_sku: sku,
+                            variant_id: d.variant_id,
+                            sub_variant_id: d.sub_variant_id,
+                            variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : '',
+                            hsn_code: d.hsn_code,
+                            gst_rate: d.gst_percentage,
+                            unit_price: d.unit_price,
+                            discount_pct: d.discount_pct,
+                            mrp: d.mrp,
+                            inventory_quantity: d.inventory_quantity,
+                          }
+                          onChange(mergeOrReplaceItem(item.id, populated))
+                        }}
+                        inputClassName={inputCls + ' font-mono'}
+                        placeholder="e.g. JFS-1234"
                       />
                     )}
 
@@ -427,8 +402,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                 <div>
                   <label className={labelCls}>HSN Code</label>
-                  <input type="text" value={item.hsn_code}
-                    onChange={e => updateItem(item.id, 'hsn_code', e.target.value)}
+                  <input type="text" value={item.hsn_code} onChange={e => updateItem(item.id, 'hsn_code', e.target.value)}
                     className={inputCls + ' font-mono'} placeholder="9999" />
                 </div>
                 <div>
@@ -446,48 +420,26 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                 </div>
                 <div>
                   <label className={labelCls}>Quantity <span className="text-red-500">*</span></label>
-                  <input
-                    type="number"
-                    min={item.unit_min_qty ?? 1}
-                    max={item.unit_max_qty ?? undefined}
-                    step={item.unit_dimension === 'count' ? 1 : (item.unit_qty_step ?? 0.001)}
-                    value={item.quantity}
-                    onChange={e => updateItem(item.id, 'quantity', e.target.value)}
-                    required
-                    className={inputCls}
-                  />
+                  <input type="number" min="0.001" step="any" value={item.quantity}
+                    onChange={e => updateItem(item.id, 'quantity', e.target.value)} required className={inputCls} />
                 </div>
                 <div>
                   <label className={labelCls}>Unit</label>
-                  {item.available_units && item.available_units.length > 0 ? (
-                    <select
-                      value={item.unit}
-                      onChange={e => {
-                        const chosen = item.available_units!.find(u => u.unit === e.target.value)
-                        if (!chosen) return
-                        patchItem(item.id, {
-                          unit: chosen.unit,
-                          unit_factor: chosen.factor,
-                          unit_dimension: chosen.dimension,
-                          unit_min_qty: chosen.min_qty,
-                          unit_max_qty: chosen.max_qty ?? null,
-                          unit_qty_step: chosen.qty_step,
-                          unit_price: recalcPriceForUnit(item, chosen),
-                        })
-                      }}
-                      className="w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400"
-                    >
-                      {item.available_units.map(u => (
-                        <option key={u.unit} value={u.unit}>
-                          {u.display_label ?? u.unit}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="flex items-center w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary">
-                      <span className="text-sm font-medium text-foreground flex-1 text-center">{item.unit || 'PCS'}</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-0.5 w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary">
+                    <button type="button" onClick={() => {
+                      const i = UNITS.indexOf(item.unit)
+                      updateItem(item.id, 'unit', UNITS[(i - 1 + UNITS.length) % UNITS.length])
+                    }} className="text-foreground-secondary hover:text-foreground transition-colors">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <span className="text-sm font-medium text-foreground flex-1 text-center tabular-nums">{item.unit || 'PCS'}</span>
+                    <button type="button" onClick={() => {
+                      const i = UNITS.indexOf(item.unit)
+                      updateItem(item.id, 'unit', UNITS[(i + 1) % UNITS.length])
+                    }} className="text-foreground-secondary hover:text-foreground transition-colors">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>MRP (incl. GST) <span className="text-red-500">*</span></label>
@@ -521,8 +473,11 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       </div>
 
       {items.length > 0 && (
-        <button type="button" onClick={() => onChange([...items, newLineItem()])}
-          className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors">
+        <button
+          type="button"
+          onClick={() => onChange([...items, newLineItem()])}
+          className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
+        >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -533,13 +488,16 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       <div className="flex justify-end border-t border-border-default pt-3 mt-1">
         <div className="text-right space-y-1 min-w-[220px]">
           <div className="flex justify-between gap-8 text-xs text-foreground-secondary">
-            <span>Taxable Value</span><span>₹{fmt(taxableValue)}</span>
+            <span>Taxable Value</span>
+            <span>₹{fmt(taxableValue)}</span>
           </div>
           <div className="flex justify-between gap-8 text-xs text-foreground-secondary">
-            <span>CGST</span><span>₹{fmt(cgst)}</span>
+            <span>CGST</span>
+            <span>₹{fmt(cgst)}</span>
           </div>
           <div className="flex justify-between gap-8 text-xs text-foreground-secondary">
-            <span>SGST</span><span>₹{fmt(cgst)}</span>
+            <span>SGST</span>
+            <span>₹{fmt(sgst)}</span>
           </div>
           {Math.abs(roundOff) >= 0.005 && (
             <div className="flex justify-between gap-8 text-xs text-foreground-secondary">
@@ -571,11 +529,18 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                 </svg>
               </button>
             </div>
+
             <div className="px-4 py-3 border-b border-border-default shrink-0">
-              <input type="text" value={pickerSearch}
+              <input
+                type="text"
+                value={pickerSearch}
                 onChange={e => { setPickerSearch(e.target.value); loadPickerProducts(pickerCatId, e.target.value) }}
-                className={inputCls} placeholder="Filter by name or SKU…" autoFocus />
+                className={inputCls}
+                placeholder="Filter by name or SKU…"
+                autoFocus
+              />
             </div>
+
             <div className="overflow-y-auto flex-1">
               {pickerLoading ? (
                 <div className="p-8 text-center text-foreground-muted text-sm">Loading…</div>
@@ -608,12 +573,15 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                             </tr>
                           )}
                           {g.items.map(s => (
-                            <tr key={s.id} onClick={() => applyPickerProduct(s)}
+                            <tr key={s.id}
+                              onClick={() => applyPickerProduct(s)}
                               className="border-t border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
                               <td className="px-4 py-2.5">
-                                {g.items.length > 1
-                                  ? <span className="text-foreground pl-2">{s.variant_name || s.name}</span>
-                                  : <span className="font-medium text-foreground">{s.name}</span>}
+                                {g.items.length > 1 ? (
+                                  <span className="text-foreground pl-2">{s.variant_name || s.name}</span>
+                                ) : (
+                                  <span className="font-medium text-foreground">{s.name}</span>
+                                )}
                               </td>
                               <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{s.sku}</td>
                               <td className="px-4 py-2.5 text-right text-foreground font-medium">
