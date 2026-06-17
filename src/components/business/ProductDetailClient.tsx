@@ -24,6 +24,7 @@ interface SubVariant {
   sku?: string | null
   price: number | null
   mrp: number | null
+  price_ex_gst: number | null
   stock_quantity: number
   is_active: boolean
 }

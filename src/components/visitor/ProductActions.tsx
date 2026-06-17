@@ -19,6 +19,7 @@ interface SubVariant {
   sku?: string | null
   price: number | null
   mrp: number | null
+  price_ex_gst: number | null
   stock_quantity: number
   is_active: boolean
 }
@@ -203,8 +204,8 @@ export default function ProductActions({
   const toInclGst = (exGst: number) => Math.round(exGst * gstMultiplier * 100) / 100
 
   const effectivePrice = hasVariants
-    ? (selectedSubVariant?.price != null
-        ? toInclGst(Number(selectedSubVariant.price))
+    ? (selectedSubVariant?.price_ex_gst != null
+        ? toInclGst(Number(selectedSubVariant.price_ex_gst))
         : (selectedVariant?.price_ex_gst != null
             ? toInclGst(Number(selectedVariant.price_ex_gst))
             : basePrice))
