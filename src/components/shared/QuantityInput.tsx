@@ -477,18 +477,22 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-        <DimStepper
-          label={`Width (${unitLabel ?? ''})`}
-          value={w} step={qtyStep} min={dimMin} max={dimMax}
-          onChange={handleW}
-        />
-        <span className="text-foreground-muted pb-3 text-lg">×</span>
-        <DimStepper
-          label={`Height (${unitLabel ?? ''})`}
-          value={h} step={qtyStep} min={dimMin} max={dimMax}
-          onChange={handleH}
-        />
+      <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+        <div className="flex-1">
+          <DimStepper
+            label={`Width (${unitLabel ?? ''})`}
+            value={w} step={qtyStep} min={dimMin} max={dimMax}
+            onChange={handleW}
+          />
+        </div>
+        <span className="text-foreground-muted sm:pb-3 text-lg text-center">×</span>
+        <div className="flex-1">
+          <DimStepper
+            label={`Height (${unitLabel ?? ''})`}
+            value={h} step={qtyStep} min={dimMin} max={dimMax}
+            onChange={handleH}
+          />
+        </div>
       </div>
       <p className="text-sm text-foreground-secondary">
         Area: <span className="font-semibold text-foreground">{quantity.toFixed(3)} {unitLabel}²</span>
