@@ -1302,7 +1302,7 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium">
-                                {p.sell_unit_label || p.sell_unit || 'Pc'}
+                                {p.sell_unit_dimension === 'count' ? 'Pc' : (p.sell_unit_label || p.sell_unit || 'Pc')}
                                 {parseFloat(p.sell_unit_factor || '1') > 1 && p.base_unit_label && (
                                   <span className="text-foreground-muted font-normal">({parseFloat(p.sell_unit_factor)} {p.base_unit_label})</span>
                                 )}
