@@ -232,61 +232,89 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
       </div>
 
-      <div className="relative rounded-xl border border-border-secondary overflow-hidden bg-amber-50 dark:bg-amber-950/20 select-none" style={{ height: 72 }}>
-        {/* fixed centre needle */}
-        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 z-10 pointer-events-none flex flex-col items-center">
-          <div className="w-0.5 h-full bg-primary-600 dark:bg-primary-400 opacity-80" />
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0"
-            style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid var(--color-primary-600, #2563eb)' }} />
-        </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            const next = Math.max(qtyMin, Math.round((liveValue.current - qtyStep) * 1000) / 1000)
+            updateDOM(next)
+            prevQty.current = next
+            commit(next)
+            scrollToValue(next, true)
+          }}
+          disabled={quantity <= qtyMin}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 text-sm font-bold"
+        >‹</button>
 
-        {/* scrollable track */}
-        <div
-          ref={trackRef}
-          onScroll={onScroll}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          className="absolute inset-0 overflow-x-scroll cursor-grab active:cursor-grabbing"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
-        >
-          {/* inner: padding added by ResizeObserver so qtyMin/qtyMax reach the needle */}
-          <div ref={innerRef} style={{ display: 'inline-block', height: '100%' }}>
-            <div style={{ width: ticksWidth, height: '100%', position: 'relative' }}>
-              {/* fill bar */}
-              <div
-                ref={fillRef}
-                className="absolute top-0 bottom-0 left-0 bg-primary-100 dark:bg-primary-900/30"
-                style={{ width: (quantity - qtyMin) * PX_PER_UNIT }}
-              />
-              {/* ticks */}
-              {ticks.map((t, i) => (
-                <div key={i} style={{ position: 'absolute', left: t.pos, top: 0, width: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <div style={{
-                    width: 1,
-                    height: t.kind === 'major' ? 28 : t.kind === 'mid' ? 18 : 10,
-                    background: t.kind === 'major' ? '#92400e' : '#d97706',
-                    opacity: t.kind === 'minor' ? 0.4 : 0.7,
-                    marginTop: t.kind === 'major' ? 0 : t.kind === 'mid' ? 5 : 8,
-                  }} />
-                  {t.label && (
-                    <span style={{ position: 'absolute', top: 30, fontSize: 11, fontWeight: 700, color: '#92400e', transform: 'translateX(-50%)', whiteSpace: 'nowrap', userSelect: 'none', fontFamily: 'monospace' }}>
-                      {t.label}
-                    </span>
-                  )}
-                </div>
-              ))}
-              {/* max label */}
-              <span style={{ position: 'absolute', left: ticksWidth + 8, top: 34, fontSize: 11, color: '#b45309', fontWeight: 600, userSelect: 'none' }}>
-                {unitLabel} max
-              </span>
+        <div className="relative flex-1 rounded-xl border border-border-secondary overflow-hidden bg-amber-50 dark:bg-amber-950/20 select-none" style={{ height: 72 }}>
+          {/* fixed centre needle */}
+          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 z-10 pointer-events-none flex flex-col items-center">
+            <div className="w-0.5 h-full bg-primary-600 dark:bg-primary-400 opacity-80" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-0"
+              style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid var(--color-primary-600, #2563eb)' }} />
+          </div>
+
+          {/* scrollable track */}
+          <div
+            ref={trackRef}
+            onScroll={onScroll}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            className="absolute inset-0 overflow-x-scroll cursor-grab active:cursor-grabbing"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+          >
+            {/* inner: padding added by ResizeObserver so qtyMin/qtyMax reach the needle */}
+            <div ref={innerRef} style={{ display: 'inline-block', height: '100%' }}>
+              <div style={{ width: ticksWidth, height: '100%', position: 'relative' }}>
+                {/* fill bar */}
+                <div
+                  ref={fillRef}
+                  className="absolute top-0 bottom-0 left-0 bg-primary-100 dark:bg-primary-900/30"
+                  style={{ width: (quantity - qtyMin) * PX_PER_UNIT }}
+                />
+                {/* ticks */}
+                {ticks.map((t, i) => (
+                  <div key={i} style={{ position: 'absolute', left: t.pos, top: 0, width: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{
+                      width: 1,
+                      height: t.kind === 'major' ? 28 : t.kind === 'mid' ? 18 : 10,
+                      background: t.kind === 'major' ? '#92400e' : '#d97706',
+                      opacity: t.kind === 'minor' ? 0.4 : 0.7,
+                      marginTop: t.kind === 'major' ? 0 : t.kind === 'mid' ? 5 : 8,
+                    }} />
+                    {t.label && (
+                      <span style={{ position: 'absolute', top: 30, fontSize: 11, fontWeight: 700, color: '#92400e', transform: 'translateX(-50%)', whiteSpace: 'nowrap', userSelect: 'none', fontFamily: 'monospace' }}>
+                        {t.label}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {/* max label */}
+                <span style={{ position: 'absolute', left: ticksWidth + 8, top: 34, fontSize: 11, color: '#b45309', fontWeight: 600, userSelect: 'none' }}>
+                  {unitLabel} max
+                </span>
+              </div>
             </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            const next = Math.min(max, Math.round((liveValue.current + qtyStep) * 1000) / 1000)
+            updateDOM(next)
+            prevQty.current = next
+            commit(next)
+            scrollToValue(next, true)
+          }}
+          disabled={quantity >= max}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 text-sm font-bold"
+        >›</button>
       </div>
 
-      <p className="text-xs text-foreground-muted">Drag the tape to set length</p>
+      <p className="text-xs text-foreground-muted">Drag the tape or use arrows to set length</p>
     </div>
   )
 }
