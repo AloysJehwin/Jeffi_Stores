@@ -60,23 +60,7 @@ export async function GET(request: NextRequest) {
     params.push(limit)
 
     const rows = await queryMany(
-      `SELECT
-         id, product_id, variant_id, name, variant_name, sku, slug,
-         mrp, price_ex_gst, base_price, gst_percentage, hsn_code,
-         brand_name, gtin, inventory_quantity,
-         CASE
-           WHEN pu_unit IS NOT NULL THEN jsonb_build_object(
-             'unit',          pu_unit,
-             'factor',        pu_factor,
-             'dimension',     pu_dimension,
-             'min_qty',       pu_min_qty,
-             'max_qty',       pu_max_qty,
-             'qty_step',      pu_qty_step,
-             'display_label', pu_display_label
-           )
-           ELSE NULL
-         END AS sell_unit
-       FROM (
+      `SELECT * FROM (
          SELECT
            'product:' || p.id AS id,
            p.id AS product_id,
@@ -92,18 +76,9 @@ export async function GET(request: NextRequest) {
            p.hsn_code,
            b.name AS brand_name,
            p.gtin,
-           COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity,
-           pu.unit          AS pu_unit,
-           pu.factor        AS pu_factor,
-           pu.dimension     AS pu_dimension,
-           pu.min_qty       AS pu_min_qty,
-           pu.max_qty       AS pu_max_qty,
-           pu.qty_step      AS pu_qty_step,
-           pu.display_label AS pu_display_label
+           COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity
          FROM products p
          LEFT JOIN brands b ON b.id = p.brand_id
-         LEFT JOIN product_units pu
-           ON pu.product_id = p.id AND pu.variant_id IS NULL AND pu.is_sell_default = true
          WHERE p.is_active = true AND p.has_variants = false AND ${catClause} AND ${productClause} AND ${searchWhere}
 
          UNION ALL
@@ -123,19 +98,10 @@ export async function GET(request: NextRequest) {
            p.hsn_code,
            b.name AS brand_name,
            COALESCE(pv.gtin, p.gtin) AS gtin,
-           COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity,
-           pu.unit          AS pu_unit,
-           pu.factor        AS pu_factor,
-           pu.dimension     AS pu_dimension,
-           pu.min_qty       AS pu_min_qty,
-           pu.max_qty       AS pu_max_qty,
-           pu.qty_step      AS pu_qty_step,
-           pu.display_label AS pu_display_label
+           COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id
-         LEFT JOIN product_units pu
-           ON pu.variant_id = pv.id AND pu.is_sell_default = true
          WHERE pv.is_active = true AND p.is_active = true AND ${catClause} AND ${productClause} AND ${searchWherePv}
            AND NOT EXISTS (SELECT 1 FROM product_sub_variants WHERE variant_id = pv.id AND is_active = true)
 
@@ -156,20 +122,11 @@ export async function GET(request: NextRequest) {
            p.hsn_code,
            b.name AS brand_name,
            COALESCE(pv.gtin, p.gtin) AS gtin,
-           COALESCE(ps.stock_quantity, 0)::numeric AS inventory_quantity,
-           pu.unit          AS pu_unit,
-           pu.factor        AS pu_factor,
-           pu.dimension     AS pu_dimension,
-           pu.min_qty       AS pu_min_qty,
-           pu.max_qty       AS pu_max_qty,
-           pu.qty_step      AS pu_qty_step,
-           pu.display_label AS pu_display_label
+           COALESCE(ps.stock_quantity, 0)::numeric AS inventory_quantity
          FROM product_sub_variants ps
          JOIN product_variants pv ON pv.id = ps.variant_id
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id
-         LEFT JOIN product_units pu
-           ON pu.variant_id = pv.id AND pu.is_sell_default = true
          WHERE ps.is_active = true AND pv.is_active = true AND p.is_active = true AND ${catClause} AND ${productClause} AND ${searchWhereSv}
        ) results
        ORDER BY ${rank}, name ASC, variant_name ASC NULLS FIRST

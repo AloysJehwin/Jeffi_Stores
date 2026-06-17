@@ -8,43 +8,6 @@ import { parseBody, zUuid, zCurrency } from '@/lib/validate'
 
 export const dynamic = 'force-dynamic'
 
-type UnitRow = { unit: string; dimension: string; min_qty: string; max_qty: string | null; qty_step: string }
-
-async function validatePurchaseQty(
-  productId: string | null | undefined,
-  variantId: string | null | undefined,
-  qty: number
-): Promise<string | null> {
-  if (!productId && !variantId) return null
-  let unit: UnitRow | null = null
-  if (variantId) {
-    unit = await queryOne<UnitRow>(
-      `SELECT unit, dimension, min_qty, max_qty, qty_step FROM product_units
-       WHERE variant_id = $1 AND is_purchase_default = TRUE LIMIT 1`,
-      [variantId]
-    ) ?? null
-  }
-  if (!unit && productId) {
-    unit = await queryOne<UnitRow>(
-      `SELECT unit, dimension, min_qty, max_qty, qty_step FROM product_units
-       WHERE product_id = $1 AND variant_id IS NULL AND is_purchase_default = TRUE LIMIT 1`,
-      [productId]
-    ) ?? null
-  }
-  if (!unit) return null
-  const min = Number(unit.min_qty ?? 1)
-  const max = unit.max_qty != null ? Number(unit.max_qty) : null
-  const step = Number(unit.qty_step ?? 1)
-  if (qty < min) return `Quantity must be at least ${min} ${unit.unit}`
-  if (max !== null && qty > max) return `Quantity cannot exceed ${max} ${unit.unit}`
-  if (unit.dimension !== 'count' && step > 0) {
-    const steps = Math.round((qty - min) / step)
-    const snapped = Math.round((min + steps * step) * 1e6) / 1e6
-    if (Math.abs(snapped - qty) > 1e-9) return `Quantity must be in steps of ${step} from ${min}`
-  }
-  return null
-}
-
 const poItemSchema = z.object({
   product_id: zUuid,
   variant_id: zUuid.nullish(),
@@ -147,8 +110,6 @@ export async function POST(request: NextRequest) {
     let subtotal = 0
     let taxAmount = 0
     for (const item of items) {
-      const qtyErr = await validatePurchaseQty(item.product_id, item.variant_id ?? null, item.quantity)
-      if (qtyErr) return NextResponse.json({ error: qtyErr }, { status: 400 })
       const qty = item.quantity
       const cost = item.unit_cost
       const tax = item.tax_rate ?? 0

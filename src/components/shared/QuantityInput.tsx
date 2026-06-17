@@ -86,12 +86,7 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
 const PX_PER_UNIT = 80
 
 function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyStep, onChange }: QuantityInputProps) {
-  // Ensure each qtyStep spans at least 20px on the ruler
-  const pxPerUnit = Math.max(PX_PER_UNIT, Math.ceil(20 / qtyStep))
-
-  // Cap ruler range to ~20 steps when no explicit qtyMax
-  const rulerMax = qtyMax ?? Math.min(effectiveStock, qtyMin + 20 * qtyStep)
-  const max = Math.max(Math.min(effectiveStock, rulerMax), qtyMin)
+  const max = Math.max(Math.min(effectiveStock, qtyMax ?? effectiveStock), qtyMin)
 
   const trackRef    = useRef<HTMLDivElement>(null)
   const fillRef     = useRef<HTMLDivElement>(null)
@@ -105,15 +100,15 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   const programmaticTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const snap         = (v: number) => Math.round((v - qtyMin) / qtyStep) * qtyStep + qtyMin
-  const toScrollLeft = (v: number) => (v - qtyMin) * pxPerUnit
-  const fromScrollLeft = (sl: number) => qtyMin + sl / pxPerUnit
+  const toScrollLeft = (v: number) => (v - qtyMin) * PX_PER_UNIT
+  const fromScrollLeft = (sl: number) => qtyMin + sl / PX_PER_UNIT
 
   const updateDOM = (v: number) => {
     liveValue.current = v
     if (readoutRef.current)
       readoutRef.current.textContent = v % 1 === 0 ? String(v) : v.toFixed(2)
     if (fillRef.current)
-      fillRef.current.style.width = `${(v - qtyMin) * pxPerUnit}px`
+      fillRef.current.style.width = `${(v - qtyMin) * PX_PER_UNIT}px`
   }
 
   const commit = (v: number) => onChange(v, v % 1 === 0 ? String(v) : v.toFixed(2))
@@ -187,14 +182,14 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     scrollToValue(v, false)
   }
 
-  // tick marks — subStep always ≥4px apart because pxPerUnit is scaled to guarantee it
+  // tick marks
   const ticks: { pos: number; label: string | null; kind: 'major' | 'mid' | 'minor' }[] = []
   const subStep = qtyStep <= 0.1 ? qtyStep : 0.1
   const totalSteps = Math.round((max - qtyMin) / subStep)
   let lastMajorLabel: string | null = null
   for (let i = 0; i <= totalSteps; i++) {
     const v = Math.round((qtyMin + i * subStep) * 1000) / 1000
-    const pos = (v - qtyMin) * pxPerUnit
+    const pos = (v - qtyMin) * PX_PER_UNIT
     const stepsFromMin = (v - qtyMin) / qtyStep
     const isMajor = Math.abs(stepsFromMin - Math.round(stepsFromMin)) < 0.001
     const isMid = !isMajor && Math.abs((stepsFromMin * 2) % 1) < 0.01
@@ -247,7 +242,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
 
   useEffect(() => stopLongPress, [])
 
-  const ticksWidth = Math.round((max - qtyMin) * pxPerUnit)
+  const ticksWidth = Math.round((max - qtyMin) * PX_PER_UNIT)
 
   return (
     <div className="space-y-3">
@@ -286,7 +281,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
               <div
                 ref={fillRef}
                 className="absolute top-0 bottom-0 left-0 bg-primary-100 dark:bg-primary-900/30"
-                style={{ width: (quantity - qtyMin) * pxPerUnit }}
+                style={{ width: (quantity - qtyMin) * PX_PER_UNIT }}
               />
               {/* ticks */}
               {ticks.map((t, i) => (
