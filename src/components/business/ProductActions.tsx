@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { bp } from '@/lib/business-path'
+import QuantityInput from '@/components/shared/QuantityInput'
 
 interface VariantImage {
   id: string
@@ -52,6 +53,9 @@ interface ProductUnit {
   is_purchase_default: boolean
   display_label: string | null
   dimension: string
+  min_qty?: number | null
+  max_qty?: number | null
+  qty_step?: number | null
 }
 
 interface ProductActionsProps {
@@ -103,7 +107,6 @@ export default function ProductActions({
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [quantityRaw, setQuantityRaw] = useState('1')
-  useEffect(() => { setQuantityRaw(String(quantity)) }, [quantity])
 
   const pricingTypes = Array.from(new Set(variants.map(v => v.pricing_type || 'unit')))
   const hasMultipleModes = pricingTypes.length > 1
@@ -210,8 +213,15 @@ export default function ProductActions({
     ? (user.businessDiscountMap?.[categoryId] ?? 0)
     : 0
 
+  const gstMultiplier = 1 + (gstPercentage ?? 0) / 100
+  const toInclGst = (exGst: number) => Math.round(exGst * gstMultiplier * 100) / 100
+
   const rawEffectivePrice = hasVariants
-    ? (selectedSubVariant?.price != null ? Number(selectedSubVariant.price) : (selectedVariant?.price ?? basePrice))
+    ? (selectedSubVariant?.price != null
+        ? toInclGst(Number(selectedSubVariant.price))
+        : (selectedVariant?.price_ex_gst != null
+            ? toInclGst(Number(selectedVariant.price_ex_gst))
+            : basePrice))
     : (salePrice ?? basePrice)
   const effectivePrice = businessDiscountPct > 0
     ? rawEffectivePrice * (1 - businessDiscountPct / 100)
@@ -243,6 +253,8 @@ export default function ProductActions({
         ?? null
     }
     return units.find(u => u.variant_id === selectedVariantId && u.is_sell_default)
+      ?? units.find(u => u.variant_id === selectedVariantId && u.is_base)
+      ?? units.find(u => u.variant_id === selectedVariantId)
       ?? units.find(u => u.variant_id === null && u.is_sell_default)
       ?? units.find(u => u.variant_id === null && u.is_base)
       ?? null
@@ -250,9 +262,33 @@ export default function ProductActions({
   const effectiveUnitKey = sellUnit?.unit ?? 'unit'
   const effectiveUnitLabel = sellUnit?.display_label ?? sellUnit?.unit ?? null
 
+  const isContinuous = sellUnit?.dimension === 'length' || sellUnit?.dimension === 'weight' || sellUnit?.dimension === 'area' || sellUnit?.dimension === 'volume'
+  const unitFactor = sellUnit?.factor != null ? Number(sellUnit.factor) : 1
+  // baseUnit = the factor-1 unit distinct from the sell unit (e.g. "pc" when selling by "pair")
+  const baseUnit = (() => {
+    const variantUnits = selectedVariantId ? units.filter(u => u.variant_id === selectedVariantId) : []
+    const productLevelUnits = units.filter(u => u.variant_id === null)
+    const pool = variantUnits.length > 0 ? variantUnits : productLevelUnits
+    return pool.find(u => Number(u.factor) === 1 && u.unit !== (sellUnit?.unit ?? '')) ?? null
+  })()
+  const baseUnitLabel = baseUnit?.display_label ?? baseUnit?.unit ?? null
+  const showPerBasePrice = unitFactor !== 1
+  const qtyStep = sellUnit?.dimension === 'count'
+    ? 1
+    : (sellUnit?.qty_step != null ? Number(sellUnit.qty_step) : (isContinuous ? 0.001 : 1))
+  const qtyMin = sellUnit?.min_qty != null ? Number(sellUnit.min_qty) : 1
+  const qtyMax = sellUnit?.max_qty != null ? Number(sellUnit.max_qty) : undefined
+
   useEffect(() => {
-    setQuantity(1)
+    setQuantity(qtyMin)
+    setQuantityRaw(String(qtyMin))
   }, [selectedVariantId])
+
+  useEffect(() => {
+    const initial = qtyMin
+    setQuantity(initial)
+    setQuantityRaw(isContinuous ? initial.toFixed(3) : String(initial))
+  }, [effectiveUnitKey])
 
   const handleAddToCart = async () => {
     setIsAddingToCart(true)
@@ -450,6 +486,7 @@ export default function ProductActions({
                   <div className="flex items-center gap-2 flex-wrap justify-end">
                     <span className="text-base text-foreground-muted line-through tabular-nums">
                       Rs.&nbsp;{rawEffectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {` / ${showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel}`}
                     </span>
                     {effectiveMrp && effectiveMrp > rawEffectivePrice && (
                       <span className="text-sm text-foreground-muted line-through tabular-nums">
@@ -458,38 +495,65 @@ export default function ProductActions({
                     )}
                   </div>
                 </div>
-                <div className="mb-3">
-                  <p className="text-sm font-semibold text-accent-600 dark:text-accent-400 mb-1">Your business price</p>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                      Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                {/* Big orange = base unit price (discounted) */}
+                <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+                  <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-sm text-foreground-secondary">/ {showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel}</span>
+                  {showPerBasePrice && (
+                    <span className="text-base font-semibold text-foreground tabular-nums">
+                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
                     </span>
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap shrink-0">
-                      ✦ {businessDiscountPct}% off
-                    </span>
-                  </div>
+                  )}
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap shrink-0">
+                    ✦ {businessDiscountPct}% off
+                  </span>
+                </div>
+                {/* Total price */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm text-foreground-secondary">
+                    Total ({quantity} {effectiveUnitLabel ?? 'pc'}):
+                  </span>
+                  <span className="text-base font-semibold text-foreground tabular-nums">
+                    Rs.&nbsp;{(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
                 </div>
               </>
             ) : (
-              <div className="flex items-baseline gap-3 mb-2 flex-wrap">
-                <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                  Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-                {effectiveMrp && effectiveMrp > effectivePrice && (
-                  <span className="text-lg text-foreground-muted line-through tabular-nums">
-                    Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              <>
+                {/* Big orange = base unit price */}
+                <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+                  <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                )}
-              </div>
+                  <span className="text-sm text-foreground-secondary">/ {showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel}</span>
+                  {/* Selling unit price in white next to it */}
+                  {showPerBasePrice && (
+                    <span className="text-base font-semibold text-foreground tabular-nums">
+                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
+                    </span>
+                  )}
+                  {effectiveMrp && effectiveMrp > effectivePrice && (
+                    <span className="text-xl text-foreground-muted line-through tabular-nums">
+                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+                {/* Total = selling unit price × qty */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm text-foreground-secondary">
+                    Total ({quantity} {effectiveUnitLabel ?? 'pc'}):
+                  </span>
+                  <span className="text-base font-semibold text-foreground tabular-nums">
+                    Rs.&nbsp;{(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </>
             )}
             {perUnitRate && (
               <p className="text-sm font-medium text-accent-600 dark:text-accent-400 mb-2">
                 {perUnitRate}
-              </p>
-            )}
-            {effectiveUnitLabel && effectiveUnitKey !== 'unit' && (
-              <p className="text-sm font-medium text-accent-600 dark:text-accent-400 mb-2">
-                ₹{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
               </p>
             )}
             {mrpDiscount > 0 && (
@@ -498,7 +562,7 @@ export default function ProductActions({
                   {mrpDiscount}% off
                 </span>
                 <span className="text-sm text-foreground-secondary">
-                  You save Rs. {(effectiveMrp! - effectivePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  You save Rs. {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             )}
@@ -508,7 +572,7 @@ export default function ProductActions({
             {effectiveWholesalePrice && (
               <div className="mt-3 pt-3 border-t border-border-default">
                 <span className="text-sm text-foreground-secondary">
-                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel ?? 'pc'}</span>
                 </span>
               </div>
             )}
@@ -535,47 +599,21 @@ export default function ProductActions({
       )}
 
       <div>
-        <label className="block text-sm font-medium text-foreground-secondary mb-2">Quantity</label>
-        <div className="flex items-center border border-border-secondary rounded-lg w-fit overflow-hidden">
-          <button
-            onClick={() => setQuantity(Math.max(1, quantity - 1))}
-            disabled={quantity <= 1}
-            className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-            </svg>
-          </button>
-          <input
-            type="number"
-            min={1}
-            max={effectiveStock}
-            value={quantityRaw}
-            onChange={e => {
-              const raw = e.target.value
-              setQuantityRaw(raw)
-              if (raw === '' || raw === '0') return
-              const v = parseInt(raw, 10)
-              if (!isNaN(v)) setQuantity(Math.min(effectiveStock, Math.max(1, v)))
-            }}
-            onBlur={e => {
-              const v = parseInt(e.target.value, 10)
-              const clamped = isNaN(v) || v < 1 ? 1 : Math.min(effectiveStock, v)
-              setQuantity(clamped)
-              setQuantityRaw(String(clamped))
-            }}
-            className="w-16 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none animate-fade-in [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          />
-          <button
-            onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
-            disabled={quantity >= effectiveStock}
-            className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-        </div>
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
+          Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? ` (${effectiveUnitLabel})` : ''}
+        </label>
+        <QuantityInput
+          dimension={sellUnit?.dimension ?? 'count'}
+          quantity={quantity}
+          quantityRaw={quantityRaw}
+          unitLabel={effectiveUnitLabel}
+          unitKey={effectiveUnitKey}
+          effectiveStock={effectiveStock}
+          qtyStep={qtyStep}
+          qtyMin={qtyMin}
+          qtyMax={qtyMax}
+          onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
+        />
       </div>
 
       <div className="space-y-3">
