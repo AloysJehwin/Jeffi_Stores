@@ -73,91 +73,66 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
 }
 
 // ─── Tape-measure ruler ────────────────────────────────────────────────────
-// Scroll-only design: the tape div itself is overflow-x-scroll.
-// All visual updates (readout + fill) happen via direct DOM refs — zero React
-// re-renders during scroll/drag, so there is no lag or re-centering fight.
-// onChange is called once on pointer-up or after touch scroll settles.
+// Design: the tape inner div has no padding. The scrollable container uses
+// CSS scroll-padding-inline so the browser's snap logic anchors to the
+// centre needle. scrollLeft=0 means qtyMin is under the needle.
+//
+// scrollLeft for value v  =  (v - qtyMin) * PX_PER_UNIT
+// value from scrollLeft   =  qtyMin + scrollLeft / PX_PER_UNIT
+//
+// The tape inner div is wider than the container by one full container-width
+// on each side (via paddingInline) so the user can actually reach qtyMin and
+// qtyMax by scrolling — without any dead zone.
 const PX_PER_UNIT = 80
 
 function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyStep, onChange }: QuantityInputProps) {
   const max = Math.max(Math.min(effectiveStock, qtyMax ?? effectiveStock), qtyMin)
-  const PADDING = 200
-  const tapeWidth = Math.round((max - qtyMin) * PX_PER_UNIT) + PADDING * 2
 
   const trackRef = useRef<HTMLDivElement>(null)
-  const fillRef = useRef<HTMLDivElement>(null)
+  const fillRef  = useRef<HTMLDivElement>(null)
   const readoutRef = useRef<HTMLSpanElement>(null)
 
-  const isDragging = useRef(false)
-  const lastX = useRef(0)
-  const liveValue = useRef(quantity) // current value without triggering re-render
+  const isDragging  = useRef(false)
+  const lastX       = useRef(0)
+  const liveValue   = useRef(quantity)
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const programmatic = useRef(false)
+  const programmatic      = useRef(false)
   const programmaticTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // snap v to the nearest valid step anchored at qtyMin
   const snap = (v: number) => Math.round((v - qtyMin) / qtyStep) * qtyStep + qtyMin
 
-  const getScrollLeft = (v: number) => {
-    const el = trackRef.current
-    if (!el) return 0
-    return (v - qtyMin) * PX_PER_UNIT + PADDING - el.clientWidth / 2
-  }
+  // scrollLeft ↔ value — no container-width dependence
+  const toScrollLeft = (v: number) => (v - qtyMin) * PX_PER_UNIT
+  const fromScrollLeft = (sl: number) => qtyMin + sl / PX_PER_UNIT
 
-  const getValueFromScroll = (scrollLeft: number) => {
-    const el = trackRef.current
-    if (!el) return qtyMin
-    return qtyMin + (scrollLeft + el.clientWidth / 2 - PADDING) / PX_PER_UNIT
-  }
-
-  // update DOM readout + fill directly — no React re-render
   const updateDOM = (v: number) => {
     liveValue.current = v
-    if (readoutRef.current) {
+    if (readoutRef.current)
       readoutRef.current.textContent = v % 1 === 0 ? String(v) : v.toFixed(2)
-    }
-    if (fillRef.current) {
+    if (fillRef.current)
       fillRef.current.style.width = `${(v - qtyMin) * PX_PER_UNIT}px`
-    }
   }
 
-  // commit to React state (called once, not on every scroll tick)
-  const commit = (v: number) => {
-    onChange(v, v % 1 === 0 ? String(v) : v.toFixed(2))
-  }
+  const commit = (v: number) => onChange(v, v % 1 === 0 ? String(v) : v.toFixed(2))
 
   const scrollToValue = (v: number, smooth = false) => {
     const el = trackRef.current
     if (!el) return
     programmatic.current = true
     if (programmaticTimer.current) clearTimeout(programmaticTimer.current)
-    el.scrollTo({ left: Math.max(0, getScrollLeft(v)), behavior: smooth ? 'smooth' : 'instant' })
-    // Use 1200ms for smooth — browser smooth-scroll can take 800ms+; if the
-    // guard drops too early the scroll event is misread and causes snap-back.
-    programmaticTimer.current = setTimeout(() => { programmatic.current = false }, smooth ? 1200 : 50)
+    el.scrollTo({ left: toScrollLeft(v), behavior: smooth ? 'smooth' : 'instant' })
+    programmaticTimer.current = setTimeout(() => { programmatic.current = false }, smooth ? 600 : 30)
   }
 
-  // mount: scroll to initial quantity only after the element has a real width.
-  // A plain useEffect([]) fires before layout — clientWidth is 0, so getScrollLeft
-  // returns 200 regardless of qtyMin, and the tape ends up centred on the wrong value.
-  // ResizeObserver fires after the first paint when clientWidth is known.
-  const initialised = useRef(false)
+  // initial scroll — runs once after mount
   useEffect(() => {
-    const el = trackRef.current
-    if (!el) return
-    const ro = new ResizeObserver(() => {
-      if (el.clientWidth > 0 && !initialised.current) {
-        initialised.current = true
-        updateDOM(quantity)
-        scrollToValue(quantity, false)
-        ro.disconnect()
-      }
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
+    updateDOM(quantity)
+    scrollToValue(quantity, false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // external quantity change (variant switch etc.) — re-centre
+  // external quantity change (e.g. variant switch) — re-centre
   const prevQty = useRef(quantity)
   useEffect(() => {
     if (isDragging.current) return
@@ -169,28 +144,24 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quantity])
 
-  // scroll handler — update DOM only, debounce commit for touch scroll settle
   const onScroll = useCallback(() => {
     if (programmatic.current) return
     const el = trackRef.current
     if (!el) return
-    const raw = getValueFromScroll(el.scrollLeft)
+    const raw = fromScrollLeft(el.scrollLeft)
     const v = Math.round(snap(Math.min(max, Math.max(qtyMin, raw))) * 1000) / 1000
     updateDOM(v)
-    // for touch scroll: commit after scroll settles
     if (!isDragging.current) {
       if (commitTimer.current) clearTimeout(commitTimer.current)
       commitTimer.current = setTimeout(() => {
         prevQty.current = liveValue.current
         commit(liveValue.current)
-        // snap tape to grid after touch settle — instant to avoid onScroll race
         scrollToValue(liveValue.current, false)
       }, 150)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [max, qtyMin, qtyStep])
 
-  // pointer drag — mouse only (touch uses native scroll)
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'touch') return
     isDragging.current = true
@@ -213,22 +184,47 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     scrollToValue(v, false)
   }
 
-  // tick marks — computed once per render (max/qtyStep rarely change)
+  // tick marks
   const ticks: { pos: number; label: string | null; kind: 'major' | 'mid' | 'minor' }[] = []
   const subStep = qtyStep <= 0.1 ? qtyStep : 0.1
   const totalSteps = Math.round((max - qtyMin) / subStep)
+  let lastMajorLabel: string | null = null
   for (let i = 0; i <= totalSteps; i++) {
     const v = Math.round((qtyMin + i * subStep) * 1000) / 1000
-    const pos = PADDING + (v - qtyMin) * PX_PER_UNIT
+    const pos = (v - qtyMin) * PX_PER_UNIT
     const stepsFromMin = (v - qtyMin) / qtyStep
     const isMajor = Math.abs(stepsFromMin - Math.round(stepsFromMin)) < 0.001
     const isMid = !isMajor && Math.abs((stepsFromMin * 2) % 1) < 0.01
-    ticks.push({ pos, label: isMajor ? String(Math.round(v)) : null, kind: isMajor ? 'major' : isMid ? 'mid' : 'minor' })
+    const snappedLabel: string | null = isMajor ? String(Math.round((qtyMin + Math.round(stepsFromMin) * qtyStep) * 1000) / 1000) : null
+    const label: string | null = snappedLabel !== null && snappedLabel !== lastMajorLabel ? snappedLabel : null
+    if (label !== null) lastMajorLabel = label
+    ticks.push({ pos, label, kind: isMajor ? 'major' : isMid ? 'mid' : 'minor' })
   }
+
+  // tape inner width: the ticks span (max-qtyMin)*PX_PER_UNIT.
+  // We add half-container padding on each side via paddingInline so the user
+  // can scroll qtyMin and qtyMax under the centre needle. This is set as a
+  // CSS variable updated by ResizeObserver so it stays correct after resize.
+  const innerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = trackRef.current
+    const inner = innerRef.current
+    if (!el || !inner) return
+    const ro = new ResizeObserver(() => {
+      const half = el.clientWidth / 2
+      inner.style.paddingInline = `${half}px`
+      // re-scroll to keep current value under needle after resize
+      el.scrollLeft = toScrollLeft(liveValue.current)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const ticksWidth = Math.round((max - qtyMin) * PX_PER_UNIT)
 
   return (
     <div className="space-y-3">
-      {/* value readout — updated via DOM ref, not re-render */}
       <div className="flex items-baseline gap-1.5">
         <span ref={readoutRef} className="text-2xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
           {quantity % 1 === 0 ? String(quantity) : quantity.toFixed(2)}
@@ -236,7 +232,6 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
       </div>
 
-      {/* tape box */}
       <div className="relative rounded-xl border border-border-secondary overflow-hidden bg-amber-50 dark:bg-amber-950/20 select-none" style={{ height: 72 }}>
         {/* fixed centre needle */}
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 z-10 pointer-events-none flex flex-col items-center">
@@ -245,7 +240,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
             style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid var(--color-primary-600, #2563eb)' }} />
         </div>
 
-        {/* scrollable tape */}
+        {/* scrollable track */}
         <div
           ref={trackRef}
           onScroll={onScroll}
@@ -256,54 +251,37 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
           className="absolute inset-0 overflow-x-scroll cursor-grab active:cursor-grabbing"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         >
-          <div style={{ width: tapeWidth, height: '100%', position: 'relative' }}>
-            {/* fill — updated via DOM ref */}
-            <div
-              ref={fillRef}
-              className="absolute top-0 bottom-0 bg-primary-100 dark:bg-primary-900/30"
-              style={{ left: PADDING, width: (quantity - qtyMin) * PX_PER_UNIT }}
-            />
-
-            {/* tick marks */}
-            {ticks.map((t, i) => (
-              <div key={i} style={{ position: 'absolute', left: t.pos, top: 0, width: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <div style={{
-                  width: 1,
-                  height: t.kind === 'major' ? 28 : t.kind === 'mid' ? 18 : 10,
-                  background: t.kind === 'major' ? '#92400e' : '#d97706',
-                  opacity: t.kind === 'minor' ? 0.4 : 0.7,
-                  marginTop: t.kind === 'major' ? 0 : t.kind === 'mid' ? 5 : 8,
-                }} />
-                {t.label && (
-                  <span style={{
-                    position: 'absolute',
-                    top: 30,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#92400e',
-                    transform: 'translateX(-50%)',
-                    whiteSpace: 'nowrap',
-                    userSelect: 'none',
-                    fontFamily: 'monospace',
-                  }}>
-                    {t.label}
-                  </span>
-                )}
-              </div>
-            ))}
-
-            {/* unit label at the end */}
-            <span style={{
-              position: 'absolute',
-              left: PADDING + (max - qtyMin) * PX_PER_UNIT + 8,
-              top: 34,
-              fontSize: 11,
-              color: '#b45309',
-              fontWeight: 600,
-              userSelect: 'none',
-            }}>
-              {unitLabel} max
-            </span>
+          {/* inner: padding added by ResizeObserver so qtyMin/qtyMax reach the needle */}
+          <div ref={innerRef} style={{ display: 'inline-block', height: '100%' }}>
+            <div style={{ width: ticksWidth, height: '100%', position: 'relative' }}>
+              {/* fill bar */}
+              <div
+                ref={fillRef}
+                className="absolute top-0 bottom-0 left-0 bg-primary-100 dark:bg-primary-900/30"
+                style={{ width: (quantity - qtyMin) * PX_PER_UNIT }}
+              />
+              {/* ticks */}
+              {ticks.map((t, i) => (
+                <div key={i} style={{ position: 'absolute', left: t.pos, top: 0, width: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{
+                    width: 1,
+                    height: t.kind === 'major' ? 28 : t.kind === 'mid' ? 18 : 10,
+                    background: t.kind === 'major' ? '#92400e' : '#d97706',
+                    opacity: t.kind === 'minor' ? 0.4 : 0.7,
+                    marginTop: t.kind === 'major' ? 0 : t.kind === 'mid' ? 5 : 8,
+                  }} />
+                  {t.label && (
+                    <span style={{ position: 'absolute', top: 30, fontSize: 11, fontWeight: 700, color: '#92400e', transform: 'translateX(-50%)', whiteSpace: 'nowrap', userSelect: 'none', fontFamily: 'monospace' }}>
+                      {t.label}
+                    </span>
+                  )}
+                </div>
+              ))}
+              {/* max label */}
+              <span style={{ position: 'absolute', left: ticksWidth + 8, top: 34, fontSize: 11, color: '#b45309', fontWeight: 600, userSelect: 'none' }}>
+                {unitLabel} max
+              </span>
+            </div>
           </div>
         </div>
       </div>
