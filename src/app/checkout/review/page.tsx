@@ -487,8 +487,15 @@ function CheckoutReviewPage() {
                         )}
                       </div>
                       <div className="flex items-center justify-between mt-2">
+                        {(() => {
+                          const isBuyNowFractional = (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') || !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
+                          const effectiveBuyNowQty = isBuyNowFractional ? buyNowItem.qty : Math.round(buyNowItem.qty)
+                          const buyNowTotal = buyNowItem.price * effectiveBuyNowQty
+                          const displayUnit = buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit' ? buyNowItem.buyUnit : (buyNowItem.buyMode !== 'unit' ? buyNowItem.buyMode : null)
+                          return (
+                          <>
                         <p className="text-sm text-foreground-secondary">
-                          ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode && buyNowItem.buyMode !== 'unit' ? <>{Number(Number(buyNowItem.qty).toFixed(6)).toString()}{buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit' ? <> <UnitLabel label={buyNowItem.buyUnit} /></> : ''}</> : Math.round(buyNowItem.qty)}
+                          ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {isBuyNowFractional ? <>{Number(Number(buyNowItem.qty).toFixed(6)).toString()}{displayUnit ? <> <UnitLabel label={displayUnit} /></> : ''}</> : effectiveBuyNowQty}
                           {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
                             <>
                               {' '}<span className="line-through text-foreground-muted">₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -497,11 +504,15 @@ function CheckoutReviewPage() {
                           )}
                         </p>
                         <p className="text-sm font-semibold text-foreground">
-                          ₹{(buyNowItem.price * buyNowItem.qty).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ₹{buyNowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
+                          </>
+                          )
+                        })()}
                       </div>
                       {buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
-                        const lineTotal = buyNowItem.price * buyNowItem.qty
+                        const isBuyNowFractional2 = (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') || !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
+                        const lineTotal = buyNowItem.price * (isBuyNowFractional2 ? buyNowItem.qty : Math.round(buyNowItem.qty))
                         const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
                         return (
                           <p className="text-[11px] text-foreground-muted mt-0.5">
