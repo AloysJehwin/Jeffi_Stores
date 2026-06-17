@@ -173,8 +173,8 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
       commitTimer.current = setTimeout(() => {
         prevQty.current = liveValue.current
         commit(liveValue.current)
-        // snap tape to grid after touch settle
-        scrollToValue(liveValue.current, true)
+        // snap tape to grid after touch settle — instant to avoid onScroll race
+        scrollToValue(liveValue.current, false)
       }, 150)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -200,7 +200,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     const v = liveValue.current
     prevQty.current = v
     commit(v)
-    scrollToValue(v, true)
+    scrollToValue(v, false)
   }
 
   // tick marks — computed once per render (max/qtyStep rarely change)
