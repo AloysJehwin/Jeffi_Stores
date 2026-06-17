@@ -500,7 +500,7 @@ export default function ProductActions({
             {showPerBasePrice && (
               <div className="mb-1">
                 <span className="text-base font-semibold text-foreground">
-                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                  Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                 </span>
               </div>
             )}
@@ -511,7 +511,7 @@ export default function ProductActions({
                 Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
               </span>
               <span className="text-base font-semibold text-foreground">
-                Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                Rs. {(effectivePrice * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
             </div>
 
@@ -521,7 +521,7 @@ export default function ProductActions({
                   {mrpDiscount}% off
                 </span>
                 <span className="text-sm text-foreground-secondary">
-                  You save Rs. {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  You save Rs. {((effectiveMrp! - effectivePrice) * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             )}
@@ -531,7 +531,7 @@ export default function ProductActions({
             {effectiveWholesalePrice && (
               <div className="mt-3 pt-3 border-t border-border-default">
                 <span className="text-sm text-foreground-secondary">
-                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel ?? 'pc'} /></span>
+                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel ?? 'pc'} /></span>
                 </span>
               </div>
             )}
