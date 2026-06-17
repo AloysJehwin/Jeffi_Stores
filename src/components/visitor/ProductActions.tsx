@@ -471,23 +471,25 @@ export default function ProductActions({
         <>
           <div className="bg-surface rounded-lg p-6">
             {/* Big orange = base unit price (per m, per kg, per pc etc.) */}
-            <div className="flex items-baseline gap-3 mb-1">
+            <div className="flex items-baseline gap-2 flex-wrap mb-1">
               <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
                 Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
               <span className="text-sm text-foreground-secondary">/ {showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel}</span>
-              {/* Selling unit price in white next to it */}
-              {showPerBasePrice && (
-                <span className="text-base font-semibold text-foreground">
-                  ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
-                </span>
-              )}
               {effectiveMrp && effectiveMrp > effectivePrice && (
                 <span className="text-xl text-foreground-muted line-through">
                   Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               )}
             </div>
+            {/* Selling unit price (e.g. per pair/box) on its own line */}
+            {showPerBasePrice && (
+              <div className="mb-1">
+                <span className="text-base font-semibold text-foreground">
+                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
+                </span>
+              </div>
+            )}
 
             {/* Total = selling unit price × qty */}
             <div className="flex items-center gap-2 mb-2">
