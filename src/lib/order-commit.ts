@@ -142,8 +142,8 @@ export async function resolveBuyNowItem(input: {
   // Apply unit factor if buyMode is a real unit key (not 'unit')
   if (buyMode && buyMode !== 'unit') {
     const effectiveVariantId = input.variantId || null
-    const unitRow = await queryOne<{ factor: string | number }>(
-      `SELECT factor FROM product_units
+    const unitRow = await queryOne<{ factor: string | number; dimension: string; min_qty: string | number | null; max_qty: string | number | null; qty_step: string | number | null; unit: string }>(
+      `SELECT factor, dimension, min_qty, max_qty, qty_step, unit FROM product_units
        WHERE product_id = $1 AND unit = $2
          AND (variant_id = $3 OR (variant_id IS NULL AND NOT EXISTS (
            SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2 AND pu2.variant_id = $3
@@ -153,6 +153,19 @@ export async function resolveBuyNowItem(input: {
       [input.productId, buyMode, effectiveVariantId]
     )
     if (unitRow) {
+      const minQty = Number(unitRow.min_qty ?? 1)
+      const maxQty = unitRow.max_qty != null ? Number(unitRow.max_qty) : null
+      const qtyStep = Number(unitRow.qty_step ?? 1)
+      const isContinuous = unitRow.dimension !== 'count'
+
+      if (qty < minQty) return { ok: false, error: `Minimum quantity is ${minQty} ${unitRow.unit}` }
+      if (maxQty !== null && qty > maxQty) return { ok: false, error: `Maximum quantity is ${maxQty} ${unitRow.unit}` }
+      if (isContinuous && qtyStep > 0) {
+        const steps = Math.round((qty - minQty) / qtyStep)
+        const snapped = Math.round((minQty + steps * qtyStep) * 1e6) / 1e6
+        if (Math.abs(snapped - qty) > 1e-9) return { ok: false, error: `Quantity must be a multiple of ${qtyStep}` }
+      }
+
       price = Math.round(price * Number(unitRow.factor) * 100) / 100
     }
   }
