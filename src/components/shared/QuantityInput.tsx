@@ -221,6 +221,32 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const stepInterval = useRef<ReturnType<typeof setInterval> | null>(null)
+  const stepTimeout  = useRef<ReturnType<typeof setTimeout>  | null>(null)
+
+  const stepBy = useCallback((dir: 1 | -1) => {
+    const next = Math.min(max, Math.max(qtyMin, Math.round((liveValue.current + dir * qtyStep) * 1000) / 1000))
+    updateDOM(next)
+    prevQty.current = next
+    commit(next)
+    scrollToValue(next, false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [max, qtyMin, qtyStep])
+
+  const startLongPress = (dir: 1 | -1) => {
+    stepBy(dir)
+    stepTimeout.current = setTimeout(() => {
+      stepInterval.current = setInterval(() => stepBy(dir), 80)
+    }, 400)
+  }
+
+  const stopLongPress = () => {
+    if (stepTimeout.current)  { clearTimeout(stepTimeout.current);   stepTimeout.current  = null }
+    if (stepInterval.current) { clearInterval(stepInterval.current); stepInterval.current = null }
+  }
+
+  useEffect(() => stopLongPress, [])
+
   const ticksWidth = Math.round((max - qtyMin) * PX_PER_UNIT)
 
   return (
@@ -232,21 +258,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
       </div>
 
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            const next = Math.max(qtyMin, Math.round((liveValue.current - qtyStep) * 1000) / 1000)
-            updateDOM(next)
-            prevQty.current = next
-            commit(next)
-            scrollToValue(next, true)
-          }}
-          disabled={quantity <= qtyMin}
-          className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 text-sm font-bold"
-        >‹</button>
-
-        <div className="relative flex-1 rounded-xl border border-border-secondary overflow-hidden bg-amber-50 dark:bg-amber-950/20 select-none" style={{ height: 72 }}>
+      <div className="relative rounded-xl border border-border-secondary overflow-hidden bg-amber-50 dark:bg-amber-950/20 select-none" style={{ height: 72 }}>
           {/* fixed centre needle */}
           <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 z-10 pointer-events-none flex flex-col items-center">
             <div className="w-0.5 h-full bg-primary-600 dark:bg-primary-400 opacity-80" />
@@ -298,23 +310,33 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
               </div>
             </div>
           </div>
+
+          {/* ‹ button — left overlay */}
+          <button
+            type="button"
+            onPointerDown={e => { e.stopPropagation(); startLongPress(-1) }}
+            onPointerUp={stopLongPress}
+            onPointerLeave={stopLongPress}
+            onPointerCancel={stopLongPress}
+            disabled={quantity <= qtyMin}
+            className="absolute left-0 inset-y-0 z-20 w-9 flex items-center justify-center bg-amber-100/80 dark:bg-amber-900/40 hover:bg-amber-200/90 dark:hover:bg-amber-800/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-amber-900 dark:text-amber-200 text-lg font-bold"
+            style={{ backdropFilter: 'blur(2px)' }}
+          >‹</button>
+
+          {/* › button — right overlay */}
+          <button
+            type="button"
+            onPointerDown={e => { e.stopPropagation(); startLongPress(1) }}
+            onPointerUp={stopLongPress}
+            onPointerLeave={stopLongPress}
+            onPointerCancel={stopLongPress}
+            disabled={quantity >= max}
+            className="absolute right-0 inset-y-0 z-20 w-9 flex items-center justify-center bg-amber-100/80 dark:bg-amber-900/40 hover:bg-amber-200/90 dark:hover:bg-amber-800/60 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-amber-900 dark:text-amber-200 text-lg font-bold"
+            style={{ backdropFilter: 'blur(2px)' }}
+          >›</button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            const next = Math.min(max, Math.round((liveValue.current + qtyStep) * 1000) / 1000)
-            updateDOM(next)
-            prevQty.current = next
-            commit(next)
-            scrollToValue(next, true)
-          }}
-          disabled={quantity >= max}
-          className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 text-sm font-bold"
-        >›</button>
-      </div>
-
-      <p className="text-xs text-foreground-muted">Drag the tape or use arrows to set length</p>
+      <p className="text-xs text-foreground-muted">Drag the tape or hold ‹ › to set length</p>
     </div>
   )
 }
