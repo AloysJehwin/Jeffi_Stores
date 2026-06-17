@@ -7,6 +7,7 @@ interface SuggestItem {
   label: string
   sublabel?: string
   href?: string
+  extra?: unknown
 }
 
 interface AdminTypeaheadProps {

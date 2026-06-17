@@ -367,21 +367,33 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                           ? setNameInputs(p => ({ ...p, [item.id]: v }))
                           : setSkuInputs(p => ({ ...p, [item.id]: v }))}
                         onSelect={s => {
-                          const d = decodeLineItemId(s.id)
-                          const populated: LineItem = {
-                            ...item,
-                            product_id: d.product_id,
-                            product_name: s.label,
-                            product_sku: s.sublabel?.split(' · ')[0] ?? '',
-                            variant_id: d.variant_id,
-                            sub_variant_id: d.sub_variant_id,
-                            variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : '',
-                            hsn_code: d.hsn_code,
-                            gst_rate: d.gst_percentage,
-                            unit_price: d.unit_price,
-                            discount_pct: d.discount_pct,
-                            mrp: d.mrp,
-                            inventory_quantity: d.inventory_quantity,
+                          // If the suggestion carries full data (via extra), use buildLineItemFromSuggestion
+                          // so sell_unit / available_units are applied. Fall back to encoded id otherwise.
+                          const extra = s.extra as Suggestion | undefined
+                          let populated: LineItem
+                          if (extra?.product_id) {
+                            populated = buildLineItemFromSuggestion(item, {
+                              ...extra,
+                              id: s.id,
+                              name: extra.name ?? s.label,
+                            })
+                          } else {
+                            const d = decodeLineItemId(s.id)
+                            populated = {
+                              ...item,
+                              product_id: d.product_id,
+                              product_name: s.label,
+                              product_sku: s.sublabel?.split(' · ')[0] ?? '',
+                              variant_id: d.variant_id,
+                              sub_variant_id: d.sub_variant_id,
+                              variant_name: s.label.includes(' — ') ? s.label.split(' — ')[1] : '',
+                              hsn_code: d.hsn_code,
+                              gst_rate: d.gst_percentage,
+                              unit_price: d.unit_price,
+                              discount_pct: d.discount_pct,
+                              mrp: d.mrp,
+                              inventory_quantity: d.inventory_quantity,
+                            }
                           }
                           onChange(mergeOrReplaceItem(item.id, populated))
                         }}
