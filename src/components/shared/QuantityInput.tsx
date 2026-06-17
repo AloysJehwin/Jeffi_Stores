@@ -136,14 +136,24 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     programmaticTimer.current = setTimeout(() => { programmatic.current = false }, smooth ? 1200 : 50)
   }
 
-  // mount: scroll to initial quantity
-  const mounted = useRef(false)
+  // mount: scroll to initial quantity only after the element has a real width.
+  // A plain useEffect([]) fires before layout — clientWidth is 0, so getScrollLeft
+  // returns 200 regardless of qtyMin, and the tape ends up centred on the wrong value.
+  // ResizeObserver fires after the first paint when clientWidth is known.
+  const initialised = useRef(false)
   useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true
-      updateDOM(quantity)
-      scrollToValue(quantity, false)
-    }
+    const el = trackRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth > 0 && !initialised.current) {
+        initialised.current = true
+        updateDOM(quantity)
+        scrollToValue(quantity, false)
+        ro.disconnect()
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
