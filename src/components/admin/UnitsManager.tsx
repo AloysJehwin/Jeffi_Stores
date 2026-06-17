@@ -40,7 +40,8 @@ export interface UnitLoadedInfo {
 interface Props {
   productId: string
   variantId?: string | null
-  /** Variant selling price including GST — shown beside the saved unit row. */
+  subVariantId?: string | null
+  /** Variant/sub-variant selling price including GST — shown beside the saved unit row. */
   basePrice?: number | string | null
   onUnitLoaded?: (info: UnitLoadedInfo) => void
 }
@@ -51,7 +52,7 @@ const DIMENSIONS: Dimension[] = ['count', 'length', 'area', 'volume', 'weight']
 const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]"
 const lockedCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface-secondary text-foreground-muted text-sm w-full h-[34px] cursor-not-allowed select-none"
 
-export default function UnitsManager({ productId, variantId, basePrice, onUnitLoaded }: Props) {
+export default function UnitsManager({ productId, variantId, subVariantId, basePrice, onUnitLoaded }: Props) {
   const { showToast } = useToast()
   const [unit, setUnit] = useState<ProductUnit | null>(null)
   const [inherited, setInherited] = useState(false)
@@ -60,10 +61,13 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const baseUrl = variantId
-    ? `/api/admin/products/${productId}/variants/${variantId}/units`
-    : `/api/admin/products/${productId}/units`
-  const isVariantScope = !!variantId
+  const baseUrl = subVariantId
+    ? `/api/admin/products/${productId}/variants/${variantId}/sub-variants/${subVariantId}/units`
+    : variantId
+      ? `/api/admin/products/${productId}/variants/${variantId}/units`
+      : `/api/admin/products/${productId}/units`
+  const isVariantScope = !!variantId && !subVariantId
+  const isSubVariantScope = !!subVariantId
 
   const [draftUnit, setDraftUnit] = useState('')
   const [draftDimension, setDraftDimension] = useState<Dimension>('count')
@@ -104,7 +108,7 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
     }
   }
 
-  useEffect(() => { load() }, [productId, variantId])
+  useEffect(() => { load() }, [productId, variantId, subVariantId])
 
   function resetCustomFields(dimUnit?: string) {
     setIsCustomUnit(false)
@@ -341,18 +345,25 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
     <div className="border-t border-border-default pt-4 mt-4 space-y-3">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-bold uppercase tracking-wide text-foreground-secondary flex items-center gap-2">
-          {isVariantScope ? 'Variant Unit' : 'Selling Unit'}
+          {isSubVariantScope ? 'Sub-variant Unit' : isVariantScope ? 'Variant Unit' : 'Selling Unit'}
           {isVariantScope && inherited && (
             <span className="text-[10px] font-normal normal-case bg-surface-secondary border border-border-default text-foreground-muted px-2 py-0.5 rounded-full">
               inherited from product
             </span>
           )}
+          {isSubVariantScope && inherited && (
+            <span className="text-[10px] font-normal normal-case bg-surface-secondary border border-border-default text-foreground-muted px-2 py-0.5 rounded-full">
+              inherited from variant
+            </span>
+          )}
         </h4>
         {!editing && (
           <span className="text-[10px] text-foreground-muted">
-            {isVariantScope
-              ? inherited ? 'Click Override to set a variant-specific unit.' : 'Variant-specific unit.'
-              : 'The unit stock and base price are measured in.'}
+            {isSubVariantScope
+              ? inherited ? 'Click Override to set a sub-variant-specific unit.' : 'Sub-variant-specific unit.'
+              : isVariantScope
+                ? inherited ? 'Click Override to set a variant-specific unit.' : 'Variant-specific unit.'
+                : 'The unit stock and base price are measured in.'}
           </span>
         )}
       </div>
@@ -418,14 +429,14 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
               )}
             </div>
             <div className="flex items-center gap-2">
-              {isVariantScope && !inherited && (
+              {(isVariantScope || isSubVariantScope) && !inherited && (
                 <button
                   type="button"
                   onClick={handleReset}
                   disabled={saving}
                   className="text-xs text-foreground-muted hover:text-red-500 border border-border-secondary rounded px-2 py-1 disabled:opacity-50"
                 >
-                  Reset to product default
+                  {isSubVariantScope ? 'Reset to variant default' : 'Reset to product default'}
                 </button>
               )}
               <button
@@ -459,7 +470,7 @@ export default function UnitsManager({ productId, variantId, basePrice, onUnitLo
       ) : (
         <div className="bg-surface border border-border-default rounded-lg p-3 space-y-3">
           <p className="text-[10px] uppercase tracking-wide text-foreground-muted">
-            {unit && !inherited ? 'Edit unit' : isVariantScope ? 'Override unit for this variant' : 'Set unit'}
+            {unit && !inherited ? 'Edit unit' : isSubVariantScope ? 'Override unit for this sub-variant' : isVariantScope ? 'Override unit for this variant' : 'Set unit'}
           </p>
 
           {/* Top row: always 4 cols — Dimension | Unit name | Factor (count) or empty | Label */}

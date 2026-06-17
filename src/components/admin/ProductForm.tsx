@@ -253,6 +253,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; wholeprice_ex_gst: string; discount_pct: string; wholesaleManuallySet: boolean; stock: string; sku: string }>>({})
   const [subVariantEditId, setSubVariantEditId] = useState<string | null>(null)
   const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; wholeprice_incl: string; wholeprice_ex_gst: string; discount_pct: string; wholesaleManuallySet: boolean; stock: string; sku: string } | null>(null)
+  const [expandedSvUnits, setExpandedSvUnits] = useState<Set<string>>(new Set())
   const [productPackageType, setProductPackageType] = useState<string>(product?.package_type || 'flat_poly_auto')
   const [gstRate, setGstRate] = useState<number>(product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18)
 
@@ -2300,7 +2301,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                             const ed = subVariantEditDraft
                             const svInputCls = "px-1.5 py-1 border border-accent-500 rounded bg-surface text-foreground text-xs focus:ring-1 focus:ring-accent-500 w-16"
                             return (
-                              <tr key={sv.id} className="border-b border-border-default last:border-0">
+                              <React.Fragment key={sv.id}>
+                              <tr className="border-b border-border-default last:border-0">
                                 {isEditingSv && ed ? (<>
                                   <td className="py-1 pr-1"><input type="text" value={ed.name} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, name: e.target.value }))} className={`${svInputCls} w-20`} /></td>
                                   {/* MRP (Ex. GST) — primary input */}
@@ -2370,10 +2372,24 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1.5 pr-2 font-mono text-foreground-muted">{sv.sku}</td>
                                   <td className="py-1.5 flex items-center gap-2">
                                     <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', wholeprice_incl: sv.wholeprice_ex_gst != null ? exToIncl(String(sv.wholeprice_ex_gst), gstRate) : '', wholeprice_ex_gst: sv.wholeprice_ex_gst != null ? String(sv.wholeprice_ex_gst) : '', discount_pct: sv.discount_pct != null ? String(sv.discount_pct) : '', wholesaleManuallySet: sv.wholeprice_ex_gst != null, stock: String(sv.stock_quantity ?? 0), sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
+                                    <button type="button" onClick={() => setExpandedSvUnits(s => { const n = new Set(s); n.has(sv.id) ? n.delete(sv.id) : n.add(sv.id); return n })} className="text-foreground-muted hover:text-accent-500 leading-none text-xs font-medium">Unit</button>
                                     <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none" aria-label="Delete"><X className="w-3.5 h-3.5" /></button>
                                   </td>
                                 </>)}
                               </tr>
+                              {expandedSvUnits.has(sv.id) && productId && !variantPopupId.startsWith('temp-') && (
+                                <tr key={`${sv.id}-unit`}>
+                                  <td colSpan={11} className="px-2 pb-3 pt-1 bg-surface-secondary/50">
+                                    <UnitsManager
+                                      productId={productId}
+                                      variantId={variantPopupId}
+                                      subVariantId={sv.id}
+                                      basePrice={sv.price}
+                                    />
+                                  </td>
+                                </tr>
+                              )}
+                              </React.Fragment>
                             )
                           })}
                         </tbody>

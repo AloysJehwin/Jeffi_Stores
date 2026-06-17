@@ -29,7 +29,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const variantUnits = await queryMany(
-    `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
+    `SELECT id, product_id, variant_id, sub_variant_id, unit, factor, dimension, conversion_meta,
             is_base, is_purchase_default, is_sell_default,
             display_label, notes, min_qty, max_qty, qty_step,
             created_at, updated_at
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest, { params }: Params) {
   const inherited = variantUnits.length === 0
   const units = inherited
     ? await queryMany(
-        `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
+        `SELECT id, product_id, variant_id, sub_variant_id, unit, factor, dimension, conversion_meta,
                 is_base, is_purchase_default, is_sell_default,
                 display_label, notes, min_qty, max_qty, qty_step,
                 created_at, updated_at
