@@ -16,6 +16,13 @@ interface AppliedCoupon {
   discountAmount: number
 }
 
+// Render unit labels with proper superscripts: "ft2" → "ft²", "m2" → "m²"
+function UnitLabel({ label }: { label: string }) {
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 export default function CartPage() {
   const { cartItems, savedItems, cartCount, isLoading, removeFromCart, updateQuantity, saveForLater, moveToCart, getCartTotal, getCartTax } = useCart()
   const { user } = useAuth()
@@ -174,7 +181,7 @@ export default function CartPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               {cartItems.map((item) => {
                 const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || item.buy_mode === 'weight' || item.buy_mode === 'length'
                 const price = isCustomQty
                   ? item.price_at_addition
                   : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
@@ -242,7 +249,7 @@ export default function CartPage() {
 
                         <div className="mt-2 flex items-center gap-3 flex-wrap">
                           <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel || item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
+                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? <>/&thinsp;<UnitLabel label={unitLabel || item.buy_unit || ''} /></> : (showUnitLabel ? <>/&thinsp;<UnitLabel label={unitLabel} /></> : '')}
                           </span>
                           {showMrp && (
                             <>
@@ -284,8 +291,8 @@ export default function CartPage() {
                                 disabled={isUpdating}
                                 className="w-24 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground font-semibold text-sm text-center focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
                               />
-                              <span className="text-sm text-foreground-muted">{unitLabel || item.buy_unit}</span>
-                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{unitLabel || item.buy_unit}</span>
+                              <span className="text-sm text-foreground-muted"><UnitLabel label={unitLabel || item.buy_unit || ''} /></span>
+                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/&thinsp;<UnitLabel label={unitLabel || item.buy_unit || ''} /></span>
                             </div>
                           ) : (
                             <div className="flex items-center border border-border-secondary rounded-lg">
@@ -333,7 +340,7 @@ export default function CartPage() {
                           )}
 
                           {!isCustomQty && showUnitLabel && (
-                            <span className="text-sm text-foreground-muted">{unitLabel}</span>
+                            <span className="text-sm text-foreground-muted"><UnitLabel label={unitLabel} /></span>
                           )}
 
                           <button
@@ -383,7 +390,7 @@ export default function CartPage() {
                 <div className="divide-y divide-border-default">
                   {savedItems.map((item) => {
                     const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                    const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                    const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || item.buy_mode === 'weight' || item.buy_mode === 'length'
                     const price = isCustomQty
                       ? item.price_at_addition
                       : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
@@ -433,7 +440,7 @@ export default function CartPage() {
                             )}
                           </div>
                           <p className="text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">
-                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? <>/&thinsp;<UnitLabel label={item.cart_item_unit?.display_label ?? item.buy_unit ?? ''} /></> : ''}
                           </p>
                           <div className="flex items-center gap-3 mt-2">
                             <button

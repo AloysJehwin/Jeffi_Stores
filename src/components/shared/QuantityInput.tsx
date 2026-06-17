@@ -467,13 +467,33 @@ function DimStepper({ label, value, step, min, max, onChange }: {
 
 function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyStep, onChange }: AreaInputProps) {
   const ceiling = Math.min(effectiveStock, qtyMax ?? effectiveStock)
-  const sqrtQty = Math.sqrt(Math.max(quantity, qtyMin))
-  const isSquare = Math.abs(sqrtQty - Math.round(sqrtQty * 100) / 100) < 0.01
-  const initW = isSquare ? Math.round(sqrtQty * 100) / 100 : qtyStep
-  const initH = isSquare ? Math.round(sqrtQty * 100) / 100 : Math.round((quantity / initW) * 1000) / 1000
 
-  const [w, setW] = useState(Math.max(qtyStep, initW))
-  const [h, setH] = useState(Math.max(qtyStep, initH))
+  // Strip trailing "2" or "²" to get the linear unit for width/height labels (e.g. "ft2" → "ft", "m²" → "m")
+  const linearUnit = unitLabel
+    ? unitLabel.replace(/²$/, '').replace(/2$/, '')
+    : ''
+
+  function initDims(qty: number): [number, number] {
+    const sqrtQ = Math.sqrt(Math.max(qty, qtyMin))
+    const isSquare = Math.abs(sqrtQ - Math.round(sqrtQ * 100) / 100) < 0.01
+    const w0 = isSquare ? Math.round(sqrtQ * 100) / 100 : qtyStep
+    const h0 = isSquare ? Math.round(sqrtQ * 100) / 100 : Math.round((qty / w0) * 1000) / 1000
+    return [Math.max(qtyStep, w0), Math.max(qtyStep, h0)]
+  }
+
+  const [w, setW] = useState(() => initDims(quantity)[0])
+  const [h, setH] = useState(() => initDims(quantity)[1])
+
+  // Reset dimensions when quantity is reset externally (e.g. sub-variant switch resets to qtyMin)
+  useEffect(() => {
+    const expected = Math.round(w * h * 1000) / 1000
+    if (Math.abs(quantity - expected) > 0.001) {
+      const [nw, nh] = initDims(quantity)
+      setW(nw)
+      setH(nh)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quantity])
 
   const dimMax = Math.sqrt(ceiling)
   const dimMin = qtyStep
@@ -492,7 +512,7 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
       <div className="flex flex-col sm:flex-row sm:items-end gap-2">
         <div className="flex-1">
           <DimStepper
-            label={`Width (${unitLabel ?? ''})`}
+            label={linearUnit ? `Width (${linearUnit})` : 'Width'}
             value={w} step={qtyStep} min={dimMin} max={dimMax}
             onChange={handleW}
           />
@@ -500,14 +520,14 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
         <span className="text-foreground-muted sm:pb-3 text-lg text-center">×</span>
         <div className="flex-1">
           <DimStepper
-            label={`Height (${unitLabel ?? ''})`}
+            label={linearUnit ? `Height (${linearUnit})` : 'Height'}
             value={h} step={qtyStep} min={dimMin} max={dimMax}
             onChange={handleH}
           />
         </div>
       </div>
       <p className="text-sm text-foreground-secondary">
-        Area: <span className="font-semibold text-foreground">{fmtQty(quantity)} {unitLabel}²</span>
+        Area: <span className="font-semibold text-foreground">{fmtQty(quantity)} {linearUnit ? <>{linearUnit}<sup>2</sup></> : unitLabel}</span>
       </p>
     </div>
   )

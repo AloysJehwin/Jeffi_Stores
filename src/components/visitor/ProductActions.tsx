@@ -81,6 +81,13 @@ const MODE_LABELS: Record<string, string> = {
   unit: 'By Piece',
 }
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 function getPerUnitRate(price: number, numeric_value: number, unit: string): string {
   if (!price || !numeric_value || numeric_value === 0) return ''
   let rate = price / numeric_value
@@ -482,7 +489,7 @@ export default function ProductActions({
               <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
                 Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
-              <span className="text-sm text-foreground-secondary">/ {showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel}</span>
+              <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
               {effectiveMrp && effectiveMrp > effectivePrice && (
                 <span className="text-xl text-foreground-muted line-through">
                   Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -493,7 +500,7 @@ export default function ProductActions({
             {showPerBasePrice && (
               <div className="mb-1">
                 <span className="text-base font-semibold text-foreground">
-                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel}
+                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                 </span>
               </div>
             )}
@@ -501,7 +508,7 @@ export default function ProductActions({
             {/* Total = selling unit price × qty */}
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm text-foreground-secondary">
-                Total ({quantity} {effectiveUnitLabel ?? 'pc'}):
+                Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
               </span>
               <span className="text-base font-semibold text-foreground">
                 Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -524,7 +531,7 @@ export default function ProductActions({
             {effectiveWholesalePrice && (
               <div className="mt-3 pt-3 border-t border-border-default">
                 <span className="text-sm text-foreground-secondary">
-                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / {effectiveUnitLabel ?? 'pc'}</span>
+                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel ?? 'pc'} /></span>
                 </span>
               </div>
             )}
@@ -536,7 +543,7 @@ export default function ProductActions({
                 <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock{effectiveStock < 10 ? ` (${effectiveStock}${effectiveUnitLabel ? ' ' + effectiveUnitLabel : ''} left)` : ''}</span>
+                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock{effectiveStock < 10 ? <> ({effectiveStock}{effectiveUnitLabel ? <> <UnitLabel label={effectiveUnitLabel} /></> : ''} left)</> : ''}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -552,7 +559,7 @@ export default function ProductActions({
 
       <div>
         <label className="block text-sm font-medium text-foreground-secondary mb-2">
-          Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? ` (${effectiveUnitLabel})` : ''}
+          Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
         </label>
         <QuantityInput
           dimension={sellUnit?.dimension ?? 'count'}
