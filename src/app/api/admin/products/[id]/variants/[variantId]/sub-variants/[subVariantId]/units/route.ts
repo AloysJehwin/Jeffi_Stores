@@ -31,8 +31,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const units = await queryMany(
     `SELECT id, product_id, variant_id, sub_variant_id, unit, factor, dimension, conversion_meta,
-            is_base, is_purchase_default, is_sell_default,
-            display_label, notes, min_qty, max_qty, qty_step,
+            is_base, display_label, notes, min_qty, max_qty, qty_step,
             created_at, updated_at
      FROM product_units
      WHERE sub_variant_id = $1
@@ -65,8 +64,6 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const isBase = !!body.is_base
-  const isSellDefault = !!body.is_sell_default
-  const isPurchaseDefault = !!body.is_purchase_default
   const displayLabel = body.display_label ? String(body.display_label).slice(0, 80) : null
   const notes = body.notes ? String(body.notes).slice(0, 500) : null
   const allowedDimensions = ['count', 'length', 'area', 'volume', 'weight', 'custom']
@@ -81,26 +78,17 @@ export async function POST(request: NextRequest, { params }: Params) {
       if (isBase) {
         await client.query(`UPDATE product_units SET is_base = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
       }
-      if (isSellDefault) {
-        await client.query(`UPDATE product_units SET is_sell_default = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
-      }
-      if (isPurchaseDefault) {
-        await client.query(`UPDATE product_units SET is_purchase_default = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
-      }
       const res = await client.query(
         `INSERT INTO product_units (
            product_id, variant_id, sub_variant_id, unit, factor, dimension, conversion_meta,
-           is_base, is_sell_default, is_purchase_default,
-           display_label, notes, min_qty, max_qty, qty_step
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+           is_base, display_label, notes, min_qty, max_qty, qty_step
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          ON CONFLICT (sub_variant_id, unit) WHERE sub_variant_id IS NOT NULL
          DO UPDATE SET
            factor = EXCLUDED.factor,
            dimension = EXCLUDED.dimension,
            conversion_meta = EXCLUDED.conversion_meta,
            is_base = EXCLUDED.is_base,
-           is_sell_default = EXCLUDED.is_sell_default,
-           is_purchase_default = EXCLUDED.is_purchase_default,
            display_label = EXCLUDED.display_label,
            notes = EXCLUDED.notes,
            min_qty = EXCLUDED.min_qty,
@@ -114,7 +102,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           params.subVariantId,
           unit, factor, dimension,
           conversionMeta ? JSON.stringify(conversionMeta) : null,
-          isBase, isSellDefault, isPurchaseDefault,
+          isBase,
           displayLabel, notes,
           minQty, maxQty, qtyStep,
         ]
