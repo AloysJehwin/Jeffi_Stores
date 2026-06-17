@@ -89,7 +89,6 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   const max = Math.max(Math.min(effectiveStock, qtyMax ?? effectiveStock), qtyMin)
 
   const trackRef    = useRef<HTMLDivElement>(null)
-  const fillRef     = useRef<HTMLDivElement>(null)
   const readoutRef  = useRef<HTMLSpanElement>(null)
 
   const isDragging        = useRef(false)
@@ -107,8 +106,6 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
     liveValue.current = v
     if (readoutRef.current)
       readoutRef.current.textContent = v % 1 === 0 ? String(v) : v.toFixed(2)
-    if (fillRef.current)
-      fillRef.current.style.width = `${(v - qtyMin) * PX_PER_UNIT}px`
   }
 
   const commit = (v: number) => onChange(v, v % 1 === 0 ? String(v) : v.toFixed(2))
@@ -264,6 +261,9 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
             style={{ borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '8px solid var(--color-primary-600, #2563eb)' }} />
         </div>
 
+        {/* fill overlay — always covers left-of-needle; lives outside scroll content */}
+        <div className="absolute inset-y-0 left-0 right-1/2 bg-primary-100 dark:bg-primary-900/30 pointer-events-none z-[1]" />
+
         {/* scrollable track — touch scrolls natively; mouse uses pointer drag */}
         <div
           ref={trackRef}
@@ -277,12 +277,6 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         >
           <div ref={innerRef} style={{ display: 'inline-block', height: '100%' }}>
             <div style={{ width: ticksWidth, height: '100%', position: 'relative' }}>
-              {/* fill bar */}
-              <div
-                ref={fillRef}
-                className="absolute top-0 bottom-0 left-0 bg-primary-100 dark:bg-primary-900/30"
-                style={{ width: (quantity - qtyMin) * PX_PER_UNIT }}
-              />
               {/* ticks */}
               {ticks.map((t, i) => (
                 <div key={i} style={{ position: 'absolute', left: t.pos, top: 0, width: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
