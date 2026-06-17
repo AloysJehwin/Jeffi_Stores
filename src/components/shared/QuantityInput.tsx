@@ -277,11 +277,11 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
         >
           <div ref={innerRef} style={{ display: 'inline-block', height: '100%' }}>
             <div style={{ width: ticksWidth, height: '100%', position: 'relative' }}>
-              {/* fill bar — left:0 to needle position, behind ticks */}
+              {/* fill bar */}
               <div
                 ref={fillRef}
-                className="absolute top-0 bottom-0 left-0 bg-amber-200/60 dark:bg-amber-800/30"
-                style={{ width: (quantity - qtyMin) * PX_PER_UNIT, zIndex: 0 }}
+                className="absolute top-0 bottom-0 left-0 bg-primary-100 dark:bg-primary-900/30"
+                style={{ width: (quantity - qtyMin) * PX_PER_UNIT }}
               />
               {/* ticks */}
               {ticks.map((t, i) => (
