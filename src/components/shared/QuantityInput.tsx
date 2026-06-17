@@ -95,7 +95,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   const programmatic = useRef(false)
   const programmaticTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const snap = (v: number) => Math.round(v / qtyStep) * qtyStep
+  const snap = (v: number) => Math.round((v - qtyMin) / qtyStep) * qtyStep + qtyMin
 
   const getScrollLeft = (v: number) => {
     const el = trackRef.current
@@ -208,8 +208,9 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
   for (let i = 0; i <= totalSteps; i++) {
     const v = Math.round((qtyMin + i * subStep) * 1000) / 1000
     const pos = PADDING + (v - qtyMin) * PX_PER_UNIT
-    const isMajor = Math.abs(v - Math.round(v)) < 0.001
-    const isMid = !isMajor && Math.abs((v * 10) % 5) < 0.01
+    const stepsFromMin = (v - qtyMin) / qtyStep
+    const isMajor = Math.abs(stepsFromMin - Math.round(stepsFromMin)) < 0.001
+    const isMid = !isMajor && Math.abs((stepsFromMin * 2) % 1) < 0.01
     ticks.push({ pos, label: isMajor ? String(Math.round(v)) : null, kind: isMajor ? 'major' : isMid ? 'mid' : 'minor' })
   }
 
