@@ -35,6 +35,7 @@ interface Variant {
   sku: string
   price: number | null
   mrp: number | null
+  mrp_ex_gst: number | null
   price_ex_gst: number | null
   wholeprice_ex_gst: number | null
   stock_quantity: number
@@ -61,6 +62,7 @@ interface ProductDetailClientProps {
     stock_quantity: number
     has_variants: boolean
     variant_type?: string | null
+    discount_pct?: number | null
     weight?: number | null
     dimensions?: string | null
     brands?: {
@@ -403,6 +405,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           variants={hasVariants ? product.product_variants : []}
           variantType={product.variant_type || 'Variant'}
           initialSkuParam={initialSkuParam}
+          discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           onVariantChange={handleVariantChange}
           onSelectionChange={(vId, svId) => { setSelectedVariantId(vId); setSelectedSubVariantId(svId) }}
           categoryId={categoryId ?? null}
