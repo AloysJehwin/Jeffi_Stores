@@ -91,15 +91,21 @@ export async function GET(request: NextRequest) {
            WHERE pu.product_id = ci.product_id
              AND pu.unit = ci.buy_unit
              AND (
-               pu.variant_id = ci.variant_id
-               OR (pu.variant_id IS NULL AND NOT EXISTS (
+               (ci.sub_variant_id IS NOT NULL AND pu.sub_variant_id = ci.sub_variant_id)
+               OR (pu.sub_variant_id IS NULL AND pu.variant_id = ci.variant_id AND NOT EXISTS (
                  SELECT 1 FROM product_units pu2
                  WHERE pu2.product_id = ci.product_id
                    AND pu2.unit = ci.buy_unit
-                   AND pu2.variant_id = ci.variant_id
+                   AND pu2.sub_variant_id = ci.sub_variant_id
+               ))
+               OR (pu.sub_variant_id IS NULL AND pu.variant_id IS NULL AND NOT EXISTS (
+                 SELECT 1 FROM product_units pu2
+                 WHERE pu2.product_id = ci.product_id
+                   AND pu2.unit = ci.buy_unit
+                   AND (pu2.sub_variant_id = ci.sub_variant_id OR pu2.variant_id = ci.variant_id)
                ))
              )
-           ORDER BY pu.variant_id NULLS LAST
+           ORDER BY pu.sub_variant_id NULLS LAST, pu.variant_id NULLS LAST
            LIMIT 1
           ),
           NULL
@@ -166,16 +172,24 @@ export async function POST(request: NextRequest) {
     // multiply price by the unit's factor so the stored price is per-selected-unit.
     if (buyMode && buyMode !== 'unit') {
       const effectiveVariantId = variantId || null
-      // Prefer variant-level unit override, fall back to product-level
+      const effectiveSubVariantId = subVariantId || null
+      // Prefer sub-variant-level unit, then variant-level, then product-level
       const unitRow = await queryOne<{ factor: string | number; is_base: boolean }>(
         `SELECT factor, is_base FROM product_units
          WHERE product_id = $1 AND unit = $2
-           AND (variant_id = $3 OR (variant_id IS NULL AND NOT EXISTS (
-             SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2 AND pu2.variant_id = $3
-           )))
-         ORDER BY variant_id NULLS LAST
+           AND (
+             ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
+             OR (sub_variant_id IS NULL AND variant_id = $3 AND NOT EXISTS (
+               SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2 AND pu2.sub_variant_id = $4::uuid
+             ))
+             OR (sub_variant_id IS NULL AND variant_id IS NULL AND NOT EXISTS (
+               SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2
+                 AND (pu2.sub_variant_id = $4::uuid OR pu2.variant_id = $3)
+             ))
+           )
+         ORDER BY sub_variant_id NULLS LAST, variant_id NULLS LAST
          LIMIT 1`,
-        [productId, buyMode, effectiveVariantId]
+        [productId, buyMode, effectiveVariantId, effectiveSubVariantId]
       )
       if (unitRow) {
         priceAtAddition = Math.round(priceAtAddition * Number(unitRow.factor) * 100) / 100

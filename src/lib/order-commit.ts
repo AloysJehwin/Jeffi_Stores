@@ -142,15 +142,24 @@ export async function resolveBuyNowItem(input: {
   // Apply unit factor if buyMode is a real unit key (not 'unit')
   if (buyMode && buyMode !== 'unit') {
     const effectiveVariantId = input.variantId || null
+    const effectiveSubVariantId = input.subVariantId || null
+    // Prefer sub-variant-level unit, then variant-level, then product-level
     const unitRow = await queryOne<{ factor: string | number }>(
       `SELECT factor FROM product_units
        WHERE product_id = $1 AND unit = $2
-         AND (variant_id = $3 OR (variant_id IS NULL AND NOT EXISTS (
-           SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2 AND pu2.variant_id = $3
-         )))
-       ORDER BY variant_id NULLS LAST
+         AND (
+           ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
+           OR (sub_variant_id IS NULL AND variant_id = $3 AND NOT EXISTS (
+             SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2 AND pu2.sub_variant_id = $4::uuid
+           ))
+           OR (sub_variant_id IS NULL AND variant_id IS NULL AND NOT EXISTS (
+             SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2
+               AND (pu2.sub_variant_id = $4::uuid OR pu2.variant_id = $3)
+           ))
+         )
+       ORDER BY sub_variant_id NULLS LAST, variant_id NULLS LAST
        LIMIT 1`,
-      [input.productId, buyMode, effectiveVariantId]
+      [input.productId, buyMode, effectiveVariantId, effectiveSubVariantId]
     )
     if (unitRow) {
       price = Math.round(price * Number(unitRow.factor) * 100) / 100
