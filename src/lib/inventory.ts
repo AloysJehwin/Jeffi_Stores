@@ -246,8 +246,19 @@ export async function getStockValuation() {
     JOIN products p ON p.id = pv.product_id
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN brands b ON b.id = p.brand_id
-    LEFT JOIN product_units su ON su.product_id = p.id AND su.is_sell_default = TRUE
-      AND su.sub_variant_id = sv.id
+    LEFT JOIN LATERAL (
+      SELECT unit, display_label, dimension FROM product_units
+      WHERE product_id = p.id AND is_sell_default = TRUE AND sub_variant_id = sv.id
+      UNION ALL
+      SELECT unit, display_label, dimension FROM product_units
+      WHERE product_id = p.id AND is_sell_default = TRUE AND variant_id = pv.id AND sub_variant_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM product_units WHERE product_id = p.id AND is_sell_default = TRUE AND sub_variant_id = sv.id)
+      UNION ALL
+      SELECT unit, display_label, dimension FROM product_units
+      WHERE product_id = p.id AND is_sell_default = TRUE AND variant_id IS NULL AND sub_variant_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM product_units WHERE product_id = p.id AND is_sell_default = TRUE AND (sub_variant_id = sv.id OR variant_id = pv.id))
+      LIMIT 1
+    ) su ON TRUE
     WHERE p.is_active = TRUE AND pv.is_active = TRUE AND sv.is_active = TRUE
     ORDER BY name, variant_name, sub_variant_name
   `)
