@@ -223,8 +223,9 @@ export default function ProductActions({
     ? (selectedSubVariant?.price_ex_gst != null
         ? toInclGst(Number(selectedSubVariant.price_ex_gst))
         : (() => {
-            if (selectedVariant?.mrp_ex_gst != null && discountPct != null) {
-              return toInclGst(Math.round(Number(selectedVariant.mrp_ex_gst) * (1 - discountPct / 100) * 100) / 100)
+            const varMrp = selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : null
+            if (varMrp != null && discountPct != null) {
+              return Math.round(varMrp * (1 - discountPct / 100) * 100) / 100
             }
             if (selectedVariant?.price_ex_gst != null) return toInclGst(Number(selectedVariant.price_ex_gst))
             return basePrice
