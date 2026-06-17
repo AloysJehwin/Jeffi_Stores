@@ -16,6 +16,13 @@ import CustomerMailPanel from '@/components/admin/CustomerMailPanel'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
 
 export default async function OrderDetailsPage({ params }: { params: { id: string } }) {
@@ -209,8 +216,8 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                             const qtyStr = isFractional ? qty.toFixed(qty % 1 === 0 ? 0 : 3).replace(/\.?0+$/, '') : String(qty)
                             const priceStr = Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })
                             return displayUnit
-                              ? `${qtyStr} ${displayUnit} × Rs. ${priceStr}/${displayUnit}`
-                              : `Quantity: ${qtyStr} × Rs. ${priceStr}`
+                              ? <>{qtyStr} <UnitLabel label={displayUnit} /> × Rs. {priceStr}/<UnitLabel label={displayUnit} /></>
+                              : <>Quantity: {qtyStr} × Rs. {priceStr}</>
                           })()}
                         </p>
                       </div>
