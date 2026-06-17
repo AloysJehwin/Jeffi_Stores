@@ -30,6 +30,7 @@ interface Variant {
   sku: string
   price: number | null
   mrp: number | null
+  mrp_ex_gst: number | null
   price_ex_gst: number | null
   wholeprice_ex_gst: number | null
   stock_quantity: number
@@ -70,6 +71,7 @@ interface ProductActionsProps {
   variants: Variant[]
   variantType: string
   initialSkuParam?: string
+  discountPct?: number | null
   onVariantChange?: (variant: Variant | null) => void
   productUnits?: ProductUnit[]
 }
@@ -92,7 +94,7 @@ function getPerUnitRate(price: number, numeric_value: number, unit: string): str
 export default function ProductActions({
   productId, productName, sku, stockQuantity,
   basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
-  variants, variantType, initialSkuParam,
+  variants, variantType, initialSkuParam, discountPct,
   onVariantChange, productUnits: productUnitsProp,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
@@ -206,9 +208,13 @@ export default function ProductActions({
   const effectivePrice = hasVariants
     ? (selectedSubVariant?.price_ex_gst != null
         ? toInclGst(Number(selectedSubVariant.price_ex_gst))
-        : (selectedVariant?.price_ex_gst != null
-            ? toInclGst(Number(selectedVariant.price_ex_gst))
-            : basePrice))
+        : (() => {
+            if (selectedVariant?.mrp_ex_gst != null && discountPct != null) {
+              return toInclGst(Math.round(Number(selectedVariant.mrp_ex_gst) * (1 - discountPct / 100) * 100) / 100)
+            }
+            if (selectedVariant?.price_ex_gst != null) return toInclGst(Number(selectedVariant.price_ex_gst))
+            return basePrice
+          })())
     : (salePrice ?? basePrice)
   const effectiveMrp = hasVariants
     ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))
