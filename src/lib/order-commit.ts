@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg'
 import { queryMany, queryOne, withTransaction } from './db'
 import { isInterState, calculateGST } from './gst'
+import { logStockMovement } from './inventory'
 import type { DraftBuyNowItem, DraftCartItem } from './order-draft'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
@@ -533,6 +534,34 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           r.buyMode, r.buyUnit,
         ]
       )
+    }
+
+    for (const r of itemRows) {
+      if (r.subVariantId) {
+        await client.query(
+          `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+          [r.qty, r.subVariantId]
+        )
+      } else if (r.variantId) {
+        await client.query(
+          `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+          [r.qty, r.variantId]
+        )
+      } else {
+        await client.query(
+          `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+          [r.qty, r.productId]
+        )
+      }
+      await logStockMovement(client, {
+        productId: r.productId,
+        variantId: r.variantId,
+        subVariantId: r.subVariantId,
+        transactionType: 'sale',
+        quantityChange: -r.qty,
+        referenceType: 'order',
+        referenceId: created.id,
+      })
     }
 
     if (input.mode === 'cart') {

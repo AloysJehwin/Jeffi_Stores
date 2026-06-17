@@ -24,7 +24,7 @@ const AddCartSchema = z
 
 const UpdateCartSchema = z.object({
   cartItemId: zUuid,
-  quantity: z.number().int().min(0).optional(),
+  quantity: z.number().min(0).optional(),
   savedForLater: z.boolean().optional(),
 })
 
