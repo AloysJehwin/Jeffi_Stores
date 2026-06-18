@@ -154,8 +154,6 @@ export async function POST(request: NextRequest) {
 
     const total = subtotal - appliedDiscount + appliedShipping
 
-    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-
     const order = await withTransaction(async (client) => {
       let shippingAddressId = null
       let billingAddressId = null
@@ -255,6 +253,8 @@ export async function POST(request: NextRequest) {
         const existing = existingUnpaidResult.rows[0]
         throw Object.assign(new Error('EXISTING_UNPAID_ORDER'), { existingOrderId: existing.id, existingOrderNumber: existing.order_number })
       }
+
+      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
       const orderResult = await client.query(
         `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot)
