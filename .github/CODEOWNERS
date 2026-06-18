@@ -1,0 +1,11 @@
+# Default owner for everything
+* @aloysJehwin
+
+# Database schema and migrations
+/database/ @aloysJehwin
+
+# API routes
+/src/app/api/ @aloysJehwin
+
+# Shared library code
+/src/lib/ @aloysJehwin
