@@ -43,7 +43,7 @@ describe('GET /api/admin/financial/cashflow', () => {
   it('returns cashflow data with default FY date range', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    const data = { inflows: 100000, outflows: 60000, net: 40000 }
+    const data = { monthly: [{ month: '2026-01', cash_in: 100000, cash_out: 60000, net: 40000, running_balance: 40000 }] }
     mockGetCashflow.mockResolvedValue(data)
 
     const res = await GET(makeRequest())
@@ -56,7 +56,7 @@ describe('GET /api/admin/financial/cashflow', () => {
   it('passes explicit from/to params to getCashflow', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
-    mockGetCashflow.mockResolvedValue({ inflows: 0, outflows: 0, net: 0 })
+    mockGetCashflow.mockResolvedValue({ monthly: [] })
 
     const res = await GET(makeRequest({ from: '2024-01-01', to: '2024-03-31' }))
     expect(res.status).toBe(200)

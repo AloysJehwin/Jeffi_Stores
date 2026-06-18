@@ -14,7 +14,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 vi.mock('@/lib/orders', () => ({
-  cancelOrder: vi.fn().mockResolvedValue({ success: true }),
+  cancelOrder: vi.fn().mockResolvedValue({ success: true, directCancel: false, restoredToCart: false }),
 }))
 
 vi.mock('@/lib/customer-health', () => ({
@@ -103,8 +103,8 @@ describe('GET /api/cron/cancel-stale-orders', () => {
 
     const { cancelOrder } = await import('@/lib/orders')
     vi.mocked(cancelOrder)
-      .mockResolvedValueOnce({ success: true })
-      .mockResolvedValueOnce({ success: false, error: 'already cancelled' })
+      .mockResolvedValueOnce({ success: true, directCancel: false, restoredToCart: false })
+      .mockResolvedValueOnce({ success: false, error: 'already cancelled', status: 400 })
 
     const res = await cancelStaleGET(
       makeRequest('/api/cron/cancel-stale-orders', `Bearer ${CRON_SECRET}`) as any

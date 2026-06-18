@@ -61,8 +61,8 @@ describe('customer-agent/tools', () => {
 
     it('returns product search results via embedding (products match)', async () => {
       mockFindSimilar.mockResolvedValueOnce([
-        { matchedVia: 'products', productId: 'p1', variantId: null },
-        { matchedVia: 'products', productId: 'p2', variantId: null },
+        { matchedVia: 'products', productId: 'p1', variantId: null, similarity: 0.9 },
+        { matchedVia: 'products', productId: 'p2', variantId: null, similarity: 0.8 },
       ])
       mockQueryMany.mockResolvedValueOnce([
         { id: 'p1', name: 'Widget A', slug: 'widget-a', sku: 'WA1', price: '199', short_description: null, stock: 5 },
@@ -76,7 +76,7 @@ describe('customer-agent/tools', () => {
 
     it('resolves variant matches to product ids', async () => {
       mockFindSimilar.mockResolvedValueOnce([
-        { matchedVia: 'product_variants', productId: null, variantId: 'v1' },
+        { matchedVia: 'product_variants', productId: '', variantId: 'v1', similarity: 0.9 },
       ])
       // variant -> product lookup
       mockQueryMany
@@ -166,8 +166,8 @@ describe('customer-agent/tools', () => {
     it('excludes the source product from similar results', async () => {
       mockQueryOne.mockResolvedValueOnce({ name: 'Widget A' })
       mockFindSimilar.mockResolvedValueOnce([
-        { matchedVia: 'products', productId: 'p1', variantId: null }, // same as source, should be excluded
-        { matchedVia: 'products', productId: 'p2', variantId: null },
+        { matchedVia: 'products', productId: 'p1', variantId: null, similarity: 0.9 }, // same as source, should be excluded
+        { matchedVia: 'products', productId: 'p2', variantId: null, similarity: 0.8 },
       ])
       mockQueryMany.mockResolvedValueOnce([
         { id: 'p2', name: 'Widget B', slug: 'widget-b', sku: 'WB1', price: '299', stock: 5 },
@@ -180,8 +180,8 @@ describe('customer-agent/tools', () => {
     it('returns products when similar products found', async () => {
       mockQueryOne.mockResolvedValueOnce({ name: 'Widget A' })
       mockFindSimilar.mockResolvedValueOnce([
-        { matchedVia: 'products', productId: 'p2', variantId: null },
-        { matchedVia: 'products', productId: 'p3', variantId: null },
+        { matchedVia: 'products', productId: 'p2', variantId: null, similarity: 0.9 },
+        { matchedVia: 'products', productId: 'p3', variantId: null, similarity: 0.8 },
       ])
       mockQueryMany.mockResolvedValueOnce([
         { id: 'p2', name: 'Widget B', slug: 'widget-b', sku: 'WB1', price: '299', stock: 5 },
@@ -360,8 +360,8 @@ describe('customer-agent/tools', () => {
           { product_id: 'p2', product_name: 'Widget B' },
         ])
       mockFindSimilar.mockResolvedValueOnce([
-        { matchedVia: 'products', productId: 'p3', variantId: null },
-        { matchedVia: 'products', productId: 'p4', variantId: null },
+        { matchedVia: 'products', productId: 'p3', variantId: null, similarity: 0.9 },
+        { matchedVia: 'products', productId: 'p4', variantId: null, similarity: 0.8 },
       ])
       mockQueryMany.mockResolvedValueOnce([
         { id: 'p3', name: 'Similar C', slug: 'similar-c', sku: 'SC1', price: '299', short_description: null },
@@ -377,8 +377,8 @@ describe('customer-agent/tools', () => {
           { product_id: 'p1', product_name: 'Widget A' },
         ])
       mockFindSimilar.mockResolvedValueOnce([
-        { matchedVia: 'products', productId: 'p1', variantId: null }, // already owned — excluded
-        { matchedVia: 'products', productId: 'p2', variantId: null },
+        { matchedVia: 'products', productId: 'p1', variantId: null, similarity: 0.9 }, // already owned — excluded
+        { matchedVia: 'products', productId: 'p2', variantId: null, similarity: 0.8 },
       ])
       mockQueryMany.mockResolvedValueOnce([
         { id: 'p2', name: 'Widget B', slug: 'widget-b', sku: 'WB1', price: '199', short_description: null },
@@ -392,7 +392,7 @@ describe('customer-agent/tools', () => {
       mockQueryMany
         .mockResolvedValueOnce([{ product_id: 'p1', product_name: 'Widget A' }])
       mockFindSimilar.mockResolvedValueOnce([
-        { matchedVia: 'products', productId: 'p1', variantId: null }, // only result, already owned
+        { matchedVia: 'products', productId: 'p1', variantId: null, similarity: 0.9 }, // only result, already owned
       ])
       const result = await tool().handler({}, ctx)
       expect((result as any).products).toHaveLength(0)

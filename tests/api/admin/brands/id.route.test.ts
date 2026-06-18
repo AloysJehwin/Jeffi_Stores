@@ -32,6 +32,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne } from '@/lib/db'
 import { parseBody } from '@/lib/validate'
+import { NextResponse } from 'next/server'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -93,7 +94,7 @@ describe('PATCH /api/admin/brands/[id]', () => {
   it('returns parseBody validation error when schema fails', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const errorResponse = { ok: false as const, response: Response.json({ error: 'Validation failed' }, { status: 400 }) }
+    const errorResponse = { ok: false as const, response: NextResponse.json({ error: 'Validation failed' }, { status: 400 }) }
     mockParseBody.mockReturnValue(errorResponse)
 
     const res = await PATCH(makeRequest({ name: 'Nike', slug: '' }), { params: { id: 'brand-1' } })

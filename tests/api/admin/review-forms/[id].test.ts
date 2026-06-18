@@ -21,7 +21,7 @@ const mockQueryMany = vi.mocked(queryMany)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', role: 'super_admin', scopes: ['review_forms'] }
+const admin = { adminId: 'admin-1', username: 'testadmin', role: 'super_admin', scopes: ['review_forms'] }
 
 function makeGet(id: string) {
   return new NextRequest(`http://localhost/api/admin/review-forms/${id}`)

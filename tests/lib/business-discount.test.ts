@@ -56,7 +56,7 @@ describe('getBusinessDiscountPct', () => {
   })
 
   it('returns 0 when no row found (undefined)', async () => {
-    mockQueryOne.mockResolvedValueOnce(undefined)
+    mockQueryOne.mockResolvedValueOnce(null)
     const result = await getBusinessDiscountPct('user-1', 'cat-99')
     expect(result).toBe(0)
   })

@@ -104,7 +104,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
     const insertCall = mockQuery.mock.calls.find((c: any) =>
       typeof c[0] === 'string' && c[0].includes('INSERT INTO rfq_messages')
     )
-    expect(insertCall[1][1]).toBe('Great, proceed!')
+    expect(insertCall![1][1]).toBe('Great, proceed!')
   })
 
   it('declines offer — sets status to negotiating', async () => {

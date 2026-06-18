@@ -148,8 +148,8 @@ describe('POST /api/admin/inflation/rollback', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     // Verify variant UPDATE was called: set_config + product UPDATE + 2x variant UPDATE + log UPDATE + log INSERT = 6 calls
-    const updateCalls = mockClient.query.mock.calls.filter(([sql]: [string]) =>
-      typeof sql === 'string' && sql.includes('UPDATE product_variants')
+    const updateCalls = mockClient.query.mock.calls.filter((c: any[]) =>
+      typeof c[0] === 'string' && c[0].includes('UPDATE product_variants')
     )
     expect(updateCalls.length).toBe(2)
   })
@@ -174,8 +174,8 @@ describe('POST /api/admin/inflation/rollback', () => {
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
     const res = await POST(makeReq({ log_id: 'log-1' }))
     expect(res.status).toBe(200)
-    const variantUpdates = mockClient.query.mock.calls.filter(([sql]: [string]) =>
-      typeof sql === 'string' && sql.includes('UPDATE product_variants')
+    const variantUpdates = mockClient.query.mock.calls.filter((c: any[]) =>
+      typeof c[0] === 'string' && c[0].includes('UPDATE product_variants')
     )
     expect(variantUpdates).toHaveLength(0)
   })
@@ -205,8 +205,8 @@ describe('POST /api/admin/inflation/rollback', () => {
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
     const res = await POST(makeReq({ log_id: 'log-1' }))
     expect(res.status).toBe(200)
-    const productUpdates = mockClient.query.mock.calls.filter(([sql]: [string]) =>
-      typeof sql === 'string' && sql.includes('UPDATE products SET')
+    const productUpdates = mockClient.query.mock.calls.filter((c: any[]) =>
+      typeof c[0] === 'string' && c[0].includes('UPDATE products SET')
     )
     expect(productUpdates).toHaveLength(0)
   })

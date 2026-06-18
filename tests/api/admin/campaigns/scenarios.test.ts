@@ -154,7 +154,7 @@ describe('GET /api/admin/campaigns/scenarios', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockListScenarios.mockReturnValue([])
-    mockGetScenario.mockReturnValue(undefined) // not in registry
+    mockGetScenario.mockReturnValue(null) // not in registry
     const customRow = {
       kind: 'my_custom_scenario',
       name: 'My Custom',

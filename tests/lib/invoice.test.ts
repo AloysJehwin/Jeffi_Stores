@@ -20,7 +20,7 @@ vi.mock('@/lib/gst', () => ({
   generateInvoiceNumber: vi.fn().mockReturnValue('JS/2024-25/0001'),
   getNextInvoiceSequence: vi.fn().mockResolvedValue(1),
   isInterState: vi.fn().mockReturnValue(false),
-  calculateGST: vi.fn().mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0 }),
+  calculateGST: vi.fn().mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 }),
 }))
 
 vi.mock('@/lib/invoice-pdf', () => ({
@@ -232,13 +232,13 @@ describe('generateOrderInvoice success path', () => {
           rowCount: 1,
         }),
       }
-      return fn(mockClient)
+      return fn(mockClient as any)
     })
 
     mockGetFinancialYear.mockReturnValue('2024-25')
     mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0001')
     mockIsInterState.mockReturnValue(false)
-    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0 })
+    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 })
     mockGenerateInvoicePDF.mockResolvedValue(Buffer.from('pdf-content'))
     mockUploadInvoicePDF.mockResolvedValue('https://s3.example.com/JS-0001.pdf')
   }
@@ -346,13 +346,13 @@ describe('generateOrderInvoice with separate billing address', () => {
       const mockClient = {
         query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
       }
-      return fn(mockClient)
+      return fn(mockClient as any)
     })
 
     mockGetFinancialYear.mockReturnValue('2024-25')
     mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0002')
     mockIsInterState.mockReturnValue(false)
-    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0 })
+    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 })
     mockGenerateInvoicePDF.mockResolvedValue(Buffer.from('pdf'))
     mockUploadInvoicePDF.mockResolvedValue('https://s3.example.com/inv.pdf')
 

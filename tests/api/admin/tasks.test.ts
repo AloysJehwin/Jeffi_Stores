@@ -21,7 +21,7 @@ const mockQueryOne = vi.mocked(queryOne)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', role: 'super_admin', scopes: ['customers'] }
+const admin = { adminId: 'admin-1', username: 'testadmin', role: 'super_admin', scopes: ['customers'] }
 
 function makeGet(params: Record<string, string> = {}) {
   const url = new URL('http://localhost/api/admin/tasks')

@@ -48,7 +48,7 @@ describe('GET /api/ai-assistant/recommend', () => {
 
   it('returns quota for authenticated user', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    mockGetQuota.mockResolvedValueOnce(8)
+    mockGetQuota.mockResolvedValueOnce({ used: 0, remaining: 8, resetAt: new Date() } as any)
     const res = await GET(makeGetRequest() as any)
     expect(res.status).toBe(200)
     const json = await res.json()
@@ -87,7 +87,7 @@ describe('POST /api/ai-assistant/recommend', () => {
       products: [{ id: 'p1', name: 'Hex Bolt' }],
       message: 'Here are some bolts',
     } as any)
-    mockGetQuota.mockResolvedValueOnce(7)
+    mockGetQuota.mockResolvedValueOnce({ used: 0, remaining: 7, resetAt: new Date() } as any)
 
     const res = await POST(makePostRequest({ query: 'I need hex bolts for my machine' }) as any)
     expect(res.status).toBe(200)

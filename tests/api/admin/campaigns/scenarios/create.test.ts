@@ -25,7 +25,7 @@ const mockValidateSql = vi.mocked(validateScenarioSql)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', id: 'admin-uuid-1', role: 'super_admin', scopes: ['mailer'] }
+const admin = { adminId: 'admin-1', username: 'testadmin', id: 'admin-uuid-1', role: 'super_admin', scopes: ['mailer'] }
 
 function makeRequest(body: unknown) {
   return new NextRequest('http://localhost/api/admin/campaigns/scenarios/create', {

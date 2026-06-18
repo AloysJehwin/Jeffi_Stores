@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 
 describe('openGoogleOAuthPopup — server-side (window undefined)', () => {

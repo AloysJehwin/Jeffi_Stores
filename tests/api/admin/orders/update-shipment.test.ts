@@ -30,7 +30,7 @@ const mockParseBody = vi.mocked(parseBody)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', role: 'super_admin', scopes: ['orders'] }
+const admin = { adminId: 'admin-1', username: 'testadmin', role: 'super_admin', scopes: ['orders'] }
 
 function makeRequest(id: string, body?: unknown) {
   return new NextRequest(`http://localhost/api/admin/orders/${id}/update-shipment`, {

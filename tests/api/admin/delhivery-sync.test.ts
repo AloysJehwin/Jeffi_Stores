@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 // ── Mocks (must precede imports) ───────────────────────────────────────────
 
 vi.mock('@/lib/db', () => ({
-  query: vi.fn().mockResolvedValue(undefined),
+  query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0, command: '', oid: 0, fields: [] }),
   queryMany: vi.fn(),
 }))
 
@@ -80,7 +80,7 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
     mockQuery.mockReset()
     // Default: no orders, no RVP requests
     mockQueryMany.mockResolvedValue([])
-    mockQuery.mockResolvedValue(undefined)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 0, command: '', oid: 0, fields: [] } as any)
   })
 
   // ── Auth ─────────────────────────────────────────────────────────────────

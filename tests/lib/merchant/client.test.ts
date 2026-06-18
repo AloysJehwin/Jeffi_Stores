@@ -132,7 +132,7 @@ describe('merchant/client', () => {
 
       vi.resetModules()
       const { gmcRequest } = await import('@/lib/merchant/client')
-      const result = await gmcRequest('/products', { method: 'GET' }).catch(() => null)
+      const result = await gmcRequest('GET', '/products').catch(() => null)
       expect(result === null || typeof result === 'object').toBe(true)
     })
   })

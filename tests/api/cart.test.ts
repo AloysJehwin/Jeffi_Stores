@@ -441,8 +441,8 @@ describe('POST /api/cart — buyMode factor multiplication', () => {
     const res = await POST(req as any)
     expect(res.status).toBe(200)
     // price should have been multiplied by factor 12
-    const callArgs = vi.mocked(query).mock.calls[0]
-    const priceArg = callArgs[1][5] // price_at_addition is the 6th param (index 5)
+    const callArgs = vi.mocked(query).mock.calls[0]!
+    const priceArg = callArgs[1]![5] // price_at_addition is the 6th param (index 5)
     expect(priceArg).toBe(1080) // 90 * 12
   })
 })

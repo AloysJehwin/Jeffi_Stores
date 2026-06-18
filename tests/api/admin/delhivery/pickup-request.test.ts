@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ const mockQueryMany = vi.mocked(queryMany)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['orders'] }
+const ADMIN = { adminId: 'admin-1', username: 'testadmin', role: 'super_admin', scopes: ['orders'] }
 
 function makeGet() {
   return new NextRequest('http://localhost/api/admin/delhivery/pickup-request')

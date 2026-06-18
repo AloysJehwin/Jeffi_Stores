@@ -29,10 +29,10 @@ describe('tool-envelope', () => {
     })
 
     it('preserves all extra fields', () => {
-      const result = ok({ summary: 'x', count: 5, items: [], meta: { page: 1 } })
+      const result = ok({ summary: 'x', count: 5, data: [], meta: { page: 1 } })
       expect(result.ok).toBe(true)
       expect(result.count).toBe(5)
-      expect(result.items).toEqual([])
+      expect(result.data).toEqual([])
       expect(result.meta).toEqual({ page: 1 })
     })
   })

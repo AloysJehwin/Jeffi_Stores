@@ -150,8 +150,8 @@ describe('POST /api/admin/invoices/drafts', () => {
       ],
     }))
     expect(res.status).toBe(200)
-    const itemInserts = mockClient.query.mock.calls.filter(([sql]: [string]) =>
-      typeof sql === 'string' && sql.includes('INSERT INTO order_items')
+    const itemInserts = mockClient.query.mock.calls.filter((args: any[]) =>
+      typeof args[0] === 'string' && args[0].includes('INSERT INTO order_items')
     )
     expect(itemInserts).toHaveLength(2)
   })
@@ -193,11 +193,11 @@ describe('POST /api/admin/invoices/drafts', () => {
       items: [],
     }))
     expect(res.status).toBe(200)
-    const orderInsertCall = mockClient.query.mock.calls.find(([sql]: [string]) =>
-      typeof sql === 'string' && sql.includes('INSERT INTO orders')
+    const orderInsertCall = mockClient.query.mock.calls.find((args: any[]) =>
+      typeof args[0] === 'string' && args[0].includes('INSERT INTO orders')
     )
     expect(orderInsertCall).toBeDefined()
-    expect(orderInsertCall[1]).toContain('unpaid')
+    expect(orderInsertCall![1]).toContain('unpaid')
   })
 
   it('returns 500 on POST withTransaction error', async () => {

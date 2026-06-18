@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -39,7 +39,7 @@ vi.mock('@/lib/validate', () => {
       if (result.success) return { ok: true, data: result.data }
       return {
         ok: false,
-        response: Response.json(
+        response: NextResponse.json(
           { error: result.error.issues[0]?.message ?? 'Validation error' },
           { status: 400 },
         ),
@@ -65,7 +65,7 @@ import { parseBody } from '@/lib/validate'
 // Helpers
 // ---------------------------------------------------------------------------
 
-const ADMIN = { adminId: 'admin-1', id: 'admin-1', role: 'super_admin', scopes: ['invoices'] }
+const ADMIN = { adminId: 'admin-1', username: 'testadmin', id: 'admin-1', role: 'super_admin', scopes: ['invoices'] }
 
 function postReq(body: unknown) {
   return new NextRequest(new Request('http://localhost/api/admin/invoices/cash-sale', {
@@ -128,7 +128,7 @@ describe('POST /api/admin/invoices/cash-sale', () => {
       if (result.success) return { ok: true, data: result.data }
       return {
         ok: false,
-        response: Response.json(
+        response: NextResponse.json(
           { error: result.error.issues[0]?.message ?? 'Validation error' },
           { status: 400 },
         ),

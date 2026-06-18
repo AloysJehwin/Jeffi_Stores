@@ -12,7 +12,7 @@ import { queryMany } from '@/lib/db'
 
 const mockQueryMany = vi.mocked(queryMany)
 
-function makeRows(overrides: Record<string, string> = []) {
+function makeRows(overrides: Record<string, string> = {}) {
   const defaults: Array<{ key: string; value: string }> = [
     { key: 'delivery_charges_enabled', value: 'true' },
     { key: 'delivery_free_threshold', value: '500' },
