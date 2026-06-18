@@ -76,7 +76,8 @@ export async function GET(request: NextRequest) {
            p.hsn_code,
            b.name AS brand_name,
            p.gtin,
-           COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity
+           COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity,
+           COALESCE(p.discount_pct, 0)::numeric AS discount_pct
          FROM products p
          LEFT JOIN brands b ON b.id = p.brand_id
          WHERE p.is_active = true AND p.has_variants = false AND ${catClause} AND ${productClause} AND ${searchWhere}
@@ -98,7 +99,8 @@ export async function GET(request: NextRequest) {
            p.hsn_code,
            b.name AS brand_name,
            COALESCE(pv.gtin, p.gtin) AS gtin,
-           COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity
+           COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity,
+           COALESCE(pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id
@@ -122,7 +124,8 @@ export async function GET(request: NextRequest) {
            p.hsn_code,
            b.name AS brand_name,
            COALESCE(pv.gtin, p.gtin) AS gtin,
-           COALESCE(ps.inventory_quantity, 0)::numeric AS inventory_quantity
+           COALESCE(ps.inventory_quantity, 0)::numeric AS inventory_quantity,
+           COALESCE(ps.discount_pct, pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct
          FROM product_sub_variants ps
          JOIN product_variants pv ON pv.id = ps.variant_id
          JOIN products p ON p.id = pv.product_id
