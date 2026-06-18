@@ -180,6 +180,40 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       .catch(() => {})
   }, [])
 
+  // Backfill units for items loaded from an existing order (available_units is [])
+  useEffect(() => {
+    const needsUnits = items.filter(it => it.product_id && it.available_units.length === 0)
+    if (!needsUnits.length) return
+    let cancelled = false
+    Promise.all(
+      needsUnits.map(it =>
+        fetchProductUnits(it.product_id!, it.variant_id).then(units => ({ it, units }))
+      )
+    ).then(results => {
+      if (cancelled) return
+      onChange(items.map(it => {
+        const found = results.find(r => r.it.id === it.id)
+        if (!found || !found.units.length) return it
+        const u = found.units[0]
+        const normalizedQty = u.dimension === 'count'
+          ? String(Math.round(parseFloat(String(it.quantity)) || 1))
+          : String(it.quantity)
+        return {
+          ...it,
+          available_units: found.units,
+          buy_unit: it.buy_unit || u.unit,
+          buy_mode: u.dimension === 'count' ? 'count' : u.dimension,
+          sell_unit_factor: u.factor,
+          sell_unit_dimension: u.dimension,
+          unit: u.display_label.toUpperCase(),
+          quantity: normalizedQty,
+        }
+      }))
+    })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.map(i => i.id).join(',')])
+
   function openPicker(itemId: string, catId: string) {
     setPickerItemId(itemId)
     setPickerCatId(catId)
