@@ -93,7 +93,7 @@ function statusLabel(s: string) {
 }
 
 export default async function AdminDashboard() {
-  const headersList = headers()
+  const headersList = await headers()
   const username = headersList.get('x-username') || 'Admin'
   const host = headersList.get('host') ?? ''
 

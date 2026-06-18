@@ -14,7 +14,7 @@ export const revalidate = 0
 const PAGE_SIZE = 25
 
 export default async function CustomersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
-  const host = headers().get('host') ?? ''
+  const host = (await headers()).get('host') ?? ''
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const sort = searchParams.sort
   const dir = searchParams.dir as 'asc' | 'desc' | undefined

@@ -52,7 +52,7 @@ describe('GET /api/ai-assistant/recommend', () => {
     const res = await GET(makeGetRequest() as any)
     expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.quota).toBe(8)
+    expect(json.quota.remaining).toBe(8)
   })
 })
 
@@ -93,7 +93,7 @@ describe('POST /api/ai-assistant/recommend', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.products).toHaveLength(1)
-    expect(json.quota).toBe(7)
+    expect(json.quota.remaining).toBe(7)
   })
 
   it('returns 429 when daily limit exceeded', async () => {

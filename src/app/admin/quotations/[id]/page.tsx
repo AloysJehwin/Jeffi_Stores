@@ -8,7 +8,7 @@ import QuotationDetailClient from './QuotationDetailClient'
 export const dynamic = 'force-dynamic'
 
 export default async function QuotationDetailPage({ params }: { params: { id: string } }) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))

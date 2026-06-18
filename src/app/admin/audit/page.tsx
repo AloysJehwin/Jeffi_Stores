@@ -5,7 +5,7 @@ import AdminAuditClient from './AdminAuditClient'
 import AccessDenied from '@/components/admin/AccessDenied'
 
 export default async function AdminAuditPage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   let role = ''
   let scopes: string[] = []
