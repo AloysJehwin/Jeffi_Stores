@@ -29,7 +29,8 @@ async function rzpPost(path: string, body: object) {
   return json
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
        LEFT JOIN purchase_orders po ON po.id = e.po_id
        LEFT JOIN suppliers s ON s.id = po.supplier_id
        WHERE e.id = $1`,
-      [params.id]
+      [id]
     )
     if (!expense) return NextResponse.json({ error: 'Expense not found' }, { status: 404 })
 
@@ -112,18 +113,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     await query(
       `INSERT INTO expense_payments (expense_id, amount, payment_date, payment_method, reference, notes, payout_id, payout_status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [params.id, payAmount, payment_date, mode.toLowerCase(), payout.id,
+      [id, payAmount, payment_date, mode.toLowerCase(), payout.id,
        notes || null, payout.id, payout.status]
     )
 
     const paidResult = await queryOne<{ paid: string }>(
       'SELECT COALESCE(SUM(amount), 0) AS paid FROM expense_payments WHERE expense_id = $1',
-      [params.id]
+      [id]
     )
     const paid = parseFloat(paidResult?.paid || '0')
     const total = parseFloat(expense.total_amount)
     const newStatus = paid >= total ? 'paid' : 'partial'
-    await query('UPDATE expenses SET status = $1, updated_at = NOW() WHERE id = $2', [newStatus, params.id])
+    await query('UPDATE expenses SET status = $1, updated_at = NOW() WHERE id = $2', [newStatus, id])
 
     return NextResponse.json({
       success: true,

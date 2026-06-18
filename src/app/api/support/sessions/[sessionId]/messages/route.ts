@@ -18,8 +18,9 @@ const CLOSING_PHRASES = [
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
+  const { sessionId } = await params
   try {
     const authUser = await authenticateAnyUser(request)
     if (!authUser) {
@@ -28,7 +29,7 @@ export async function GET(
 
     const session = await queryOne(
       `SELECT id, admin_name FROM support_sessions WHERE id = $1 AND user_id = $2`,
-      [params.sessionId, authUser.userId]
+      [sessionId, authUser.userId]
     )
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
@@ -37,7 +38,7 @@ export async function GET(
     const messages = await queryMany(
       `SELECT id, sender, message, created_at FROM support_messages
        WHERE session_id = $1 ORDER BY created_at ASC`,
-      [params.sessionId]
+      [sessionId]
     )
 
     const messagesWithMeta = messages.map((m: any) => ({
@@ -57,8 +58,9 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
+  const { sessionId } = await params
   try {
     const authUser = await authenticateAnyUser(request)
     if (!authUser) {
@@ -67,7 +69,7 @@ export async function POST(
 
     const session = await queryOne(
       `SELECT id FROM support_sessions WHERE id = $1 AND user_id = $2 AND status = 'open'`,
-      [params.sessionId, authUser.userId]
+      [sessionId, authUser.userId]
     )
     if (!session) {
       return NextResponse.json({ error: 'Session not found or closed' }, { status: 404 })
@@ -85,7 +87,7 @@ export async function POST(
       `INSERT INTO support_messages (session_id, sender, message)
        VALUES ($1, 'user', $2)
        RETURNING id, sender, message, created_at`,
-      [params.sessionId, message.trim()]
+      [sessionId, message.trim()]
     )
 
     const trimmed = message.trim()
@@ -93,7 +95,7 @@ export async function POST(
     logActivity({
       userId: authUser.userId,
       kind: 'support_message',
-      referenceId: params.sessionId,
+      referenceId: sessionId,
       referenceType: 'support_sessions',
       summary: `Customer: ${preview}`,
       metadata: { from: 'customer' },

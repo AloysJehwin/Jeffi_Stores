@@ -195,13 +195,13 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
 
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-    const res = await POST(postReq(), { params: { id: QUOT_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when quotations scope missing', async () => {
     vi.mocked(hasScope).mockReturnValue(false)
-    const res = await POST(postReq(), { params: { id: QUOT_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(403)
   })
 
@@ -210,7 +210,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   it('returns 404 when quotation not found', async () => {
     vi.mocked(queryOne).mockReset()
     vi.mocked(queryOne).mockResolvedValue(null as any)
-    const res = await POST(postReq(), { params: { id: QUOT_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(404)
   })
 
@@ -218,7 +218,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     vi.mocked(queryOne).mockReset()
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ ...FINAL_QUOTATION, status: 'draft' } as any)
-    const res = await POST(postReq(), { params: { id: QUOT_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/finalised/)
@@ -228,7 +228,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     vi.mocked(queryOne).mockReset()
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ ...FINAL_QUOTATION, converted_order_id: 'existing-order' } as any)
-    const res = await POST(postReq(), { params: { id: QUOT_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/already been converted/)
@@ -240,7 +240,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       .mockResolvedValueOnce(FINAL_QUOTATION as any)
       .mockResolvedValueOnce(null as any)
     vi.mocked(queryMany).mockResolvedValue([] as any)
-    const res = await POST(postReq(), { params: { id: QUOT_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/no line items/)
@@ -253,7 +253,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       fn(makeTransactionClient()),
     )
 
-    const res = await POST(postReq({ paymentMode: 'cash' }), { params: { id: QUOT_ID } })
+    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -282,7 +282,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       return fn(client)
     })
 
-    const res = await POST(postReq({ paymentMode: 'cash' }), { params: { id: QUOT_ID } })
+    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -297,7 +297,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       fn(makeTransactionClient()),
     )
 
-    const res = await POST(postReq({ paymentMode: 'cash', enableDelivery: true }), { params: { id: QUOT_ID } })
+    const res = await POST(postReq({ paymentMode: 'cash', enableDelivery: true }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -312,7 +312,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       return fn(client)
     })
 
-    const res = await POST(postReq({ paymentMode: 'upi_qr' }), { params: { id: QUOT_ID } })
+    const res = await POST(postReq({ paymentMode: 'upi_qr' }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
     // qrImageUrl should be populated (mocked razorpay)
@@ -324,7 +324,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       fn(makeTransactionClient()),
     )
 
-    const res = await POST(postReq({ paymentMode: 'bank_transfer' }), { params: { id: QUOT_ID } })
+    const res = await POST(postReq({ paymentMode: 'bank_transfer' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -347,7 +347,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       fn(makeTransactionClient()),
     )
 
-    const res = await POST(postReq({ paymentMode: 'cash' }), { params: { id: QUOT_ID } })
+    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -358,7 +358,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       fn(makeTransactionClient()),
     )
 
-    await POST(postReq({ paymentMode: 'cash' }), { params: { id: QUOT_ID } })
+    await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
 
     // Both emails should be attempted (they use .catch so errors won't propagate)
     expect(sendInvoiceFinalizedEmail).toHaveBeenCalled()
@@ -375,7 +375,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       fn(makeTransactionClient()),
     )
 
-    await POST(postReq({ paymentMode: 'cash' }), { params: { id: QUOT_ID } })
+    await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
 
     expect(sendInvoiceFinalizedEmail).not.toHaveBeenCalled()
   })
@@ -407,7 +407,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       return fn(client)
     })
 
-    const res = await POST(postReq(), { params: { id: QUOT_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -425,7 +425,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       fn(makeTransactionClient()),
     )
 
-    const res = await POST(postReq({ paymentMode: 'cash' }), { params: { id: QUOT_ID } })
+    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -433,7 +433,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
 
   it('returns 500 on transaction error', async () => {
     vi.mocked(withTransaction).mockRejectedValue(new Error('TX failed'))
-    const res = await POST(postReq(), { params: { id: QUOT_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(500)
     const json = await res.json()
     expect(json.error).toBe('TX failed')

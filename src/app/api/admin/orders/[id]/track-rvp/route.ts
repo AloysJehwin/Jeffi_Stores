@@ -7,16 +7,17 @@ const TOKEN = process.env.DELHIVERY_API_KEY
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const rr = await queryOne<{ rvp_awb_number: string | null }>(
       `SELECT rvp_awb_number FROM return_requests WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [params.id]
+      [id]
     )
 
     if (!rr?.rvp_awb_number) return NextResponse.json({ tracking: null })
@@ -60,8 +61,7 @@ export async function GET(
         })),
       },
     })
-  } catch (err) {
-    console.error('[route]', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

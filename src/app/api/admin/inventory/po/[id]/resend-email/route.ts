@@ -6,8 +6,9 @@ import { sendPurchaseOrderEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        WHERE po.id = $1`,
-      [params.id]
+      [id]
     )
     if (!po) return NextResponse.json({ error: 'PO not found' }, { status: 404 })
     if (!po.supplier_email) return NextResponse.json({ error: 'No email address on file for this supplier' }, { status: 400 })
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
        LEFT JOIN products p ON p.id = poi.product_id
        LEFT JOIN product_variants pv ON pv.id = poi.variant_id
        WHERE poi.po_id = $1`,
-      [params.id]
+      [id]
     )
 
     const viewUrl = `https://purchaseorder.jeffistores.in/${po.view_token}`

@@ -15,19 +15,20 @@ import MerchantSyncStatus from '@/components/admin/MerchantSyncStatus'
 
 const PAGE_SIZE = 25
 
-export default async function ProductsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedSearchParams = await searchParams
   const host = (await headers()).get('host') ?? ''
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
-  const sort = searchParams.sort
-  const dir = searchParams.dir as 'asc' | 'desc' | undefined
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const sort = resolvedSearchParams.sort
+  const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
 
   const [{ products, total }, categories, brands, allProductsForStats] = await Promise.all([
     getFilteredProducts({
-      category_id: searchParams.category_id,
-      brand_id: searchParams.brand_id,
-      is_active: searchParams.is_active,
-      stock: searchParams.stock,
-      search: searchParams.search,
+      category_id: resolvedSearchParams.category_id,
+      brand_id: resolvedSearchParams.brand_id,
+      is_active: resolvedSearchParams.is_active,
+      stock: resolvedSearchParams.stock,
+      search: resolvedSearchParams.search,
       page,
       limit: PAGE_SIZE,
       sort,
@@ -54,11 +55,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
-    if (searchParams.category_id) params.set('category_id', searchParams.category_id)
-    if (searchParams.brand_id) params.set('brand_id', searchParams.brand_id)
-    if (searchParams.is_active) params.set('is_active', searchParams.is_active)
-    if (searchParams.stock) params.set('stock', searchParams.stock)
-    if (searchParams.search) params.set('search', searchParams.search)
+    if (resolvedSearchParams.category_id) params.set('category_id', resolvedSearchParams.category_id)
+    if (resolvedSearchParams.brand_id) params.set('brand_id', resolvedSearchParams.brand_id)
+    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
+    if (resolvedSearchParams.stock) params.set('stock', resolvedSearchParams.stock)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))

@@ -30,7 +30,7 @@ const mockQueryCount = vi.mocked(queryCount)
 const mockQuery = vi.mocked(query)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['mailer'] }
-const params = { id: 'camp-1' }
+const params = Promise.resolve({ id: 'camp-1' })
 
 function makeGetReq(searchParams: Record<string, string> = {}) {
   const url = new URL('http://localhost/api/admin/mailer/camp-1')

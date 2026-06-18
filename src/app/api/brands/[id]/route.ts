@@ -4,15 +4,16 @@ import { authenticateAdmin } from '@/lib/jwt'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const brand = await queryOne('SELECT * FROM brands WHERE id = $1', [params.id])
+    const brand = await queryOne('SELECT * FROM brands WHERE id = $1', [id])
     if (!brand) {
       return NextResponse.json({ error: 'Brand not found' }, { status: 404 })
     }
@@ -25,9 +26,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -43,7 +45,7 @@ export async function PATCH(
     const updated = await queryOne(
       `UPDATE brands SET name = $1, slug = $2, description = $3, website = $4, logo_url = $5, is_active = $6
        WHERE id = $7 RETURNING id`,
-      [name, slug, description || null, website || null, logo_url || null, is_active ?? true, params.id]
+      [name, slug, description || null, website || null, logo_url || null, is_active ?? true, id]
     )
 
     if (!updated) {
@@ -61,15 +63,16 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const brandId = params.id
+    const brandId = id
 
     const productCount = await queryCount(
       'SELECT COUNT(*) FROM products WHERE brand_id = $1',

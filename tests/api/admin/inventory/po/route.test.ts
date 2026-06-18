@@ -55,14 +55,14 @@ beforeEach(() => { vi.clearAllMocks() })
 describe('GET /api/admin/inventory/po/[id]', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeGetReq('po-1'), { params: { id: 'po-1' } })
+    const res = await GET(makeGetReq('po-1'), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeGetReq('po-1'), { params: { id: 'po-1' } })
+    const res = await GET(makeGetReq('po-1'), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -70,7 +70,7 @@ describe('GET /api/admin/inventory/po/[id]', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeGetReq('po-1'), { params: { id: 'po-1' } })
+    const res = await GET(makeGetReq('po-1'), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(404)
   })
 
@@ -81,7 +81,7 @@ describe('GET /api/admin/inventory/po/[id]', () => {
     const items = [{ id: 'i1', product_name_current: 'Bolt', quantity: 10 }]
     mockQueryOne.mockResolvedValue(po)
     mockQueryMany.mockResolvedValue(items)
-    const res = await GET(makeGetReq('po-1'), { params: { id: 'po-1' } })
+    const res = await GET(makeGetReq('po-1'), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.purchase_order).toEqual(po)
@@ -92,14 +92,14 @@ describe('GET /api/admin/inventory/po/[id]', () => {
 describe('PATCH /api/admin/inventory/po/[id]', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await PATCH(makePatchReq('po-1', { status: 'received' }), { params: { id: 'po-1' } })
+    const res = await PATCH(makePatchReq('po-1', { status: 'received' }), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
-    const res = await PATCH(makePatchReq('po-1', { status: 'received' }), { params: { id: 'po-1' } })
+    const res = await PATCH(makePatchReq('po-1', { status: 'received' }), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -111,7 +111,7 @@ describe('PATCH /api/admin/inventory/po/[id]', () => {
       body: 'not-json',
       headers: { 'Content-Type': 'application/json' },
     })
-    const res = await PATCH(req, { params: { id: 'po-1' } })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(400)
   })
 
@@ -123,7 +123,7 @@ describe('PATCH /api/admin/inventory/po/[id]', () => {
       ok: false,
       response: NextResponse.json({ error: 'Validation failed' }, { status: 400 }),
     })
-    const res = await PATCH(makePatchReq('po-1', { status: 'received' }), { params: { id: 'po-1' } })
+    const res = await PATCH(makePatchReq('po-1', { status: 'received' }), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(400)
   })
 
@@ -132,7 +132,7 @@ describe('PATCH /api/admin/inventory/po/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockParseBody.mockReturnValue({ ok: true, data: { status: 'received', expected_date: null, notes: null } })
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
-    const res = await PATCH(makePatchReq('po-1', { status: 'received' }), { params: { id: 'po-1' } })
+    const res = await PATCH(makePatchReq('po-1', { status: 'received' }), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)

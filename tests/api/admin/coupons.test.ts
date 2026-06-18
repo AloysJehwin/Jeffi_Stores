@@ -248,7 +248,7 @@ describe('PATCH /api/admin/coupons/[id]', () => {
   it('updates discount_value and returns 200', async () => {
     const res = await couponPATCH(
       patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { discount_value: 20 }),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
     const json = await res.json()
 
@@ -260,7 +260,7 @@ describe('PATCH /api/admin/coupons/[id]', () => {
   it('returns 400 when no fields provided', async () => {
     const res = await couponPATCH(
       patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, {}),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
     expect(res.status).toBe(400)
   })
@@ -270,7 +270,7 @@ describe('PATCH /api/admin/coupons/[id]', () => {
 
     const res = await couponPATCH(
       patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { is_active: false }),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
     expect(res.status).toBe(404)
   })
@@ -280,7 +280,7 @@ describe('PATCH /api/admin/coupons/[id]', () => {
 
     const res = await couponPATCH(
       patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { discount_value: 5 }),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
     expect(res.status).toBe(401)
   })
@@ -290,7 +290,7 @@ describe('PATCH /api/admin/coupons/[id]', () => {
 
     await couponPATCH(
       patchReq(`http://localhost/api/admin/coupons/${COUPON_ID}`, { code: 'newcode' }),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
 
     expect(queryMany).toHaveBeenCalledWith(
@@ -315,7 +315,7 @@ describe('DELETE /api/admin/coupons/[id]', () => {
   it('deletes coupon and returns success', async () => {
     const res = await couponDELETE(
       deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
     const json = await res.json()
 
@@ -328,7 +328,7 @@ describe('DELETE /api/admin/coupons/[id]', () => {
 
     const res = await couponDELETE(
       deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
     expect(res.status).toBe(409)
     const json = await res.json()
@@ -340,7 +340,7 @@ describe('DELETE /api/admin/coupons/[id]', () => {
 
     const res = await couponDELETE(
       deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
     expect(res.status).toBe(401)
   })
@@ -350,7 +350,7 @@ describe('DELETE /api/admin/coupons/[id]', () => {
 
     const res = await couponDELETE(
       deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
     expect(res.status).toBe(403)
   })
@@ -358,7 +358,7 @@ describe('DELETE /api/admin/coupons/[id]', () => {
   it('unlinks coupon from campaigns before deleting', async () => {
     const res = await couponDELETE(
       deleteReq(`http://localhost/api/admin/coupons/${COUPON_ID}`),
-      { params: { id: COUPON_ID } }
+      { params: Promise.resolve({ id: COUPON_ID }) }
     )
 
     expect(res.status).toBe(200)

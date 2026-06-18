@@ -37,7 +37,7 @@ const ADMIN = {
   last_name: 'Smith',
 }
 const SESSION_ID = 'session-uuid-1'
-const PARAMS = { params: { sessionId: SESSION_ID } }
+const PARAMS = { params: Promise.resolve({ sessionId: SESSION_ID }) }
 
 function makeGet() {
   return new NextRequest(`http://localhost/api/admin/support/sessions/${SESSION_ID}/messages`, {

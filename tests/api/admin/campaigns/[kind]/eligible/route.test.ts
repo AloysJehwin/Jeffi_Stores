@@ -107,13 +107,13 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when mailer scope missing', async () => {
     vi.mocked(hasScope).mockReturnValue(false)
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     expect(res.status).toBe(403)
   })
 
@@ -121,7 +121,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
 
   it('returns 404 when campaign not found', async () => {
     vi.mocked(getCampaign).mockResolvedValue(null as any)
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     expect(res.status).toBe(404)
     const json = await res.json()
     expect(json.error).toBe('Campaign not found')
@@ -130,7 +130,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
   // --- Built-in scenario ---
 
   it('returns eligible recipients for builtin scenario', async () => {
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -140,7 +140,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
   })
 
   it('maps user data onto eligible rows', async () => {
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     const alice = json.eligible.find((r: any) => r.user_id === 'user-uuid-1')
@@ -151,7 +151,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
 
   it('returns empty eligible when findEligible returns nothing', async () => {
     vi.mocked(SCENARIO.findEligible).mockResolvedValue([])
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -161,7 +161,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
 
   it('returns 500 when findEligible throws', async () => {
     vi.mocked(SCENARIO.findEligible).mockRejectedValue(new Error('query timeout'))
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(res.status).toBe(500)
@@ -177,7 +177,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     }
     vi.mocked(getScenario).mockReturnValue(scenarioWithSuppressed as any)
 
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -192,7 +192,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     }
     vi.mocked(getScenario).mockReturnValue(scenarioWithFailingSuppressed as any)
 
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -202,7 +202,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
   it('uses campaign.scenario_kind when set', async () => {
     vi.mocked(getCampaign).mockResolvedValue({ ...CAMPAIGN, scenario_kind: 'cart_abandoners' } as any)
 
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     // getScenario should be called with 'cart_abandoners'
     expect(getScenario).toHaveBeenCalledWith('cart_abandoners')
   })
@@ -213,7 +213,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     vi.mocked(getScenario).mockReturnValue(undefined as any)
     vi.mocked(queryOne).mockResolvedValue(null as any) // no custom scenario either
 
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -249,7 +249,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     vi.mocked(getClient).mockResolvedValue(mockClient as any)
     vi.mocked(queryMany).mockResolvedValue(USERS as any)
 
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -268,7 +268,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     } as any)
     vi.mocked(validateScenarioSql).mockReturnValue({ ok: false, reason: 'DML not allowed' } as any)
 
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -294,7 +294,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     }
     vi.mocked(getClient).mockResolvedValue(mockClient as any)
 
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(res.status).toBe(500)
@@ -325,7 +325,7 @@ describe('GET /api/admin/campaigns/[kind]/eligible', () => {
     vi.mocked(getClient).mockResolvedValue(mockClient as any)
     vi.mocked(queryMany).mockResolvedValue([] as any)
 
-    const res = await GET(makeReq(), { params: { kind: CAMPAIGN_KIND } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ kind: CAMPAIGN_KIND }) })
     const json = await res.json()
 
     expect(json.note).toMatch(/DISABLED/)

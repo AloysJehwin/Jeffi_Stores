@@ -50,21 +50,21 @@ describe('PATCH /api/admin/orders/[id]/payment-status', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await PATCH(makeRequest('order-1', { payment_status: 'paid' }), { params: { id: 'order-1' } })
+    const res = await PATCH(makeRequest('order-1', { payment_status: 'paid' }), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await PATCH(makeRequest('order-1', { payment_status: 'paid' }), { params: { id: 'order-1' } })
+    const res = await PATCH(makeRequest('order-1', { payment_status: 'paid' }), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 400 for invalid payment_status', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const res = await PATCH(makeRequest('order-1', { payment_status: 'cancelled' }), { params: { id: 'order-1' } })
+    const res = await PATCH(makeRequest('order-1', { payment_status: 'cancelled' }), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/invalid payment_status/i)
@@ -74,7 +74,7 @@ describe('PATCH /api/admin/orders/[id]/payment-status', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await PATCH(makeRequest('order-999', { payment_status: 'paid' }), { params: { id: 'order-999' } })
+    const res = await PATCH(makeRequest('order-999', { payment_status: 'paid' }), { params: Promise.resolve({ id: 'order-999' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -86,7 +86,7 @@ describe('PATCH /api/admin/orders/[id]/payment-status', () => {
     mockQueryOne.mockResolvedValue({ id: 'order-1' })
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await PATCH(makeRequest('order-1', { payment_status: 'paid' }), { params: { id: 'order-1' } })
+    const res = await PATCH(makeRequest('order-1', { payment_status: 'paid' }), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -103,7 +103,7 @@ describe('PATCH /api/admin/orders/[id]/payment-status', () => {
     mockQueryOne.mockResolvedValue({ id: 'order-1' })
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await PATCH(makeRequest('order-1', { payment_status: status }), { params: { id: 'order-1' } })
+    const res = await PATCH(makeRequest('order-1', { payment_status: status }), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(200)
   })
 
@@ -112,7 +112,7 @@ describe('PATCH /api/admin/orders/[id]/payment-status', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockRejectedValue(new Error('DB down'))
 
-    const res = await PATCH(makeRequest('order-1', { payment_status: 'paid' }), { params: { id: 'order-1' } })
+    const res = await PATCH(makeRequest('order-1', { payment_status: 'paid' }), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toMatch(/DB down/i)

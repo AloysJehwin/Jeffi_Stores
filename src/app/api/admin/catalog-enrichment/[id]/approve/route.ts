@@ -84,7 +84,8 @@ async function reEmbedProduct(productId: string): Promise<{ ok: boolean; error?:
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'catalog_enrichment')) {
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             ai_description, ai_use_cases, ai_keywords, ai_who_uses_it,
             ai_application, ai_product_type, ai_features, ai_search_tags, status
        FROM product_ai_enrichment_log WHERE id = $1::uuid`,
-    [params.id]
+    [id]
   )
   if (!row) return NextResponse.json({ error: 'Enrichment not found' }, { status: 404 })
   if (row.status !== 'proposed') {
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     `UPDATE product_ai_enrichment_log
         SET status = 'approved', decided_at = NOW(), decided_by_admin_id = $1::uuid
       WHERE id = $2::uuid`,
-    [admin.adminId, params.id]
+    [admin.adminId, id]
   )
 
   await query(
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             re_embedded_at = CASE WHEN $1 THEN NOW() ELSE re_embedded_at END,
             error = $2
       WHERE id = $3::uuid`,
-    [embedResult.ok, embedResult.ok ? null : embedResult.error || null, params.id]
+    [embedResult.ok, embedResult.ok ? null : embedResult.error || null, id]
   )
 
   return NextResponse.json({

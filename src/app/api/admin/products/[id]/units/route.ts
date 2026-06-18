@@ -5,7 +5,7 @@ import { queryMany, queryOne, withTransaction } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: { id: string } }
+interface Params { params: Promise<{ id: string }> }
 
 async function ensureProduct(productId: string) {
   const row = await queryOne<{ id: string }>(`SELECT id FROM products WHERE id = $1`, [productId])
@@ -13,12 +13,13 @@ async function ensureProduct(productId: string) {
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  if (!(await ensureProduct(params.id))) {
+  if (!(await ensureProduct(id))) {
     return NextResponse.json({ error: 'Product not found' }, { status: 404 })
   }
 
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest, { params }: Params) {
      FROM product_units
      WHERE product_id = $1 AND variant_id IS NULL
      ORDER BY is_base DESC, unit ASC`,
-    [params.id]
+    [id]
   )
 
   const unitIds = units.map(u => u.id)
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'factor must be a positive number' }, { status: 400 })
   }
 
-  if (!(await ensureProduct(params.id))) {
+  if (!(await ensureProduct(id))) {
     return NextResponse.json({ error: 'Product not found' }, { status: 404 })
   }
 
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       if (isBase) {
         await client.query(
           `UPDATE product_units SET is_base = FALSE WHERE product_id = $1 AND variant_id IS NULL`,
-          [params.id]
+          [id]
         )
       }
       const res = await client.query(
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest, { params }: Params) {
            is_base, display_label, notes, min_qty, max_qty, qty_step
          ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [
-          params.id,
+          id,
           unit, factor, dimension,
           conversionMeta ? JSON.stringify(conversionMeta) : null,
           isBase,

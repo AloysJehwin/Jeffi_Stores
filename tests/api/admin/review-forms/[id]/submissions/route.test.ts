@@ -23,7 +23,7 @@ import { queryMany, queryCount, queryOne } from '@/lib/db'
 
 const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['review_forms'] }
 const FORM_ID = 'form-uuid-1'
-const PARAMS = { params: { id: FORM_ID } }
+const PARAMS = { params: Promise.resolve({ id: FORM_ID }) }
 
 function makeGet(searchParams: Record<string, string> = {}) {
   const url = new URL(`http://localhost/api/admin/review-forms/${FORM_ID}/submissions`)

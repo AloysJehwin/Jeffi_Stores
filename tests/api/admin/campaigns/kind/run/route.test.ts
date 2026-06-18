@@ -12,7 +12,7 @@ const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['mailer'] }
-const params = { kind: 'welcome' }
+const params = Promise.resolve({ kind: 'welcome' })
 
 function makeRequest(kind = 'welcome') {
   return new NextRequest(`http://localhost/api/admin/campaigns/${kind}/run`, { method: 'POST' })
@@ -91,7 +91,7 @@ describe('POST /api/admin/campaigns/[kind]/run', () => {
     })
     vi.stubGlobal('fetch', mockFetch)
 
-    await POST(makeRequest('reorder'), { params: { kind: 'reorder' } })
+    await POST(makeRequest('reorder'), { params: Promise.resolve({ kind: 'reorder' }) })
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('kind=reorder'),
       expect.any(Object)

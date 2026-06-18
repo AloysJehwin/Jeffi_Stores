@@ -11,16 +11,17 @@ export const dynamic = 'force-dynamic'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(
       `SELECT id, source, invoice_number, status FROM orders WHERE id = $1`,
-      [params.id]
+      [id]
     )
     if (!order) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     if (order.source !== 'offline') return NextResponse.json({ error: 'Only offline invoices can be edited' }, { status: 400 })
@@ -87,7 +88,7 @@ export async function PATCH(
     const result = await withTransaction(async (client) => {
       const existingResult = await client.query<{ product_id: string | null; variant_id: string | null; sub_variant_id: string | null; quantity: string }>(
         `SELECT product_id, variant_id, sub_variant_id, quantity FROM order_items WHERE order_id = $1`,
-        [params.id]
+        [id]
       )
 
       const existingQtyMap = new Map<string, number>()
@@ -161,12 +162,12 @@ export async function PATCH(
           effectiveDate, notes || null,
           moveToDraft ? 'draft' : order.status,
           moveToDraft ? null : order.invoice_number,
-          params.id,
+          id,
         ]
       )
 
       if (moveToDraft && order.invoice_number) {
-        await client.query(`DELETE FROM invoices WHERE order_id = $1`, [params.id])
+        await client.query(`DELETE FROM invoices WHERE order_id = $1`, [id])
       }
 
       if (addressLine1) {
@@ -175,11 +176,11 @@ export async function PATCH(
             full_name = $1, address_line1 = $2, address_line2 = $3,
             city = $4, state = $5, postal_code = $6
           WHERE id = (SELECT shipping_address_id FROM orders WHERE id = $7)`,
-          [customerName, addressLine1, addressLine2 || null, city || '', state || '', postalCode || '', params.id]
+          [customerName, addressLine1, addressLine2 || null, city || '', state || '', postalCode || '', id]
         )
       }
 
-      await client.query(`DELETE FROM order_items WHERE order_id = $1`, [params.id])
+      await client.query(`DELETE FROM order_items WHERE order_id = $1`, [id])
 
       for (const item of processedItems) {
         await client.query(
@@ -189,7 +190,7 @@ export async function PATCH(
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
           [
-            params.id, item.product_id, item.product_name, item.product_sku,
+            id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
             item.quantity, item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
@@ -244,7 +245,7 @@ export async function PATCH(
             transactionType: 'sale',
             quantityChange: -extraQty,
             referenceType: 'order',
-            referenceId: params.id,
+            referenceId: id,
             currentStock: stockBefore,
           })
         }

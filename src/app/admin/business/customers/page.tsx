@@ -80,8 +80,9 @@ const STATUS_STYLES: Record<string, string> = {
 export default async function BusinessCustomersPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | undefined }
+  searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
+  const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
@@ -89,18 +90,18 @@ export default async function BusinessCustomersPage({
   const session = await verifyToken(token.value).catch(() => null)
   if (!session || !hasScope(session.role, session.scopes || [], 'business_customers')) redirect(ap('/admin/dashboard', host))
 
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const { customers, total } = await getBusinessCustomers({
-    status: searchParams.status,
-    search: searchParams.search,
+    status: resolvedSearchParams.status,
+    search: resolvedSearchParams.search,
     page,
   })
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   const buildUrl = (p: number, extra: Record<string, string> = {}) => {
     const params = new URLSearchParams()
-    if (searchParams.status) params.set('status', searchParams.status)
-    if (searchParams.search) params.set('search', searchParams.search)
+    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     Object.entries(extra).forEach(([k, v]) => params.set(k, v))
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
@@ -123,7 +124,7 @@ export default async function BusinessCustomersPage({
             key={s}
             href={buildUrl(1, s === 'all' ? {} : { status: s })}
             className={`bg-surface-elevated rounded-lg border p-4 text-center transition-colors ${
-              (searchParams.status ?? 'all') === s
+              (resolvedSearchParams.status ?? 'all') === s
                 ? 'border-accent-500 ring-1 ring-accent-500'
                 : 'border-border-default hover:border-accent-300'
             }`}
@@ -138,11 +139,11 @@ export default async function BusinessCustomersPage({
 
       {/* Filters */}
       <form method="get" className="flex gap-3 mb-4">
-        {searchParams.status && <input type="hidden" name="status" value={searchParams.status} />}
+        {resolvedSearchParams.status && <input type="hidden" name="status" value={resolvedSearchParams.status} />}
         <input
           type="search"
           name="search"
-          defaultValue={searchParams.search}
+          defaultValue={resolvedSearchParams.search}
           placeholder="Search by email, company, GST…"
           className="flex-1 px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
@@ -158,7 +159,7 @@ export default async function BusinessCustomersPage({
             key={s}
             href={buildUrl(1, s === 'all' ? {} : { status: s })}
             className={`px-3 py-1.5 text-xs font-semibold rounded-full capitalize transition-colors ${
-              (searchParams.status ?? 'all') === s
+              (resolvedSearchParams.status ?? 'all') === s
                 ? 'bg-accent-500 text-white'
                 : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
             }`}

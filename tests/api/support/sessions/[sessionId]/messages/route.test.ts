@@ -53,14 +53,14 @@ describe('GET /api/support/sessions/[sessionId]/messages', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(null)
-    const res = await GET(makeGet(SESSION_ID) as any, { params: { sessionId: SESSION_ID } })
+    const res = await GET(makeGet(SESSION_ID) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 404 when session not found', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeGet(SESSION_ID) as any, { params: { sessionId: SESSION_ID } })
+    const res = await GET(makeGet(SESSION_ID) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -73,7 +73,7 @@ describe('GET /api/support/sessions/[sessionId]/messages', () => {
       { id: 'msg-1', sender: 'user', message: 'hello', created_at: new Date().toISOString() },
       { id: 'msg-2', sender: 'admin', message: 'Hi, how can I help?', created_at: new Date().toISOString() },
     ])
-    const res = await GET(makeGet(SESSION_ID) as any, { params: { sessionId: SESSION_ID } })
+    const res = await GET(makeGet(SESSION_ID) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.messages).toHaveLength(2)
@@ -90,7 +90,7 @@ describe('GET /api/support/sessions/[sessionId]/messages', () => {
     mockQueryMany.mockResolvedValue([
       { id: 'msg-1', sender: 'admin', message: 'Thank you for contacting us!', created_at: new Date().toISOString() },
     ])
-    const res = await GET(makeGet(SESSION_ID) as any, { params: { sessionId: SESSION_ID } })
+    const res = await GET(makeGet(SESSION_ID) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     const body = await res.json()
     expect(body.messages[0].is_closing).toBe(true)
   })
@@ -101,7 +101,7 @@ describe('GET /api/support/sessions/[sessionId]/messages', () => {
     mockQueryMany.mockResolvedValue([
       { id: 'msg-1', sender: 'admin', message: 'Sure, let me check that for you.', created_at: new Date().toISOString() },
     ])
-    const res = await GET(makeGet(SESSION_ID) as any, { params: { sessionId: SESSION_ID } })
+    const res = await GET(makeGet(SESSION_ID) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     const body = await res.json()
     expect(body.messages[0].is_closing).toBe(false)
   })
@@ -109,7 +109,7 @@ describe('GET /api/support/sessions/[sessionId]/messages', () => {
   it('returns 500 on db error', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockRejectedValue(new Error('boom'))
-    const res = await GET(makeGet(SESSION_ID) as any, { params: { sessionId: SESSION_ID } })
+    const res = await GET(makeGet(SESSION_ID) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(500)
   })
 })
@@ -123,14 +123,14 @@ describe('POST /api/support/sessions/[sessionId]/messages', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(null)
-    const res = await POST(makePost(SESSION_ID, { message: 'hi' }) as any, { params: { sessionId: SESSION_ID } })
+    const res = await POST(makePost(SESSION_ID, { message: 'hi' }) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 404 when session not found or closed', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makePost(SESSION_ID, { message: 'hi' }) as any, { params: { sessionId: SESSION_ID } })
+    const res = await POST(makePost(SESSION_ID, { message: 'hi' }) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found|closed/i)
@@ -139,14 +139,14 @@ describe('POST /api/support/sessions/[sessionId]/messages', () => {
   it('returns 400 when message is empty', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(OPEN_SESSION)
-    const res = await POST(makePost(SESSION_ID, { message: '   ' }) as any, { params: { sessionId: SESSION_ID } })
+    const res = await POST(makePost(SESSION_ID, { message: '   ' }) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when message is missing', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(OPEN_SESSION)
-    const res = await POST(makePost(SESSION_ID, {}) as any, { params: { sessionId: SESSION_ID } })
+    const res = await POST(makePost(SESSION_ID, {}) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(400)
   })
 
@@ -156,7 +156,7 @@ describe('POST /api/support/sessions/[sessionId]/messages', () => {
     mockQueryOne
       .mockResolvedValueOnce(OPEN_SESSION)  // session check
       .mockResolvedValueOnce(savedMsg)      // insert
-    const res = await POST(makePost(SESSION_ID, { message: 'Need help' }) as any, { params: { sessionId: SESSION_ID } })
+    const res = await POST(makePost(SESSION_ID, { message: 'Need help' }) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.message).toMatchObject({ id: 'msg-new', sender: 'user' })
@@ -167,14 +167,14 @@ describe('POST /api/support/sessions/[sessionId]/messages', () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(OPEN_SESSION)
     const longMsg = 'x'.repeat(2001)
-    const res = await POST(makePost(SESSION_ID, { message: longMsg }) as any, { params: { sessionId: SESSION_ID } })
+    const res = await POST(makePost(SESSION_ID, { message: longMsg }) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(400)
   })
 
   it('returns 500 on db error', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockRejectedValue(new Error('db error'))
-    const res = await POST(makePost(SESSION_ID, { message: 'help' }) as any, { params: { sessionId: SESSION_ID } })
+    const res = await POST(makePost(SESSION_ID, { message: 'help' }) as any, { params: Promise.resolve({ sessionId: SESSION_ID }) })
     expect(res.status).toBe(500)
   })
 })

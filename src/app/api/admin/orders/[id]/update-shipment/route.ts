@@ -22,8 +22,9 @@ const Schema = z.object({
 const TOKEN = process.env.DELHIVERY_API_KEY
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const order = await queryOne<{ awb_number: string | null }>(
       'SELECT awb_number FROM orders WHERE id = $1',
-      [params.id]
+      [id]
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })

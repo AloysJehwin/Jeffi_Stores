@@ -6,7 +6,7 @@ import { queryOne, query } from '@/lib/db'
 export const dynamic = 'force-dynamic'
 
 interface Params {
-  params: { id: string; variantId: string; unitId: string; ruleId: string }
+  params: Promise<{ id: string; variantId: string; unitId: string; ruleId: string }>
 }
 
 async function ensureRule(productId: string, variantId: string, unitId: string, ruleId: string) {
@@ -21,12 +21,13 @@ async function ensureRule(productId: string, variantId: string, unitId: string, 
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const { id, variantId, unitId, ruleId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  if (!(await ensureRule(params.id, params.variantId, params.unitId, params.ruleId))) {
+  if (!(await ensureRule(id, variantId, unitId, ruleId))) {
     return NextResponse.json({ error: 'Rule not found' }, { status: 404 })
   }
 
@@ -51,7 +52,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (updates.length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
   }
-  vals.push(params.ruleId)
+  vals.push(ruleId)
   const updated = await queryOne(
     `UPDATE product_unit_rules SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
     vals
@@ -60,14 +61,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
+  const { id, variantId, unitId, ruleId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  if (!(await ensureRule(params.id, params.variantId, params.unitId, params.ruleId))) {
+  if (!(await ensureRule(id, variantId, unitId, ruleId))) {
     return NextResponse.json({ error: 'Rule not found' }, { status: 404 })
   }
-  await query(`DELETE FROM product_unit_rules WHERE id = $1`, [params.ruleId])
+  await query(`DELETE FROM product_unit_rules WHERE id = $1`, [ruleId])
   return NextResponse.json({ ok: true })
 }

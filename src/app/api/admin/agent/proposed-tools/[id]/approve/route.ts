@@ -5,7 +5,8 @@ import { query, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'agent')) {
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const row = await queryOne<{ id: string; name: string; status: string; proposed_by_admin_id: string }>(
     `SELECT id::text, name, status, proposed_by_admin_id::text FROM admin_agent_proposed_tools WHERE id = $1::uuid`,
-    [params.id]
+    [id]
   )
   if (!row) return NextResponse.json({ error: 'Proposed tool not found' }, { status: 404 })
   if (row.status !== 'proposed') {
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     `UPDATE admin_agent_proposed_tools
         SET status = 'approved', decided_at = NOW(), decided_by_admin_id = $1::uuid
       WHERE id = $2::uuid`,
-    [admin.adminId, params.id]
+    [admin.adminId, id]
   )
   return NextResponse.json({ ok: true, status: 'approved' })
 }

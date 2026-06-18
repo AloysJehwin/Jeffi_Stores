@@ -48,21 +48,21 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateBusiness.mockResolvedValue(null)
-    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 404 when rfq not found', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(404)
   })
 
   it('returns 400 when rfq status is not active for responding (converted)', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue({ ...NEGOTIATING_RFQ, status: 'converted' })
-    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/no active offer/i)
@@ -71,7 +71,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
   it('returns 400 when action is invalid', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(NEGOTIATING_RFQ)
-    const res = await POST(makePost(RFQ_ID, { action: 'maybe' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'maybe' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/action must be accept or decline/i)
@@ -82,7 +82,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
     mockQueryOne
       .mockResolvedValueOnce(NEGOTIATING_RFQ)    // rfq check
       .mockResolvedValueOnce(null)               // no latest admin offer
-    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
@@ -99,7 +99,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
     mockQueryOne
       .mockResolvedValueOnce(NEGOTIATING_RFQ)
       .mockResolvedValueOnce(null)
-    const res = await POST(makePost(RFQ_ID, { action: 'accept', message: 'Great, proceed!' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'accept', message: 'Great, proceed!' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     const insertCall = mockQuery.mock.calls.find((c: any) =>
       typeof c[0] === 'string' && c[0].includes('INSERT INTO rfq_messages')
@@ -110,7 +110,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
   it('declines offer — sets status to negotiating', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValueOnce(NEGOTIATING_RFQ)
-    const res = await POST(makePost(RFQ_ID, { action: 'decline' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'decline' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.action).toBe('decline')
@@ -125,7 +125,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
     mockQueryOne
       .mockResolvedValueOnce(NEGOTIATING_RFQ)
       .mockResolvedValueOnce(adminOffer)
-    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringMatching(/UPDATE business_rfq_items SET requested_price/),
@@ -141,7 +141,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
     mockQueryOne
       .mockResolvedValueOnce(NEGOTIATING_RFQ)
       .mockResolvedValueOnce(adminOffer)
-    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringMatching(/UPDATE business_rfq_items SET requested_price/),
@@ -155,7 +155,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
     const res = await POST(makePost(RFQ_ID, {
       action: 'decline',
       counter_items: 'not-array',
-    }) as any, { params: { id: RFQ_ID } })
+    }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/must be an array/i)
@@ -167,7 +167,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
     const res = await POST(makePost(RFQ_ID, {
       action: 'decline',
       counter_items: [{ rfq_item_id: null, offered_price: 10 }],
-    }) as any, { params: { id: RFQ_ID } })
+    }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
   })
 
@@ -182,7 +182,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
         { rfq_item_id: 'item-1', offered_price: 10 },
         { rfq_item_id: 'item-2', offered_price: 20 },
       ],
-    }) as any, { params: { id: RFQ_ID } })
+    }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/do not belong/i)
@@ -195,7 +195,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
     const res = await POST(makePost(RFQ_ID, {
       action: 'decline',
       counter_items: [{ rfq_item_id: 'item-1', offered_price: 80 }],
-    }) as any, { params: { id: RFQ_ID } })
+    }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringMatching(/INSERT INTO rfq_messages/),
@@ -206,7 +206,7 @@ describe('POST /api/business/rfqs/[id]/respond', () => {
   it('returns 500 on unexpected error', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockRejectedValue(new Error('unexpected db error'))
-    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID, { action: 'accept' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(500)
   })
 })

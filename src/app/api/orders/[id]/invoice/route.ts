@@ -9,9 +9,10 @@ import { generateOrderInvoice } from '@/lib/invoice'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const userAuth = await authenticateUser(request)
     const adminAuth = await authenticateAdmin(request)
 
@@ -19,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
 
     const order = await queryOne(
       `SELECT o.*,
@@ -236,15 +237,16 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
 
     const order = await queryOne('SELECT id, invoice_number, payment_status, status FROM orders WHERE id = $1', [orderId])
     if (!order) {

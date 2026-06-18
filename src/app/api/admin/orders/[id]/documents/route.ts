@@ -8,8 +8,9 @@ const TOKEN = process.env.DELHIVERY_API_KEY
 const ALLOWED_DOC_TYPES = ['SIGNATURE_URL', 'RVP_QC_IMAGE', 'EPOD', 'SELLER_RETURN_IMAGE'] as const
 type DocType = typeof ALLOWED_DOC_TYPES[number]
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const order = await queryOne<{ awb_number: string | null; order_number: string }>(
       'SELECT awb_number, order_number FROM orders WHERE id = $1',
-      [params.id]
+      [id]
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const contentType = res.headers.get('content-type') || 'application/octet-stream'
     const buffer = await res.arrayBuffer()
 
-    const safeOrderNum = (order.order_number || params.id.slice(0, 8)).replace(/[^a-zA-Z0-9-]/g, '-')
+    const safeOrderNum = (order.order_number || id.slice(0, 8)).replace(/[^a-zA-Z0-9-]/g, '-')
     const ext = contentType.includes('pdf') ? 'pdf' : contentType.includes('image') ? 'jpg' : 'bin'
     const filename = `${docType.toLowerCase()}-${safeOrderNum}.${ext}`
 

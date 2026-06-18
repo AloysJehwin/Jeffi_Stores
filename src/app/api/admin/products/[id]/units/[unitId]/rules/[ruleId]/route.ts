@@ -5,7 +5,7 @@ import { queryOne, query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: { id: string; unitId: string; ruleId: string } }
+interface Params { params: Promise<{ id: string; unitId: string; ruleId: string }> }
 
 async function ensureRule(productId: string, unitId: string, ruleId: string) {
   const row = await queryOne<{ id: string }>(
@@ -18,12 +18,13 @@ async function ensureRule(productId: string, unitId: string, ruleId: string) {
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const { id, unitId, ruleId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  if (!(await ensureRule(params.id, params.unitId, params.ruleId))) {
+  if (!(await ensureRule(id, unitId, ruleId))) {
     return NextResponse.json({ error: 'Rule not found' }, { status: 404 })
   }
 
@@ -37,7 +38,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (body.is_active !== undefined) { updates.push(`is_active = $${i++}`); vals.push(!!body.is_active) }
   if (body.priority !== undefined) { updates.push(`priority = $${i++}`); vals.push(Number(body.priority)) }
   if (updates.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
-  vals.push(params.ruleId)
+  vals.push(ruleId)
   const updated = await queryOne(
     `UPDATE product_unit_rules SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
     vals
@@ -46,14 +47,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
+  const { id, unitId, ruleId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  if (!(await ensureRule(params.id, params.unitId, params.ruleId))) {
+  if (!(await ensureRule(id, unitId, ruleId))) {
     return NextResponse.json({ error: 'Rule not found' }, { status: 404 })
   }
-  await query(`DELETE FROM product_unit_rules WHERE id = $1`, [params.ruleId])
+  await query(`DELETE FROM product_unit_rules WHERE id = $1`, [ruleId])
   return NextResponse.json({ ok: true })
 }

@@ -7,9 +7,10 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -32,11 +33,11 @@ export async function GET(
       LEFT JOIN addresses a ON o.shipping_address_id = a.id
       LEFT JOIN invoices inv ON inv.order_id = o.id
       WHERE o.id = $1`,
-      [params.id]
+      [id]
     )
 
     if (!order) {
-      const cashSale = await queryOne<{ id: string }>(`SELECT id FROM cash_sales WHERE id = $1`, [params.id])
+      const cashSale = await queryOne<{ id: string }>(`SELECT id FROM cash_sales WHERE id = $1`, [id])
       if (cashSale) return NextResponse.json({ redirect: `/admin/cash-sale/${cashSale.id}` }, { status: 200 })
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
@@ -46,7 +47,7 @@ export async function GET(
               quantity, unit_price, total_price,
               taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
        FROM order_items WHERE order_id = $1 ORDER BY created_at`,
-      [params.id]
+      [id]
     )
 
     return NextResponse.json({ order, items: items || [] })

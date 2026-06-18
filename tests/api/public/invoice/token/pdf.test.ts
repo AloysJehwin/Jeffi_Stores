@@ -23,7 +23,7 @@ const mockQueryMany = vi.mocked(queryMany)
 const mockGenerateInvoice = vi.mocked(generateInvoicePDF)
 const mockGenerateReceipt = vi.mocked(generateReceiptPDF)
 
-const params = { params: { token: 'tok-abc' } }
+const params = { params: Promise.resolve({ token: 'tok-abc' }) }
 
 function makeRequest() {
   return new Request('http://localhost/api/public/invoice/tok-abc/pdf')

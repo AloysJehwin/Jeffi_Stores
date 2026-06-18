@@ -20,8 +20,9 @@ interface ProductDisplay {
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
-  const intent = await verifyIntent(params.token)
+export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
+  const intent = await verifyIntent(token)
   if (!intent) return NextResponse.json({ error: 'Invalid or expired intent' }, { status: 400 })
 
   if (intent.mode === 'cart') {

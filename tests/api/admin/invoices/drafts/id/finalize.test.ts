@@ -120,7 +120,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toBe('Unauthorized')
   })
@@ -128,7 +128,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
   it('returns 403 when scope missing', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toBe('Insufficient permissions')
   })
@@ -137,7 +137,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Draft not found')
   })
@@ -146,7 +146,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce({ ...draftOrder, status: 'processing' })
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Invoice is already finalized')
   })
@@ -155,7 +155,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockRejectedValueOnce(new Error('DB connection failed'))
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('DB connection failed')
   })
@@ -168,7 +168,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockQueryOne.mockResolvedValueOnce(draftOrder)
     const client = makeTxClient({ itemsRows: [] })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Cannot finalize an invoice with no items')
   })
@@ -183,7 +183,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       itemsRows: [{ product_id: null, variant_id: null, sub_variant_id: null, quantity: '1', product_name: 'Gift' }],
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
   })
@@ -202,7 +202,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       stockQty: 10,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
   })
@@ -219,7 +219,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       stockQty: 2,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toContain('Insufficient stock')
   })
@@ -239,7 +239,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       hasSubs: false,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
   })
@@ -257,7 +257,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       hasSubs: false,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toContain('Insufficient stock')
   })
@@ -278,7 +278,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       hasSubs: true,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
   })
 
@@ -296,7 +296,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       hasSubs: true,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toContain('Insufficient stock')
   })
@@ -315,7 +315,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       stockQty: 10,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
   })
@@ -332,7 +332,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       stockQty: 1,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toContain('Insufficient stock')
   })
@@ -352,7 +352,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       stockQty: 50,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -374,7 +374,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     })
     setupTx(client)
     mockSendEmail.mockResolvedValueOnce(undefined as any)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect(mockSendEmail).toHaveBeenCalledWith(
       'alice@example.com', 'Alice', 'JS/2024-25/0001', 1200, 'ORD-001'
@@ -395,7 +395,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     })
     setupTx(client)
     mockSendEmail.mockRejectedValueOnce(new Error('SMTP down'))
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
   })
@@ -416,7 +416,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     })
     setupTx(client)
     mockGenerateInvoice.mockResolvedValueOnce(undefined as any)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect(mockGenerateInvoice).toHaveBeenCalledWith('order-123')
     expect(mockSendEmail).not.toHaveBeenCalled()
@@ -436,7 +436,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     })
     setupTx(client)
     mockGenerateInvoice.mockRejectedValueOnce(new Error('PDF render failed'))
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
   })
@@ -454,7 +454,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       stockQty: 50,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect(mockGenerateInvoice).not.toHaveBeenCalled()
     expect(mockSendEmail).not.toHaveBeenCalled()
@@ -476,7 +476,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
       hasInvoicePrefix: false,
     })
     setupTx(client)
-    const res = await POST(makeRequest(), { params: { id: 'order-123' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).invoiceNumber).toBe('JS/2024-25/0001')
   })

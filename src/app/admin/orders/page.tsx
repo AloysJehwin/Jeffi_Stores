@@ -13,18 +13,19 @@ export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-export default async function OrdersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedSearchParams = await searchParams
   const host = (await headers()).get('host') ?? ''
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
-  const sort = searchParams.sort
-  const dir = searchParams.dir as 'asc' | 'desc' | undefined
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const sort = resolvedSearchParams.sort
+  const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
 
   const [{ orders, total }, allStats] = await Promise.all([
     getFilteredOrders({
-      status: searchParams.status,
-      payment_status: searchParams.payment_status,
-      source: searchParams.source,
-      search: searchParams.search,
+      status: resolvedSearchParams.status,
+      payment_status: resolvedSearchParams.payment_status,
+      source: resolvedSearchParams.source,
+      search: resolvedSearchParams.search,
       page,
       limit: PAGE_SIZE,
       sort,
@@ -43,10 +44,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: { [ke
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
-    if (searchParams.status) params.set('status', searchParams.status)
-    if (searchParams.payment_status) params.set('payment_status', searchParams.payment_status)
-    if (searchParams.source) params.set('source', searchParams.source)
-    if (searchParams.search) params.set('search', searchParams.search)
+    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
+    if (resolvedSearchParams.payment_status) params.set('payment_status', resolvedSearchParams.payment_status)
+    if (resolvedSearchParams.source) params.set('source', resolvedSearchParams.source)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))

@@ -59,16 +59,18 @@ export default async function CategoryDetailPage({
   params,
   searchParams,
 }: {
-  params: { slug: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const category = await getCategoryBySlug(params.slug)
+  const { slug } = await params
+  const resolvedSearchParams = await searchParams
+  const category = await getCategoryBySlug(slug)
 
   if (!category) {
     notFound()
   }
 
-  const pageParam = typeof searchParams.page === 'string' ? searchParams.page : '1'
+  const pageParam = typeof resolvedSearchParams.page === 'string' ? resolvedSearchParams.page : '1'
   const page = Math.max(1, parseInt(pageParam, 10) || 1)
 
   const subcategories = await getSubcategories(category.id)
@@ -179,7 +181,7 @@ export default async function CategoryDetailPage({
             <Pagination
               page={page}
               totalPages={totalPages}
-              buildHref={(p) => p > 1 ? `/categories/${params.slug}?page=${p}` : `/categories/${params.slug}`}
+              buildHref={(p) => p > 1 ? `/categories/${slug}?page=${p}` : `/categories/${slug}`}
             />
             </>
           ) : (

@@ -7,7 +7,8 @@ import InvoiceDetailClient from './InvoiceDetailClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function InvoiceDetailPage({ params }: { params: { id: string } }) {
+export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
@@ -20,5 +21,5 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
     redirect(ap('/admin/dashboard', host))
   }
 
-  return <InvoiceDetailClient id={params.id} />
+  return <InvoiceDetailClient id={id} />
 }

@@ -26,9 +26,10 @@ const STATUS_SYNC: Record<string, {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -43,7 +44,7 @@ export async function GET(
        FROM orders o
        LEFT JOIN users u ON u.id = o.user_id
        WHERE o.id = $1`,
-      [params.id]
+      [id]
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -111,7 +112,7 @@ export async function GET(
         setClauses.push(`awb_number = NULL`)
       }
 
-      const queryParams: any[] = [params.id]
+      const queryParams: any[] = [id]
       if ((syncRule.setShippedAt || syncRule.setDeliveredAt) && statusDateTime) {
         queryParams.push(statusDateTime)
       }
@@ -124,7 +125,7 @@ export async function GET(
       if (order.customer_email && order.customer_name) {
         sendOrderStatusUpdate(
           order.customer_email, order.customer_name,
-          order.order_number, params.id,
+          order.order_number, id,
           syncRule.orderStatus, order.status
         ).catch(() => {})
       }
@@ -153,8 +154,7 @@ export async function GET(
       statusSynced,
       syncedTo: statusSynced ? STATUS_SYNC[statusType]?.orderStatus : null,
     })
-  } catch (err) {
-    console.error('[route]', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

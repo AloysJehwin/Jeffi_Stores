@@ -4,8 +4,9 @@ import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
+  const { slug } = await params
   try {
     const product = await queryOne(
       `SELECT p.*,
@@ -84,7 +85,7 @@ export async function GET(
        LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN brands b ON p.brand_id = b.id
        WHERE p.slug = $1 AND p.is_active = true`,
-      [params.slug]
+      [slug]
     )
 
     if (!product) {

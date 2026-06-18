@@ -27,7 +27,7 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockQuery = vi.mocked(query)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['products'] }
-const params = { id: 'prod-1', unitId: 'unit-1', ruleId: 'rule-1' }
+const params = Promise.resolve({ id: 'prod-1', unitId: 'unit-1', ruleId: 'rule-1' })
 
 function makePatchReq(body: unknown) {
   return new NextRequest('http://localhost/api/admin/products/prod-1/units/unit-1/rules/rule-1', {

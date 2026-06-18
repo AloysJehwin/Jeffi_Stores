@@ -5,7 +5,8 @@ import { queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest, { params }: { params: { productId: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ productId: string }> }) {
+  const { productId } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'catalog_enrichment')) {
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: { productId: s
       WHERE product_id = $1::uuid
       ORDER BY proposed_at DESC
       LIMIT 1`,
-    [params.productId]
+    [productId]
   )
 
   if (!row) return NextResponse.json({ item: null })

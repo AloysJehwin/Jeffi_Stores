@@ -5,9 +5,10 @@ import { getOrderItemsPolicy } from '@/lib/return-policy'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -20,12 +21,12 @@ export async function GET(
       `SELECT id, status, delivered_at, updated_at
        FROM orders
        WHERE id = $1 AND user_id = $2`,
-      [params.id, authUser.userId]
+      [id, authUser.userId]
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
-    const items = await getOrderItemsPolicy(params.id)
+    const items = await getOrderItemsPolicy(id)
 
     const isDelivered = order.status === 'delivered'
     const deliveredAt = order.delivered_at || order.updated_at

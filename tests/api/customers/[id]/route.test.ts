@@ -27,7 +27,7 @@ import * as queries from '@/lib/queries'
 import * as db from '@/lib/db'
 
 const ADMIN = { adminId: 'admin-1', role: 'admin', scopes: [] }
-const PARAMS = { params: { id: 'user-42' } }
+const PARAMS = { params: Promise.resolve({ id: 'user-42' }) }
 const CUSTOMER = { id: 'user-42', email: 'c@example.com', first_name: 'Jo', last_name: 'Doe' }
 
 function makeGet() {

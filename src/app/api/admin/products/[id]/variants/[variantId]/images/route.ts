@@ -16,21 +16,23 @@ const PatchSchema = z.object({
 
 const MAX_IMAGES = 5
 
-type Params = { params: { id: string; variantId: string } }
+type Params = { params: Promise<{ id: string; variantId: string }> }
 
 export async function GET(request: NextRequest, { params }: Params) {
+  const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const images = await queryMany(
     `SELECT * FROM variant_images WHERE variant_id = $1 ORDER BY display_order ASC, created_at ASC`,
-    [params.variantId]
+    [variantId]
   )
   return NextResponse.json({ images })
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
+  const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -38,13 +40,13 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const variant = await queryOne(
       `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2`,
-      [params.variantId, params.id]
+      [variantId, id]
     )
     if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
 
     const existing = await queryMany(
       `SELECT id FROM variant_images WHERE variant_id = $1`,
-      [params.variantId]
+      [variantId]
     )
     if (existing.length >= MAX_IMAGES) {
       return NextResponse.json({ error: `Maximum ${MAX_IMAGES} images per variant` }, { status: 400 })
@@ -75,8 +77,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             error: `Gallery image file is missing from storage (HTTP ${head.status}). The original file may have been deleted. Please re-upload it.`
           }, { status: 410 })
         }
-      } catch (err) {
-        console.error('[route]', err)
+      } catch {
         return NextResponse.json({ error: 'Could not reach gallery image storage. Try again or re-upload the image.' }, { status: 502 })
       }
       const image = await queryOne(
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest, { params }: Params) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING *`,
         [
-          params.variantId, imageUrl, thumbnailUrl,
+          variantId, imageUrl, thumbnailUrl,
           process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
           gimg.s3_key, gimg.s3_thumbnail_key,
           gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
-    const result = await uploadVariantImage(file, params.variantId)
+    const result = await uploadVariantImage(file, variantId)
 
     const image = await queryOne(
       `INSERT INTO variant_images
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest, { params }: Params) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING *`,
       [
-        params.variantId, result.url, result.thumbnailUrl,
+        variantId, result.url, result.thumbnailUrl,
         process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
         result.s3Key, result.s3ThumbnailKey,
         result.fileName, result.fileSize, result.mimeType,
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
+  const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -135,7 +137,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
 
   const image = await queryOne(
     `SELECT * FROM variant_images WHERE id = $1 AND variant_id = $2`,
-    [imageId, params.variantId]
+    [imageId, variantId]
   )
   if (!image) return NextResponse.json({ error: 'Image not found' }, { status: 404 })
 
@@ -148,13 +150,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     await query(
       `UPDATE variant_images SET is_primary = TRUE
        WHERE id = (SELECT id FROM variant_images WHERE variant_id = $1 ORDER BY display_order ASC LIMIT 1)`,
-      [params.variantId]
+      [variantId]
     )
   }
   return NextResponse.json({ success: true })
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -166,7 +169,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const { imageId, isPrimary, displayOrder } = parsedPatch.data
 
   if (isPrimary) {
-    await query(`UPDATE variant_images SET is_primary = FALSE WHERE variant_id = $1`, [params.variantId])
+    await query(`UPDATE variant_images SET is_primary = FALSE WHERE variant_id = $1`, [variantId])
     await query(`UPDATE variant_images SET is_primary = TRUE WHERE id = $1`, [imageId])
   }
   if (displayOrder !== undefined) {

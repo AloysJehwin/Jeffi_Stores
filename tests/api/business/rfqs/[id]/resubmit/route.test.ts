@@ -72,13 +72,13 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateBusiness.mockResolvedValue(null)
-    const res = await POST(makePost(RFQ_ID) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when user is not approved', async () => {
     mockAuthenticateBusiness.mockResolvedValue(PENDING_USER)
-    const res = await POST(makePost(RFQ_ID) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toMatch(/pending approval/i)
@@ -87,14 +87,14 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
   it('returns 404 when source rfq not found', async () => {
     mockAuthenticateBusiness.mockResolvedValue(APPROVED_USER)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makePost(RFQ_ID) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(404)
   })
 
   it('returns 400 when source rfq is not rejected', async () => {
     mockAuthenticateBusiness.mockResolvedValue(APPROVED_USER)
     mockQueryOne.mockResolvedValue({ ...REJECTED_RFQ, status: 'pending' })
-    const res = await POST(makePost(RFQ_ID) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/only rejected rfqs can be resubmitted/i)
@@ -104,7 +104,7 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
     mockAuthenticateBusiness.mockResolvedValue(APPROVED_USER)
     mockQueryOne.mockResolvedValue(REJECTED_RFQ)
     mockQueryMany.mockResolvedValue([]) // no items
-    const res = await POST(makePost(RFQ_ID) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/no items/i)
@@ -118,7 +118,7 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
       .mockResolvedValueOnce(NEW_RFQ)             // insert
       .mockResolvedValueOnce({ first_name: 'Biz', last_name: 'Owner' }) // user profile
     mockQueryMany.mockResolvedValue(SOURCE_ITEMS)
-    const res = await POST(makePost(RFQ_ID) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.rfq.id).toBe('rfq-new-1')
@@ -137,7 +137,7 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
       .mockResolvedValueOnce(NEW_RFQ)
       .mockResolvedValueOnce(null) // user profile not found
     mockQueryMany.mockResolvedValue(SOURCE_ITEMS)
-    await POST(makePost(RFQ_ID) as any, { params: { id: RFQ_ID } })
+    await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     // The INSERT call should contain combined notes
     const insertCall = mockQueryOne.mock.calls.find((c: any) =>
       typeof c[0] === 'string' && c[0].includes('INSERT INTO business_rfqs')
@@ -154,7 +154,7 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
       .mockResolvedValueOnce(NEW_RFQ)
       .mockResolvedValueOnce({ first_name: null, last_name: null })
     mockQueryMany.mockResolvedValue(SOURCE_ITEMS)
-    await POST(makePost(RFQ_ID, { notes: 'Please reconsider pricing' }) as any, { params: { id: RFQ_ID } })
+    await POST(makePost(RFQ_ID, { notes: 'Please reconsider pricing' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     const insertCall = mockQueryOne.mock.calls.find((c: any) =>
       typeof c[0] === 'string' && c[0].includes('INSERT INTO business_rfqs')
     )
@@ -169,7 +169,7 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
       .mockResolvedValueOnce(NEW_RFQ)
       .mockResolvedValueOnce(null) // no user profile
     mockQueryMany.mockResolvedValue(SOURCE_ITEMS)
-    await POST(makePost(RFQ_ID) as any, { params: { id: RFQ_ID } })
+    await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(mockSendRfqSubmittedEmail).toHaveBeenCalledWith(
       APPROVED_USER.email,
       APPROVED_USER.email, // fallback to email
@@ -189,7 +189,7 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
       .mockResolvedValueOnce(NEW_RFQ)
       .mockResolvedValueOnce({ first_name: 'Biz', last_name: null })
     mockQueryMany.mockResolvedValue(twoItems)
-    const res = await POST(makePost(RFQ_ID) as any, { params: { id: RFQ_ID } })
+    const res = await POST(makePost(RFQ_ID) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(201)
     const itemInserts = mockQuery.mock.calls.filter((c: any) =>
       typeof c[0] === 'string' && c[0].includes('business_rfq_items')

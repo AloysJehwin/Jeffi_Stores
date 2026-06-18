@@ -22,7 +22,7 @@ function makeRequest(body: unknown = {}, headers: Record<string, string> = {}) {
 }
 
 const AUTH_USER = { userId: 'user-456', email: 'test@example.com' }
-const PARAMS = { params: { id: 'order-123' } }
+const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }
 
 // ------------------------------------------------------------------ tests
 

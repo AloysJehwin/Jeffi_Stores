@@ -14,8 +14,9 @@ function calcTotals(items: any[]) {
   return { subtotal, cgst_amount: cgst, sgst_amount: sgst, total_amount: total }
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(_req)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -23,7 +24,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     const qt = await queryOne<any>(
       `SELECT q.*, EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = q.id) AS from_rfq
        FROM quotations q WHERE q.id = $1`,
-      [params.id]
+      [id]
     )
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -36,20 +37,21 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL AND qi.sub_variant_id IS NULL
       WHERE qi.quotation_id = $1
       ORDER BY qi.position
-    `, [params.id])
+    `, [id])
     return NextResponse.json({ quotation: qt, items: items || [] })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Failed' }, { status: 500 })
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const existing = await queryOne<any>(`SELECT id, status FROM quotations WHERE id = $1`, [params.id])
+    const existing = await queryOne<any>(`SELECT id, status FROM quotations WHERE id = $1`, [id])
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const body = await request.json()
@@ -64,14 +66,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       }))
       totals = calcTotals(computedItems)
 
-      await query(`DELETE FROM quotation_items WHERE quotation_id = $1`, [params.id])
+      await query(`DELETE FROM quotation_items WHERE quotation_id = $1`, [id])
       for (let idx = 0; idx < computedItems.length; idx++) {
         const item = computedItems[idx]
         await query(
           `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
           [
-            params.id, idx,
+            id, idx,
             item.description, item.hsn_code || null, Number(item.gst_rate) || 18,
             Number(item.quantity), item.unit || 'PCS', Number(item.rate),
             Number(item.discount_pct) || 0, item.amount,
@@ -81,7 +83,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       }
     } else if (Number(existing.total_amount) === 0) {
       // Stored totals are zero (e.g. legacy RFQ-converted quotation) — recompute from existing items
-      const existingItems = await queryMany<any>(`SELECT * FROM quotation_items WHERE quotation_id = $1`, [params.id])
+      const existingItems = await queryMany<any>(`SELECT * FROM quotation_items WHERE quotation_id = $1`, [id])
       if (existingItems?.length) totals = calcTotals(existingItems)
     }
 
@@ -105,7 +107,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     setClauses.push(`subtotal = $${pi++}`, `cgst_amount = $${pi++}`, `sgst_amount = $${pi++}`, `total_amount = $${pi++}`)
     updateParams.push(totals.subtotal, totals.cgst_amount, totals.sgst_amount, totals.total_amount)
-    updateParams.push(params.id)
+    updateParams.push(id)
 
     const qt = await queryOne<any>(
       `UPDATE quotations SET ${setClauses.join(', ')} WHERE id = $${pi} RETURNING *`,
@@ -121,7 +123,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL AND qi.sub_variant_id IS NULL
       WHERE qi.quotation_id = $1
       ORDER BY qi.position
-    `, [params.id])
+    `, [id])
 
     if (fields.status === 'final' && qt?.consignee_email) {
       try {
@@ -143,23 +145,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const existing = await queryOne<any>(`SELECT id, status FROM quotations WHERE id = $1`, [params.id])
+    const existing = await queryOne<any>(`SELECT id, status FROM quotations WHERE id = $1`, [id])
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (existing.status !== 'draft') return NextResponse.json({ error: 'Only draft quotations can be deleted' }, { status: 400 })
 
     // Detach any RFQ that points to this quotation before deleting
     await query(
       `UPDATE business_rfqs SET converted_quotation_id = NULL, status = 'reviewed' WHERE converted_quotation_id = $1`,
-      [params.id]
+      [id]
     )
 
-    await query(`DELETE FROM quotations WHERE id = $1`, [params.id])
+    await query(`DELETE FROM quotations WHERE id = $1`, [id])
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     // FK violation fallback (shouldn't reach here after the detach above, but just in case)

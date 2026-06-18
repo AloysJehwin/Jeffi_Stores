@@ -63,21 +63,21 @@ describe('GET /api/admin/campaigns/[kind]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await GET(makeGet('welcome'), { params: { kind: 'welcome' } })
+    const res = await GET(makeGet('welcome'), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toBe('Unauthorized')
   })
 
   it('returns 403 when scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeGet('welcome'), { params: { kind: 'welcome' } })
+    const res = await GET(makeGet('welcome'), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toBe('Insufficient permissions')
   })
 
   it('returns 404 when campaign not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await GET(makeGet('nonexistent'), { params: { kind: 'nonexistent' } })
+    const res = await GET(makeGet('nonexistent'), { params: Promise.resolve({ kind: 'nonexistent' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Campaign not found')
   })
@@ -87,7 +87,7 @@ describe('GET /api/admin/campaigns/[kind]', () => {
     mockQueryMany.mockResolvedValueOnce(sampleSends as any)
     mockQueryOne.mockResolvedValueOnce({ total: '5' } as any)
 
-    const res = await GET(makeGet('welcome'), { params: { kind: 'welcome' } })
+    const res = await GET(makeGet('welcome'), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.campaign).toEqual(sampleCampaign)
@@ -102,7 +102,7 @@ describe('GET /api/admin/campaigns/[kind]', () => {
     mockQueryMany.mockResolvedValueOnce([] as any)
     mockQueryOne.mockResolvedValueOnce({ total: '50' } as any)
 
-    const res = await GET(makeGet('welcome', { offset: '20' }), { params: { kind: 'welcome' } })
+    const res = await GET(makeGet('welcome', { offset: '20' }), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.offset).toBe(20)
@@ -113,7 +113,7 @@ describe('GET /api/admin/campaigns/[kind]', () => {
     mockQueryMany.mockResolvedValueOnce([] as any)
     mockQueryOne.mockResolvedValueOnce(null)
 
-    const res = await GET(makeGet('welcome'), { params: { kind: 'welcome' } })
+    const res = await GET(makeGet('welcome'), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.total).toBe(0)
@@ -132,18 +132,18 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await PATCH(makePatch('welcome', { enabled: true }), { params: { kind: 'welcome' } })
+    const res = await PATCH(makePatch('welcome', { enabled: true }), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await PATCH(makePatch('welcome', { enabled: true }), { params: { kind: 'welcome' } })
+    const res = await PATCH(makePatch('welcome', { enabled: true }), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(403)
   })
 
   it('updates enabled flag', async () => {
-    const res = await PATCH(makePatch('welcome', { enabled: false }), { params: { kind: 'welcome' } })
+    const res = await PATCH(makePatch('welcome', { enabled: false }), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(mockQuery).toHaveBeenCalledWith(
@@ -153,7 +153,7 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
   })
 
   it('updates delay_hours within valid range', async () => {
-    const res = await PATCH(makePatch('welcome', { delay_hours: 48 }), { params: { kind: 'welcome' } })
+    const res = await PATCH(makePatch('welcome', { delay_hours: 48 }), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('delay_hours'),
@@ -162,7 +162,7 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
   })
 
   it('ignores delay_hours out of range (>720)', async () => {
-    const res = await PATCH(makePatch('welcome', { delay_hours: 999 }), { params: { kind: 'welcome' } })
+    const res = await PATCH(makePatch('welcome', { delay_hours: 999 }), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(200)
     // Query still called but without delay_hours param in SET
     const callArgs = mockQuery.mock.calls[0]
@@ -170,7 +170,7 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
   })
 
   it('updates discount_percent within valid range', async () => {
-    const res = await PATCH(makePatch('welcome', { discount_percent: 10 }), { params: { kind: 'welcome' } })
+    const res = await PATCH(makePatch('welcome', { discount_percent: 10 }), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('discount_percent'),
@@ -179,7 +179,7 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
   })
 
   it('updates subject_template', async () => {
-    const res = await PATCH(makePatch('welcome', { subject_template: 'Hello {{name}}' }), { params: { kind: 'welcome' } })
+    const res = await PATCH(makePatch('welcome', { subject_template: 'Hello {{name}}' }), { params: Promise.resolve({ kind: 'welcome' }) })
     expect(res.status).toBe(200)
   })
 
@@ -188,7 +188,7 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
     mockValidateTemplate.mockReturnValueOnce({ ok: false, reason: 'Missing required variable', hint: 'Add {{name}}' } as any)
     const res = await PATCH(
       makePatch('welcome', { body_template: '<p>Bad template</p>' }),
-      { params: { kind: 'welcome' } }
+      { params: Promise.resolve({ kind: 'welcome' }) }
     )
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -201,7 +201,7 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
     mockValidateTemplate.mockReturnValueOnce({ ok: true } as any)
     const res = await PATCH(
       makePatch('welcome', { body_template: '<p>Hello {{name}}</p>' }),
-      { params: { kind: 'welcome' } }
+      { params: Promise.resolve({ kind: 'welcome' }) }
     )
     expect(res.status).toBe(200)
   })
@@ -213,7 +213,7 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
       .mockResolvedValueOnce({ kind: 'welcome' } as any)       // seeded check
     const res = await PATCH(
       makePatch('welcome', { scenario_kind: 'new-kind' }),
-      { params: { kind: 'welcome' } }
+      { params: Promise.resolve({ kind: 'welcome' }) }
     )
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Cannot change scenario on a seeded campaign')
@@ -226,7 +226,7 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
       .mockResolvedValueOnce(null)                             // exists check — does not exist
     const res = await PATCH(
       makePatch('welcome', { scenario_kind: 'nonexistent-scenario' }),
-      { params: { kind: 'welcome' } }
+      { params: Promise.resolve({ kind: 'welcome' }) }
     )
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Unknown scenario_kind')
@@ -235,7 +235,7 @@ describe('PATCH /api/admin/campaigns/[kind]', () => {
   it('updates parameters object', async () => {
     const res = await PATCH(
       makePatch('welcome', { parameters: { foo: 'bar' } }),
-      { params: { kind: 'welcome' } }
+      { params: Promise.resolve({ kind: 'welcome' }) }
     )
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(

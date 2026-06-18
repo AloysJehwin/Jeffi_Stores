@@ -412,9 +412,10 @@ async function updateProduct(productId: string, formData: FormData) {
   }
 }
 
-export default async function EditProductPage({ params }: { params: { id: string } }) {
+export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const host = (await headers()).get('host') ?? ''
-  const product = await getProduct(params.id).catch(() => null)
+  const product = await getProduct(id).catch(() => null)
 
   if (!product) {
     notFound()
@@ -443,8 +444,8 @@ export default async function EditProductPage({ params }: { params: { id: string
         categories={categories || []}
         brands={brands || []}
         product={product}
-        productId={params.id}
-        action={updateProduct.bind(null, params.id)}
+        productId={id}
+        action={updateProduct.bind(null, id)}
       />
     </div>
   )

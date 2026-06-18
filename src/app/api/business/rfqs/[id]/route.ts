@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateBusiness } from '@/lib/jwt'
 import { queryOne, queryMany, query } from '@/lib/db'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
      FROM business_rfqs r
      LEFT JOIN quotations q ON q.id = r.converted_quotation_id
      WHERE r.id = $1 AND r.user_id = $2`,
-    [params.id, user.userId]
+    [id, user.userId]
   )
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       AND qi.product_id = ri.product_id
       AND (qi.variant_id = ri.variant_id OR (qi.variant_id IS NULL AND ri.variant_id IS NULL))
      WHERE ri.rfq_id = $1 ORDER BY ri.position, ri.created_at`,
-    [params.id, rfq.converted_quotation_id]
+    [id, rfq.converted_quotation_id]
   )
 
   const discountRows = await queryMany<{ category_id: string; discount_pct: string }>(
@@ -64,13 +65,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   return NextResponse.json({ rfq, items, order: order || null, discountMap })
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const rfq = await queryOne<any>(
     `SELECT id, status FROM business_rfqs WHERE id = $1 AND user_id = $2`,
-    [params.id, user.userId]
+    [id, user.userId]
   )
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!['pending', 'reviewed', 'negotiating'].includes(rfq.status)) {
@@ -80,7 +82,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   const { notes, items } = await request.json()
 
   if (notes !== undefined) {
-    await query(`UPDATE business_rfqs SET notes = $1 WHERE id = $2`, [notes || null, params.id])
+    await query(`UPDATE business_rfqs SET notes = $1 WHERE id = $2`, [notes || null, id])
   }
 
   if (Array.isArray(items)) {
@@ -97,7 +99,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           item.requested_price != null ? Number(item.requested_price) : null,
           item.notes ?? null,
           item.id,
-          params.id,
+          id,
         ]
       )
     }

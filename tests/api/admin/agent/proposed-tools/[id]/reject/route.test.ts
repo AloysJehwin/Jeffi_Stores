@@ -51,14 +51,14 @@ describe('POST /api/admin/agent/proposed-tools/[id]/reject', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeReq(), { params: { id: TOOL_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: TOOL_ID }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toMatch(/unauthorized/i)
   })
 
   it('returns 403 when agent scope is missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeReq(), { params: { id: TOOL_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: TOOL_ID }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/insufficient/i)
   })
@@ -67,21 +67,21 @@ describe('POST /api/admin/agent/proposed-tools/[id]/reject', () => {
 
   it('returns 404 when tool not found', async () => {
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeReq(), { params: { id: TOOL_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: TOOL_ID }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Not found')
   })
 
   it('returns 400 when tool is already approved', async () => {
     mockQueryOne.mockResolvedValue({ status: 'approved' } as any)
-    const res = await POST(makeReq(), { params: { id: TOOL_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: TOOL_ID }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Already approved')
   })
 
   it('returns 400 when tool is already rejected', async () => {
     mockQueryOne.mockResolvedValue({ status: 'rejected' } as any)
-    const res = await POST(makeReq(), { params: { id: TOOL_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: TOOL_ID }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Already rejected')
   })
@@ -89,7 +89,7 @@ describe('POST /api/admin/agent/proposed-tools/[id]/reject', () => {
   // ── Happy path ───────────────────────────────────────────────────────────
 
   it('rejects the tool and returns ok:true with status rejected', async () => {
-    const res = await POST(makeReq({ reason: 'Not needed' }), { params: { id: TOOL_ID } })
+    const res = await POST(makeReq({ reason: 'Not needed' }), { params: Promise.resolve({ id: TOOL_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
@@ -101,14 +101,14 @@ describe('POST /api/admin/agent/proposed-tools/[id]/reject', () => {
     const req = new NextRequest(`http://localhost/api/admin/agent/proposed-tools/${TOOL_ID}/reject`, {
       method: 'POST',
     })
-    const res = await POST(req, { params: { id: TOOL_ID } })
+    const res = await POST(req, { params: Promise.resolve({ id: TOOL_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).ok).toBe(true)
   })
 
   it('truncates reason to 500 chars', async () => {
     const longReason = 'x'.repeat(600)
-    const res = await POST(makeReq({ reason: longReason }), { params: { id: TOOL_ID } })
+    const res = await POST(makeReq({ reason: longReason }), { params: Promise.resolve({ id: TOOL_ID }) })
     expect(res.status).toBe(200)
     // Verify the query was called (truncation happens silently)
     expect(mockQuery).toHaveBeenCalledOnce()

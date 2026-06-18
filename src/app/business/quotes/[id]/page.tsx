@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { use, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { bp } from '@/lib/business-path'
@@ -96,7 +96,8 @@ function fmtTime(iso: string) {
   })
 }
 
-export default function BusinessRFQDetail({ params }: { params: { id: string } }) {
+export default function BusinessRFQDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const [rfq, setRfq] = useState<RFQ | null>(null)
   const [items, setItems] = useState<RFQItem[]>([])
   const [linkedOrder, setLinkedOrder] = useState<LinkedOrder | null>(null)
@@ -128,7 +129,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
 
   const load = () => {
     setLoading(true)
-    fetch(`/api/business/rfqs/${params.id}`, { credentials: 'include' })
+    fetch(`/api/business/rfqs/${id}`, { credentials: 'include' })
       .then(r => r.json())
       .then(d => {
         setRfq(d.rfq || null)
@@ -139,13 +140,13 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
       })
       .catch(() => setLoading(false))
 
-    fetch(`/api/business/rfqs/${params.id}/messages`, { credentials: 'include' })
+    fetch(`/api/business/rfqs/${id}/messages`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : { messages: [] })
       .then(m => setMessages(m.messages || []))
       .catch(() => {/* messages table may not exist yet */})
   }
 
-  useEffect(() => { load() }, [params.id])
+  useEffect(() => { load() }, [id])
 
   useEffect(() => {
     if (threadRef.current) {
@@ -172,7 +173,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     setSaving(true)
     setSaveError('')
     try {
-      const res = await fetch(`/api/business/rfqs/${params.id}`, {
+      const res = await fetch(`/api/business/rfqs/${id}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -206,7 +207,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     setSendingMsg(true)
     setMsgError('')
     try {
-      const res = await fetch(`/api/business/rfqs/${params.id}/messages`, {
+      const res = await fetch(`/api/business/rfqs/${id}/messages`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -238,7 +239,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
         : undefined
       const payload: { action: string; message?: string; counter_items?: typeof counter_items } = { action, message }
       if (counter_items && counter_items.length > 0) payload.counter_items = counter_items
-      const res = await fetch(`/api/business/rfqs/${params.id}/respond`, {
+      const res = await fetch(`/api/business/rfqs/${id}/respond`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -261,7 +262,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     setResubmitError('')
     setResubmitting(true)
     try {
-      const res = await fetch(`/api/business/rfqs/${params.id}/resubmit`, {
+      const res = await fetch(`/api/business/rfqs/${id}/resubmit`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

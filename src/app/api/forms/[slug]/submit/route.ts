@@ -75,10 +75,11 @@ function couponEmail(coupon: Coupon, email: string) {
   return { subject: `Your reward coupon from Jeffi Store's — ${coupon.code}`, html }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { slug: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const form = await queryOne<ReviewForm>(
     'SELECT id, coupon_id, is_active, custom_fields FROM review_forms WHERE slug = $1',
-    [params.slug]
+    [slug]
   )
   if (!form) return NextResponse.json({ error: 'Form not found' }, { status: 404 })
   if (!form.is_active) return NextResponse.json({ error: 'This form is no longer accepting submissions' }, { status: 410 })

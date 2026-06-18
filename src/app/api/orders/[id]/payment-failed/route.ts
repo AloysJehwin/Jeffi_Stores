@@ -7,15 +7,16 @@ import { logActivity } from '@/lib/activity'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authUser = await authenticateUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
     const body = await request.json().catch(() => ({}))
     const errorDescription = body?.errorDescription || ''
 

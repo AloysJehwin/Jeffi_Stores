@@ -24,7 +24,7 @@ import { createRVPShipment } from '@/lib/delhivery'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const ADMIN = { adminId: 'a1', role: 'admin', scopes: ['orders'] }
-const PARAMS = { params: { id: 'order-1' } }
+const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }
 
 function makePost() {
   return new NextRequest('http://localhost/api/admin/orders/order-1/create-rvp-shipment', {

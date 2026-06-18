@@ -37,7 +37,7 @@ const mockUploadVariantImage = vi.mocked(uploadVariantImage)
 const mockDeleteProductImage = vi.mocked(deleteProductImage)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['products'] }
-const params = { id: 'prod-1', variantId: 'var-1' }
+const params = Promise.resolve({ id: 'prod-1', variantId: 'var-1' })
 const baseUrl = 'http://localhost/api/admin/products/prod-1/variants/var-1/images'
 
 // Valid v4 UUIDs — zod requires version nibble 1-8 in position 13

@@ -47,8 +47,9 @@ async function updateBrand(brandId: string, formData: FormData) {
   }
 }
 
-export default async function EditBrandPage({ params }: { params: { id: string } }) {
-  const brand = await getBrand(params.id).catch(() => null)
+export default async function EditBrandPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const brand = await getBrand(id).catch(() => null)
 
   if (!brand) {
     notFound()
@@ -71,7 +72,7 @@ export default async function EditBrandPage({ params }: { params: { id: string }
         <p className="text-foreground-secondary mt-1">Update brand information</p>
       </div>
 
-      <BrandForm brand={brand} action={updateBrand.bind(null, params.id)} />
+      <BrandForm brand={brand} action={updateBrand.bind(null, id)} />
     </div>
   )
 }

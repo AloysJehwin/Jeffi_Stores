@@ -12,14 +12,15 @@ function buildRfqNumber(now: Date, seq: number): string {
   return `RFQ/${fy}/${mon}/${seq}`
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (user.approvalStatus !== 'approved') return NextResponse.json({ error: 'Account pending approval' }, { status: 403 })
 
   const source = await queryOne<any>(
     `SELECT id, rfq_number, status, notes FROM business_rfqs WHERE id = $1 AND user_id = $2`,
-    [params.id, user.userId]
+    [id, user.userId]
   )
   if (!source) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (source.status !== 'rejected') {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const sourceItems = await queryMany<any>(
     `SELECT product_id, variant_id, sub_variant_id, description, quantity, unit, requested_price, notes, position
      FROM business_rfq_items WHERE rfq_id = $1 ORDER BY position`,
-    [params.id]
+    [id]
   )
   if (sourceItems.length === 0) {
     return NextResponse.json({ error: 'Source RFQ has no items' }, { status: 400 })

@@ -49,7 +49,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await PATCH(makePatch('c1', 't1', {}), { params: { id: 'c1', taskId: 't1' } })
+    const res = await PATCH(makePatch('c1', 't1', {}), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toMatch(/unauthorized/i)
   })
@@ -57,7 +57,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
   it('returns 403 when scope missing', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
-    const res = await PATCH(makePatch('c1', 't1', {}), { params: { id: 'c1', taskId: 't1' } })
+    const res = await PATCH(makePatch('c1', 't1', {}), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/insufficient/i)
   })
@@ -66,7 +66,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await PATCH(makePatch('c1', 't999', { title: 'New' }), { params: { id: 'c1', taskId: 't999' } })
+    const res = await PATCH(makePatch('c1', 't999', { title: 'New' }), { params: Promise.resolve({ id: 'c1', taskId: 't999' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toMatch(/not found/i)
   })
@@ -77,7 +77,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue(sampleTask)
     mockQuery.mockResolvedValue(undefined as any)
 
-    const res = await PATCH(makePatch('c1', 't1', { title: 'Updated title' }), { params: { id: 'c1', taskId: 't1' } })
+    const res = await PATCH(makePatch('c1', 't1', { title: 'Updated title' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(mockQuery).toHaveBeenCalledWith(
@@ -93,7 +93,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQuery.mockResolvedValue(undefined as any)
 
     const longDesc = 'x'.repeat(2500)
-    const res = await PATCH(makePatch('c1', 't1', { description: longDesc }), { params: { id: 'c1', taskId: 't1' } })
+    const res = await PATCH(makePatch('c1', 't1', { description: longDesc }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(200)
     const queryArgs = mockQuery.mock.calls[0][1] as any[]
     const descArg = queryArgs.find((a: any) => typeof a === 'string' && a.length === 2000)
@@ -106,7 +106,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue(sampleTask)
     mockQuery.mockResolvedValue(undefined as any)
 
-    await PATCH(makePatch('c1', 't1', { description: '' }), { params: { id: 'c1', taskId: 't1' } })
+    await PATCH(makePatch('c1', 't1', { description: '' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     const queryArgs = mockQuery.mock.calls[0][1] as any[]
     expect(queryArgs).toContain(null)
   })
@@ -117,7 +117,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue(sampleTask)
     mockQuery.mockResolvedValue(undefined as any)
 
-    const res = await PATCH(makePatch('c1', 't1', { priority: 'high' }), { params: { id: 'c1', taskId: 't1' } })
+    const res = await PATCH(makePatch('c1', 't1', { priority: 'high' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('priority'),
@@ -131,7 +131,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue(sampleTask)
     mockQuery.mockResolvedValue(undefined as any)
 
-    await PATCH(makePatch('c1', 't1', { priority: 'invalid_priority' }), { params: { id: 'c1', taskId: 't1' } })
+    await PATCH(makePatch('c1', 't1', { priority: 'invalid_priority' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     const sql = mockQuery.mock.calls[0][0] as string
     expect(sql).not.toContain('priority')
   })
@@ -143,7 +143,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQuery.mockResolvedValue(undefined as any)
     mockLogActivity.mockResolvedValue(undefined as any)
 
-    const res = await PATCH(makePatch('c1', 't1', { status: 'completed' }), { params: { id: 'c1', taskId: 't1' } })
+    const res = await PATCH(makePatch('c1', 't1', { status: 'completed' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(200)
     const sql = mockQuery.mock.calls[0][0] as string
     expect(sql).toContain('completed_at = NOW()')
@@ -157,7 +157,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQuery.mockResolvedValue(undefined as any)
     mockLogActivity.mockResolvedValue(undefined as any)
 
-    await PATCH(makePatch('c1', 't1', { status: 'completed' }), { params: { id: 'c1', taskId: 't1' } })
+    await PATCH(makePatch('c1', 't1', { status: 'completed' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
 
     // logActivity is fire-and-forget — give microtask queue a tick
     await new Promise(r => setTimeout(r, 0))
@@ -174,7 +174,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue({ status: 'completed', title: 'Old task' })
     mockQuery.mockResolvedValue(undefined as any)
 
-    await PATCH(makePatch('c1', 't1', { status: 'in_progress' }), { params: { id: 'c1', taskId: 't1' } })
+    await PATCH(makePatch('c1', 't1', { status: 'in_progress' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     const sql = mockQuery.mock.calls[0][0] as string
     expect(sql).toContain('completed_at = NULL')
   })
@@ -185,7 +185,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue(sampleTask)
     mockQuery.mockResolvedValue(undefined as any)
 
-    await PATCH(makePatch('c1', 't1', { assigned_to: '' }), { params: { id: 'c1', taskId: 't1' } })
+    await PATCH(makePatch('c1', 't1', { assigned_to: '' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     const queryArgs = mockQuery.mock.calls[0][1] as any[]
     expect(queryArgs).toContain(null)
   })
@@ -196,7 +196,7 @@ describe('PATCH /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockQueryOne.mockResolvedValue(sampleTask)
     mockQuery.mockResolvedValue(undefined as any)
 
-    await PATCH(makePatch('c1', 't1', { due_date: '' }), { params: { id: 'c1', taskId: 't1' } })
+    await PATCH(makePatch('c1', 't1', { due_date: '' }), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     const queryArgs = mockQuery.mock.calls[0][1] as any[]
     expect(queryArgs).toContain(null)
   })
@@ -209,14 +209,14 @@ describe('DELETE /api/admin/customers/[id]/tasks/[taskId]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await DELETE(makeDelete('c1', 't1'), { params: { id: 'c1', taskId: 't1' } })
+    const res = await DELETE(makeDelete('c1', 't1'), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
-    const res = await DELETE(makeDelete('c1', 't1'), { params: { id: 'c1', taskId: 't1' } })
+    const res = await DELETE(makeDelete('c1', 't1'), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -225,7 +225,7 @@ describe('DELETE /api/admin/customers/[id]/tasks/[taskId]', () => {
     mockHasScope.mockReturnValue(true)
     mockQuery.mockResolvedValue(undefined as any)
 
-    const res = await DELETE(makeDelete('c1', 't1'), { params: { id: 'c1', taskId: 't1' } })
+    const res = await DELETE(makeDelete('c1', 't1'), { params: Promise.resolve({ id: 'c1', taskId: 't1' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(mockQuery).toHaveBeenCalledWith(

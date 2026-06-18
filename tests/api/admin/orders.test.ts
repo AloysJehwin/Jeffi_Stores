@@ -77,7 +77,7 @@ describe('GET /api/admin/orders/[id]', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
     const req = makeRequest('GET', 'order-1')
-    const res = await GET(req, { params: { id: 'order-1' } })
+    const res = await GET(req, { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body.error).toMatch(/unauthorized/i)
@@ -87,7 +87,7 @@ describe('GET /api/admin/orders/[id]', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
     const req = makeRequest('GET', 'order-1')
-    const res = await GET(req, { params: { id: 'order-1' } })
+    const res = await GET(req, { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toMatch(/insufficient/i)
@@ -98,7 +98,7 @@ describe('GET /api/admin/orders/[id]', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
     const req = makeRequest('GET', 'order-999')
-    const res = await GET(req, { params: { id: 'order-999' } })
+    const res = await GET(req, { params: Promise.resolve({ id: 'order-999' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -111,7 +111,7 @@ describe('GET /api/admin/orders/[id]', () => {
     mockQueryMany.mockResolvedValue(sampleItems)
 
     const req = makeRequest('GET', 'order-1')
-    const res = await GET(req, { params: { id: 'order-1' } })
+    const res = await GET(req, { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.order.id).toBe('order-1')
@@ -126,7 +126,7 @@ describe('GET /api/admin/orders/[id]', () => {
     mockQueryMany.mockResolvedValue([])
 
     const req = makeRequest('GET', 'order-1')
-    const res = await GET(req, { params: { id: 'order-1' } })
+    const res = await GET(req, { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.items).toEqual([])
@@ -139,7 +139,7 @@ describe('PATCH /api/admin/orders/[id]', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
     const req = makeRequest('PATCH', 'order-1', { status: 'shipped' })
-    const res = await PATCH(req, { params: { id: 'order-1' } })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(401)
   })
 
@@ -147,7 +147,7 @@ describe('PATCH /api/admin/orders/[id]', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
     const req = makeRequest('PATCH', 'order-1', { status: 'shipped' })
-    const res = await PATCH(req, { params: { id: 'order-1' } })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -158,7 +158,7 @@ describe('PATCH /api/admin/orders/[id]', () => {
     mockParseBody.mockReturnValue({ ok: false, response: errorResponse } as any)
 
     const req = makeRequest('PATCH', 'order-1', {})
-    const res = await PATCH(req, { params: { id: 'order-1' } })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(422)
   })
 
@@ -168,7 +168,7 @@ describe('PATCH /api/admin/orders/[id]', () => {
     mockParseBody.mockReturnValue({ ok: true } as any)
 
     const req = makeRequest('PATCH', 'order-1', { status: 'shipped' })
-    const res = await PATCH(req, { params: { id: 'order-1' } })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
@@ -180,7 +180,7 @@ describe('PATCH /api/admin/orders/[id]', () => {
     mockParseBody.mockReturnValue({ ok: true } as any)
 
     const req = makeRequest('PATCH', 'order-1', { awb_number: 'AWB123456' })
-    const res = await PATCH(req, { params: { id: 'order-1' } })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)

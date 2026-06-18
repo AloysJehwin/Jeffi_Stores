@@ -59,14 +59,14 @@ beforeEach(() => {
 describe('POST /api/admin/orders/[id]/create-shipment', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeReq('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makeReq('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeReq('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makeReq('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -74,7 +74,7 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockRejectedValue(new Error('DB crash'))
-    const res = await POST(makeReq('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makeReq('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(500)
   })
 
@@ -82,7 +82,7 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeReq('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makeReq('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(404)
   })
 
@@ -90,7 +90,7 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...baseOrder, awb_number: 'AWB123' })
-    const res = await POST(makeReq('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makeReq('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(409)
   })
 
@@ -98,7 +98,7 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...baseOrder, postal_code: '123' })
-    const res = await POST(makeReq('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makeReq('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(422)
   })
 
@@ -111,7 +111,7 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
       ok: false,
       json: async () => ({ rmk: 'API Error' }),
     } as any)
-    const res = await POST(makeReq('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makeReq('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(502)
   })
 
@@ -125,7 +125,7 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
       ok: true,
       json: async () => ({ packages: [{ waybill: 'AWB999', sort_code: 'RIP', status: 'Success', err_code: null, remarks: [] }] }),
     } as any)
-    const res = await POST(makeReq('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makeReq('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.awb).toBe('AWB999')

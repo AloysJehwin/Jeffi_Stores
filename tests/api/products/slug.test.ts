@@ -63,7 +63,7 @@ describe('GET /api/products/slug/[slug]', () => {
   it('returns 200 with full product for valid slug', async () => {
     queryOneMock.mockResolvedValue(fullProduct)
 
-    const res = await GET(makeReq('hex-bolt-m8') as any, { params: { slug: 'hex-bolt-m8' } })
+    const res = await GET(makeReq('hex-bolt-m8') as any, { params: Promise.resolve({ slug: 'hex-bolt-m8' }) })
     expect(res.status).toBe(200)
 
     const body = await res.json()
@@ -75,7 +75,7 @@ describe('GET /api/products/slug/[slug]', () => {
   it('includes variants in the response', async () => {
     queryOneMock.mockResolvedValue(fullProduct)
 
-    const res = await GET(makeReq('hex-bolt-m8') as any, { params: { slug: 'hex-bolt-m8' } })
+    const res = await GET(makeReq('hex-bolt-m8') as any, { params: Promise.resolve({ slug: 'hex-bolt-m8' }) })
     const body = await res.json()
 
     expect(body.product.product_variants).toHaveLength(1)
@@ -85,7 +85,7 @@ describe('GET /api/products/slug/[slug]', () => {
   it('includes product_units in the response', async () => {
     queryOneMock.mockResolvedValue(fullProduct)
 
-    const res = await GET(makeReq('hex-bolt-m8') as any, { params: { slug: 'hex-bolt-m8' } })
+    const res = await GET(makeReq('hex-bolt-m8') as any, { params: Promise.resolve({ slug: 'hex-bolt-m8' }) })
     const body = await res.json()
 
     expect(body.product).toHaveProperty('product_units')
@@ -95,7 +95,7 @@ describe('GET /api/products/slug/[slug]', () => {
   it('returns 404 for non-existent slug', async () => {
     queryOneMock.mockResolvedValue(null)
 
-    const res = await GET(makeReq('does-not-exist') as any, { params: { slug: 'does-not-exist' } })
+    const res = await GET(makeReq('does-not-exist') as any, { params: Promise.resolve({ slug: 'does-not-exist' }) })
     expect(res.status).toBe(404)
 
     const body = await res.json()
@@ -105,7 +105,7 @@ describe('GET /api/products/slug/[slug]', () => {
   it('returns 500 when db throws', async () => {
     queryOneMock.mockRejectedValue(new Error('Connection refused'))
 
-    const res = await GET(makeReq('any-slug') as any, { params: { slug: 'any-slug' } })
+    const res = await GET(makeReq('any-slug') as any, { params: Promise.resolve({ slug: 'any-slug' }) })
     expect(res.status).toBe(500)
 
     const body = await res.json()
@@ -115,7 +115,7 @@ describe('GET /api/products/slug/[slug]', () => {
   it('passes the slug param to the db query', async () => {
     queryOneMock.mockResolvedValue(fullProduct)
 
-    await GET(makeReq('hex-bolt-m8') as any, { params: { slug: 'hex-bolt-m8' } })
+    await GET(makeReq('hex-bolt-m8') as any, { params: Promise.resolve({ slug: 'hex-bolt-m8' }) })
 
     expect(queryOneMock).toHaveBeenCalledOnce()
     const [, queryParams] = queryOneMock.mock.calls[0]

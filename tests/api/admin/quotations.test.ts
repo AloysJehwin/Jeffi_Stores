@@ -235,7 +235,7 @@ describe('GET /api/admin/quotations/[id]', () => {
     vi.mocked(queryOne).mockResolvedValue({ id: QUOTE_ID, quote_number: 'QT/24-25/JAN/1', status: 'draft' } as any)
     vi.mocked(queryMany).mockResolvedValue([SAMPLE_ITEM] as any)
 
-    const res = await quotationByIdGET(makeReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`), { params: { id: QUOTE_ID } })
+    const res = await quotationByIdGET(makeReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`), { params: Promise.resolve({ id: QUOTE_ID }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -245,14 +245,14 @@ describe('GET /api/admin/quotations/[id]', () => {
   it('returns 404 when quotation not found', async () => {
     vi.mocked(queryOne).mockResolvedValue(null as any)
 
-    const res = await quotationByIdGET(makeReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`), { params: { id: QUOTE_ID } })
+    const res = await quotationByIdGET(makeReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`), { params: Promise.resolve({ id: QUOTE_ID }) })
     expect(res.status).toBe(404)
   })
 
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
 
-    const res = await quotationByIdGET(makeReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`), { params: { id: QUOTE_ID } })
+    const res = await quotationByIdGET(makeReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`), { params: Promise.resolve({ id: QUOTE_ID }) })
     expect(res.status).toBe(401)
   })
 })
@@ -282,7 +282,7 @@ describe('PATCH /api/admin/quotations/[id]', () => {
 
     const res = await quotationByIdPATCH(
       patchReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`, { status: 'final' }),
-      { params: { id: QUOTE_ID } }
+      { params: Promise.resolve({ id: QUOTE_ID }) }
     )
     const json = await res.json()
 
@@ -295,7 +295,7 @@ describe('PATCH /api/admin/quotations/[id]', () => {
 
     const res = await quotationByIdPATCH(
       patchReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`, { status: 'final' }),
-      { params: { id: QUOTE_ID } }
+      { params: Promise.resolve({ id: QUOTE_ID }) }
     )
     expect(res.status).toBe(404)
   })
@@ -305,7 +305,7 @@ describe('PATCH /api/admin/quotations/[id]', () => {
 
     const res = await quotationByIdPATCH(
       patchReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`, {}),
-      { params: { id: QUOTE_ID } }
+      { params: Promise.resolve({ id: QUOTE_ID }) }
     )
     expect(res.status).toBe(401)
   })
@@ -329,7 +329,7 @@ describe('DELETE /api/admin/quotations/[id]', () => {
 
     const res = await quotationByIdDELETE(
       deleteReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`),
-      { params: { id: QUOTE_ID } }
+      { params: Promise.resolve({ id: QUOTE_ID }) }
     )
     const json = await res.json()
 
@@ -342,7 +342,7 @@ describe('DELETE /api/admin/quotations/[id]', () => {
 
     const res = await quotationByIdDELETE(
       deleteReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`),
-      { params: { id: QUOTE_ID } }
+      { params: Promise.resolve({ id: QUOTE_ID }) }
     )
     expect(res.status).toBe(404)
   })
@@ -352,7 +352,7 @@ describe('DELETE /api/admin/quotations/[id]', () => {
 
     const res = await quotationByIdDELETE(
       deleteReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`),
-      { params: { id: QUOTE_ID } }
+      { params: Promise.resolve({ id: QUOTE_ID }) }
     )
     expect(res.status).toBe(400)
   })
@@ -362,7 +362,7 @@ describe('DELETE /api/admin/quotations/[id]', () => {
 
     const res = await quotationByIdDELETE(
       deleteReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`),
-      { params: { id: QUOTE_ID } }
+      { params: Promise.resolve({ id: QUOTE_ID }) }
     )
     expect(res.status).toBe(401)
   })

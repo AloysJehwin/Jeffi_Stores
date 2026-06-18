@@ -62,14 +62,14 @@ describe('POST /api/admin/invoices/[id]/resend-email', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -77,7 +77,7 @@ describe('POST /api/admin/invoices/[id]/resend-email', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeRequest('order-999'), { params: { id: 'order-999' } })
+    const res = await POST(makeRequest('order-999'), { params: Promise.resolve({ id: 'order-999' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -87,7 +87,7 @@ describe('POST /api/admin/invoices/[id]/resend-email', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...sampleOrder, customer_email: null })
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/no email/i)
@@ -97,7 +97,7 @@ describe('POST /api/admin/invoices/[id]/resend-email', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...sampleOrder, invoice_number: null })
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/not yet finalized/i)
@@ -109,7 +109,7 @@ describe('POST /api/admin/invoices/[id]/resend-email', () => {
     mockQueryOne.mockResolvedValue(sampleOrder)
     mockSendEmail.mockResolvedValue(undefined as any)
 
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -129,7 +129,7 @@ describe('POST /api/admin/invoices/[id]/resend-email', () => {
     mockQueryOne.mockResolvedValue(sampleOrder)
     mockSendEmail.mockRejectedValue(new Error('email failed'))
 
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toMatch(/email failed/i)

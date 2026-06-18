@@ -6,7 +6,7 @@ import { queryOne } from '@/lib/db'
 export const dynamic = 'force-dynamic'
 
 interface Params {
-  params: { id: string; variantId: string; unitId: string }
+  params: Promise<{ id: string; variantId: string; unitId: string }>
 }
 
 const SUPPORTED_RULE_TYPES = ['tiered_price', 'bonus_qty'] as const
@@ -40,12 +40,13 @@ function validateConfig(ruleType: string, config: any): string | null {
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
+  const { id, variantId, unitId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  if (!(await ensureUnit(params.id, params.variantId, params.unitId))) {
+  if (!(await ensureUnit(id, variantId, unitId))) {
     return NextResponse.json({ error: 'Unit not found' }, { status: 404 })
   }
 
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const inserted = await queryOne(
     `INSERT INTO product_unit_rules (product_unit_id, rule_type, config, is_active, priority)
      VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [params.unitId, ruleType, JSON.stringify(body.config), isActive, priority]
+    [unitId, ruleType, JSON.stringify(body.config), isActive, priority]
   )
   return NextResponse.json({ rule: inserted })
 }

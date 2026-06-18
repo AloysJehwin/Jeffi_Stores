@@ -25,15 +25,16 @@ function UnitLabel({ label }: { label: string | null | undefined }) {
 
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
 
-export default async function OrderDetailsPage({ params }: { params: { id: string } }) {
+export default async function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const host = (await headers()).get('host') ?? ''
-  const order = await getOrder(params.id).catch(() => null)
+  const order = await getOrder(id).catch(() => null)
 
   if (!order) {
     notFound()
   }
 
-  const returnRequest = await getReturnRequest(params.id).catch(() => null)
+  const returnRequest = await getReturnRequest(id).catch(() => null)
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
   const showRetryEmailButton =
     (order.payment_status === 'failed' || order.payment_status === 'unpaid') &&

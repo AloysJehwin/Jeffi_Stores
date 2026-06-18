@@ -23,7 +23,7 @@ import * as db from '@/lib/db'
 import * as validate from '@/lib/validate'
 
 const AUTH_USER = { userId: 'user-1' }
-const PARAMS = { params: { id: 'addr-42' } }
+const PARAMS = { params: Promise.resolve({ id: 'addr-42' }) }
 
 const VALID_PATCH_BODY = {
   address_type: 'shipping',

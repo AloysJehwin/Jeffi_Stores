@@ -142,7 +142,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-    const res = await PATCH(patchReq(VALID_BODY), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(401)
     const json = await res.json()
     expect(json.error).toBe('Unauthorized')
@@ -150,7 +150,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('returns 403 when scope is missing', async () => {
     vi.mocked(hasScope).mockReturnValue(false)
-    const res = await PATCH(patchReq(VALID_BODY), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(403)
     const json = await res.json()
     expect(json.error).toBe('Insufficient permissions')
@@ -160,7 +160,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('returns 404 when order does not exist', async () => {
     vi.mocked(queryOne).mockResolvedValue(null as any)
-    const res = await PATCH(patchReq(VALID_BODY), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(404)
     const json = await res.json()
     expect(json.error).toBe('Invoice not found')
@@ -168,7 +168,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('returns 400 when order source is not offline', async () => {
     vi.mocked(queryOne).mockResolvedValue({ ...OFFLINE_ORDER, source: 'online' } as any)
-    const res = await PATCH(patchReq(VALID_BODY), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/offline/)
@@ -178,7 +178,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('returns 400 when customerName is missing', async () => {
     const body = { ...VALID_BODY, customerName: '' }
-    const res = await PATCH(patchReq(body), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(body), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/customerName/)
@@ -186,7 +186,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('returns 400 when items array is empty', async () => {
     const body = { ...VALID_BODY, items: [] }
-    const res = await PATCH(patchReq(body), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(body), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(400)
   })
 
@@ -216,7 +216,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
       return fn(client)
     })
 
-    const res = await PATCH(patchReq(VALID_BODY), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.success).toBe(true)
@@ -246,7 +246,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
       return fn(client)
     })
 
-    const res = await PATCH(patchReq(VALID_BODY), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.movedToDraft).toBe(true)
@@ -272,7 +272,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
       return fn(client)
     })
 
-    await PATCH(patchReq(VALID_BODY), { params: { id: ORDER_ID } })
+    await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(sendInvoiceFinalizedEmail).toHaveBeenCalledWith(
       'test@example.com',
       'Test Customer',
@@ -299,7 +299,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
     await PATCH(
       patchReq({ ...VALID_BODY, customerEmail: null }),
-      { params: { id: ORDER_ID } },
+      { params: Promise.resolve({ id: ORDER_ID }) },
     )
     expect(sendInvoiceFinalizedEmail).not.toHaveBeenCalled()
   })
@@ -334,7 +334,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
       return fn(client)
     })
 
-    const res = await PATCH(patchReq(bodyWithVariant), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(bodyWithVariant), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -366,7 +366,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
       return fn(client)
     })
 
-    const res = await PATCH(patchReq(bodyWithSV), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(bodyWithSV), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -393,7 +393,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
       return fn(client)
     })
 
-    const res = await PATCH(patchReq(bodyIgst), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(bodyIgst), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -401,7 +401,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('returns 500 on unexpected error', async () => {
     vi.mocked(withTransaction).mockRejectedValue(new Error('DB connection lost'))
-    const res = await PATCH(patchReq(VALID_BODY), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(500)
     const json = await res.json()
     expect(json.error).toBe('DB connection lost')
@@ -426,7 +426,7 @@ describe('PATCH /api/admin/invoices/[id]', () => {
       return fn(client)
     })
 
-    const res = await PATCH(patchReq(bodyNoProductId), { params: { id: ORDER_ID } })
+    const res = await PATCH(patchReq(bodyNoProductId), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
   })
 })

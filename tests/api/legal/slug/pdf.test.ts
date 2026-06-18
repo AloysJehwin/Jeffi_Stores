@@ -14,7 +14,7 @@ import { generatePolicyPDF } from '@/lib/policy-pdf'
 const mockGetPolicy = vi.mocked(getPolicyBySlug)
 const mockGeneratePDF = vi.mocked(generatePolicyPDF)
 
-const params = { params: { slug: 'privacy-policy' } }
+const params = { params: Promise.resolve({ slug: 'privacy-policy' }) }
 
 function makeRequest() {
   return new Request('http://localhost/api/legal/privacy-policy/pdf')

@@ -62,14 +62,14 @@ describe('POST /api/admin/mailer/[id]/send', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeRequest(), { params: { id: 'campaign-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'campaign-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeRequest(), { params: { id: 'campaign-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'campaign-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -77,7 +77,7 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeRequest('bad-id'), { params: { id: 'bad-id' } })
+    const res = await POST(makeRequest('bad-id'), { params: Promise.resolve({ id: 'bad-id' }) })
     expect(res.status).toBe(404)
   })
 
@@ -85,7 +85,7 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ status: 'sent', scheduled_at: null })
-    const res = await POST(makeRequest(), { params: { id: 'campaign-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'campaign-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/already sent/i)
@@ -95,7 +95,7 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ status: 'sending', scheduled_at: null })
-    const res = await POST(makeRequest(), { params: { id: 'campaign-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'campaign-1' }) })
     expect(res.status).toBe(400)
   })
 
@@ -105,7 +105,7 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     mockQueryOne.mockResolvedValue(futureCampaign)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await POST(makeRequest('campaign-1', { dispatchNow: false }), { params: { id: 'campaign-1' } })
+    const res = await POST(makeRequest('campaign-1', { dispatchNow: false }), { params: Promise.resolve({ id: 'campaign-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.scheduled).toBe(true)
@@ -121,7 +121,7 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     mockQueryOne.mockResolvedValue(futureCampaign)
     mockSendCampaign.mockResolvedValue({ sent: 50, failed: 2 })
 
-    const res = await POST(makeRequest('campaign-1', { dispatchNow: true }), { params: { id: 'campaign-1' } })
+    const res = await POST(makeRequest('campaign-1', { dispatchNow: true }), { params: Promise.resolve({ id: 'campaign-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.sent).toBe(50)
@@ -134,7 +134,7 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     mockQueryOne.mockResolvedValue(draftCampaign)
     mockSendCampaign.mockResolvedValue({ sent: 100, failed: 0 })
 
-    const res = await POST(makeRequest(), { params: { id: 'campaign-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'campaign-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.sent).toBe(100)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Star } from 'lucide-react'
@@ -38,7 +38,8 @@ function StarDisplay({ value }: { value: number }) {
   )
 }
 
-export default function SubmissionsPage({ params }: { params: { id: string } }) {
+export default function SubmissionsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [formMeta, setFormMeta] = useState<FormMeta | null>(null)
   const [total, setTotal] = useState(0)
@@ -51,8 +52,8 @@ export default function SubmissionsPage({ params }: { params: { id: string } }) 
     try {
       const qs = statusFilter ? `?status=${statusFilter}` : ''
       const [subsRes, formRes] = await Promise.all([
-        fetch(`/api/admin/review-forms/${params.id}/submissions${qs}`),
-        fetch(`/api/admin/review-forms/${params.id}`),
+        fetch(`/api/admin/review-forms/${id}/submissions${qs}`),
+        fetch(`/api/admin/review-forms/${id}`),
       ])
       if (subsRes.ok) {
         const data = await subsRes.json()
@@ -72,7 +73,7 @@ export default function SubmissionsPage({ params }: { params: { id: string } }) 
 
   const updateStatus = async (submissionId: string, status: string) => {
     setUpdating(submissionId)
-    const res = await fetch(`/api/admin/review-forms/${params.id}/submissions`, {
+    const res = await fetch(`/api/admin/review-forms/${id}/submissions`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ submissionId, status }),

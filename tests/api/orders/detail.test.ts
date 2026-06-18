@@ -65,7 +65,7 @@ function makeDeleteRequest() {
 
 const AUTH_USER = { userId: 'user-456', email: 'test@example.com', isBusiness: false }
 const ADMIN_USER = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
-const PARAMS = { params: { id: 'order-123' } }
+const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }
 
 const MOCK_ORDER = {
   id: 'order-123',

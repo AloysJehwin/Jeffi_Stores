@@ -28,7 +28,7 @@ const mockQueryMany = vi.mocked(queryMany)
 const mockWithTx = vi.mocked(withTransaction)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['products'] }
-const params = { id: 'prod-1' }
+const params = Promise.resolve({ id: 'prod-1' })
 
 function makeGetReq() {
   return new NextRequest(`http://localhost/api/admin/products/prod-1/units`)

@@ -26,7 +26,7 @@ import { Pool } from 'pg'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const ADMIN = { adminId: 'admin-uuid-1', role: 'admin', scopes: ['catalog_enrichment'] }
-const PARAMS = { params: { id: 'enrich-1' } }
+const PARAMS = { params: Promise.resolve({ id: 'enrich-1' }) }
 
 function makePost() {
   return new NextRequest('http://localhost/api/admin/catalog-enrichment/enrich-1/approve', {

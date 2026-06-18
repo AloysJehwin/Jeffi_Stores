@@ -16,7 +16,7 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['financial'] }
-const params = { id: 'expense-123' }
+const params = Promise.resolve({ id: 'expense-123' })
 
 function makeRequest() {
   return new NextRequest('http://localhost/api/admin/financial/payables/expense-123')

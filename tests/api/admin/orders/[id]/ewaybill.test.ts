@@ -60,7 +60,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body.error).toMatch(/unauthorized/i)
@@ -69,7 +69,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
   it('returns 403 when orders scope is missing', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toMatch(/insufficient/i)
@@ -82,7 +82,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     // No queryOne mock needed — route short-circuits before DB call
-    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     // When TOKEN is falsy (env not set in test config), route returns 503.
     // When TOKEN happened to be set (e.g. via leaked env), the DB call for the
     // order runs instead and we get 404 (no mock). Either way, 404 from DB or
@@ -94,7 +94,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/order not found/i)
@@ -104,7 +104,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ awb_number: null })
-    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/no awb/i)
@@ -114,7 +114,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ awb_number: 'AWB123456' })
-    const res = await POST(makeRequest({ ewbn: 'EWB001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ ewbn: 'EWB001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/dcn.*ewbn/i)
@@ -124,7 +124,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ awb_number: 'AWB123456' })
-    const res = await POST(makeRequest({ dcn: 'INV001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ dcn: 'INV001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(400)
   })
 
@@ -136,7 +136,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
       ok: true,
       json: async () => ({ status: 'Success' }),
     })
-    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -155,7 +155,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
       ok: false,
       json: async () => ({ error: 'Bad request from Delhivery' }),
     })
-    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(502)
     const body = await res.json()
     expect(body.error).toMatch(/ewaybill update failed/i)
@@ -165,7 +165,7 @@ describe('POST /api/admin/orders/[id]/ewaybill', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockRejectedValue(new Error('Connection refused'))
-    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: { id: ORDER_ID } })
+    const res = await POST(makeRequest({ dcn: 'INV001', ewbn: 'EWB001' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toBe('Connection refused')

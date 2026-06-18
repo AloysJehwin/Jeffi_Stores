@@ -20,7 +20,7 @@ function makeRequest() {
   return new Request('http://localhost/api/products/slug/test-bolt')
 }
 
-const params = { params: { slug: 'test-bolt' } }
+const params = { params: Promise.resolve({ slug: 'test-bolt' }) }
 
 describe('GET /api/products/slug/[slug]', () => {
   beforeEach(() => { vi.clearAllMocks() })

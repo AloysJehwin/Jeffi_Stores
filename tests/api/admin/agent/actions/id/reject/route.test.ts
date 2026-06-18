@@ -16,7 +16,7 @@ const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)
 
 const admin = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['agent'] }
-const params = { id: 'action-uuid-123' }
+const params = Promise.resolve({ id: 'action-uuid-123' })
 
 function makeRequest() {
   return new NextRequest('http://localhost/api/admin/agent/actions/action-uuid-123/reject', { method: 'POST' })

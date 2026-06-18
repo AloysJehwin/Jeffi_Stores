@@ -63,14 +63,14 @@ describe('GET /api/admin/business/rfqs/[id]', () => {
 
   it('returns 401/403 when requireAdminScope rejects', async () => {
     mockRequireScope.mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
-    const res = await GET(makeGetRequest(), { params: { id: 'rfq-1' } })
+    const res = await GET(makeGetRequest(), { params: Promise.resolve({ id: 'rfq-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 404 when RFQ not found', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeGetRequest('rfq-999'), { params: { id: 'rfq-999' } })
+    const res = await GET(makeGetRequest('rfq-999'), { params: Promise.resolve({ id: 'rfq-999' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -83,7 +83,7 @@ describe('GET /api/admin/business/rfqs/[id]', () => {
       .mockResolvedValueOnce(sampleItems)
       .mockResolvedValueOnce(sampleDiscounts)
 
-    const res = await GET(makeGetRequest(), { params: { id: 'rfq-1' } })
+    const res = await GET(makeGetRequest(), { params: Promise.resolve({ id: 'rfq-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.rfq).toEqual(sampleRfq)
@@ -96,7 +96,7 @@ describe('GET /api/admin/business/rfqs/[id]', () => {
     mockQueryOne.mockResolvedValue(sampleRfq)
     mockQueryMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
 
-    const res = await GET(makeGetRequest(), { params: { id: 'rfq-1' } })
+    const res = await GET(makeGetRequest(), { params: Promise.resolve({ id: 'rfq-1' }) })
     const body = await res.json()
     expect(body.discountMap).toEqual({})
   })
@@ -107,13 +107,13 @@ describe('PATCH /api/admin/business/rfqs/[id]', () => {
 
   it('returns 401/403 when requireAdminScope rejects', async () => {
     mockRequireScope.mockResolvedValue(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
-    const res = await PATCH(makePatchRequest(), { params: { id: 'rfq-1' } })
+    const res = await PATCH(makePatchRequest(), { params: Promise.resolve({ id: 'rfq-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 400 for invalid status', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
-    const res = await PATCH(makePatchRequest('rfq-1', { status: 'invalid' }), { params: { id: 'rfq-1' } })
+    const res = await PATCH(makePatchRequest('rfq-1', { status: 'invalid' }), { params: Promise.resolve({ id: 'rfq-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/invalid status/i)
@@ -125,7 +125,7 @@ describe('PATCH /api/admin/business/rfqs/[id]', () => {
 
     const res = await PATCH(
       makePatchRequest('rfq-1', { status: 'reviewed', adminNote: 'Looks good' }),
-      { params: { id: 'rfq-1' } },
+      { params: Promise.resolve({ id: 'rfq-1' }) },
     )
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -142,7 +142,7 @@ describe('PATCH /api/admin/business/rfqs/[id]', () => {
 
     const res = await PATCH(
       makePatchRequest('rfq-1', { status: 'rejected' }),
-      { params: { id: 'rfq-1' } },
+      { params: Promise.resolve({ id: 'rfq-1' }) },
     )
     expect(res.status).toBe(200)
     const body = await res.json()

@@ -64,7 +64,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeRequest({ amount: 100, payment_date: '2026-06-18' }), { params: { id: EXPENSE_ID } })
+    const res = await POST(makeRequest({ amount: 100, payment_date: '2026-06-18' }), { params: Promise.resolve({ id: EXPENSE_ID }) })
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body.error).toMatch(/unauthorized/i)
@@ -73,7 +73,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
   it('returns 403 when financial scope is missing', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeRequest({ amount: 100, payment_date: '2026-06-18' }), { params: { id: EXPENSE_ID } })
+    const res = await POST(makeRequest({ amount: 100, payment_date: '2026-06-18' }), { params: Promise.resolve({ id: EXPENSE_ID }) })
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toMatch(/insufficient/i)
@@ -82,7 +82,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
   it('returns 400 when amount is missing', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const res = await POST(makeRequest({ payment_date: '2026-06-18' }), { params: { id: EXPENSE_ID } })
+    const res = await POST(makeRequest({ payment_date: '2026-06-18' }), { params: Promise.resolve({ id: EXPENSE_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/amount and payment_date are required/i)
@@ -91,7 +91,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
   it('returns 400 when payment_date is missing', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const res = await POST(makeRequest({ amount: 100 }), { params: { id: EXPENSE_ID } })
+    const res = await POST(makeRequest({ amount: 100 }), { params: Promise.resolve({ id: EXPENSE_ID }) })
     expect(res.status).toBe(400)
   })
 
@@ -100,7 +100,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
     mockHasScope.mockReturnValue(true)
     const errorResponse = new Response(JSON.stringify({ error: 'Validation failed' }), { status: 422 })
     mockParseBody.mockReturnValue({ ok: false, response: errorResponse } as any)
-    const res = await POST(makeRequest({ amount: -50, payment_date: '2026-06-18', paymentMethod: 'cash' }), { params: { id: EXPENSE_ID } })
+    const res = await POST(makeRequest({ amount: -50, payment_date: '2026-06-18', paymentMethod: 'cash' }), { params: Promise.resolve({ id: EXPENSE_ID }) })
     expect(res.status).toBe(422)
   })
 
@@ -109,7 +109,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
     mockHasScope.mockReturnValue(true)
     mockParseBody.mockReturnValue({ ok: true } as any)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeRequest({ amount: 100, payment_date: '2026-06-18', paymentMethod: 'cash' }), { params: { id: EXPENSE_ID } })
+    const res = await POST(makeRequest({ amount: 100, payment_date: '2026-06-18', paymentMethod: 'cash' }), { params: Promise.resolve({ id: EXPENSE_ID }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/expense not found/i)
@@ -128,7 +128,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
 
     const res = await POST(
       makeRequest({ amount: 500, payment_date: '2026-06-18', payment_method: 'bank_transfer' }),
-      { params: { id: EXPENSE_ID } }
+      { params: Promise.resolve({ id: EXPENSE_ID }) }
     )
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -148,7 +148,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
 
     const res = await POST(
       makeRequest({ amount: 300, payment_date: '2026-06-18', payment_method: 'cash' }),
-      { params: { id: EXPENSE_ID } }
+      { params: Promise.resolve({ id: EXPENSE_ID }) }
     )
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -169,7 +169,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
 
     const res = await POST(
       makeRequest({ amount: 1, payment_date: '2026-06-18', payment_method: 'cash' }),
-      { params: { id: EXPENSE_ID } }
+      { params: Promise.resolve({ id: EXPENSE_ID }) }
     )
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -183,7 +183,7 @@ describe('POST /api/admin/financial/payables/[id]/pay', () => {
     mockQueryOne.mockRejectedValue(new Error('DB connection lost'))
     const res = await POST(
       makeRequest({ amount: 100, payment_date: '2026-06-18', paymentMethod: 'cash' }),
-      { params: { id: EXPENSE_ID } }
+      { params: Promise.resolve({ id: EXPENSE_ID }) }
     )
     expect(res.status).toBe(500)
     const body = await res.json()

@@ -16,8 +16,9 @@ const Schema = z.object({
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       LEFT JOIN addresses a ON o.shipping_address_id = a.id
       LEFT JOIN invoices i ON i.order_id = o.id
       WHERE o.id = $1
-    `, [params.id])
+    `, [id])
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.invoice_number) return NextResponse.json({ error: 'Invoice not generated yet' }, { status: 422 })
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const items = await queryMany(
       'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
-      [params.id]
+      [id]
     )
 
     const settingsRows = await queryMany(
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     await queryOne(
       `UPDATE orders SET eway_bill_no = $1, eway_bill_date = NOW(), eway_bill_valid_upto = $2 WHERE id = $3`,
-      [result.ewbNo, result.ewbValidTill ? new Date(result.ewbValidTill) : null, params.id]
+      [result.ewbNo, result.ewbValidTill ? new Date(result.ewbValidTill) : null, id]
     )
 
     return NextResponse.json({

@@ -10,15 +10,16 @@ const REASONS = ['defective', 'wrong_item', 'not_as_described', 'damaged', 'othe
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const returnRequest = await queryOne(
       `SELECT * FROM return_requests WHERE order_id = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 1`,
-      [params.id, authUser.userId]
+      [id, authUser.userId]
     )
 
     const monthlyCount = await queryOne(
@@ -41,9 +42,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -63,7 +65,7 @@ export async function POST(
        FROM orders o
        LEFT JOIN users u ON u.id = o.user_id
        WHERE o.id = $1 AND o.user_id = $2`,
-      [params.id, authUser.userId]
+      [id, authUser.userId]
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -73,7 +75,7 @@ export async function POST(
     }
 
     const eligibility = await checkReturnEligibility(
-      params.id,
+      id,
       type as 'refund' | 'replacement',
       new Date(order.delivered_at || order.updated_at)
     )
@@ -83,7 +85,7 @@ export async function POST(
 
     const existing = await queryOne(
       `SELECT id FROM return_requests WHERE order_id = $1 AND status NOT IN ('rejected', 'completed')`,
-      [params.id]
+      [id]
     )
     if (existing) {
       return NextResponse.json({ error: 'A return request already exists for this order.' }, { status: 400 })
@@ -108,18 +110,18 @@ export async function POST(
       `INSERT INTO return_requests (order_id, user_id, type, reason, description)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [params.id, authUser.userId, type, reason, description || null]
+      [id, authUser.userId, type, reason, description || null]
     )
 
     await query(
       `UPDATE orders SET status = 'return_requested', updated_at = NOW() WHERE id = $1`,
-      [params.id]
+      [id]
     )
 
     logActivity({
       userId: authUser.userId,
       kind: 'return_requested',
-      referenceId: params.id,
+      referenceId: id,
       referenceType: 'orders',
       summary: `${type === 'return' ? 'Return' : 'Replacement'} requested for order #${order.order_number}: ${reason}`,
       metadata: { type, reason, orderNumber: order.order_number },
@@ -128,7 +130,7 @@ export async function POST(
     createAutoTask({
       userId: authUser.userId,
       sourceKind: 'review_return',
-      sourceRefId: params.id,
+      sourceRefId: id,
       title: `Review ${type} request for #${order.order_number}`,
       description: `Reason: ${reason}${description ? `\n\n${description}` : ''}`,
       priority: 'high',
@@ -147,7 +149,7 @@ export async function POST(
     if (fallback && !adminEmails.includes(fallback)) adminEmails.push(fallback)
 
     if (adminEmails.length > 0) {
-      await sendReturnStatusEmail(adminEmails, customerName, order.order_number, params.id, 'requested_admin', {
+      await sendReturnStatusEmail(adminEmails, customerName, order.order_number, id, 'requested_admin', {
         returnType: type,
         reason,
       })

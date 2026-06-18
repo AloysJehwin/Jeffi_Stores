@@ -18,15 +18,16 @@ const OrderPatchSchema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const authUser = await authenticateUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
     const isBusiness = authUser.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
 
     let order: any
@@ -170,15 +171,16 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
     const body = await request.json()
     const parsed = parseBody(OrderPatchSchema, body)
     if (!parsed.ok) return parsed.response
@@ -464,8 +466,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const authUser = await authenticateUser(request)
     if (!authUser) {
@@ -482,7 +485,7 @@ export async function DELETE(
         (SELECT COUNT(*) FROM payments p WHERE p.order_id = o.id AND p.status NOT IN ('pending', 'failed'))::int AS committed_payment_count
        FROM orders o
        WHERE o.id = $1 AND o.user_id = $2`,
-      [params.id, authUser.userId]
+      [id, authUser.userId]
     )
 
     if (!order) {
@@ -511,7 +514,7 @@ export async function DELETE(
     }>(
       `SELECT product_id, variant_id, sub_variant_id, quantity, unit_price, buy_mode, buy_unit
        FROM order_items WHERE order_id = $1`,
-      [params.id]
+      [id]
     )
     for (const item of orderItems) {
       const existing = await queryOne<{ id: string }>(
@@ -528,7 +531,7 @@ export async function DELETE(
       }
     }
 
-    await query('DELETE FROM orders WHERE id = $1 AND user_id = $2', [params.id, authUser.userId])
+    await query('DELETE FROM orders WHERE id = $1 AND user_id = $2', [id, authUser.userId])
 
     return NextResponse.json({ success: true, deleted: true })
   } catch (err) {

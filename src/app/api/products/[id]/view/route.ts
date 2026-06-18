@@ -5,8 +5,9 @@ import { logActivity } from '@/lib/activity'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const productId = params.id
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const productId = id
   const sessionId = req.cookies.get('session_id')?.value || req.headers.get('x-session-id') || null
   const userAgent = req.headers.get('user-agent') || null
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null

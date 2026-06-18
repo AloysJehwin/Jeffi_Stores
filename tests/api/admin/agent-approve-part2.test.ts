@@ -72,7 +72,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('items missing')
   })
@@ -98,7 +98,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     }
     mockWithTransaction.mockImplementation(async (fn: any) => fn(mockClient))
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.quotationId).toBe('qt-1')
@@ -117,7 +117,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     } as any)
     mockWithTransaction.mockRejectedValueOnce(new Error('DB error'))
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toContain('DB error')
   })
@@ -132,7 +132,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('campaignKind missing')
   })
@@ -145,7 +145,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('No fields to update')
   })
@@ -160,7 +160,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ kind: 'welcome', name: 'Welcome' } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.kind).toBe('welcome')
@@ -177,7 +177,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce(null)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Campaign not found')
   })
@@ -192,7 +192,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/subject and body required/)
   })
@@ -210,7 +210,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     ] as any)
     vi.mocked(transporter.sendMail).mockResolvedValue({} as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.sent).toBe(2)
@@ -227,7 +227,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     mockQueryMany.mockResolvedValueOnce([{ email: 'c@example.com', name: 'Carol' }] as any)
     vi.mocked(transporter.sendMail).mockResolvedValue({} as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.sent).toBe(1)
   })
@@ -241,7 +241,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     } as any)
     vi.mocked(transporter.sendMail).mockRejectedValue(new Error('SMTP error'))
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/sends failed/)
   })
@@ -256,7 +256,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Missing required fields/)
   })
@@ -271,7 +271,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'coupon-2', code: 'SUMMER-AB1234' } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.userId).toBe('user-1')
@@ -290,7 +290,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'existing-prod' } as any) // dup check finds existing
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/already exists/)
   })
@@ -307,7 +307,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'prod-1', name: 'Updated Bolt', is_active: true, is_featured: false } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.name).toBe('Updated Bolt')
   })
@@ -322,7 +322,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce(null)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Product not found')
   })
@@ -337,7 +337,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Invalid delta')
   })
@@ -350,7 +350,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Invalid delta')
   })
@@ -375,7 +375,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     mockGetClient.mockResolvedValueOnce(mockClient as any)
     vi.mocked(logStockMovement).mockResolvedValue(undefined)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.delta).toBe(5)
@@ -400,7 +400,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     }
     mockGetClient.mockResolvedValueOnce(mockClient as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Product not found')
   })
@@ -422,7 +422,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     }
     mockGetClient.mockResolvedValueOnce(mockClient as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/drop stock to/)
   })
@@ -439,7 +439,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ n: 3 } as any) // already 3 featured
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Featured limit/)
   })
@@ -454,7 +454,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'prod-1', name: 'Bolt', is_featured: false } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.is_featured).toBe(false)
   })
@@ -469,7 +469,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce(null) // UPDATE returns null
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Product not found')
   })
@@ -487,7 +487,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       .mockResolvedValueOnce(null)  // no dup
       .mockResolvedValueOnce({ id: 'brand-1', name: 'Acme', slug: 'acme', logo_url: null, is_active: true } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.slug).toBe('acme')
   })
@@ -502,7 +502,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'existing' } as any) // dup found
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/already exists/)
   })
@@ -517,7 +517,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/name and slug required/)
   })
@@ -533,7 +533,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       .mockResolvedValueOnce(null) // no dup slug
       .mockResolvedValueOnce({ id: 'cat-1', name: 'Fasteners', slug: 'fasteners', parent_id: null, is_active: true } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.slug).toBe('fasteners')
   })
@@ -548,7 +548,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce(null) // parent lookup returns null
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Parent category not found')
   })
@@ -563,7 +563,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'dup' } as any) // dup slug
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/already exists/)
   })
@@ -578,7 +578,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.tag).toBe('vip')
@@ -592,7 +592,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/customerId and tagSlug required/)
   })
@@ -607,7 +607,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.tag).toBe('vip')
   })
@@ -620,7 +620,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/customerId and tagSlug required/)
   })
@@ -637,7 +637,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'task-1' } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.taskId).toBe('task-1')
@@ -652,7 +652,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/customerId and title required/)
   })
@@ -667,7 +667,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('taskId required')
   })
@@ -682,7 +682,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'task-1', user_id: 'cust-1', title: 'Follow up', status: 'open', description: null } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.taskId).toBe('task-1')
@@ -698,7 +698,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce(null)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Task not found')
   })
@@ -713,7 +713,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'task-1', user_id: 'cust-1', title: 'Follow up', status: 'completed', description: null } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/already completed/)
   })
@@ -728,7 +728,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('slug required')
   })
@@ -743,7 +743,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       } as any)
       .mockResolvedValueOnce(null) // max sort_order
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.slug).toBe('enterprise')
@@ -759,7 +759,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/invalid payableId\/amount/)
   })
@@ -772,7 +772,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/invalid payableId\/amount/)
   })
@@ -787,7 +787,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('from/to missing in payload')
   })
@@ -802,7 +802,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('orderIds missing')
   })
@@ -815,7 +815,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('invalid pickupDate')
   })
@@ -834,7 +834,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       .mockResolvedValueOnce([{ email: 'a@example.com', name: 'Alice' }, { email: 'b@example.com', name: 'Bob' }] as any) // recipients
     vi.mocked(sendProductAnnouncementEmail).mockResolvedValue({ success: true } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.audience).toBe('all_opted_in')
@@ -853,7 +853,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       .mockResolvedValueOnce([{ email: 'c@example.com', name: 'Carol' }] as any)
     vi.mocked(sendProductAnnouncementEmail).mockResolvedValue({ success: true } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.audience).toBe('recent_buyers')
   })
@@ -867,7 +867,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
     } as any)
     mockQueryMany.mockResolvedValueOnce([] as any) // no products found
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('No active products resolved')
   })

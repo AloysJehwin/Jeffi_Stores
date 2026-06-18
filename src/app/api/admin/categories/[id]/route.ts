@@ -5,7 +5,8 @@ import { hasScope } from '@/lib/scopes'
 import { suggestIcon } from '@/lib/iconSuggest'
 import { revalidatePath } from 'next/cache'
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'categories')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -29,7 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const replDays     = replacement_allowed  == null ? null : Math.max(1, parseInt(replacement_window_days) || 7)
 
 
-  const before = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [params.id])
+  const before = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [id])
 
   await query(
     `UPDATE categories SET
@@ -44,13 +45,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       iconToUse,
       retAllowed, retDays,
       replAllowed, replDays,
-      new Date().toISOString(), params.id,
+      new Date().toISOString(), id,
     ]
   )
 
   revalidatePath('/admin/categories')
 
-  const updated = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [params.id])
+  const updated = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [id])
 
   return NextResponse.json(updated)
 }

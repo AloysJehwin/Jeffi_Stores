@@ -55,7 +55,7 @@ const admin = {
   adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['financial'],
 }
 
-const params = { id: 'exp-1' }
+const params = Promise.resolve({ id: 'exp-1' })
 
 const baseExpense = {
   id: 'exp-1',

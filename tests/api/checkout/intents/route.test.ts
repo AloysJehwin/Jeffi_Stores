@@ -36,7 +36,7 @@ function makeRequest() {
   return new Request('http://localhost/api/checkout/intents/tok123')
 }
 
-const params = { params: { token: 'tok123' } }
+const params = { params: Promise.resolve({ token: 'tok123' }) }
 
 describe('GET /api/checkout/intents/[token]', () => {
   beforeEach(() => { vi.clearAllMocks() })

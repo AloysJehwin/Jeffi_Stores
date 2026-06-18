@@ -22,17 +22,18 @@ interface EligibleRecipient {
   raw: Record<string, unknown>
 }
 
-export async function GET(req: NextRequest, { params }: { params: { kind: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'mailer')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const campaign = await getCampaign(params.kind as any)
+  const campaign = await getCampaign(kind as any)
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
-  const scenarioKind = (campaign as any).scenario_kind || params.kind
+  const scenarioKind = (campaign as any).scenario_kind || kind
 
   const builtin = getScenario(scenarioKind)
   if (builtin) {

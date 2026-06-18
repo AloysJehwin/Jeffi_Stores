@@ -37,7 +37,7 @@ function makeRequest(body: unknown = {}) {
 }
 
 const AUTH_USER = { userId: 'user-456', email: 'test@example.com' }
-const PARAMS = { params: { id: 'order-123' } }
+const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }
 
 const DELIVERED_ORDER = {
   id: 'order-123',

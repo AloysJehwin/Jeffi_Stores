@@ -26,7 +26,7 @@ const mockHasScope = vi.mocked(hasScope)
 const mockQueryOne = vi.mocked(queryOne)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['products'] }
-const params = { id: 'prod-1', unitId: 'unit-1' }
+const params = Promise.resolve({ id: 'prod-1', unitId: 'unit-1' })
 
 function makePostReq(body: unknown) {
   return new NextRequest('http://localhost/api/admin/products/prod-1/units/unit-1/rules', {

@@ -52,7 +52,7 @@ const VAR_ID  = 'b49444be-0c82-4710-a891-49eb8c3166bf'
 const SV_ID   = 'be35ce54-870f-4167-9e05-c7c3c863ac9d'
 
 const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['products'] }
-const PARAMS = { params: { id: PROD_ID, variantId: VAR_ID } }
+const PARAMS = { params: Promise.resolve({ id: PROD_ID, variantId: VAR_ID }) }
 
 function makeReq(method: string, body?: unknown) {
   return new NextRequest('http://localhost/api/admin/products/prod-1/variants/var-1/sub-variants', {

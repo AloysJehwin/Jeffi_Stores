@@ -14,14 +14,15 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const quotation = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [params.id])
+    const quotation = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [id])
     if (!quotation) return NextResponse.json({ error: 'Quotation not found' }, { status: 404 })
     if (quotation.status !== 'final') {
       return NextResponse.json({ error: 'Only finalised quotations can be converted to an invoice' }, { status: 400 })
@@ -32,7 +33,7 @@ export async function POST(
 
     const qItems = await queryMany<any>(
       `SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`,
-      [params.id]
+      [id]
     )
     if (!qItems.length) {
       return NextResponse.json({ error: 'Quotation has no line items' }, { status: 400 })
@@ -294,7 +295,7 @@ export async function POST(
 
       await client.query(
         `UPDATE quotations SET converted_order_id = $1, updated_at = NOW() WHERE id = $2`,
-        [newOrder.id, params.id]
+        [newOrder.id, id]
       )
 
       return { id: newOrder.id, order_number: newOrder.order_number, invoice_number: invoiceNumber, saveAsDraft, insufficientItems }
