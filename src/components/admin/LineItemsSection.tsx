@@ -520,28 +520,62 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                     const qMax  = su?.max_qty != null
                       ? (stockMax != null ? Math.min(su.max_qty, stockMax) : su.max_qty)
                       : stockMax
+                    const clamp = (v: number) => {
+                      let r = Math.round((Math.round((v - qMin) / qStep) * qStep + qMin) * 1e9) / 1e9
+                      if (r < qMin) r = qMin
+                      if (qMax != null && r > qMax) r = qMax
+                      return r
+                    }
+                    const cur = parseFloat(String(item.quantity)) || qMin
                     return (
                       <div>
-                        <input
-                          type="number"
-                          min={qMin}
-                          step={qStep}
-                          max={qMax}
-                          value={item.quantity}
-                          onChange={e => updateItem(item.id, 'quantity', e.target.value)}
-                          onBlur={e => {
-                            let v = parseFloat(e.target.value)
-                            if (isNaN(v) || v < qMin) v = qMin
-                            if (qMax != null && v > qMax) v = qMax
-                            // Snap to nearest valid step from min
-                            const steps = Math.round((v - qMin) / qStep)
-                            v = Math.round((qMin + steps * qStep) * 1e9) / 1e9
-                            if (qMax != null && v > qMax) v = qMax
-                            updateItem(item.id, 'quantity', String(v))
-                          }}
-                          required
-                          className={inputCls}
-                        />
+                        {su ? (
+                          <div className="flex items-center gap-0.5 w-full px-1 py-1.5 rounded border border-border-default bg-surface-secondary">
+                            <button type="button"
+                              onClick={() => updateItem(item.id, 'quantity', String(clamp(cur - qStep)))}
+                              disabled={cur <= qMin}
+                              className="px-1 text-foreground-secondary hover:text-foreground disabled:opacity-30 transition-colors">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <input
+                              type="number"
+                              min={qMin}
+                              step={qStep}
+                              max={qMax}
+                              value={item.quantity}
+                              onChange={e => updateItem(item.id, 'quantity', e.target.value)}
+                              onBlur={e => {
+                                let v = parseFloat(e.target.value)
+                                updateItem(item.id, 'quantity', String(clamp(isNaN(v) ? qMin : v)))
+                              }}
+                              required
+                              className="flex-1 min-w-0 text-center text-sm font-medium bg-transparent border-none outline-none text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <button type="button"
+                              onClick={() => updateItem(item.id, 'quantity', String(clamp(cur + qStep)))}
+                              disabled={qMax != null && cur >= qMax}
+                              className="px-1 text-foreground-secondary hover:text-foreground disabled:opacity-30 transition-colors">
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            min={qMin}
+                            step={qStep}
+                            max={qMax}
+                            value={item.quantity}
+                            onChange={e => updateItem(item.id, 'quantity', e.target.value)}
+                            onBlur={e => {
+                              let v = parseFloat(e.target.value)
+                              if (isNaN(v) || v < qMin) v = qMin
+                              if (qMax != null && v > qMax) v = qMax
+                              updateItem(item.id, 'quantity', String(v))
+                            }}
+                            required
+                            className={inputCls}
+                          />
+                        )}
                         {su && su.factor > 1 && Number(item.quantity) > 0 && (
                           <p className="text-[10px] text-foreground-secondary mt-0.5">
                             {Math.round(Number(item.quantity) * su.factor)} pcs total
