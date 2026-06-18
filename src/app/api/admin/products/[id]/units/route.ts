@@ -23,14 +23,21 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Product not found' }, { status: 404 })
   }
 
-  // Product-level rows only (variant_id IS NULL).
+  const variantId = request.nextUrl.searchParams.get('variant_id')
+
   const units = await queryMany(
-    `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
-            is_base, display_label, notes, min_qty, max_qty, qty_step, created_at, updated_at
-     FROM product_units
-     WHERE product_id = $1 AND variant_id IS NULL
-     ORDER BY is_base DESC, unit ASC`,
-    [id]
+    variantId
+      ? `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
+                is_base, display_label, notes, min_qty, max_qty, qty_step, created_at, updated_at
+         FROM product_units
+         WHERE product_id = $1 AND variant_id = $2
+         ORDER BY is_base DESC, unit ASC`
+      : `SELECT id, product_id, variant_id, unit, factor, dimension, conversion_meta,
+                is_base, display_label, notes, min_qty, max_qty, qty_step, created_at, updated_at
+         FROM product_units
+         WHERE product_id = $1 AND variant_id IS NULL
+         ORDER BY is_base DESC, unit ASC`,
+    variantId ? [id, variantId] : [id]
   )
 
   const unitIds = units.map(u => u.id)
