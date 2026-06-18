@@ -21,7 +21,12 @@ export async function GET(request: NextRequest) {
       `WITH item_stock AS (
          SELECT
            oi.order_id,
-           oi.quantity::numeric                                    AS req_qty,
+           -- For count-dimension selling units (box, set, etc.), multiply qty by factor
+           -- to get the actual number of individual pieces that will be deducted from inventory
+           (oi.quantity::numeric * COALESCE(
+             CASE WHEN pu.dimension = 'count' THEN pu.factor ELSE 1 END,
+             1
+           ))                                                      AS req_qty,
            COALESCE(
              psv.inventory_quantity,
              pv.inventory_quantity,
@@ -33,6 +38,7 @@ export async function GET(request: NextRequest) {
          LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
          LEFT JOIN product_variants     pv  ON pv.id  = oi.variant_id
          LEFT JOIN products             p   ON p.id   = oi.product_id
+         LEFT JOIN product_units        pu  ON pu.unit = oi.buy_unit AND pu.product_id = oi.product_id
        ),
        draft_stock AS (
          SELECT
@@ -115,6 +121,7 @@ export async function POST(request: NextRequest) {
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
+        buy_unit: item.buy_unit || null,
         unit_price: unitPrice,
         total_price: lineTotal,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
@@ -175,13 +182,13 @@ export async function POST(request: NextRequest) {
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
+            hsn_code, gst_rate, quantity, buy_unit, unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14,$15,$16,$17)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,0,$13,$14,$15,$16,$17,$18)`,
           [
             orderId, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name,
-            item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
+            item.hsn_code, item.gst_rate, item.quantity, item.buy_unit, item.unit_price,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
           ]

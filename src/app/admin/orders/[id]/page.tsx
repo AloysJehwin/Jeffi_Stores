@@ -269,15 +269,24 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               {order.order_items && order.order_items.length > 0 ? (
                 order.order_items.map((item: any) => {
                   const inv = item.sub_variant?.inventory_quantity ?? item.variant?.inventory_quantity ?? item.products?.inventory_quantity ?? 0
-                  const qty = Math.round(Number(item.quantity))
-                  const isOut = inv <= 0
-                  const isLow = inv > 0 && inv <= 5
+                  const orderedQty = Number(item.quantity)
+                  const isCount = item.sell_unit_dimension === 'count' || (!item.buy_mode || item.buy_mode === 'unit')
+                  const factor = item.sell_unit_factor ? Number(item.sell_unit_factor) : 1
+                  // For count dimension: inventory is in individual pieces; ordered qty is in selling units (e.g. boxes)
+                  // Show both: "5 box (250 pcs)" where factor=50
+                  const deductedQty = isCount ? orderedQty * factor : orderedQty
+                  const unitLabel = (item.buy_unit && item.buy_unit !== 'unit') ? item.buy_unit : null
+                  const isOut = inv < deductedQty
+                  const isLow = !isOut && inv < deductedQty * 2
                   return (
                     <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
                         <p className="text-xs text-foreground-muted mt-0.5">
-                          SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}{' · '}Ordered: {qty}
+                          SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}{' · '}
+                          Ordered: {isCount && unitLabel
+                            ? `${orderedQty} ${unitLabel}${factor > 1 ? ` (${deductedQty} pcs)` : ''}`
+                            : `${orderedQty}${unitLabel ? ` ${unitLabel}` : ''}`}
                         </p>
                         {item.variant_name && (
                           <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">

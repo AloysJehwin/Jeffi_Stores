@@ -235,6 +235,7 @@ export default function CashSaleClient() {
             hsn_code: it.hsn_code,
             gst_rate: it.gst_rate,
             quantity: it.quantity,
+            buy_unit: it.buy_unit || null,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
           })),

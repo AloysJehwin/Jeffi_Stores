@@ -4,7 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
-import { sendInvoiceFinalizedEmail } from '@/lib/email'
+import { sendInvoiceFinalizedEmail, sendOrderStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice } from '@/lib/invoice'
 
 export const dynamic = 'force-dynamic'
@@ -46,6 +46,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       for (const item of items) {
         if (!item.product_id) continue
         const qty = parseFloat(item.quantity)
+
+        // For count-dimension selling units (box, set, etc.), inventory is tracked in
+        // individual pieces. Multiply ordered qty by factor to get pieces to deduct.
+        const unitRow = await client.query<{ factor: number; dimension: string }>(
+          `SELECT factor, dimension FROM product_units WHERE unit = $1 AND product_id = $2 LIMIT 1`,
+          [item.buy_unit, item.product_id]
+        )
+        const unit = unitRow.rows[0]
+        const effectiveQty = (unit?.dimension === 'count' && unit?.factor)
+          ? qty * parseFloat(unit.factor as any)
+          : qty
+
         let stockBefore = 0
 
         if (item.sub_variant_id) {
@@ -55,14 +67,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
           stockBefore = stock
-          if (stock < qty) {
+          if (stock < effectiveQty) {
             throw new Error(
-              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
+              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${effectiveQty}`
             )
           }
           await client.query(
             `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-            [qty, item.sub_variant_id]
+            [effectiveQty, item.sub_variant_id]
           )
         } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: number; has_sub_variants: boolean }>(
@@ -80,21 +92,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             stock = parseFloat(svStock.rows[0]?.total as any) || 0
           }
           stockBefore = stock
-          if (stock < qty) {
+          if (stock < effectiveQty) {
             throw new Error(
-              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${qty}`
+              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${effectiveQty}`
             )
           }
           if (inv.rows[0]?.has_sub_variants) {
             await client.query(
               `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1
                WHERE variant_id = $2 AND sku = $3 AND is_active = true`,
-              [qty, item.variant_id, item.product_sku]
+              [effectiveQty, item.variant_id, item.product_sku]
             )
           } else {
             await client.query(
               `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-              [qty, item.variant_id]
+              [effectiveQty, item.variant_id]
             )
           }
         } else {
@@ -104,14 +116,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
           stockBefore = stock
-          if (stock < qty) {
+          if (stock < effectiveQty) {
             throw new Error(
-              `Insufficient stock for "${item.product_name}" — available: ${stock}, required: ${qty}`
+              `Insufficient stock for "${item.product_name}" — available: ${stock}, required: ${effectiveQty}`
             )
           }
           await client.query(
             `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-            [qty, item.product_id]
+            [effectiveQty, item.product_id]
           )
         }
 
@@ -120,7 +132,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           variantId: item.variant_id || null,
           subVariantId: item.sub_variant_id || null,
           transactionType: 'sale',
-          quantityChange: -qty,
+          quantityChange: -effectiveQty,
           referenceType: 'order',
           referenceId: id,
           currentStock: stockBefore,
@@ -168,9 +180,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (result.invoiceNumber) {
       if (isOnlineOrder && order.customer_email) {
-        // Generate PDF and send processing email for online orders
         try {
-          await generateOrderInvoice(id)
+          const pdfBuffer = await generateOrderInvoice(id)
+          await sendOrderStatusUpdate(
+            order.customer_email,
+            order.customer_name,
+            order.order_number,
+            id,
+            'processing',
+            undefined,
+            pdfBuffer,
+          )
         } catch (_) {}
       } else if (!isOnlineOrder && order.customer_email) {
         try {

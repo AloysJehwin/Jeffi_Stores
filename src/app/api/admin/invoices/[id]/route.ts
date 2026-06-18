@@ -70,6 +70,7 @@ export async function PATCH(
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
+        buy_unit: item.buy_unit || null,
         unit_price: unitPrice,
         total_price: lineTotal,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
@@ -103,8 +104,18 @@ export async function PATCH(
         if (!item.product_id) continue
         const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
         const previousQty = existingQtyMap.get(key) ?? 0
-        const extraQty = item.quantity - previousQty
-        if (extraQty <= 0) continue
+        const rawExtra = item.quantity - previousQty
+        if (rawExtra <= 0) continue
+
+        // Resolve unit factor for count-dimension selling units (box, set, etc.)
+        const unitRow = await client.query<{ factor: number; dimension: string }>(
+          `SELECT factor, dimension FROM product_units WHERE unit = $2 AND product_id = $1 LIMIT 1`,
+          [item.product_id, item.buy_unit]
+        )
+        const u = unitRow.rows[0]
+        const extraQty = (u?.dimension === 'count' && u?.factor)
+          ? rawExtra * parseFloat(u.factor as any)
+          : rawExtra
 
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: string }>(
@@ -186,13 +197,13 @@ export async function PATCH(
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, total_price,
+            hsn_code, gst_rate, quantity, buy_unit, unit_price, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
           [
             id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
-            item.quantity, item.unit_price, item.total_price,
+            item.quantity, item.buy_unit, item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
           ]
         )
@@ -203,8 +214,18 @@ export async function PATCH(
           if (!item.product_id) continue
           const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
           const previousQty = existingQtyMap.get(key) ?? 0
-          const extraQty = item.quantity - previousQty
-          if (extraQty <= 0) continue
+          const rawExtra = item.quantity - previousQty
+          if (rawExtra <= 0) continue
+
+          // Resolve unit factor for count-dimension selling units (box, set, etc.)
+          const unitRow2 = await client.query<{ factor: number; dimension: string }>(
+            `SELECT factor, dimension FROM product_units WHERE unit = $2 AND product_id = $1 LIMIT 1`,
+            [item.product_id, item.buy_unit]
+          )
+          const u2 = unitRow2.rows[0]
+          const extraQty = (u2?.dimension === 'count' && u2?.factor)
+            ? rawExtra * parseFloat(u2.factor as any)
+            : rawExtra
 
           let stockBefore = 0
           if (item.sub_variant_id) {
