@@ -201,7 +201,13 @@ export async function POST(request: NextRequest) {
     const upsertResult = await query(
       `INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (user_id, product_id, variant_id, sub_variant_id, buy_mode)
+       ON CONFLICT (
+         user_id,
+         product_id,
+         COALESCE(variant_id,     '00000000-0000-0000-0000-000000000000'::uuid),
+         COALESCE(sub_variant_id, '00000000-0000-0000-0000-000000000000'::uuid),
+         buy_mode
+       )
        DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity, updated_at = NOW()
        RETURNING quantity, (xmax = 0) AS inserted`,
       [userId, productId, variantId || null, subVariantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]

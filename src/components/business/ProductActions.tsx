@@ -244,8 +244,8 @@ export default function ProductActions({
     ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))
     : mrp
   const effectiveStock = hasVariants
-    ? ((selectedSubVariant ? selectedSubVariant.stock_status : selectedVariant?.stock_status) !== 'Out of Stock' ? 1 : 0)
-    : (stockStatus !== 'Out of Stock' ? 1 : 0)
+    ? ((selectedSubVariant ? selectedSubVariant.stock_status : selectedVariant?.stock_status) !== 'Out of Stock' ? 9999 : 0)
+    : (stockStatus !== 'Out of Stock' ? 9999 : 0)
 
   const mrpDiscount = effectiveMrp && effectiveMrp > effectivePrice
     ? Math.round(((effectiveMrp - effectivePrice) / effectiveMrp) * 100)

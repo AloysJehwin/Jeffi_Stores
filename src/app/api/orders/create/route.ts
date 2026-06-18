@@ -332,9 +332,11 @@ export async function POST(request: NextRequest) {
     })
 
     if (!isRazorpayPayment) {
+      await query(`UPDATE orders SET status = 'confirmed', updated_at = NOW() WHERE id = $1`, [order.id])
+      const confirmedOrder = { ...order, status: 'confirmed' }
       createDraftInvoice(order.id).catch(() => {})
-      sendOrderConfirmationEmail(user.email, order, orderItems).catch(() => {})
-      sendNewOrderNotification(order, orderItems, user).catch(() => {})
+      sendOrderConfirmationEmail(user.email, confirmedOrder, orderItems).catch(() => {})
+      sendNewOrderNotification(confirmedOrder, orderItems, user).catch(() => {})
     }
 
     logActivity({

@@ -823,7 +823,7 @@ export default function InvoicesClient() {
                         <td className="px-4 py-3 text-xs text-foreground-secondary whitespace-nowrap">{fmtDate(draft.created_at)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            {draft.source !== 'business' && (
+                            {draft.source === 'offline' && (
                             <button
                               onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
                               className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
@@ -831,7 +831,7 @@ export default function InvoicesClient() {
                               Edit
                             </button>
                             )}
-                            {draft.source === 'business' && (
+                            {draft.source !== 'offline' && (
                             <a
                               href={ap(`/admin/invoices/${draft.id}`)}
                               className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
@@ -874,7 +874,7 @@ export default function InvoicesClient() {
                       <DraftStockPill draft={draft} />
                     </div>
                     <div className="flex gap-4 pt-1">
-                      {draft.source !== 'business' && (
+                      {draft.source === 'offline' && (
                       <button
                         onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
                         className="text-xs text-foreground-secondary hover:text-foreground font-medium"
@@ -882,7 +882,7 @@ export default function InvoicesClient() {
                         Edit
                       </button>
                       )}
-                      {draft.source === 'business' && (
+                      {draft.source !== 'offline' && (
                       <a
                         href={ap(`/admin/invoices/${draft.id}`)}
                         className="text-xs text-foreground-secondary hover:text-foreground font-medium"

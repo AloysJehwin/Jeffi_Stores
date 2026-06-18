@@ -2,17 +2,26 @@
 -- sub_variant_id and buy_mode, enabling the atomic INSERT ... ON CONFLICT upsert
 -- in /api/cart (POST).
 --
--- NULLS NOT DISTINCT ensures rows where variant_id/sub_variant_id are NULL still
--- conflict correctly (standard UNIQUE treats NULLs as distinct, which would allow
--- duplicates when these columns are null).
+-- PG 14 does not support NULLS NOT DISTINCT, so we use a unique index on
+-- COALESCE sentinel values instead. The cart upsert uses ON CONFLICT on the
+-- same expression to match.
 
 BEGIN;
 
 ALTER TABLE public.cart_items
-  DROP CONSTRAINT IF EXISTS cart_items_user_id_product_id_variant_id_key;
+  DROP CONSTRAINT IF EXISTS cart_items_user_id_product_id_variant_id_key,
+  DROP CONSTRAINT IF EXISTS cart_items_user_product_variant_subvariant_key;
 
-ALTER TABLE public.cart_items
-  ADD CONSTRAINT cart_items_user_product_variant_subvariant_mode_key
-  UNIQUE NULLS NOT DISTINCT (user_id, product_id, variant_id, sub_variant_id, buy_mode);
+DROP INDEX IF EXISTS public.cart_items_upsert_key;
+
+-- Sentinel UUIDs represent NULL for the nullable FK columns so that NULL
+-- values are treated as equal (standard UNIQUE treats NULLs as distinct).
+CREATE UNIQUE INDEX cart_items_upsert_key ON public.cart_items (
+  user_id,
+  product_id,
+  COALESCE(variant_id,     '00000000-0000-0000-0000-000000000000'::uuid),
+  COALESCE(sub_variant_id, '00000000-0000-0000-0000-000000000000'::uuid),
+  buy_mode
+);
 
 COMMIT;
