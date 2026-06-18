@@ -53,10 +53,12 @@ export async function GET(
                'variant_name', pv.variant_name,
                'sku', pv.sku,
                'inventory_quantity', pv.inventory_quantity
-             ) ELSE NULL END AS variant
+             ) ELSE NULL END AS variant,
+             CASE WHEN psv.id IS NULL AND pv.id IS NULL AND p.id IS NOT NULL THEN p.inventory_quantity ELSE NULL END AS inventory_quantity
       FROM order_items oi
       LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
+      LEFT JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = $1
     `, [id])
 

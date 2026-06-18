@@ -27,12 +27,13 @@ export async function GET(request: NextRequest) {
              CASE WHEN pu.dimension = 'count' THEN pu.factor ELSE 1 END,
              1
            ))                                                      AS req_qty,
-           COALESCE(
-             psv.inventory_quantity,
-             pv.inventory_quantity,
-             p.inventory_quantity,
-             0
-           )::numeric                                              AS avail_qty,
+           -- Target the most-specific stock level; do NOT fall through to a broader
+           -- level — a sub-variant with 0 stock must not inherit variant/product stock.
+           CASE
+             WHEN oi.sub_variant_id IS NOT NULL THEN COALESCE(psv.inventory_quantity, 0)
+             WHEN oi.variant_id     IS NOT NULL THEN COALESCE(pv.inventory_quantity,  0)
+             ELSE                                    COALESCE(p.inventory_quantity,   0)
+           END::numeric                                            AS avail_qty,
            oi.product_id IS NOT NULL                               AS tracked
          FROM order_items oi
          LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
