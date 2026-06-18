@@ -85,7 +85,8 @@ export async function POST(
     }).catch(() => {})
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to record payment failure' }, { status: 500 })
   }
 }

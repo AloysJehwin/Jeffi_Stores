@@ -78,7 +78,8 @@ async function build4RPDF(pkg: any, awb: string, orderRow: any): Promise<Buffer>
       const logoH = 18
       const logoW = Math.round(logoH * (3246 / 546))
       doc.image(logoPath, M + BW - logoW - p, y + 6, { width: logoW, height: logoH })
-    } catch {
+    } catch (err) {
+      console.error('[route]', err)
       doc.fontSize(20).font('Helvetica-Bold').fillColor('#e63927').text('DELHIVERY', 0, y + 4, { width: M + BW - p, align: 'right', lineBreak: false })
     }
     y += 30; hline(y)

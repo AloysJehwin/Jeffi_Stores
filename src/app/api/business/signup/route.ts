@@ -86,7 +86,8 @@ export async function POST(request: NextRequest) {
       approvalStatus: 'pending',
       user: { id: newUser.id, email: newUser.email, firstName: newUser.first_name },
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
   }
 }

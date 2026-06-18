@@ -126,7 +126,7 @@ function parseUiBlocks(text: string): { blocks: any[]; remainder: string } {
       const parsed = JSON.parse(m[1])
       if (Array.isArray(parsed)) blocks = blocks.concat(parsed)
       else if (parsed && Array.isArray(parsed.blocks)) blocks = blocks.concat(parsed.blocks)
-    } catch {}
+    } catch (err) { console.error("[route]", err) }
   }
   const remainder = text.replace(re, '').trim()
   return { blocks, remainder }
@@ -248,7 +248,7 @@ export async function POST(req: NextRequest) {
       for (const c of calls) {
         const tool = getTool(c.name)
         let parsed: Record<string, unknown> = {}
-        try { parsed = JSON.parse(c.rawInput || '{}') } catch {}
+        try { parsed = JSON.parse(c.rawInput || '{}') } catch (err) { console.error("[route]", err) }
 
         if (!tool) {
           const err = `Unknown tool: ${c.name}`

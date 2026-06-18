@@ -99,7 +99,8 @@ export async function GET(request: NextRequest) {
       page,
       totalPages: Math.ceil(total / limit),
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

@@ -27,7 +27,8 @@ export async function POST(request: Request) {
       otpauth_url: otpauthUrl,
       qr_data_url: qrDataUrl,
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

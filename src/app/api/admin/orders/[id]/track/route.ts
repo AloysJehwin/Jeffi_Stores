@@ -153,7 +153,8 @@ export async function GET(
       statusSynced,
       syncedTo: statusSynced ? STATUS_SYNC[statusType]?.orderStatus : null,
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

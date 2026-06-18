@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
           'id', p.id, 'name', p.name, 'slug', p.slug,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'mrp', p.mrp, 'has_variants', p.has_variants,
-          'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
+          'stock_status', p.stock_status,
           'variant_stock_total', ${VARIANT_STOCK_TOTAL_SQL},
           'variant_min_price', ${VARIANT_MIN_PRICE_SQL},
           'variant_min_mrp', ${VARIANT_MIN_MRP_SQL},

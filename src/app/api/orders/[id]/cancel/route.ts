@@ -27,7 +27,8 @@ export async function POST(
     }
 
     return NextResponse.json(result)
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to request cancellation' }, { status: 500 })
   }
 }

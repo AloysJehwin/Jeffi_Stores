@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
            p.hsn_code,
            b.name AS brand_name,
            COALESCE(pv.gtin, p.gtin) AS gtin,
-           COALESCE(ps.stock_quantity, 0)::numeric AS inventory_quantity
+           COALESCE(ps.inventory_quantity, 0)::numeric AS inventory_quantity
          FROM product_sub_variants ps
          JOIN product_variants pv ON pv.id = ps.variant_id
          JOIN products p ON p.id = pv.product_id

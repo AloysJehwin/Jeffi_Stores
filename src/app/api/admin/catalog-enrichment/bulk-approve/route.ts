@@ -78,7 +78,8 @@ async function reEmbed(productId: string): Promise<boolean> {
     )
     await pool.end()
     return true
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return false
   }
 }

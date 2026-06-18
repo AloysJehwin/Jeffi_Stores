@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
-import { generateOrderInvoice } from '@/lib/invoice'
+import { createDraftInvoice } from '@/lib/invoice'
 import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
 import {
   loadActiveCart,
@@ -180,12 +180,11 @@ async function commitDraft(args: {
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
 
   const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
-  let invoicePdfBuffer: Buffer | null = null
-  try { invoicePdfBuffer = await generateOrderInvoice(created.id) } catch {}
+  createDraftInvoice(created.id).catch(() => {})
 
   const fullOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [created.id])
 
-  sendOrderConfirmationEmail(user.email, fullOrder, orderItems || [], invoicePdfBuffer).catch(() => {})
+  sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
   sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
   sendPaymentStatusUpdate(user.email, userName, created.order_number, created.id, 'paid', parseFloat(created.total_amount)).catch(() => {})
 
@@ -308,13 +307,12 @@ async function markLegacyOrderPaid(args: {
     queryMany('SELECT * FROM order_items WHERE order_id = $1', [args.orderId]),
   ])
 
-  let invoicePdfBuffer: Buffer | null = null
-  try { invoicePdfBuffer = await generateOrderInvoice(args.orderId) } catch {}
+  createDraftInvoice(args.orderId).catch(() => {})
 
   if (user) {
     const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
     const updatedOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [args.orderId])
-    sendOrderConfirmationEmail(user.email, updatedOrder || order, orderItems || [], invoicePdfBuffer).catch(() => {})
+    sendOrderConfirmationEmail(user.email, updatedOrder || order, orderItems || []).catch(() => {})
     sendNewOrderNotification(updatedOrder || order, orderItems || [], user).catch(() => {})
     sendPaymentStatusUpdate(user.email, userName, order.order_number, args.orderId, 'paid', parseFloat(order.total_amount)).catch(() => {})
 

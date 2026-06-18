@@ -80,7 +80,8 @@ export async function PATCH(
     }
 
     return NextResponse.json({ success: true, admin: updated })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -114,7 +115,8 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

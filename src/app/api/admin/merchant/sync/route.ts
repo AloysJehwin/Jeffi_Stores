@@ -14,7 +14,7 @@ function isSameOriginRequest(request: NextRequest): boolean {
     try {
       const refUrl = new URL(referer)
       if (refUrl.host === host) return true
-    } catch {}
+    } catch (err) { console.error("[route]", err) }
   }
   return false
 }

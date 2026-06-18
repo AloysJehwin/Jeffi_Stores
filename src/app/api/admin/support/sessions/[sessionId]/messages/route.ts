@@ -21,7 +21,8 @@ export async function GET(
     )
 
     return NextResponse.json({ messages })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
@@ -88,7 +89,8 @@ export async function POST(
     }
 
     return NextResponse.json({ message: { ...msg, sender_name: adminDisplayName, is_closing: isClosingMessage || false } })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

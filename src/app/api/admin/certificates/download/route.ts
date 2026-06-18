@@ -50,7 +50,8 @@ export async function GET(request: NextRequest) {
       commonName: cert.common_name,
       expiresAt: cert.expires_at,
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

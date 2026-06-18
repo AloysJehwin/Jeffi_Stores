@@ -61,7 +61,8 @@ export async function POST(request: NextRequest) {
         }
 
         synced++
-      } catch {
+      } catch (err) {
+        console.error('[route]', err)
         void 0
       }
     }

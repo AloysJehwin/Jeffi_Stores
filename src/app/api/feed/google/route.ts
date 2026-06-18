@@ -8,7 +8,7 @@ import {
   buildCustomLabels,
 } from '@/lib/google-merchant-helpers'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600
 
 function escapeXml(str: string): string {
   return str
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
         const hasSalePrice = variantMrp && variantMrp > Number(sellingPrice)
         const variantMpn = variant.mpn || product.mpn || ''
         const variantGtin = variant.gtin || product.gtin || ''
-        const variantCl = buildCustomLabels(product, variant.stock_quantity)
+        const variantCl = buildCustomLabels(product, variant.stock_status)
 
         const variantCustomLabelsXml = [variantCl[0], variantCl[1], variantCl[2], variantCl[3], variantCl[4]].map((label, i) =>
           label ? `\n      <g:custom_label_${i}>${escapeXml(label)}</g:custom_label_${i}>` : ''
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
       <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}
       <g:price>${Number(hasSalePrice ? variantMrp : sellingPrice).toFixed(2)} INR</g:price>${hasSalePrice ? `
       <g:price_ex_gst>${Number(sellingPrice).toFixed(2)} INR</g:price_ex_gst>` : ''}
-      <g:availability>${variant.stock_quantity > 0 ? 'in_stock' : 'out_of_stock'}</g:availability>
+      <g:availability>${variant.stock_status === 'Out of Stock' ? 'out_of_stock' : 'in_stock'}</g:availability>
       <g:condition>new</g:condition>
       <g:identifier_exists>${(variantMpn || variantGtin || brandName) ? 'true' : 'false'}</g:identifier_exists>${brandName ? `
       <g:brand>${escapeXml(brandName)}</g:brand>` : ''}${variantMpn ? `
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
       <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}
       <g:price>${Number(hasSalePrice ? productMrp : sellingPrice).toFixed(2)} INR</g:price>${hasSalePrice ? `
       <g:price_ex_gst>${Number(sellingPrice).toFixed(2)} INR</g:price_ex_gst>` : ''}
-      <g:availability>${product.stock_quantity > 0 ? 'in_stock' : 'out_of_stock'}</g:availability>
+      <g:availability>${product.stock_status === 'Out of Stock' ? 'out_of_stock' : 'in_stock'}</g:availability>
       <g:condition>new</g:condition>
       <g:identifier_exists>${(product.mpn || product.gtin || brandName) ? 'true' : 'false'}</g:identifier_exists>${brandName ? `
       <g:brand>${escapeXml(brandName)}</g:brand>` : ''}${product.mpn ? `

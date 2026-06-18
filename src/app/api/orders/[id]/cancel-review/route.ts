@@ -121,7 +121,8 @@ export async function POST(
               await restoreStock(client)
             })
             refundSuccess = true
-          } catch {
+          } catch (err) {
+            console.error('[route]', err)
             refundFailed = true
             await withTransaction(async (client) => {
               await client.query(
@@ -206,7 +207,8 @@ export async function POST(
     }
 
     return NextResponse.json({ success: true, newStatus, refundFailed })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to process cancellation review' }, { status: 500 })
   }
 }

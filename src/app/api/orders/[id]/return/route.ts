@@ -33,7 +33,8 @@ export async function GET(
     const monthlyLimitReached = parseInt(monthlyCount?.cnt || '0', 10) >= 1
 
     return NextResponse.json({ returnRequest: returnRequest || null, monthlyLimitReached })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

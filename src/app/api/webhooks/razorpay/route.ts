@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ status: 'ok' })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ status: 'ok' })
   }
 }

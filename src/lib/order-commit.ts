@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg'
 import { queryMany, queryOne, withTransaction } from './db'
 import { isInterState, calculateGST } from './gst'
-import { logStockMovement } from './inventory'
+import { createDraftInvoice } from './invoice'
 import type { DraftBuyNowItem, DraftCartItem } from './order-draft'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
@@ -289,6 +289,7 @@ export async function quoteShipping(input: {
   try {
     const res = await fetch(new URL('/api/shipping/rate', origin).toString(), {
       method: 'POST',
+      signal: AbortSignal.timeout(4000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         destinationPin: input.destinationPin,
@@ -305,7 +306,8 @@ export async function quoteShipping(input: {
     const data = await res.json()
     const charge = Number(data?.charge)
     return Number.isFinite(charge) && charge >= 0 ? Math.round(charge * 100) / 100 : 0
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return 0
   }
 }
@@ -534,34 +536,6 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           r.buyMode, r.buyUnit,
         ]
       )
-    }
-
-    for (const r of itemRows) {
-      if (r.subVariantId) {
-        await client.query(
-          `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-          [r.qty, r.subVariantId]
-        )
-      } else if (r.variantId) {
-        await client.query(
-          `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-          [r.qty, r.variantId]
-        )
-      } else {
-        await client.query(
-          `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-          [r.qty, r.productId]
-        )
-      }
-      await logStockMovement(client, {
-        productId: r.productId,
-        variantId: r.variantId,
-        subVariantId: r.subVariantId,
-        transactionType: 'sale',
-        quantityChange: -r.qty,
-        referenceType: 'order',
-        referenceId: created.id,
-      })
     }
 
     if (input.mode === 'cart') {

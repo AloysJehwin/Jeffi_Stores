@@ -197,7 +197,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             ]
           )
           await expClient.query('COMMIT')
-        } catch {
+        } catch (err) {
+          console.error('[route]', err)
           await expClient.query('ROLLBACK')
         } finally {
           expClient.release()

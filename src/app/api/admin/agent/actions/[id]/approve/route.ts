@@ -392,9 +392,9 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
       if (dup) return { result: null, error: `SKU "${sku}" already exists` }
       const created = await queryOne<{ id: string; name: string; sku: string }>(
         `INSERT INTO products (name, slug, sku, base_price, mrp, gst_percentage, short_description,
-                               brand_id, category_id, weight_grams, inventory_quantity, low_stock_threshold,
+                               brand_id, category_id, weight_grams, inventory_quantity,
                                is_active, is_featured, has_variants)
-         VALUES ($1, $2, $3, $4, $4, $5, $6, $7::uuid, $8::uuid, $9, 0, 10, TRUE, FALSE, FALSE)
+         VALUES ($1, $2, $3, $4, $4, $5, $6, $7::uuid, $8::uuid, $9, 0, TRUE, FALSE, FALSE)
          RETURNING id::text, name, sku`,
         [name, slug, sku, basePrice, gstPercentage, shortDescription, brandId, categoryId, weightGrams]
       )

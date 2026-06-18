@@ -62,7 +62,8 @@ export async function GET(request: NextRequest) {
     const reviews = await queryMany(sql, [...params, pageSize, offset])
 
     return NextResponse.json({ reviews: reviews || [], total, page, pageSize })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 })
   }
 }
@@ -92,7 +93,8 @@ export async function PATCH(request: NextRequest) {
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to update review' }, { status: 500 })
   }
 }

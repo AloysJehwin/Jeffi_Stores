@@ -47,7 +47,8 @@ Rules:
     })
 
     return NextResponse.json({ review: result.content.trim() })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to generate review' }, { status: 500 })
   }
 }

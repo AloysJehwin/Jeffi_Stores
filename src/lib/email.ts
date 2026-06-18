@@ -22,7 +22,7 @@ async function getAdminNotificationEmails(): Promise<string> {
       []
     )
     if (rows.length > 0) return rows.map(r => r.email).join(', ')
-  } catch {}
+  } catch (err) { console.error("[route]", err) }
   return process.env.ADMIN_EMAIL || 'admin@admin.jeffistores.in'
 }
 
@@ -238,9 +238,9 @@ export async function sendWelcomeEmail(email: string, name: string) {
   }
 }
 
-export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[], invoicePdfBuffer?: Buffer | null) {
+export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[]) {
   const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
-  const subject = `Order Confirmation - ${order.order_number}`
+  const subject = `Order Received - ${order.order_number}`
   const html = `
       <!DOCTYPE html>
       <html>
@@ -315,20 +315,19 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
-            <h2>Order Confirmed!</h2>
+            <h2>Order Received!</h2>
             <p>Hello ${order.customer_name},</p>
-            <p>Thank you for your order! We've received it and our team will contact you shortly to confirm payment and delivery details.</p>
+            <p>Thank you for your order! We've received your order and payment — our team is preparing it and will keep you updated on dispatch.</p>
 
             <div class="order-box">
               <h3 style="margin-top: 0;">Order Details</h3>
               <p><strong>Order Number:</strong> ${order.order_number}</p>
-              ${order.invoice_number ? `<p><strong>Invoice Number:</strong> ${order.invoice_number}</p>` : ''}
               <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleDateString('en-IN', {
                 day: '2-digit',
                 month: 'short',
                 year: 'numeric'
               })}</p>
-              <p><strong>Status:</strong> <span style="color: #f97316; font-weight: bold;">PENDING CONFIRMATION</span></p>
+              <p><strong>Status:</strong> <span style="color: #16a34a; font-weight: bold;">CONFIRMED</span></p>
               ${order.taxable_amount > 0 ? `
               <p><strong>GSTIN:</strong> 22AQFPJ2897M1ZG</p>
               ` : ''}
@@ -366,14 +365,9 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
               <h3 style="margin: 0;">Total Amount: ₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
             </div>
 
-            <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0;">
-              <h4 style="margin-top: 0;">Next Steps</h4>
-              <p style="margin: 5px 0;">Our team will contact you within 24 hours to:</p>
-              <ul style="margin: 10px 0;">
-                <li>Confirm your order details</li>
-                <li>Provide payment instructions</li>
-                <li>Schedule delivery</li>
-              </ul>
+            <div style="background-color: #dcfce7; border-left: 4px solid #16a34a; padding: 15px; margin: 20px 0;">
+              <h4 style="margin-top: 0;">What happens next?</h4>
+              <p style="margin: 5px 0;">Your payment has been received. We're now preparing your order for dispatch. You'll receive another email once your order is on its way.</p>
             </div>
 
             <p>If you have any questions, feel free to contact us:</p>
@@ -387,19 +381,13 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
         </body>
       </html>
     `
-  const attachments = invoicePdfBuffer ? [{
-    filename: `Invoice-${order.invoice_number || order.order_number}.pdf`,
-    content: invoicePdfBuffer,
-    contentType: 'application/pdf',
-  }] : []
-
   try {
     const info = await sendAuditedMail({
       from,
       to: email,
       subject,
       html,
-      attachments,
+      attachments: [],
       kind: 'order',
       templateName: 'order_confirmation',
       entityType: 'orders',
