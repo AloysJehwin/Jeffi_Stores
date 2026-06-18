@@ -316,7 +316,7 @@ export default function InvoicesClient() {
         sub_variant_id: it.sub_variant_id || null,
         variant_name: it.variant_name || '',
         hsn_code: it.hsn_code || '',
-        gst_rate: String(it.gst_rate ?? '18'),
+        gst_rate: String(Math.round(parseFloat(it.gst_rate ?? '18')) || 18),
         quantity: String(it.quantity ?? '1'),
         unit: it.unit || 'pcs',
         buy_unit: it.buy_unit || null,
