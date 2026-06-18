@@ -319,6 +319,11 @@ export default function InvoicesClient() {
         gst_rate: String(it.gst_rate ?? '18'),
         quantity: String(it.quantity ?? '1'),
         unit: it.unit || 'pcs',
+        buy_unit: it.buy_unit || null,
+        buy_mode: null,
+        sell_unit_factor: 1,
+        sell_unit_dimension: null,
+        available_units: [],
         unit_price: String(it.unit_price ?? ''),
         discount_pct: it.discount_pct ?? 0,
         mrp: it.mrp ?? 0,
@@ -396,6 +401,7 @@ export default function InvoicesClient() {
             sub_variant_id: it.sub_variant_id || null,
             variant_name: it.variant_name, hsn_code: it.hsn_code,
             gst_rate: it.gst_rate, quantity: it.quantity,
+            buy_unit: it.buy_unit || null,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
           })),
@@ -445,6 +451,7 @@ export default function InvoicesClient() {
             sub_variant_id: it.sub_variant_id || null,
             variant_name: it.variant_name, hsn_code: it.hsn_code,
             gst_rate: it.gst_rate, quantity: it.quantity,
+            buy_unit: it.buy_unit || null,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
           })),
@@ -493,6 +500,7 @@ export default function InvoicesClient() {
             sub_variant_id: it.sub_variant_id || null,
             variant_name: it.variant_name, hsn_code: it.hsn_code,
             gst_rate: it.gst_rate, quantity: it.quantity,
+            buy_unit: it.buy_unit || null,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
           })),
@@ -806,7 +814,7 @@ export default function InvoicesClient() {
                       <tr key={draft.id} className="border-b border-amber-100 dark:border-amber-800/30 hover:bg-amber-100/40 dark:hover:bg-amber-900/20 transition-colors">
                         <td className="px-4 py-3 font-mono text-xs font-medium">
                           <a
-                            href={ap(`/admin/invoices/${draft.id}`)}
+                            href={ap(`/admin/orders/${draft.id}`)}
                             className="text-foreground hover:text-accent-500 hover:underline transition-colors"
                           >
                             {draft.order_number}
@@ -858,7 +866,7 @@ export default function InvoicesClient() {
                 {drafts.map(draft => (
                   <div key={draft.id} className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-medium text-foreground">{draft.order_number}</span>
+                      <a href={ap(`/admin/orders/${draft.id}`)} className="font-mono text-xs font-medium text-foreground hover:text-accent-500 hover:underline transition-colors">{draft.order_number}</a>
                       <span className="text-sm font-semibold text-foreground">
                         ₹{parseFloat(draft.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>

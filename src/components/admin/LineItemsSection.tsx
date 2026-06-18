@@ -6,6 +6,13 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { applyDiscount, mrpDiscountPct, lineItemInclGst } from '@/lib/pricing'
 
+export interface SellUnit {
+  unit: string
+  display_label: string
+  factor: number
+  dimension: string
+}
+
 export interface LineItem {
   id: string
   product_id: string | null
@@ -18,6 +25,11 @@ export interface LineItem {
   gst_rate: string
   quantity: string | number
   unit: string
+  buy_unit: string | null
+  buy_mode: string | null
+  sell_unit_factor: number
+  sell_unit_dimension: string | null
+  available_units: SellUnit[]
   unit_price: string | number
   price_ex_gst?: number
   discount_pct: number
@@ -56,8 +68,25 @@ export function newLineItem(): LineItem {
     id: Math.random().toString(36).slice(2),
     product_id: null, product_name: '', product_sku: '',
     variant_id: null, sub_variant_id: null, variant_name: '',
-    hsn_code: '', gst_rate: '18', quantity: 1, unit: 'PCS', unit_price: 0,
-    discount_pct: 0, mrp: 0, inventory_quantity: null,
+    hsn_code: '', gst_rate: '18', quantity: 1, unit: 'PCS',
+    buy_unit: null, buy_mode: null, sell_unit_factor: 1, sell_unit_dimension: null, available_units: [],
+    unit_price: 0, discount_pct: 0, mrp: 0, inventory_quantity: null,
+  }
+}
+
+async function fetchProductUnits(productId: string): Promise<SellUnit[]> {
+  try {
+    const res = await fetch(`/api/admin/products/${productId}/units`, { credentials: 'include' })
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data.units || []).map((u: any) => ({
+      unit: u.unit,
+      display_label: u.display_label || u.unit,
+      factor: Number(u.factor) || 1,
+      dimension: u.dimension || 'count',
+    }))
+  } catch {
+    return []
   }
 }
 
@@ -179,6 +208,27 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       discount_pct,
       mrp,
       inventory_quantity: s.inventory_quantity ?? null,
+      buy_unit: it.buy_unit,
+      buy_mode: it.buy_mode,
+      sell_unit_factor: it.sell_unit_factor,
+      sell_unit_dimension: it.sell_unit_dimension,
+      available_units: it.available_units,
+    }
+  }
+
+  async function populateUnits(populated: LineItem): Promise<LineItem> {
+    if (!populated.product_id) return populated
+    const units = await fetchProductUnits(populated.product_id)
+    if (!units.length) return populated
+    const defaultUnit = units[0]
+    return {
+      ...populated,
+      available_units: units,
+      buy_unit: defaultUnit.unit,
+      buy_mode: defaultUnit.dimension === 'count' ? 'count' : defaultUnit.dimension,
+      sell_unit_factor: defaultUnit.factor,
+      sell_unit_dimension: defaultUnit.dimension,
+      unit: defaultUnit.display_label.toUpperCase(),
     }
   }
 
@@ -207,12 +257,13 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       .filter(it => it.id !== targetItemId)
   }
 
-  function applyPickerProduct(s: Suggestion) {
+  async function applyPickerProduct(s: Suggestion) {
     if (!pickerItemId) return
     const target = items.find(it => it.id === pickerItemId)
     if (!target) return
     const populated = buildLineItemFromSuggestion(target, s)
-    onChange(mergeOrReplaceItem(pickerItemId, populated))
+    const withUnits = await populateUnits(populated)
+    onChange(mergeOrReplaceItem(pickerItemId, withUnits))
     setPickerOpen(false)
     setPickerItemId(null)
   }
@@ -222,6 +273,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       ...it, product_id: null, product_name: '', product_sku: '',
       variant_id: null, variant_name: '', hsn_code: '', gst_rate: '18',
       unit_price: 0, discount_pct: 0, mrp: 0, inventory_quantity: null,
+      buy_unit: null, buy_mode: null, sell_unit_factor: 1, sell_unit_dimension: null, available_units: [],
     }))
     setNameInputs(p => { const n = { ...p }; delete n[itemId]; return n })
     setSkuInputs(p => { const n = { ...p }; delete n[itemId]; return n })
@@ -323,7 +375,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                         type="line_items"
                         value={nameInputs[item.id] ?? ''}
                         onChange={v => setNameInputs(p => ({ ...p, [item.id]: v }))}
-                        onSelect={s => {
+                        onSelect={async s => {
                           const d = decodeLineItemId(s.id)
                           const populated: LineItem = {
                             ...item,
@@ -339,8 +391,14 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                             discount_pct: d.discount_pct,
                             mrp: d.mrp,
                             inventory_quantity: d.inventory_quantity,
+                            buy_unit: item.buy_unit,
+                            buy_mode: item.buy_mode,
+                            sell_unit_factor: item.sell_unit_factor,
+                            sell_unit_dimension: item.sell_unit_dimension,
+                            available_units: item.available_units,
                           }
-                          onChange(mergeOrReplaceItem(item.id, populated))
+                          const withUnits = await populateUnits(populated)
+                          onChange(mergeOrReplaceItem(item.id, withUnits))
                         }}
                         inputClassName={inputCls}
                         placeholder="Search by product name..."
@@ -352,7 +410,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                         type="line_items"
                         value={skuInputs[item.id] ?? ''}
                         onChange={v => setSkuInputs(p => ({ ...p, [item.id]: v }))}
-                        onSelect={s => {
+                        onSelect={async s => {
                           const d = decodeLineItemId(s.id)
                           const sku = s.sublabel?.split(' · ')[0] ?? ''
                           const populated: LineItem = {
@@ -369,8 +427,14 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                             discount_pct: d.discount_pct,
                             mrp: d.mrp,
                             inventory_quantity: d.inventory_quantity,
+                            buy_unit: item.buy_unit,
+                            buy_mode: item.buy_mode,
+                            sell_unit_factor: item.sell_unit_factor,
+                            sell_unit_dimension: item.sell_unit_dimension,
+                            available_units: item.available_units,
                           }
-                          onChange(mergeOrReplaceItem(item.id, populated))
+                          const withUnits = await populateUnits(populated)
+                          onChange(mergeOrReplaceItem(item.id, withUnits))
                         }}
                         inputClassName={inputCls + ' font-mono'}
                         placeholder="e.g. JFS-1234"
@@ -425,21 +489,47 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                 </div>
                 <div>
                   <label className={labelCls}>Unit</label>
-                  <div className="flex items-center gap-0.5 w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary">
-                    <button type="button" onClick={() => {
-                      const i = UNITS.indexOf(item.unit)
-                      updateItem(item.id, 'unit', UNITS[(i - 1 + UNITS.length) % UNITS.length])
-                    }} className="text-foreground-secondary hover:text-foreground transition-colors">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                    </button>
-                    <span className="text-sm font-medium text-foreground flex-1 text-center tabular-nums">{item.unit || 'PCS'}</span>
-                    <button type="button" onClick={() => {
-                      const i = UNITS.indexOf(item.unit)
-                      updateItem(item.id, 'unit', UNITS[(i + 1) % UNITS.length])
-                    }} className="text-foreground-secondary hover:text-foreground transition-colors">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                    </button>
-                  </div>
+                  {item.available_units.length > 0 ? (
+                    <select
+                      value={item.buy_unit ?? ''}
+                      onChange={e => {
+                        const u = item.available_units.find(u => u.unit === e.target.value)
+                        if (!u) return
+                        onChange(items.map(it => it.id === item.id ? {
+                          ...it,
+                          buy_unit: u.unit,
+                          buy_mode: u.dimension,
+                          sell_unit_factor: u.factor,
+                          sell_unit_dimension: u.dimension,
+                          unit: u.display_label.toUpperCase(),
+                        } : it))
+                      }}
+                      className={inputCls}
+                    >
+                      {item.available_units.map(u => (
+                        <option key={u.unit} value={u.unit}>
+                          {u.display_label}
+                          {u.dimension === 'count' && u.factor > 1 ? ` (${u.factor} pcs)` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="flex items-center gap-0.5 w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary">
+                      <button type="button" onClick={() => {
+                        const i = UNITS.indexOf(item.unit)
+                        updateItem(item.id, 'unit', UNITS[(i - 1 + UNITS.length) % UNITS.length])
+                      }} className="text-foreground-secondary hover:text-foreground transition-colors">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                      </button>
+                      <span className="text-sm font-medium text-foreground flex-1 text-center tabular-nums">{item.unit || 'PCS'}</span>
+                      <button type="button" onClick={() => {
+                        const i = UNITS.indexOf(item.unit)
+                        updateItem(item.id, 'unit', UNITS[(i + 1) % UNITS.length])
+                      }} className="text-foreground-secondary hover:text-foreground transition-colors">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className={labelCls}>MRP (incl. GST) <span className="text-red-500">*</span></label>

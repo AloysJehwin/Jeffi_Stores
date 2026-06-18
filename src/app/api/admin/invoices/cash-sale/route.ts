@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
+        buy_unit: item.buy_unit || null,
         unit_price: unitPrice,
         total_price: lineTotal,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
@@ -165,7 +166,17 @@ export async function POST(request: NextRequest) {
 
       for (const item of processedItems) {
         if (!item.product_id) continue
-        const qty = item.quantity
+        const rawQty = item.quantity
+
+        const unitRow = await client.query<{ factor: number; dimension: string }>(
+          `SELECT factor, dimension FROM product_units WHERE unit = $1 AND product_id = $2 LIMIT 1`,
+          [item.buy_unit, item.product_id]
+        )
+        const u = unitRow.rows[0]
+        const qty = (u?.dimension === 'count' && u?.factor)
+          ? rawQty * parseFloat(u.factor as any)
+          : rawQty
+
         let stockBefore = 0
 
         if (item.sub_variant_id) {

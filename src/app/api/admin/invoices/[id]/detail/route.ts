@@ -43,10 +43,15 @@ export async function GET(
     }
 
     const items = await queryMany<any>(
-      `SELECT product_name, product_sku, variant_name, hsn_code, gst_rate,
-              quantity, unit_price, total_price,
-              taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-       FROM order_items WHERE order_id = $1 ORDER BY created_at`,
+      `SELECT oi.product_name, oi.product_sku, oi.variant_name, oi.hsn_code, oi.gst_rate,
+              oi.quantity, oi.unit_price, oi.total_price,
+              oi.taxable_amount, oi.cgst_amount, oi.sgst_amount, oi.igst_amount, oi.tax_amount,
+              oi.buy_unit, oi.buy_mode,
+              pu.factor AS sell_unit_factor,
+              pu.dimension AS sell_unit_dimension
+       FROM order_items oi
+       LEFT JOIN product_units pu ON pu.unit = oi.buy_unit AND pu.product_id = oi.product_id
+       WHERE oi.order_id = $1 ORDER BY oi.created_at`,
       [id]
     )
 

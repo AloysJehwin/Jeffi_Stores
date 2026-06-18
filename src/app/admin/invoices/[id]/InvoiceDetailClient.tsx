@@ -195,7 +195,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {o.status === 'draft' && o.source !== 'business' && (
+          {o.status === 'draft' && o.source === 'offline' && (
             <a
               href={ap(`/admin/invoices?view=edit&edit=${o.id}`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
@@ -204,7 +204,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               Edit
             </a>
           )}
-          {o.status === 'draft' && o.source === 'business' && (
+          {o.status === 'draft' && (
             <button
               onClick={finalizeInvoice}
               disabled={finalizing}
@@ -381,7 +381,21 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">{item.hsn_code || '—'}</td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
-                  <td className="px-4 py-3 text-center text-foreground">{item.quantity}</td>
+                  <td className="px-4 py-3 text-center text-foreground">
+                    {(() => {
+                      const orderedQty = Number(item.quantity)
+                      const isCount = item.sell_unit_dimension === 'count'
+                      const factor = item.sell_unit_factor ? Number(item.sell_unit_factor) : 1
+                      const unitLabel = (item.buy_unit && item.buy_unit !== 'unit') ? item.buy_unit : null
+                      if (isCount && unitLabel && factor > 1) {
+                        return `${orderedQty} ${unitLabel} (${orderedQty * factor} pcs)`
+                      }
+                      if (unitLabel && !isCount) {
+                        return `${orderedQty} ${unitLabel}`
+                      }
+                      return orderedQty
+                    })()}
+                  </td>
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.unit_price))}</td>
                   <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(item.taxable_amount || '0'))}</td>
                   <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(item.tax_amount || '0'))}</td>
