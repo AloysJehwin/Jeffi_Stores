@@ -512,14 +512,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                     const su = item.available_units[0] ?? null
                     const qMin  = su ? su.min_qty  : 0.001
                     const qStep = su ? su.qty_step : 1
-                    const rawStockMax = item.inventory_quantity != null ? item.inventory_quantity / (su?.factor ?? 1) : undefined
-                    // For count units you can't sell a fractional box/set — floor to whole units
-                    const stockMax = rawStockMax != null
-                      ? (su?.dimension === 'count' ? Math.floor(rawStockMax) : rawStockMax)
-                      : undefined
-                    const qMax  = su?.max_qty != null
-                      ? (stockMax != null ? Math.min(su.max_qty, stockMax) : su.max_qty)
-                      : stockMax
+                    // UI only caps at product_units.max_qty — stock is checked at finalization
+                    const qMax: number | undefined = su?.max_qty != null ? su.max_qty : undefined
                     const clamp = (v: number) => {
                       let r = Math.round((Math.round((v - qMin) / qStep) * qStep + qMin) * 1e9) / 1e9
                       if (r < qMin) r = qMin
@@ -579,11 +573,11 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                         {su && su.factor > 1 && Number(item.quantity) > 0 && (
                           <p className="text-[10px] text-foreground-secondary mt-0.5">
                             {Math.round(Number(item.quantity) * su.factor)} pcs total
-                          </p>
-                        )}
-                        {qMax != null && (
-                          <p className="text-[10px] text-foreground-secondary mt-0.5">
-                            max {qMax} {su?.display_label ?? ''}
+                            {item.inventory_quantity != null && (
+                              <span className={Number(item.quantity) * su.factor > item.inventory_quantity ? ' text-amber-500 font-medium' : ''}>
+                                {' · '}stock: {item.inventory_quantity} pcs
+                              </span>
+                            )}
                           </p>
                         )}
                       </div>
