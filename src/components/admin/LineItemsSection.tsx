@@ -115,7 +115,12 @@ function calcLine(it: LineItem) {
   const gstRate = Number(it.gst_rate) || 0
   const discPct = Number(it.discount_pct) || 0
   const mrpEx = mrpIncl / (1 + gstRate / 100)
-  return lineItemInclGst(qty, mrpEx, discPct, gstRate)
+  // For count-dimension units, MRP is per piece; multiply qty by factor
+  const su = it.available_units[0] ?? null
+  const effectiveQty = (su && su.dimension === 'count' && su.factor > 1)
+    ? qty * su.factor
+    : qty
+  return lineItemInclGst(effectiveQty, mrpEx, discPct, gstRate)
 }
 
 function fmt(n: number) {
@@ -507,7 +512,11 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                     const su = item.available_units[0] ?? null
                     const qMin  = su ? su.min_qty  : 0.001
                     const qStep = su ? su.qty_step : 1
-                    const stockMax = item.inventory_quantity != null ? item.inventory_quantity / (su?.factor ?? 1) : undefined
+                    const rawStockMax = item.inventory_quantity != null ? item.inventory_quantity / (su?.factor ?? 1) : undefined
+                    // For count units you can't sell a fractional box/set — floor to whole units
+                    const stockMax = rawStockMax != null
+                      ? (su?.dimension === 'count' ? Math.floor(rawStockMax) : rawStockMax)
+                      : undefined
                     const qMax  = su?.max_qty != null
                       ? (stockMax != null ? Math.min(su.max_qty, stockMax) : su.max_qty)
                       : stockMax
@@ -520,6 +529,16 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                           max={qMax}
                           value={item.quantity}
                           onChange={e => updateItem(item.id, 'quantity', e.target.value)}
+                          onBlur={e => {
+                            let v = parseFloat(e.target.value)
+                            if (isNaN(v) || v < qMin) v = qMin
+                            if (qMax != null && v > qMax) v = qMax
+                            // Snap to nearest valid step from min
+                            const steps = Math.round((v - qMin) / qStep)
+                            v = Math.round((qMin + steps * qStep) * 1e9) / 1e9
+                            if (qMax != null && v > qMax) v = qMax
+                            updateItem(item.id, 'quantity', String(v))
+                          }}
                           required
                           className={inputCls}
                         />
