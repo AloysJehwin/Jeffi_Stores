@@ -76,9 +76,6 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
             </svg>
           </button>
         </div>
-        {unitLabel && unitKey !== 'unit' && (
-          <span className="text-sm text-foreground-secondary"><UnitLabel label={unitLabel} /></span>
-        )}
       </div>
     </div>
   )
