@@ -248,18 +248,39 @@ export async function PATCH(
 
     if (statusChanged && status === 'processing') {
       const items = await queryMany<any>(
-        `SELECT oi.product_id, oi.variant_id, oi.quantity,
-          CASE WHEN oi.variant_id IS NOT NULL
-            THEN (SELECT inventory_quantity FROM product_variants WHERE id = oi.variant_id)
+        `SELECT oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.buy_unit, oi.product_name, oi.variant_name,
+          CASE
+            WHEN oi.sub_variant_id IS NOT NULL THEN (SELECT inventory_quantity FROM product_sub_variants WHERE id = oi.sub_variant_id)
+            WHEN oi.variant_id IS NOT NULL THEN (SELECT inventory_quantity FROM product_variants WHERE id = oi.variant_id)
             ELSE (SELECT inventory_quantity FROM products WHERE id = oi.product_id)
           END AS inventory_quantity
          FROM order_items oi WHERE oi.order_id = $1`,
         [orderId]
       )
-      const insufficient = items.filter((item: any) => Number(item.inventory_quantity) < parseFloat(item.quantity))
+      const insufficient: string[] = []
+      for (const item of items) {
+        const rawQty = parseFloat(item.quantity)
+        const unitRow = await queryOne<{ factor: string; dimension: string }>(
+          `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                  COALESCE(puv.dimension, pup.dimension) AS dimension
+           FROM (SELECT 1) x
+           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+          [item.buy_unit, item.product_id, item.variant_id || null]
+        )
+        const baseQty = (unitRow?.dimension === 'count' && unitRow?.factor)
+          ? rawQty * parseFloat(unitRow.factor)
+          : rawQty
+        const stock = Number(item.inventory_quantity) || 0
+        if (stock < baseQty) {
+          insufficient.push(
+            `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`
+          )
+        }
+      }
       if (insufficient.length > 0) {
         return NextResponse.json(
-          { error: 'Insufficient stock for one or more items. Update inventory before marking as processing.' },
+          { error: `Insufficient stock for: ${insufficient.join('; ')}. Update inventory before marking as processing.` },
           { status: 400 }
         )
       }
@@ -381,19 +402,53 @@ export async function PATCH(
 
     if (statusChanged && status === 'processing') {
       const items = await queryMany<any>(
-        `SELECT oi.product_id, oi.variant_id, oi.quantity
+        `SELECT oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.buy_unit
          FROM order_items oi WHERE oi.order_id = $1`,
         [orderId]
       )
       await withTransaction(async (client) => {
         for (const item of items) {
-          const qty = parseFloat(item.quantity)
-          if (item.variant_id) {
+          const rawQty = parseFloat(item.quantity)
+          const unitRow = await client.query<{ factor: string; dimension: string }>(
+            `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                    COALESCE(puv.dimension, pup.dimension) AS dimension
+             FROM (SELECT 1) x
+             LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+             LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+            [item.buy_unit, item.product_id, item.variant_id || null]
+          )
+          const u = unitRow.rows[0]
+          const qty = (u?.dimension === 'count' && u?.factor)
+            ? rawQty * parseFloat(u.factor)
+            : rawQty
+
+          let stockBefore = 0
+          if (item.sub_variant_id) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+              [item.sub_variant_id]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              'UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
+              [qty, item.sub_variant_id]
+            )
+          } else if (item.variant_id) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+              [item.variant_id]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
               'UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
               [qty, item.variant_id]
             )
           } else {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
+              [item.product_id]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
               'UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
               [qty, item.product_id]
@@ -402,10 +457,12 @@ export async function PATCH(
           await logStockMovement(client, {
             productId: item.product_id,
             variantId: item.variant_id || null,
+            subVariantId: item.sub_variant_id || null,
             transactionType: 'sale',
             quantityChange: -qty,
             referenceType: 'order',
             referenceId: orderId,
+            currentStock: stockBefore,
           })
         }
       })
@@ -535,7 +592,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, deleted: true })
   } catch (err) {
-    console.error('[route]', err)
-    return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
+return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
   }
 }
