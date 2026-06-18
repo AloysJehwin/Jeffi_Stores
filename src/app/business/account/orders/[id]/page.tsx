@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { use, useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
@@ -112,7 +112,8 @@ function statusLabel(status: string) {
   }
 }
 
-export default function BusinessOrderDetailPage({ params }: { params: { id: string } }) {
+export default function BusinessOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetails | null>(null)
@@ -143,7 +144,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
 
   const fetchOrder = async () => {
     try {
-      const res = await fetch(`/api/orders/${params.id}`, { credentials: 'include', headers: PH })
+      const res = await fetch(`/api/orders/${id}`, { credentials: 'include', headers: PH })
       if (!res.ok) throw new Error('Failed to fetch order details')
       const data = await res.json()
       setOrder(data.order)
@@ -159,7 +160,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     autoCancelTriggeredRef.current = true
     setIsAutoCancelling(true)
     try {
-      const res = await fetch(`/api/orders/${params.id}/cancel`, {
+      const res = await fetch(`/api/orders/${id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...PH },
         credentials: 'include',
@@ -170,7 +171,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     } finally {
       setIsAutoCancelling(false)
     }
-  }, [params.id])
+  }, [id])
 
   useEffect(() => {
     if (!order || order.status === 'cancelled' || order.status === 'cancel_requested') return
@@ -195,7 +196,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     if (order.status === 'cancelled' || order.status === 'cancel_requested') return
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/orders/${params.id}`, { credentials: 'include', headers: PH })
+        const res = await fetch(`/api/orders/${id}`, { credentials: 'include', headers: PH })
         if (!res.ok) return
         const data = await res.json()
         if (data.order?.paymentStatus === 'paid') {
@@ -205,7 +206,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
       } catch { /* ignore */ }
     }, 5000)
     return () => clearInterval(interval)
-  }, [params.id, order?.paymentMode, order?.paymentStatus, order?.status])
+  }, [id, order?.paymentMode, order?.paymentStatus, order?.status])
 
   const handleCancelOrder = async () => {
     const isImmediate = order?.status === 'pending' && order?.paymentStatus === 'unpaid'
@@ -221,7 +222,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     if (!ok) return
     setIsCancelling(true)
     try {
-      const res = await fetch(`/api/orders/${params.id}/cancel`, {
+      const res = await fetch(`/api/orders/${id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...PH },
         credentials: 'include',

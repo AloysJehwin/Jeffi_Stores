@@ -112,26 +112,26 @@ describe('GET /api/admin/invoices/drafts/[id]', () => {
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-    const res = await GET(makeReq(), { params: { id: DRAFT_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     vi.mocked(hasScope).mockReturnValue(false)
-    const res = await GET(makeReq(), { params: { id: DRAFT_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 404 when draft not found', async () => {
     vi.mocked(queryOne).mockResolvedValue(null as any)
-    const res = await GET(makeReq(), { params: { id: DRAFT_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(404)
     const json = await res.json()
     expect(json.error).toBe('Draft not found')
   })
 
   it('returns order and items on happy path', async () => {
-    const res = await GET(makeReq(), { params: { id: DRAFT_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: DRAFT_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json).toHaveProperty('order')
@@ -141,7 +141,7 @@ describe('GET /api/admin/invoices/drafts/[id]', () => {
 
   it('returns 500 on DB error', async () => {
     vi.mocked(queryOne).mockRejectedValue(new Error('DB down'))
-    const res = await GET(makeReq(), { params: { id: DRAFT_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(500)
   })
 })
@@ -165,25 +165,25 @@ describe('PATCH /api/admin/invoices/drafts/[id]', () => {
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     vi.mocked(hasScope).mockReturnValue(false)
-    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 404 when draft not found', async () => {
     vi.mocked(queryOne).mockResolvedValue(null as any)
-    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(404)
   })
 
   it('returns 400 when order is not a draft', async () => {
     vi.mocked(queryOne).mockResolvedValue({ id: DRAFT_ID, status: 'invoiced' } as any)
-    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/draft/)
@@ -191,14 +191,14 @@ describe('PATCH /api/admin/invoices/drafts/[id]', () => {
 
   it('returns 400 when customerName is missing', async () => {
     const body = { ...VALID_PATCH_BODY, customerName: '' }
-    const res = await PATCH(makeReq('PATCH', body), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', body), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/customerName/)
   })
 
   it('updates draft and returns success', async () => {
-    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: Promise.resolve({ id: DRAFT_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.success).toBe(true)
@@ -206,7 +206,7 @@ describe('PATCH /api/admin/invoices/drafts/[id]', () => {
 
   it('handles empty items array (clears line items)', async () => {
     const body = { ...VALID_PATCH_BODY, items: [] }
-    const res = await PATCH(makeReq('PATCH', body), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', body), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -215,7 +215,7 @@ describe('PATCH /api/admin/invoices/drafts/[id]', () => {
     const client = makeTransactionClient()
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
 
-    const res = await PATCH(makeReq('PATCH', body), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', body), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(200)
     // Verify query was called with 'unpaid'
     const updateCall = client.query.mock.calls.find((args: any[]) =>
@@ -230,13 +230,13 @@ describe('PATCH /api/admin/invoices/drafts/[id]', () => {
     vi.mocked(isInterState).mockReturnValue(true)
 
     const body = { ...VALID_PATCH_BODY, buyerGstin: '27AABCU9603R1ZM', state: 'Maharashtra' }
-    const res = await PATCH(makeReq('PATCH', body), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', body), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(200)
   })
 
   it('returns 500 on transaction failure', async () => {
     vi.mocked(withTransaction).mockRejectedValue(new Error('TX error'))
-    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: { id: DRAFT_ID } })
+    const res = await PATCH(makeReq('PATCH', VALID_PATCH_BODY), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(500)
   })
 })
@@ -256,32 +256,32 @@ describe('DELETE /api/admin/invoices/drafts/[id]', () => {
 
   it('returns 401 when not authenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-    const res = await DELETE(makeReq('DELETE'), { params: { id: DRAFT_ID } })
+    const res = await DELETE(makeReq('DELETE'), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     vi.mocked(hasScope).mockReturnValue(false)
-    const res = await DELETE(makeReq('DELETE'), { params: { id: DRAFT_ID } })
+    const res = await DELETE(makeReq('DELETE'), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 404 when draft not found', async () => {
     vi.mocked(queryOne).mockResolvedValue(null as any)
-    const res = await DELETE(makeReq('DELETE'), { params: { id: DRAFT_ID } })
+    const res = await DELETE(makeReq('DELETE'), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(404)
   })
 
   it('returns 400 when order is not a draft', async () => {
     vi.mocked(queryOne).mockResolvedValue({ id: DRAFT_ID, status: 'invoiced' } as any)
-    const res = await DELETE(makeReq('DELETE'), { params: { id: DRAFT_ID } })
+    const res = await DELETE(makeReq('DELETE'), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/draft/)
   })
 
   it('deletes draft and returns success', async () => {
-    const res = await DELETE(makeReq('DELETE'), { params: { id: DRAFT_ID } })
+    const res = await DELETE(makeReq('DELETE'), { params: Promise.resolve({ id: DRAFT_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.success).toBe(true)
@@ -291,7 +291,7 @@ describe('DELETE /api/admin/invoices/drafts/[id]', () => {
     const client = makeTransactionClient()
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
 
-    await DELETE(makeReq('DELETE'), { params: { id: DRAFT_ID } })
+    await DELETE(makeReq('DELETE'), { params: Promise.resolve({ id: DRAFT_ID }) })
 
     const deleteCalls = client.query.mock.calls.filter(
       (args: any[]) => typeof args[0] === 'string' && args[0].trim().startsWith('DELETE'),
@@ -301,7 +301,7 @@ describe('DELETE /api/admin/invoices/drafts/[id]', () => {
 
   it('returns 500 on transaction failure', async () => {
     vi.mocked(withTransaction).mockRejectedValue(new Error('TX error'))
-    const res = await DELETE(makeReq('DELETE'), { params: { id: DRAFT_ID } })
+    const res = await DELETE(makeReq('DELETE'), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(500)
   })
 })

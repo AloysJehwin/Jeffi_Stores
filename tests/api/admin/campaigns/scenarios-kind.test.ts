@@ -98,21 +98,21 @@ describe('GET /api/admin/campaigns/scenarios/[kind]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await GET(makeGet('abandoned-cart'), { params: { kind: 'abandoned-cart' } })
+    const res = await GET(makeGet('abandoned-cart'), { params: Promise.resolve({ kind: 'abandoned-cart' }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toBe('Unauthorized')
   })
 
   it('returns 403 when scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeGet('abandoned-cart'), { params: { kind: 'abandoned-cart' } })
+    const res = await GET(makeGet('abandoned-cart'), { params: Promise.resolve({ kind: 'abandoned-cart' }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toBe('Insufficient permissions')
   })
 
   it('returns builtin scenario details', async () => {
     mockGetScenario.mockReturnValue(builtinScenario as any)
-    const res = await GET(makeGet('abandoned-cart'), { params: { kind: 'abandoned-cart' } })
+    const res = await GET(makeGet('abandoned-cart'), { params: Promise.resolve({ kind: 'abandoned-cart' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.scenario.type).toBe('builtin')
@@ -125,7 +125,7 @@ describe('GET /api/admin/campaigns/scenarios/[kind]', () => {
   it('returns 404 when custom scenario not found', async () => {
     mockGetScenario.mockReturnValue(null)
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await GET(makeGet('nonexistent'), { params: { kind: 'nonexistent' } })
+    const res = await GET(makeGet('nonexistent'), { params: Promise.resolve({ kind: 'nonexistent' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Scenario not found')
   })
@@ -133,7 +133,7 @@ describe('GET /api/admin/campaigns/scenarios/[kind]', () => {
   it('returns custom scenario details', async () => {
     mockGetScenario.mockReturnValue(null)
     mockQueryOne.mockResolvedValueOnce(customScenarioRow as any)
-    const res = await GET(makeGet('custom-promo'), { params: { kind: 'custom-promo' } })
+    const res = await GET(makeGet('custom-promo'), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.scenario.type).toBe('custom')
@@ -144,7 +144,7 @@ describe('GET /api/admin/campaigns/scenarios/[kind]', () => {
   it('parses campaign integer counts correctly', async () => {
     mockGetScenario.mockReturnValue(builtinScenario as any)
     mockQueryMany.mockResolvedValueOnce([campaignRow] as any)
-    const res = await GET(makeGet('abandoned-cart'), { params: { kind: 'abandoned-cart' } })
+    const res = await GET(makeGet('abandoned-cart'), { params: Promise.resolve({ kind: 'abandoned-cart' }) })
     const body = await res.json()
     expect(typeof body.campaigns[0].total_sent).toBe('number')
     expect(body.campaigns[0].total_opened).toBe(10)
@@ -167,32 +167,32 @@ describe('PATCH /api/admin/campaigns/scenarios/[kind]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await PATCH(makePatch('custom-promo', { enabled: false }), { params: { kind: 'custom-promo' } })
+    const res = await PATCH(makePatch('custom-promo', { enabled: false }), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await PATCH(makePatch('custom-promo', { enabled: false }), { params: { kind: 'custom-promo' } })
+    const res = await PATCH(makePatch('custom-promo', { enabled: false }), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 400 when trying to modify builtin scenario', async () => {
     mockGetScenario.mockReturnValue(builtinScenario as any)
-    const res = await PATCH(makePatch('abandoned-cart', { enabled: false }), { params: { kind: 'abandoned-cart' } })
+    const res = await PATCH(makePatch('abandoned-cart', { enabled: false }), { params: Promise.resolve({ kind: 'abandoned-cart' }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Built-in scenarios cannot be modified')
   })
 
   it('returns 404 when custom scenario not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await PATCH(makePatch('nonexistent', { enabled: false }), { params: { kind: 'nonexistent' } })
+    const res = await PATCH(makePatch('nonexistent', { enabled: false }), { params: Promise.resolve({ kind: 'nonexistent' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Scenario not found')
   })
 
   it('updates enabled flag', async () => {
-    const res = await PATCH(makePatch('custom-promo', { enabled: false }), { params: { kind: 'custom-promo' } })
+    const res = await PATCH(makePatch('custom-promo', { enabled: false }), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(mockQuery).toHaveBeenCalledWith(
@@ -202,7 +202,7 @@ describe('PATCH /api/admin/campaigns/scenarios/[kind]', () => {
   })
 
   it('updates name', async () => {
-    const res = await PATCH(makePatch('custom-promo', { name: 'New Name' }), { params: { kind: 'custom-promo' } })
+    const res = await PATCH(makePatch('custom-promo', { name: 'New Name' }), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('name'),
@@ -211,7 +211,7 @@ describe('PATCH /api/admin/campaigns/scenarios/[kind]', () => {
   })
 
   it('updates description (including empty string to null)', async () => {
-    const res = await PATCH(makePatch('custom-promo', { description: '' }), { params: { kind: 'custom-promo' } })
+    const res = await PATCH(makePatch('custom-promo', { description: '' }), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(200)
   })
 })
@@ -229,26 +229,26 @@ describe('DELETE /api/admin/campaigns/scenarios/[kind]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await DELETE(makeDelete('custom-promo'), { params: { kind: 'custom-promo' } })
+    const res = await DELETE(makeDelete('custom-promo'), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await DELETE(makeDelete('custom-promo'), { params: { kind: 'custom-promo' } })
+    const res = await DELETE(makeDelete('custom-promo'), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 400 when trying to delete builtin scenario', async () => {
     mockGetScenario.mockReturnValue(builtinScenario as any)
-    const res = await DELETE(makeDelete('abandoned-cart'), { params: { kind: 'abandoned-cart' } })
+    const res = await DELETE(makeDelete('abandoned-cart'), { params: Promise.resolve({ kind: 'abandoned-cart' }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Built-in scenarios cannot be deleted')
   })
 
   it('returns 404 when custom scenario not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await DELETE(makeDelete('nonexistent'), { params: { kind: 'nonexistent' } })
+    const res = await DELETE(makeDelete('nonexistent'), { params: Promise.resolve({ kind: 'nonexistent' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Scenario not found')
   })
@@ -257,7 +257,7 @@ describe('DELETE /api/admin/campaigns/scenarios/[kind]', () => {
     mockQueryOne
       .mockResolvedValueOnce({ kind: 'custom-promo' } as any)  // exists check
       .mockResolvedValueOnce({ count: '3' } as any)            // linked campaigns count
-    const res = await DELETE(makeDelete('custom-promo'), { params: { kind: 'custom-promo' } })
+    const res = await DELETE(makeDelete('custom-promo'), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toContain('Cannot delete')
   })
@@ -266,7 +266,7 @@ describe('DELETE /api/admin/campaigns/scenarios/[kind]', () => {
     mockQueryOne
       .mockResolvedValueOnce({ kind: 'custom-promo' } as any)  // exists check
       .mockResolvedValueOnce({ count: '0' } as any)            // no linked campaigns
-    const res = await DELETE(makeDelete('custom-promo'), { params: { kind: 'custom-promo' } })
+    const res = await DELETE(makeDelete('custom-promo'), { params: Promise.resolve({ kind: 'custom-promo' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(mockQuery).toHaveBeenCalledWith(

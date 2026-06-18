@@ -22,7 +22,7 @@ beforeEach(() => { vi.clearAllMocks() })
 describe('GET /api/admin/audit/mail-log/[id]', () => {
   it('returns 404 when row not found', async () => {
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeReq('log-1'), { params: { id: 'log-1' } })
+    const res = await GET(makeReq('log-1'), { params: Promise.resolve({ id: 'log-1' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toBe('Not found')
@@ -34,7 +34,7 @@ describe('GET /api/admin/audit/mail-log/[id]', () => {
       template_name: 'invoice', kind: 'transactional',
     }
     mockQueryOne.mockResolvedValue(row)
-    const res = await GET(makeReq('log-1'), { params: { id: 'log-1' } })
+    const res = await GET(makeReq('log-1'), { params: Promise.resolve({ id: 'log-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.row).toEqual(row)
@@ -42,7 +42,7 @@ describe('GET /api/admin/audit/mail-log/[id]', () => {
 
   it('queries with correct id param', async () => {
     mockQueryOne.mockResolvedValue({ id: 'log-99' })
-    await GET(makeReq('log-99'), { params: { id: 'log-99' } })
+    await GET(makeReq('log-99'), { params: Promise.resolve({ id: 'log-99' }) })
     expect(mockQueryOne).toHaveBeenCalledWith(expect.any(String), ['log-99'])
   })
 })

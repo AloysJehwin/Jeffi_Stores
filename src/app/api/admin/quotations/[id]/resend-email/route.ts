@@ -6,15 +6,16 @@ import { sendQuotationFinalizedEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const qt = await queryOne<any>(
       `SELECT consignee_email, consignee_name, quote_number, total_amount, view_token FROM quotations WHERE id = $1`,
-      [params.id]
+      [id]
     )
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (!qt.consignee_email) return NextResponse.json({ error: 'No email address on file' }, { status: 400 })

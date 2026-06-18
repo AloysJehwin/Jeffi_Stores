@@ -32,7 +32,8 @@ interface CustomScenarioRow {
   parameters: Record<string, unknown> | null
 }
 
-export async function GET(req: NextRequest, { params }: { params: { kind: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'mailer')) {
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
     maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',   description: 'Hard limit per sweep' },
   }
 
-  const builtin = getScenario(params.kind)
+  const builtin = getScenario(kind)
   if (builtin) {
     scenarioPayload = {
       kind: builtin.kind,
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
     const custom = await queryOne<CustomScenarioRow>(
       `SELECT kind, name, description, ai_prompt, generated_sql, enabled, dry_run_count, parameters
        FROM custom_scenarios WHERE kind = $1`,
-      [params.kind]
+      [kind]
     )
     if (!custom) return NextResponse.json({ error: 'Scenario not found' }, { status: 404 })
     scenarioPayload = {
@@ -97,7 +98,7 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
     FROM campaigns c
     WHERE c.scenario_kind = $1
     ORDER BY c.name
-  `, [params.kind])
+  `, [kind])
 
   return NextResponse.json({
     scenario: scenarioPayload,
@@ -111,18 +112,19 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
   })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { kind: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'mailer')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  if (getScenario(params.kind)) {
+  if (getScenario(kind)) {
     return NextResponse.json({ error: 'Built-in scenarios cannot be modified' }, { status: 400 })
   }
 
-  const exists = await queryOne(`SELECT kind FROM custom_scenarios WHERE kind = $1`, [params.kind])
+  const exists = await queryOne(`SELECT kind FROM custom_scenarios WHERE kind = $1`, [kind])
   if (!exists) return NextResponse.json({ error: 'Scenario not found' }, { status: 404 })
 
   const body = await req.json().catch(() => ({}))
@@ -143,44 +145,45 @@ export async function PATCH(req: NextRequest, { params }: { params: { kind: stri
     vals.push(body.description.trim() || null)
   }
 
-  vals.push(params.kind)
+  vals.push(kind)
   await query(`UPDATE custom_scenarios SET ${updates.join(', ')} WHERE kind = $${i}`, vals)
 
   await query(
     `INSERT INTO scenario_audit_log (admin_id, scenario_kind, action, result) VALUES ($1, $2, 'patch', $3::jsonb)`,
-    [admin.id, params.kind, JSON.stringify(body)]
+    [admin.id, kind, JSON.stringify(body)]
   ).catch(() => {})
 
   return NextResponse.json({ success: true })
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { kind: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'mailer')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  if (getScenario(params.kind)) {
+  if (getScenario(kind)) {
     return NextResponse.json({ error: 'Built-in scenarios cannot be deleted' }, { status: 400 })
   }
 
-  const exists = await queryOne(`SELECT kind FROM custom_scenarios WHERE kind = $1`, [params.kind])
+  const exists = await queryOne(`SELECT kind FROM custom_scenarios WHERE kind = $1`, [kind])
   if (!exists) return NextResponse.json({ error: 'Scenario not found' }, { status: 404 })
 
   const linkedCampaigns = await queryOne<{ count: string }>(
     `SELECT COUNT(*)::text AS count FROM campaigns WHERE scenario_kind = $1`,
-    [params.kind]
+    [kind]
   )
   if (parseInt(linkedCampaigns?.count || '0', 10) > 0) {
     return NextResponse.json({ error: 'Cannot delete — campaigns still use this scenario. Delete or reassign them first.' }, { status: 400 })
   }
 
-  await query(`DELETE FROM scenarios WHERE kind = $1`, [params.kind])
+  await query(`DELETE FROM scenarios WHERE kind = $1`, [kind])
 
   await query(
     `INSERT INTO scenario_audit_log (admin_id, scenario_kind, action) VALUES ($1, $2, 'delete')`,
-    [admin.id, params.kind]
+    [admin.id, kind]
   ).catch(() => {})
 
   return NextResponse.json({ success: true })

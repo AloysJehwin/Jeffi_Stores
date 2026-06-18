@@ -13,19 +13,20 @@ export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-export default async function CustomersPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedSearchParams = await searchParams
   const host = (await headers()).get('host') ?? ''
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
-  const sort = searchParams.sort
-  const dir = searchParams.dir as 'asc' | 'desc' | undefined
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const sort = resolvedSearchParams.sort
+  const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
 
   const [{ customers, total }, allStats] = await Promise.all([
     getCustomers({
-      search: searchParams.search,
-      status: searchParams.status,
-      segment: searchParams.segment,
-      tag: searchParams.tag,
-      health: searchParams.health,
+      search: resolvedSearchParams.search,
+      status: resolvedSearchParams.status,
+      segment: resolvedSearchParams.segment,
+      tag: resolvedSearchParams.tag,
+      health: resolvedSearchParams.health,
       page,
       limit: PAGE_SIZE,
       sort,
@@ -40,11 +41,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
-    if (searchParams.status) params.set('status', searchParams.status)
-    if (searchParams.search) params.set('search', searchParams.search)
-    if (searchParams.segment) params.set('segment', searchParams.segment)
-    if (searchParams.tag) params.set('tag', searchParams.tag)
-    if (searchParams.health) params.set('health', searchParams.health)
+    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
+    if (resolvedSearchParams.tag) params.set('tag', resolvedSearchParams.tag)
+    if (resolvedSearchParams.health) params.set('health', resolvedSearchParams.health)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))

@@ -23,7 +23,7 @@ import * as jwt from '@/lib/jwt'
 import * as db from '@/lib/db'
 
 const USER = { userId: 'user-1' }
-const PARAMS = { params: { id: 'order-123' } }
+const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }
 
 const MOCK_ORDER = {
   id: 'order-123',

@@ -9,15 +9,16 @@ import { generateOrderInvoice } from '@/lib/invoice'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(
       `SELECT id, status, customer_name, customer_email, total_amount, order_number FROM orders WHERE id = $1`,
-      [params.id]
+      [id]
     )
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     if (order.status !== 'draft' && order.status !== 'confirmed') {
@@ -28,11 +29,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const targetStatus = isOnlineOrder ? 'processing' : 'delivered'
 
     const result = await withTransaction(async (client) => {
-      await client.query(`SELECT id FROM orders WHERE id = $1 FOR UPDATE`, [params.id])
+      await client.query(`SELECT id FROM orders WHERE id = $1 FOR UPDATE`, [id])
 
       const itemsResult = await client.query(
         `SELECT * FROM order_items WHERE order_id = $1`,
-        [params.id]
+        [id]
       )
       const items = itemsResult.rows
 
@@ -119,7 +120,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           transactionType: 'sale',
           quantityChange: -qty,
           referenceType: 'order',
-          referenceId: params.id,
+          referenceId: id,
           currentStock: stockBefore,
         })
       }
@@ -137,7 +138,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
         await client.query(
           `UPDATE orders SET invoice_number = $1, invoice_date = $2, status = $3, updated_at = NOW() WHERE id = $4`,
-          [invoiceNumber, invoiceDate, targetStatus, params.id]
+          [invoiceNumber, invoiceDate, targetStatus, id]
         )
 
         if (isOnlineOrder) {
@@ -145,29 +146,29 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           await client.query(
             `UPDATE invoices SET invoice_number = $1, financial_year = $2, sequence_number = $3, status = 'finalized', updated_at = NOW()
              WHERE order_id = $4 AND status = 'draft'`,
-            [invoiceNumber, fy, seq, params.id]
+            [invoiceNumber, fy, seq, id]
           )
         } else {
           await client.query(
             `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)`,
-            [params.id, invoiceNumber, fy, seq]
+            [id, invoiceNumber, fy, seq]
           )
         }
       } else {
         await client.query(
           `UPDATE orders SET status = $1, invoice_date = NOW(), updated_at = NOW() WHERE id = $2`,
-          [targetStatus, params.id]
+          [targetStatus, id]
         )
       }
 
-      return { invoiceNumber, orderId: params.id }
+      return { invoiceNumber, orderId: id }
     })
 
     if (result.invoiceNumber) {
       if (isOnlineOrder && order.customer_email) {
         // Generate PDF and send processing email for online orders
         try {
-          await generateOrderInvoice(params.id)
+          await generateOrderInvoice(id)
         } catch (_) {}
       } else if (!isOnlineOrder && order.customer_email) {
         try {

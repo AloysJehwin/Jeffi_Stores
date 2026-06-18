@@ -31,28 +31,30 @@ const PutSchema = z.object({
 
 const DeleteSchema = z.object({ id: zUuid })
 
-type Params = { params: { id: string; variantId: string } }
+type Params = { params: Promise<{ id: string; variantId: string }> }
 
 export async function GET(request: NextRequest, { params }: Params) {
+  const { variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const rows = await queryMany(
     `SELECT * FROM product_sub_variants WHERE variant_id = $1 ORDER BY created_at ASC`,
-    [params.variantId]
+    [variantId]
   )
   return NextResponse.json({ sub_variants: rows })
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
+  const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const variant = await queryOne<{ id: string; sku: string }>(
     `SELECT id, sku FROM product_variants WHERE id = $1 AND product_id = $2`,
-    [params.variantId, params.id]
+    [variantId, id]
   )
   if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
 
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!parsed.ok) return parsed.response
   const { sub_variant_name, sku: skuInput, price, mrp, price_ex_gst, mrp_ex_gst, stock_status, attributes } = parsed.data
 
-  const productRow = await queryOne<{ sku: string }>(`SELECT sku FROM products WHERE id = $1`, [params.id])
+  const productRow = await queryOne<{ sku: string }>(`SELECT sku FROM products WHERE id = $1`, [id])
   const parentSku = variant.sku || productRow?.sku || 'PRD'
   const sku = skuInput || generateVariantSku(parentSku, sub_variant_name)
 
@@ -71,7 +73,7 @@ export async function POST(request: NextRequest, { params }: Params) {
        (variant_id, product_id, sku, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, stock_status, attributes)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      RETURNING *`,
-    [params.variantId, params.id, sku, sub_variant_name, price ?? null, mrp ?? null,
+    [variantId, id, sku, sub_variant_name, price ?? null, mrp ?? null,
      price_ex_gst ?? null, mrp_ex_gst ?? null,
      stock_status ?? 'In Stock', attributes ? JSON.stringify(attributes) : null]
   )
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
+  const { variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -93,7 +96,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (sub_variant_name) {
     const variant = await queryOne<{ sku: string }>(
       `SELECT sku FROM product_variants WHERE id = $1`,
-      [params.variantId]
+      [variantId]
     )
     if (variant?.sku) {
       newSku = generateVariantSku(variant.sku, sub_variant_name)
@@ -114,13 +117,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
     [sub_variant_name, newSku, price ?? null, mrp ?? null, price_ex_gst ?? null,
      mrp_ex_gst ?? null, stock_status ?? null,
      attributes ? JSON.stringify(attributes) : null, is_active ?? null,
-     id, params.variantId]
+     id, variantId]
   )
   if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({ sub_variant: row })
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
+  const { variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
@@ -131,6 +135,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!parsedDel.ok) return parsedDel.response
   const { id } = parsedDel.data
 
-  await query(`DELETE FROM product_sub_variants WHERE id = $1 AND variant_id = $2`, [id, params.variantId])
+  await query(`DELETE FROM product_sub_variants WHERE id = $1 AND variant_id = $2`, [id, variantId])
   return NextResponse.json({ success: true })
 }

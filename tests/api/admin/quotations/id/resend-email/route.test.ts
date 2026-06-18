@@ -18,7 +18,7 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockSendEmail = vi.mocked(sendQuotationFinalizedEmail)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['quotations'] }
-const params = { id: 'qt-123' }
+const params = Promise.resolve({ id: 'qt-123' })
 
 function makeRequest() {
   return new NextRequest('http://localhost/api/admin/quotations/qt-123/resend-email', { method: 'POST' })

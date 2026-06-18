@@ -34,7 +34,7 @@ import * as invoiceLib from '@/lib/invoice'
 
 const USER = { userId: 'user-1', isBusiness: false }
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: [] }
-const PARAMS = { params: { id: 'order-123' } }
+const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }
 
 const MOCK_ORDER = {
   id: 'order-123',

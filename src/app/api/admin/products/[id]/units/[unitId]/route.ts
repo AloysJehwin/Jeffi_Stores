@@ -5,7 +5,7 @@ import { queryOne, withTransaction, query } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-interface Params { params: { id: string; unitId: string } }
+interface Params { params: Promise<{ id: string; unitId: string }> }
 
 async function ensureProductUnit(productId: string, unitId: string) {
   const row = await queryOne<{ id: string; is_base: boolean }>(
@@ -16,12 +16,13 @@ async function ensureProductUnit(productId: string, unitId: string) {
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
+  const { id, unitId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const existing = await ensureProductUnit(params.id, params.unitId)
+  const existing = await ensureProductUnit(id, unitId)
   if (!existing) return NextResponse.json({ error: 'Unit not found' }, { status: 404 })
 
   const body = await request.json().catch(() => null)
@@ -81,15 +82,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const updated = await withTransaction(async (client) => {
       if (setBase) {
-        await client.query(`UPDATE product_units SET is_base = FALSE WHERE product_id = $1 AND variant_id IS NULL`, [params.id])
+        await client.query(`UPDATE product_units SET is_base = FALSE WHERE product_id = $1 AND variant_id IS NULL`, [id])
         updates.push(`is_base = TRUE`)
       }
       if (updates.length === 0) {
-        const cur = await client.query(`SELECT * FROM product_units WHERE id = $1`, [params.unitId])
+        const cur = await client.query(`SELECT * FROM product_units WHERE id = $1`, [unitId])
         return cur.rows[0]
       }
       updates.push(`updated_at = NOW()`)
-      vals.push(params.unitId)
+      vals.push(unitId)
       const res = await client.query(
         `UPDATE product_units SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
         vals
@@ -107,16 +108,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(request: NextRequest, { params }: Params) {
+  const { id, unitId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const existing = await ensureProductUnit(params.id, params.unitId)
+  const existing = await ensureProductUnit(id, unitId)
   if (!existing) return NextResponse.json({ error: 'Unit not found' }, { status: 404 })
   if (existing.is_base) {
     return NextResponse.json({ error: 'Cannot delete the base unit. Make another unit the base first.' }, { status: 400 })
   }
-  await query(`DELETE FROM product_units WHERE id = $1`, [params.unitId])
+  await query(`DELETE FROM product_units WHERE id = $1`, [unitId])
   return NextResponse.json({ ok: true })
 }

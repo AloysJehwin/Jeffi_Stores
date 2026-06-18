@@ -16,7 +16,7 @@ const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)
 
 const admin = { adminId: 'admin-uuid-1', username: 'admin', role: 'super_admin', scopes: ['catalog_enrichment'] }
-const params = { id: 'enrich-uuid-123' }
+const params = Promise.resolve({ id: 'enrich-uuid-123' })
 
 function makeRequest() {
   return new NextRequest('http://localhost/api/admin/catalog-enrichment/enrich-uuid-123/reject', { method: 'POST' })

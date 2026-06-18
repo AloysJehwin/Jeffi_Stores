@@ -7,7 +7,8 @@ import QuotationDetailClient from './QuotationDetailClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function QuotationDetailPage({ params }: { params: { id: string } }) {
+export default async function QuotationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
@@ -20,5 +21,5 @@ export default async function QuotationDetailPage({ params }: { params: { id: st
     redirect(ap('/admin/dashboard', host))
   }
 
-  return <QuotationDetailClient id={params.id} />
+  return <QuotationDetailClient id={id} />
 }

@@ -77,20 +77,20 @@ describe('GET /api/admin/business/rfqs/[id]/messages', () => {
     vi.mocked(requireAdminScope).mockResolvedValue(
       NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     )
-    const res = await GET(makeReq('GET'), { params: { id: RFQ_ID } })
+    const res = await GET(makeReq('GET'), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 404 when RFQ not found', async () => {
     vi.mocked(queryOne).mockResolvedValue(null as any)
-    const res = await GET(makeReq('GET'), { params: { id: RFQ_ID } })
+    const res = await GET(makeReq('GET'), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(404)
     const json = await res.json()
     expect(json.error).toBe('Not found')
   })
 
   it('returns messages array on success', async () => {
-    const res = await GET(makeReq('GET'), { params: { id: RFQ_ID } })
+    const res = await GET(makeReq('GET'), { params: Promise.resolve({ id: RFQ_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.messages).toHaveLength(2)
@@ -98,7 +98,7 @@ describe('GET /api/admin/business/rfqs/[id]/messages', () => {
 
   it('returns empty array when no messages exist', async () => {
     vi.mocked(queryMany).mockResolvedValue([] as any)
-    const res = await GET(makeReq('GET'), { params: { id: RFQ_ID } })
+    const res = await GET(makeReq('GET'), { params: Promise.resolve({ id: RFQ_ID }) })
     const json = await res.json()
     expect(res.status).toBe(200)
     expect(json.messages).toHaveLength(0)
@@ -121,19 +121,19 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
     vi.mocked(requireAdminScope).mockResolvedValue(
       NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     )
-    const res = await POST(makeReq('POST', { message: 'hello' }), { params: { id: RFQ_ID } })
+    const res = await POST(makeReq('POST', { message: 'hello' }), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 404 when RFQ not found', async () => {
     vi.mocked(queryOne).mockResolvedValue(null as any)
-    const res = await POST(makeReq('POST', { message: 'hello' }), { params: { id: RFQ_ID } })
+    const res = await POST(makeReq('POST', { message: 'hello' }), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(404)
   })
 
   it('returns 400 when RFQ is converted', async () => {
     vi.mocked(queryOne).mockResolvedValue({ id: RFQ_ID, status: 'converted' } as any)
-    const res = await POST(makeReq('POST', { message: 'hello' }), { params: { id: RFQ_ID } })
+    const res = await POST(makeReq('POST', { message: 'hello' }), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/closed/)
@@ -141,26 +141,26 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
 
   it('returns 400 when RFQ is rejected', async () => {
     vi.mocked(queryOne).mockResolvedValue({ id: RFQ_ID, status: 'rejected' } as any)
-    const res = await POST(makeReq('POST', { message: 'hello' }), { params: { id: RFQ_ID } })
+    const res = await POST(makeReq('POST', { message: 'hello' }), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when message is empty string', async () => {
-    const res = await POST(makeReq('POST', { message: '   ' }), { params: { id: RFQ_ID } })
+    const res = await POST(makeReq('POST', { message: '   ' }), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/required/)
   })
 
   it('returns 400 when message is missing', async () => {
-    const res = await POST(makeReq('POST', {}), { params: { id: RFQ_ID } })
+    const res = await POST(makeReq('POST', {}), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when counter_items is not an array', async () => {
     const res = await POST(
       makeReq('POST', { message: 'Offer', counter_items: { invalid: true } }),
-      { params: { id: RFQ_ID } },
+      { params: Promise.resolve({ id: RFQ_ID }) },
     )
     expect(res.status).toBe(400)
     const json = await res.json()
@@ -173,7 +173,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
         message: 'Offer',
         counter_items: [{ offered_price: 100 }],
       }),
-      { params: { id: RFQ_ID } },
+      { params: Promise.resolve({ id: RFQ_ID }) },
     )
     expect(res.status).toBe(400)
     const json = await res.json()
@@ -186,7 +186,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
         message: 'Offer',
         counter_items: [{ rfq_item_id: 'riq-1' }],
       }),
-      { params: { id: RFQ_ID } },
+      { params: Promise.resolve({ id: RFQ_ID }) },
     )
     expect(res.status).toBe(400)
   })
@@ -205,7 +205,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
 
     const res = await POST(
       makeReq('POST', { message: 'We can offer at ₹180' }),
-      { params: { id: RFQ_ID } },
+      { params: Promise.resolve({ id: RFQ_ID }) },
     )
     const json = await res.json()
 
@@ -228,7 +228,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
 
     const res = await POST(
       makeReq('POST', { message: 'Counter offer', counter_items: counterItems }),
-      { params: { id: RFQ_ID } },
+      { params: Promise.resolve({ id: RFQ_ID }) },
     )
     expect(res.status).toBe(200)
 
@@ -242,7 +242,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
       .mockResolvedValueOnce({ id: RFQ_ID, status: 'pending' } as any)
       .mockResolvedValueOnce({ id: 'msg-new', sender: 'admin', message: 'Hi', counter_items: null, created_at: new Date().toISOString() } as any)
 
-    await POST(makeReq('POST', { message: 'Hi' }), { params: { id: RFQ_ID } })
+    await POST(makeReq('POST', { message: 'Hi' }), { params: Promise.resolve({ id: RFQ_ID }) })
 
     const updateCall = vi.mocked(query).mock.calls.find(
       (args: any[]) => typeof args[0] === 'string' && args[0].includes("status = 'negotiating'"),
@@ -255,7 +255,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
       .mockResolvedValueOnce({ id: RFQ_ID, status: 'reviewed' } as any)
       .mockResolvedValueOnce({ id: 'msg-new', sender: 'admin', message: 'Hi', counter_items: null, created_at: new Date().toISOString() } as any)
 
-    await POST(makeReq('POST', { message: 'Hi' }), { params: { id: RFQ_ID } })
+    await POST(makeReq('POST', { message: 'Hi' }), { params: Promise.resolve({ id: RFQ_ID }) })
 
     const updateCall = vi.mocked(query).mock.calls.find(
       (args: any[]) => typeof args[0] === 'string' && args[0].includes("status = 'negotiating'"),
@@ -268,7 +268,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
       .mockResolvedValueOnce({ id: RFQ_ID, status: 'negotiating' } as any)
       .mockResolvedValueOnce({ id: 'msg-new', sender: 'admin', message: 'Hi', counter_items: null, created_at: new Date().toISOString() } as any)
 
-    await POST(makeReq('POST', { message: 'Hi' }), { params: { id: RFQ_ID } })
+    await POST(makeReq('POST', { message: 'Hi' }), { params: Promise.resolve({ id: RFQ_ID }) })
 
     const updateCall = vi.mocked(query).mock.calls.find(
       (args: any[]) => typeof args[0] === 'string' && args[0].includes("status = 'negotiating'"),
@@ -281,7 +281,7 @@ describe('POST /api/admin/business/rfqs/[id]/messages', () => {
       .mockResolvedValueOnce(OPEN_RFQ as any)
       .mockRejectedValueOnce(new Error('DB error'))
 
-    const res = await POST(makeReq('POST', { message: 'Hello' }), { params: { id: RFQ_ID } })
+    const res = await POST(makeReq('POST', { message: 'Hello' }), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(500)
   })
 })

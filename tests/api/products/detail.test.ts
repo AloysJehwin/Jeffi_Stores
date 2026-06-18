@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextRequest } from 'next/server'
 
 // ── hoisted mocks ────────────────────────────────────────────────────────────
 const { queryOneMock, queryMock, authenticateAdminMock } = vi.hoisted(() => ({
@@ -43,7 +44,7 @@ describe('PATCH /api/products/[id]', () => {
     authenticateAdminMock.mockResolvedValue(null)
 
     const res = await PATCH(makeReq('PATCH', { is_active: false }) as any, {
-      params: { id: 'prod-1' },
+      params: Promise.resolve({ id: 'prod-1' }),
     })
     expect(res.status).toBe(401)
 
@@ -53,7 +54,7 @@ describe('PATCH /api/products/[id]', () => {
 
   it('returns 400 when no valid fields provided', async () => {
     const res = await PATCH(makeReq('PATCH', { unknown_field: 'value' }) as any, {
-      params: { id: 'prod-1' },
+      params: Promise.resolve({ id: 'prod-1' }),
     })
     expect(res.status).toBe(400)
 
@@ -65,7 +66,7 @@ describe('PATCH /api/products/[id]', () => {
     queryOneMock.mockResolvedValue(null)
 
     const res = await PATCH(makeReq('PATCH', { is_active: false }) as any, {
-      params: { id: 'nonexistent-id' },
+      params: Promise.resolve({ id: 'nonexistent-id' }),
     })
     expect(res.status).toBe(404)
 
@@ -77,7 +78,7 @@ describe('PATCH /api/products/[id]', () => {
     queryOneMock.mockResolvedValue({ id: 'prod-1' })
 
     const res = await PATCH(makeReq('PATCH', { is_active: false }) as any, {
-      params: { id: 'prod-1' },
+      params: Promise.resolve({ id: 'prod-1' }),
     })
     expect(res.status).toBe(200)
 
@@ -92,7 +93,7 @@ describe('PATCH /api/products/[id]', () => {
       .mockResolvedValueOnce({ id: 'prod-1' })
 
     const res = await PATCH(makeReq('PATCH', { is_featured: true }) as any, {
-      params: { id: 'prod-1' },
+      params: Promise.resolve({ id: 'prod-1' }),
     })
     expect(res.status).toBe(200)
 
@@ -104,7 +105,7 @@ describe('PATCH /api/products/[id]', () => {
     queryOneMock.mockResolvedValue({ count: '6' })
 
     const res = await PATCH(makeReq('PATCH', { is_featured: true }) as any, {
-      params: { id: 'prod-1' },
+      params: Promise.resolve({ id: 'prod-1' }),
     })
     expect(res.status).toBe(409)
 
@@ -115,7 +116,7 @@ describe('PATCH /api/products/[id]', () => {
 
 describe('DELETE /api/products/[id]', () => {
   it('always returns 405 with informative message', async () => {
-    const res = await DELETE()
+    const res = await DELETE(new NextRequest('http://localhost/api/products/test'), { params: Promise.resolve({ id: 'test' }) })
     expect(res.status).toBe(405)
 
     const body = await res.json()

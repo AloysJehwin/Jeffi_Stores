@@ -17,7 +17,7 @@ import * as returnPolicy from '@/lib/return-policy'
 import type { OrderItemPolicy } from '@/lib/return-policy'
 
 const USER = { userId: 'user-1' }
-const PARAMS = { params: { id: 'order-123' } }
+const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }
 
 const MOCK_ORDER_DELIVERED = {
   id: 'order-123',

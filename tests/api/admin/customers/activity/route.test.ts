@@ -72,14 +72,14 @@ describe('GET /api/admin/customers/[id]/activity', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeRequest(), { params: { id: 'user-1' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeRequest(), { params: { id: 'user-1' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -88,7 +88,7 @@ describe('GET /api/admin/customers/[id]/activity', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue(sampleEvents)
 
-    const res = await GET(makeRequest(), { params: { id: 'user-1' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.events).toHaveLength(2)
@@ -100,7 +100,7 @@ describe('GET /api/admin/customers/[id]/activity', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
 
-    await GET(makeRequest('user-42'), { params: { id: 'user-42' } })
+    await GET(makeRequest('user-42'), { params: Promise.resolve({ id: 'user-42' }) })
 
     const queryArgs = mockQueryMany.mock.calls[0][1] as any[]
     expect(queryArgs[0]).toBe('user-42')
@@ -111,7 +111,7 @@ describe('GET /api/admin/customers/[id]/activity', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
 
-    await GET(makeRequest('user-1', { limit: '300' }), { params: { id: 'user-1' } })
+    await GET(makeRequest('user-1', { limit: '300' }), { params: Promise.resolve({ id: 'user-1' }) })
 
     const queryArgs = mockQueryMany.mock.calls[0][1] as any[]
     // limit should be clamped to 200, passed as last arg
@@ -123,7 +123,7 @@ describe('GET /api/admin/customers/[id]/activity', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
 
-    await GET(makeRequest('user-1'), { params: { id: 'user-1' } })
+    await GET(makeRequest('user-1'), { params: Promise.resolve({ id: 'user-1' }) })
 
     const queryArgs = mockQueryMany.mock.calls[0][1] as any[]
     expect(queryArgs[queryArgs.length - 1]).toBe(50)
@@ -135,7 +135,7 @@ describe('GET /api/admin/customers/[id]/activity', () => {
     mockQueryMany.mockResolvedValue([])
 
     const before = '2024-01-01T00:00:00Z'
-    await GET(makeRequest('user-1', { before }), { params: { id: 'user-1' } })
+    await GET(makeRequest('user-1', { before }), { params: Promise.resolve({ id: 'user-1' }) })
 
     const queryArgs = mockQueryMany.mock.calls[0][1] as any[]
     expect(queryArgs).toContain(before)
@@ -146,7 +146,7 @@ describe('GET /api/admin/customers/[id]/activity', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
 
-    const res = await GET(makeRequest(), { params: { id: 'user-1' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     const body = await res.json()
     expect(body.events).toEqual([])
   })

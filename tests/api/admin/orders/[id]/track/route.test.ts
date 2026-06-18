@@ -38,7 +38,7 @@ const admin = {
 }
 
 const orderId = 'order-uuid-1'
-const routeParams = { params: { id: orderId } }
+const routeParams = { params: Promise.resolve({ id: orderId }) }
 
 function makeGet() {
   return new NextRequest(`http://localhost/api/admin/orders/${orderId}/track`)

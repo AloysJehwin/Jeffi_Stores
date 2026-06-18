@@ -67,21 +67,21 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toMatch(/unauthorized/i)
   })
 
   it('returns 403 when agent scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/insufficient/i)
   })
 
   it('returns 404 when action not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(404)
   })
 
@@ -90,7 +90,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       id: ACTION_ID, admin_id: 'other-admin', conversation_id: 'conv-1',
       kind: 'send_test_email', payload: {}, status: 'proposed',
     } as any)
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toBe('Not your action')
   })
@@ -100,7 +100,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       id: ACTION_ID, admin_id: ADMIN.adminId, conversation_id: 'conv-1',
       kind: 'send_test_email', payload: {}, status: 'executed',
     } as any)
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/already executed/)
   })
@@ -116,7 +116,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     } as any)
     vi.mocked(sendTestCampaignEmail).mockResolvedValue({ ok: true } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
@@ -133,7 +133,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     } as any)
     vi.mocked(sendTestCampaignEmail).mockResolvedValue({ ok: false, reason: 'SMTP error' } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('SMTP error')
   })
@@ -150,7 +150,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       } as any)
       .mockResolvedValueOnce({ kind: 'welcome', name: 'Welcome', enabled: true } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.kind).toBe('welcome')
@@ -166,7 +166,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       } as any)
       .mockResolvedValueOnce(null)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Campaign not found')
   })
@@ -183,7 +183,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'order-1', order_number: 'ORD-001', status: 'shipped', awb_number: 'AWB123' } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.status).toBe('shipped')
@@ -199,7 +199,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       } as any)
       .mockResolvedValueOnce(null)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/not found|already shipped/)
   })
@@ -215,7 +215,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     } as any)
     vi.mocked(sendOrderDelayNotification).mockResolvedValue({ success: true, messageId: 'msg-1' } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.sentTo).toBe('c@example.com')
   })
@@ -228,7 +228,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/missing/i)
   })
@@ -243,7 +243,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/productIds missing/)
   })
@@ -258,7 +258,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     mockQueryMany.mockResolvedValueOnce([{ id: 'pid-1', name: 'Bolt', slug: 'bolt', price: '100', short_description: null, primary_image_url: null }] as any)
     vi.mocked(sendProductAnnouncementEmail).mockResolvedValue({ success: true } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.audience).toBe('test_only')
@@ -274,7 +274,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     } as any)
     mockQueryMany.mockResolvedValueOnce([{ id: 'pid-1', name: 'Bolt', slug: 'bolt', price: '100', short_description: null, primary_image_url: null }] as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/testEmail missing/)
   })
@@ -288,7 +288,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     } as any)
     mockQueryMany.mockResolvedValueOnce([{ id: 'pid-1', name: 'Bolt', slug: 'bolt', price: '100', short_description: null, primary_image_url: null }] as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Unknown audience/)
   })
@@ -303,7 +303,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/not permitted/)
   })
@@ -316,7 +316,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Method not permitted/)
   })
@@ -333,7 +333,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'order-1', order_number: 'ORD-1', status: 'confirmed', awb_number: null } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.status).toBe('confirmed')
   })
@@ -346,7 +346,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Invalid status')
   })
@@ -363,7 +363,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'order-1', invoice_number: 'INV-1', payment_status: 'paid', invoice_date: null } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.payment_status).toBe('paid')
@@ -382,7 +382,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'coupon-1', code: 'SAVE10' } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.code).toBe('SAVE10')
@@ -396,7 +396,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Missing required coupon fields/)
   })
@@ -411,7 +411,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Invalid product payload/)
   })
@@ -427,7 +427,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       .mockResolvedValueOnce(null)  // dup check: no dup
       .mockResolvedValueOnce({ id: 'prod-1', name: 'Bolt', sku: 'BLT-01' } as any)  // INSERT
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.sku).toBe('BLT-01')
   })
@@ -442,7 +442,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/No valid fields/)
   })
@@ -458,7 +458,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     } as any)
     vi.mocked(query).mockResolvedValue({ rowCount: 1 } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.customerId).toBe('cust-1')
@@ -472,7 +472,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/too long/)
   })
@@ -487,7 +487,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/name and slug required/)
   })
@@ -502,7 +502,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Unknown action kind/)
   })
@@ -517,7 +517,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Unknown audience/)
   })
@@ -531,7 +531,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     } as any)
     vi.mocked(transporter.sendMail).mockResolvedValue({} as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.result.sent).toBe(1)
@@ -548,7 +548,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
     } as any)
     vi.mocked(sendQuotationFinalizedEmail).mockResolvedValue(undefined as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.sentTo).toBe('buyer@co.com')
   })
@@ -561,7 +561,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/Missing recipient/)
   })
@@ -578,7 +578,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       } as any)
       .mockResolvedValueOnce({ id: 'cust-1', email: 'c@x.com', marketing_opt_out: true } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(200)
     expect((await res.json()).result.marketing_opt_out).toBe(true)
   })
@@ -595,7 +595,7 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       status: 'proposed',
     } as any)
 
-    const res = await POST(makeReq(), { params: { id: ACTION_ID } })
+    const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/CRON_SECRET not configured/)
     process.env.CRON_SECRET = savedCron

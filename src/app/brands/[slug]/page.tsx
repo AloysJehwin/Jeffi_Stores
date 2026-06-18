@@ -49,21 +49,23 @@ export default async function BrandDetailPage({
   params,
   searchParams,
 }: {
-  params: { slug: string }
-  searchParams: { page?: string }
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ page?: string }>
 }) {
-  const brand = await getBrandBySlug(params.slug)
+  const { slug } = await params
+  const resolvedSearchParams = await searchParams
+  const brand = await getBrandBySlug(slug)
 
   if (!brand) {
     notFound()
   }
 
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const { products, total } = await getBrandProducts(brand.id, page)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   function buildPageUrl(p: number) {
-    return p > 1 ? `/brands/${params.slug}?page=${p}` : `/brands/${params.slug}`
+    return p > 1 ? `/brands/${slug}?page=${p}` : `/brands/${slug}`
   }
 
   return (

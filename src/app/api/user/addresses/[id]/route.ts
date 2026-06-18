@@ -18,8 +18,9 @@ const UpdateAddressSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const user = await authenticateUser(request)
     if (!user) {
@@ -27,7 +28,7 @@ export async function PATCH(
     }
 
     const userId = user.userId
-    const addressId = params.id
+    const addressId = id
     const body = await request.json()
     const parsed = parseBody(UpdateAddressSchema, body)
     if (!parsed.ok) return parsed.response
@@ -96,8 +97,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const user = await authenticateUser(request)
     if (!user) {
@@ -105,7 +107,7 @@ export async function DELETE(
     }
 
     const userId = user.userId
-    const addressId = params.id
+    const addressId = id
 
     const address = await queryOne(
       'SELECT is_default FROM addresses WHERE id = $1 AND user_id = $2',

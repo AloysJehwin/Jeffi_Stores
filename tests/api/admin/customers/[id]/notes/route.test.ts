@@ -24,7 +24,7 @@ import { logActivity } from '@/lib/activity'
 
 const ADMIN = { adminId: 'admin-uuid-1', role: 'super_admin', scopes: ['customers'] }
 const CUSTOMER_ID = 'cust-uuid-1'
-const PARAMS = { params: { id: CUSTOMER_ID } }
+const PARAMS = { params: Promise.resolve({ id: CUSTOMER_ID }) }
 
 function makeGet() {
   return new NextRequest(`http://localhost/api/admin/customers/${CUSTOMER_ID}/notes`, {

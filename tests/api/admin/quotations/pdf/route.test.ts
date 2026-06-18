@@ -81,7 +81,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeRequest(), { params: { id: 'qt-1' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'qt-1' }) })
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body.error).toMatch(/unauthorized/i)
@@ -90,7 +90,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeRequest(), { params: { id: 'qt-1' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'qt-1' }) })
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toMatch(/insufficient/i)
@@ -100,7 +100,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeRequest(), { params: { id: 'qt-999' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'qt-999' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -116,7 +116,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
     const pdfBuffer = Buffer.from('%PDF-1.4 fake pdf content')
     mockGeneratePDF.mockResolvedValue(pdfBuffer)
 
-    const res = await GET(makeRequest(), { params: { id: 'qt-1' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'qt-1' }) })
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('application/pdf')
     expect(res.headers.get('Content-Disposition')).toContain('quotation-QT-2024-001.pdf')
@@ -132,7 +132,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
     const pdfBuffer = Buffer.from('pdf')
     mockGeneratePDF.mockResolvedValue(pdfBuffer)
 
-    await GET(makeRequest(), { params: { id: 'qt-1' } })
+    await GET(makeRequest(), { params: Promise.resolve({ id: 'qt-1' }) })
 
     expect(mockGeneratePDF).toHaveBeenCalledWith(
       sampleQuotation,
@@ -148,7 +148,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
     mockQueryMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
     mockGeneratePDF.mockResolvedValue(Buffer.from('pdf'))
 
-    const res = await GET(makeRequest(), { params: { id: 'qt-1' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'qt-1' }) })
     expect(res.status).toBe(200)
   })
 
@@ -159,7 +159,7 @@ describe('GET /api/admin/quotations/[id]/pdf', () => {
     mockQueryMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
     mockGeneratePDF.mockRejectedValue(new Error('PDF render failed'))
 
-    const res = await GET(makeRequest(), { params: { id: 'qt-1' } })
+    const res = await GET(makeRequest(), { params: Promise.resolve({ id: 'qt-1' }) })
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toMatch(/PDF render failed/i)

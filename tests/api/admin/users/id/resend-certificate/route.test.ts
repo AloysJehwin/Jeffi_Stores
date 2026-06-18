@@ -16,7 +16,7 @@ const mockSendEmail = vi.mocked(sendAdminCertificateEmail)
 
 const superAdmin = { adminId: 'a1', username: 'root', role: 'super_admin', scopes: [] }
 const regularAdmin = { adminId: 'a2', username: 'user', role: 'admin', scopes: [] }
-const params = { id: 'admin-abc' }
+const params = Promise.resolve({ id: 'admin-abc' })
 
 function makeRequest() {
   return new NextRequest('http://localhost/api/admin/users/admin-abc/resend-certificate', { method: 'POST' })

@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { use, useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import { navItems } from '@/components/visitor/AccountSidebar'
@@ -128,7 +128,8 @@ function getPaymentStatusColor(status: string) {
   }
 }
 
-export default function OrderDetailPage({ params }: { params: { id: string } }) {
+export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -177,14 +178,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   const fetchOrder = async () => {
     try {
-      const response = await fetch(`/api/orders/${params.id}`, { credentials: 'include' })
+      const response = await fetch(`/api/orders/${id}`, { credentials: 'include' })
       if (!response.ok) {
         throw new Error('Failed to fetch order details')
       }
       const data = await response.json()
       setOrder(data.order)
 
-      const retRes = await fetch(`/api/orders/${params.id}/return`, { credentials: 'include' })
+      const retRes = await fetch(`/api/orders/${id}/return`, { credentials: 'include' })
       if (retRes.ok) {
         const retData = await retRes.json()
         setReturnRequest(retData.returnRequest || null)
@@ -202,7 +203,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     autoCancelTriggeredRef.current = true
     setIsAutoCancelling(true)
     try {
-      const response = await fetch(`/api/orders/${params.id}/cancel`, {
+      const response = await fetch(`/api/orders/${id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -219,7 +220,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     } finally {
       setIsAutoCancelling(false)
     }
-  }, [params.id])
+  }, [id])
 
   useEffect(() => {
     if (!order) return
@@ -247,7 +248,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const handleCancelOrder = async () => {
     setIsCancelling(true)
     try {
-      const response = await fetch(`/api/orders/${params.id}/cancel`, {
+      const response = await fetch(`/api/orders/${id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -276,7 +277,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       return
     }
     try {
-      const response = await fetch(`/api/orders/${params.id}/return`, {
+      const response = await fetch(`/api/orders/${id}/return`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

@@ -27,7 +27,8 @@ function parseAddress(raw: string | null): { addr1: string; addr2: string | null
   return { addr1, addr2, city, state, pincode }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await requireAdminScope(request, 'business_rfqs')
   if (admin instanceof NextResponse) return admin
 
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
      JOIN users u ON u.id = r.user_id
      LEFT JOIN business_profiles bp ON bp.user_id = r.user_id
      WHERE r.id = $1`,
-    [params.id]
+    [id]
   )
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (rfq.converted_quotation_id) return NextResponse.json({ error: 'Already converted' }, { status: 409 })
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
      LEFT JOIN product_sub_variants psv ON psv.id = ri.sub_variant_id
      WHERE ri.rfq_id = $1
      ORDER BY ri.position, ri.created_at`,
-    [params.id]
+    [id]
   )
   if (items.length === 0) return NextResponse.json({ error: 'RFQ has no items' }, { status: 400 })
 
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     `SELECT counter_items FROM rfq_messages
      WHERE rfq_id = $1 AND counter_items IS NOT NULL
      ORDER BY created_at DESC LIMIT 1`,
-    [params.id]
+    [id]
   )
   // Map rfq_item_id → offered_price (incl-GST, same format as requested_price)
   const negotiatedPriceMap: Record<string, number> = {}
@@ -244,7 +245,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   await query(
     `UPDATE business_rfqs SET status='converted', converted_quotation_id=$1, updated_at=NOW() WHERE id=$2`,
-    [qt!.id, params.id]
+    [qt!.id, id]
   )
 
   // Notify business user

@@ -16,7 +16,7 @@ const mockHasScope = vi.mocked(hasScope)
 const mockSendTestEmail = vi.mocked(sendTestCampaignEmail)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['mailer'] }
-const params = { kind: 'welcome' }
+const params = Promise.resolve({ kind: 'welcome' })
 
 function makeRequest(body: object) {
   return new NextRequest('http://localhost/api/admin/campaigns/welcome/test', {

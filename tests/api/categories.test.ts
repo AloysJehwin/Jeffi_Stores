@@ -112,7 +112,7 @@ describe('DELETE /api/categories/[id]', () => {
   it('returns 401 when not authenticated', async () => {
     authenticateAdminMock.mockResolvedValue(null)
 
-    const res = await deleteCategory(makeReq('DELETE') as any, { params: { id: 'cat-1' } })
+    const res = await deleteCategory(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'cat-1' }) })
     expect(res.status).toBe(401)
   })
 
@@ -122,7 +122,7 @@ describe('DELETE /api/categories/[id]', () => {
       .mockResolvedValueOnce(0)  // sub-categories count
     queryMock.mockResolvedValue({ rows: [], rowCount: 1 })
 
-    const res = await deleteCategory(makeReq('DELETE') as any, { params: { id: 'cat-2' } })
+    const res = await deleteCategory(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'cat-2' }) })
     expect(res.status).toBe(200)
 
     const body = await res.json()
@@ -132,7 +132,7 @@ describe('DELETE /api/categories/[id]', () => {
   it('returns 400 when category has products assigned', async () => {
     queryCountMock.mockResolvedValueOnce(5)
 
-    const res = await deleteCategory(makeReq('DELETE') as any, { params: { id: 'cat-1' } })
+    const res = await deleteCategory(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'cat-1' }) })
     expect(res.status).toBe(400)
 
     const body = await res.json()
@@ -145,7 +145,7 @@ describe('DELETE /api/categories/[id]', () => {
       .mockResolvedValueOnce(0)  // products = 0
       .mockResolvedValueOnce(2)  // sub-categories = 2
 
-    const res = await deleteCategory(makeReq('DELETE') as any, { params: { id: 'cat-1' } })
+    const res = await deleteCategory(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'cat-1' }) })
     expect(res.status).toBe(400)
 
     const body = await res.json()
@@ -155,7 +155,7 @@ describe('DELETE /api/categories/[id]', () => {
   it('returns 500 when db throws', async () => {
     queryCountMock.mockRejectedValue(new Error('DB error'))
 
-    const res = await deleteCategory(makeReq('DELETE') as any, { params: { id: 'cat-1' } })
+    const res = await deleteCategory(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'cat-1' }) })
     expect(res.status).toBe(500)
   })
 })

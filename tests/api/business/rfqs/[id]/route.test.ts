@@ -64,14 +64,14 @@ describe('GET /api/business/rfqs/[id]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateBusiness.mockResolvedValue(null)
-    const res = await GET(makeGet() as any, { params: { id: RFQ_ID } })
+    const res = await GET(makeGet() as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 404 when rfq not found', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeGet() as any, { params: { id: RFQ_ID } })
+    const res = await GET(makeGet() as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(404)
   })
 
@@ -81,7 +81,7 @@ describe('GET /api/business/rfqs/[id]', () => {
     mockQueryMany
       .mockResolvedValueOnce([{ id: 'item-1', description: 'Bolt', quantity: 10 }]) // items
       .mockResolvedValueOnce([{ category_id: 'cat-1', discount_pct: '5.00' }])      // discounts
-    const res = await GET(makeGet() as any, { params: { id: RFQ_ID } })
+    const res = await GET(makeGet() as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.rfq.id).toBe(RFQ_ID)
@@ -100,7 +100,7 @@ describe('GET /api/business/rfqs/[id]', () => {
     mockQueryMany
       .mockResolvedValueOnce([])  // items
       .mockResolvedValueOnce([])  // discounts
-    const res = await GET(makeGet() as any, { params: { id: RFQ_ID } })
+    const res = await GET(makeGet() as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.order).toMatchObject({ id: 'order-1' })
@@ -116,21 +116,21 @@ describe('PATCH /api/business/rfqs/[id]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateBusiness.mockResolvedValue(null)
-    const res = await PATCH(makePatch(RFQ_ID, {}) as any, { params: { id: RFQ_ID } })
+    const res = await PATCH(makePatch(RFQ_ID, {}) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 404 when rfq not found', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(null)
-    const res = await PATCH(makePatch(RFQ_ID, { notes: 'update' }) as any, { params: { id: RFQ_ID } })
+    const res = await PATCH(makePatch(RFQ_ID, { notes: 'update' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(404)
   })
 
   it('returns 400 when rfq status is not editable (converted)', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue({ ...SAMPLE_RFQ, status: 'converted' })
-    const res = await PATCH(makePatch(RFQ_ID, { notes: 'update' }) as any, { params: { id: RFQ_ID } })
+    const res = await PATCH(makePatch(RFQ_ID, { notes: 'update' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/cannot edit/i)
@@ -139,14 +139,14 @@ describe('PATCH /api/business/rfqs/[id]', () => {
   it('returns 400 for rejected status', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue({ ...SAMPLE_RFQ, status: 'rejected' })
-    const res = await PATCH(makePatch(RFQ_ID, {}) as any, { params: { id: RFQ_ID } })
+    const res = await PATCH(makePatch(RFQ_ID, {}) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
   })
 
   it('updates notes when provided', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue({ ...SAMPLE_RFQ, status: 'pending' })
-    const res = await PATCH(makePatch(RFQ_ID, { notes: 'Updated notes' }) as any, { params: { id: RFQ_ID } })
+    const res = await PATCH(makePatch(RFQ_ID, { notes: 'Updated notes' }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
@@ -160,7 +160,7 @@ describe('PATCH /api/business/rfqs/[id]', () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue({ ...SAMPLE_RFQ, status: 'negotiating' })
     const items = [{ id: 'item-1', quantity: 5, requested_price: 100, notes: 'urgent' }]
-    const res = await PATCH(makePatch(RFQ_ID, { items }) as any, { params: { id: RFQ_ID } })
+    const res = await PATCH(makePatch(RFQ_ID, { items }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringMatching(/UPDATE business_rfq_items/),
@@ -172,7 +172,7 @@ describe('PATCH /api/business/rfqs/[id]', () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue({ ...SAMPLE_RFQ, status: 'reviewed' })
     const items = [{ quantity: 5 }] // no id
-    const res = await PATCH(makePatch(RFQ_ID, { items }) as any, { params: { id: RFQ_ID } })
+    const res = await PATCH(makePatch(RFQ_ID, { items }) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     // No item update query should have been called
     const itemUpdates = mockQuery.mock.calls.filter((c: any) =>
@@ -184,7 +184,7 @@ describe('PATCH /api/business/rfqs/[id]', () => {
   it('does not update notes when not in payload', async () => {
     mockAuthenticateBusiness.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue({ ...SAMPLE_RFQ, status: 'pending' })
-    const res = await PATCH(makePatch(RFQ_ID, {}) as any, { params: { id: RFQ_ID } })
+    const res = await PATCH(makePatch(RFQ_ID, {}) as any, { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
     const noteUpdates = mockQuery.mock.calls.filter((c: any) =>
       typeof c[0] === 'string' && c[0].includes('UPDATE business_rfqs SET notes')

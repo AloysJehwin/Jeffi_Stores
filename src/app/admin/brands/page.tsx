@@ -39,12 +39,13 @@ async function getFilteredBrands(filters: { is_active?: string; search?: string;
   return { brands, total }
 }
 
-export default async function BrandsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+export default async function BrandsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedSearchParams = await searchParams
   const host = (await headers()).get('host') ?? ''
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
 
   const [{ brands, total }, allStats] = await Promise.all([
-    getFilteredBrands({ is_active: searchParams.is_active, search: searchParams.search, page, limit: PAGE_SIZE }),
+    getFilteredBrands({ is_active: resolvedSearchParams.is_active, search: resolvedSearchParams.search, page, limit: PAGE_SIZE }),
     getFilteredBrands({}),
   ])
 
@@ -54,8 +55,8 @@ export default async function BrandsPage({ searchParams }: { searchParams: { [ke
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
-    if (searchParams.is_active) params.set('is_active', searchParams.is_active)
-    if (searchParams.search) params.set('search', searchParams.search)
+    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
     return ap(`/admin/brands${qs ? `?${qs}` : ''}`, host)

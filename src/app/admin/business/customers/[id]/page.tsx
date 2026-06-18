@@ -7,7 +7,8 @@ import { redirect } from 'next/navigation'
 import BusinessCustomerDetailClient from './BusinessCustomerDetailClient'
 import { ap } from '@/lib/admin-path'
 
-export default async function BusinessCustomerDetailPage({ params }: { params: { id: string } }) {
+export default async function BusinessCustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
@@ -15,5 +16,5 @@ export default async function BusinessCustomerDetailPage({ params }: { params: {
   const session = await verifyToken(token.value).catch(() => null)
   if (!session || !hasScope(session.role, session.scopes || [], 'business_customers')) redirect(ap('/admin/dashboard', host))
 
-  return <BusinessCustomerDetailClient id={params.id} />
+  return <BusinessCustomerDetailClient id={id} />
 }

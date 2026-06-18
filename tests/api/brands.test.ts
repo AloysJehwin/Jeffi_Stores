@@ -131,7 +131,7 @@ describe('GET /api/brands/[id]', () => {
   it('returns brand when found', async () => {
     queryOneMock.mockResolvedValue(sampleBrand)
 
-    const res = await getBrand(makeReq('GET') as any, { params: { id: 'brand-1' } })
+    const res = await getBrand(makeReq('GET') as any, { params: Promise.resolve({ id: 'brand-1' }) })
     expect(res.status).toBe(200)
 
     const body = await res.json()
@@ -141,7 +141,7 @@ describe('GET /api/brands/[id]', () => {
   it('returns 404 when brand not found', async () => {
     queryOneMock.mockResolvedValue(null)
 
-    const res = await getBrand(makeReq('GET') as any, { params: { id: 'nonexistent' } })
+    const res = await getBrand(makeReq('GET') as any, { params: Promise.resolve({ id: 'nonexistent' }) })
     expect(res.status).toBe(404)
 
     const body = await res.json()
@@ -151,7 +151,7 @@ describe('GET /api/brands/[id]', () => {
   it('returns 401 when not authenticated', async () => {
     authenticateAdminMock.mockResolvedValue(null)
 
-    const res = await getBrand(makeReq('GET') as any, { params: { id: 'brand-1' } })
+    const res = await getBrand(makeReq('GET') as any, { params: Promise.resolve({ id: 'brand-1' }) })
     expect(res.status).toBe(401)
   })
 })
@@ -167,7 +167,7 @@ describe('PATCH /api/brands/[id]', () => {
 
     const res = await patchBrand(
       makeReq('PATCH', { name: 'Updated', slug: 'updated' }) as any,
-      { params: { id: 'brand-1' } }
+      { params: Promise.resolve({ id: 'brand-1' }) }
     )
     expect(res.status).toBe(200)
 
@@ -180,7 +180,7 @@ describe('PATCH /api/brands/[id]', () => {
 
     const res = await patchBrand(
       makeReq('PATCH', { name: 'X', slug: 'x' }) as any,
-      { params: { id: 'nope' } }
+      { params: Promise.resolve({ id: 'nope' }) }
     )
     expect(res.status).toBe(404)
   })
@@ -188,7 +188,7 @@ describe('PATCH /api/brands/[id]', () => {
   it('returns 400 when name or slug is missing', async () => {
     const res = await patchBrand(
       makeReq('PATCH', { name: 'Only Name' }) as any,
-      { params: { id: 'brand-1' } }
+      { params: Promise.resolve({ id: 'brand-1' }) }
     )
     expect(res.status).toBe(400)
   })
@@ -204,7 +204,7 @@ describe('DELETE /api/brands/[id]', () => {
     queryCountMock.mockResolvedValue(0)
     queryMock.mockResolvedValue({ rows: [], rowCount: 1 })
 
-    const res = await deleteBrand(makeReq('DELETE') as any, { params: { id: 'brand-1' } })
+    const res = await deleteBrand(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'brand-1' }) })
     expect(res.status).toBe(200)
 
     const body = await res.json()
@@ -214,7 +214,7 @@ describe('DELETE /api/brands/[id]', () => {
   it('returns 400 when brand has products assigned', async () => {
     queryCountMock.mockResolvedValue(3)
 
-    const res = await deleteBrand(makeReq('DELETE') as any, { params: { id: 'brand-1' } })
+    const res = await deleteBrand(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'brand-1' }) })
     expect(res.status).toBe(400)
 
     const body = await res.json()
@@ -224,7 +224,7 @@ describe('DELETE /api/brands/[id]', () => {
   it('returns 401 when not authenticated', async () => {
     authenticateAdminMock.mockResolvedValue(null)
 
-    const res = await deleteBrand(makeReq('DELETE') as any, { params: { id: 'brand-1' } })
+    const res = await deleteBrand(makeReq('DELETE') as any, { params: Promise.resolve({ id: 'brand-1' }) })
     expect(res.status).toBe(401)
   })
 })

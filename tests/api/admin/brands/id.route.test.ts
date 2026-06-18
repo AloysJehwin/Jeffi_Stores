@@ -69,7 +69,7 @@ describe('PATCH /api/admin/brands/[id]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await PATCH(makeRequest({ name: 'Nike' }), { params: { id: 'brand-1' } })
+    const res = await PATCH(makeRequest({ name: 'Nike' }), { params: Promise.resolve({ id: 'brand-1' }) })
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body.error).toMatch(/unauthorized/i)
@@ -78,14 +78,14 @@ describe('PATCH /api/admin/brands/[id]', () => {
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await PATCH(makeRequest({ name: 'Nike' }), { params: { id: 'brand-1' } })
+    const res = await PATCH(makeRequest({ name: 'Nike' }), { params: Promise.resolve({ id: 'brand-1' }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 400 when name is missing', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const res = await PATCH(makeRequest({ name: '' }), { params: { id: 'brand-1' } })
+    const res = await PATCH(makeRequest({ name: '' }), { params: Promise.resolve({ id: 'brand-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/name required/i)
@@ -97,7 +97,7 @@ describe('PATCH /api/admin/brands/[id]', () => {
     const errorResponse = { ok: false as const, response: NextResponse.json({ error: 'Validation failed' }, { status: 400 }) }
     mockParseBody.mockReturnValue(errorResponse)
 
-    const res = await PATCH(makeRequest({ name: 'Nike', slug: '' }), { params: { id: 'brand-1' } })
+    const res = await PATCH(makeRequest({ name: 'Nike', slug: '' }), { params: Promise.resolve({ id: 'brand-1' }) })
     expect(res.status).toBe(400)
   })
 
@@ -110,7 +110,7 @@ describe('PATCH /api/admin/brands/[id]', () => {
 
     const res = await PATCH(
       makeRequest({ name: 'Nike', slug: 'nike', is_active: true }),
-      { params: { id: 'brand-1' } },
+      { params: Promise.resolve({ id: 'brand-1' }) },
     )
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -128,7 +128,7 @@ describe('PATCH /api/admin/brands/[id]', () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockQueryOne.mockResolvedValue(updatedBrand)
 
-    await PATCH(makeRequest({ name: 'Nike Sport' }), { params: { id: 'brand-1' } })
+    await PATCH(makeRequest({ name: 'Nike Sport' }), { params: Promise.resolve({ id: 'brand-1' }) })
 
     const callArgs = mockQuery.mock.calls[0][1] as any[]
     expect(callArgs[1]).toBe('nike-sport')

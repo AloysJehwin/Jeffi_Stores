@@ -191,9 +191,10 @@ function buildPageUrl(searchParams: Record<string, string | undefined>, page: nu
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | undefined }
+  searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
-  const { products, total, page, totalPages } = await getProducts(searchParams)
+  const resolvedSearchParams = await searchParams
+  const { products, total, page, totalPages } = await getProducts(resolvedSearchParams)
   const categories = await getCategories()
   const brands = await getBrands()
 
@@ -219,7 +220,7 @@ export default async function ProductsPage({
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Search
                   </label>
-                  <ProductsSearch defaultValue={searchParams.search} />
+                  <ProductsSearch defaultValue={resolvedSearchParams.search} />
                 </div>
 
                 {/* Categories Filter */}
@@ -227,8 +228,8 @@ export default async function ProductsPage({
                   <h3 className="font-semibold text-foreground mb-3">Categories</h3>
                   <div className="space-y-1 max-h-64 overflow-y-auto">
                     {(() => {
-                      const activeCats = searchParams.category ? searchParams.category.split(',') : []
-                      const activeBrands = searchParams.brand ? searchParams.brand.split(',') : []
+                      const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
+                      const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
 
                       function catIsActive(cat: any) {
                         return activeCats.includes(cat.id) || activeCats.includes(cat.slug)
@@ -242,9 +243,9 @@ export default async function ProductsPage({
                         const p = new URLSearchParams()
                         if (next.length) p.set('category', next.join(','))
                         if (activeBrands.length) p.set('brand', activeBrands.join(','))
-                        if (searchParams.sort) p.set('sort', searchParams.sort)
-                        if (searchParams.order) p.set('order', searchParams.order)
-                        if (searchParams.search) p.set('search', searchParams.search)
+                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
+                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
+                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
                         return `/products${p.toString() ? `?${p.toString()}` : ''}`
                       }
 
@@ -315,8 +316,8 @@ export default async function ProductsPage({
                   <h3 className="font-semibold text-foreground mb-3">Brands</h3>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {(() => {
-                      const activeCats = searchParams.category ? searchParams.category.split(',') : []
-                      const activeBrands = searchParams.brand ? searchParams.brand.split(',') : []
+                      const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
+                      const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
 
                       function brandIsActive(brand: any) {
                         return activeBrands.includes(brand.id) || activeBrands.includes(brand.slug)
@@ -330,18 +331,18 @@ export default async function ProductsPage({
                         const p = new URLSearchParams()
                         if (activeCats.length) p.set('category', activeCats.join(','))
                         if (next.length) p.set('brand', next.join(','))
-                        if (searchParams.sort) p.set('sort', searchParams.sort)
-                        if (searchParams.order) p.set('order', searchParams.order)
-                        if (searchParams.search) p.set('search', searchParams.search)
+                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
+                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
+                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
                         return `/products${p.toString() ? `?${p.toString()}` : ''}`
                       }
 
                       const clearBrandsUrl = (() => {
                         const p = new URLSearchParams()
                         if (activeCats.length) p.set('category', activeCats.join(','))
-                        if (searchParams.sort) p.set('sort', searchParams.sort)
-                        if (searchParams.order) p.set('order', searchParams.order)
-                        if (searchParams.search) p.set('search', searchParams.search)
+                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
+                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
+                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
                         return `/products${p.toString() ? `?${p.toString()}` : ''}`
                       })()
 
@@ -385,7 +386,7 @@ export default async function ProductsPage({
                 </div>
 
                 {/* Clear Filters */}
-                {(searchParams.category || searchParams.brand || searchParams.search) && (
+                {(resolvedSearchParams.category || resolvedSearchParams.brand || resolvedSearchParams.search) && (
                   <Link
                     href="/products"
                     className="block text-center w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors"
@@ -458,7 +459,7 @@ export default async function ProductsPage({
                 <Pagination
                   page={page}
                   totalPages={totalPages}
-                  buildHref={(p) => buildPageUrl(searchParams, p)}
+                  buildHref={(p) => buildPageUrl(resolvedSearchParams, p)}
                 />
               </>
             ) : (

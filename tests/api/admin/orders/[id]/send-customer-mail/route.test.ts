@@ -36,7 +36,7 @@ import { buildVarMap, substituteVars } from '@/lib/template-vars'
 
 const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['orders'] }
 const ORDER_ID = 'order-uuid-1'
-const PARAMS = { params: { id: ORDER_ID } }
+const PARAMS = { params: Promise.resolve({ id: ORDER_ID }) }
 
 function makeReq(body: object) {
   return new NextRequest(`http://localhost/api/admin/orders/${ORDER_ID}/send-customer-mail`, {

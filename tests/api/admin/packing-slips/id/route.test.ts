@@ -22,7 +22,7 @@ const mockGeneratePDF = vi.mocked(generatePackingSlipPDF)
 const mockLoadStore = vi.mocked(loadStoreSettings)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['packing_slips'] }
-const params = { id: 'order-abc' }
+const params = Promise.resolve({ id: 'order-abc' })
 
 function makeRequest(inline = false) {
   const url = `http://localhost/api/admin/packing-slips/order-abc${inline ? '?inline=1' : ''}`

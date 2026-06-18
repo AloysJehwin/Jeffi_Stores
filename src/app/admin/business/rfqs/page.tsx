@@ -45,8 +45,9 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function BusinessRFQsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | undefined }
+  searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
+  const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
@@ -54,9 +55,9 @@ export default async function BusinessRFQsPage({
   const session = await verifyToken(token.value).catch(() => null)
   if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs')) redirect(ap('/admin/dashboard', host))
 
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
-  const status = searchParams.status
-  const search = searchParams.search
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const status = resolvedSearchParams.status
+  const search = resolvedSearchParams.search
 
   const conditions: string[] = []
   const values: unknown[] = []

@@ -55,8 +55,9 @@ async function updateCategory(categoryId: string, formData: FormData) {
   redirect(ap('/admin/categories', host))
 }
 
-export default async function EditCategoryPage({ params }: { params: { id: string } }) {
-  const category = await getCategory(params.id).catch(() => null)
+export default async function EditCategoryPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const category = await getCategory(id).catch(() => null)
 
   if (!category) {
     notFound()
@@ -83,7 +84,7 @@ export default async function EditCategoryPage({ params }: { params: { id: strin
       <CategoryForm
         categories={categories || []}
         category={category}
-        action={updateCategory.bind(null, params.id)}
+        action={updateCategory.bind(null, id)}
       />
     </div>
   )

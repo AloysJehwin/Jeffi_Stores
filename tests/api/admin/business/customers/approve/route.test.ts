@@ -60,13 +60,13 @@ describe('POST /api/admin/business/customers/[id]/approve', () => {
   it('returns 401/403 when requireAdminScope rejects', async () => {
     const unauthorizedResponse = NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     mockRequireScope.mockResolvedValue(unauthorizedResponse)
-    const res = await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+    const res = await POST(makeRequest({ action: 'approve' }), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 400 for invalid action value', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
-    const res = await POST(makeRequest({ action: 'invalid' }), { params: { id: 'user-1' } })
+    const res = await POST(makeRequest({ action: 'invalid' }), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/approve.*reject/i)
@@ -75,7 +75,7 @@ describe('POST /api/admin/business/customers/[id]/approve', () => {
   it('returns 404 when business profile not found', async () => {
     mockRequireScope.mockResolvedValue(adminPayload as any)
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+    const res = await POST(makeRequest({ action: 'approve' }), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -89,7 +89,7 @@ describe('POST /api/admin/business/customers/[id]/approve', () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockSendApproved.mockResolvedValue(undefined as any)
 
-    const res = await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+    const res = await POST(makeRequest({ action: 'approve' }), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -110,7 +110,7 @@ describe('POST /api/admin/business/customers/[id]/approve', () => {
 
     const res = await POST(
       makeRequest({ action: 'reject', rejectionNote: 'Incomplete docs' }),
-      { params: { id: 'user-1' } },
+      { params: Promise.resolve({ id: 'user-1' }) },
     )
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -128,7 +128,7 @@ describe('POST /api/admin/business/customers/[id]/approve', () => {
       .mockResolvedValueOnce({ email: null, first_name: null, last_name: null, company_name: null })
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+    const res = await POST(makeRequest({ action: 'approve' }), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(200)
     expect(mockSendApproved).not.toHaveBeenCalled()
   })
@@ -141,7 +141,7 @@ describe('POST /api/admin/business/customers/[id]/approve', () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockSendApproved.mockResolvedValue(undefined as any)
 
-    await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+    await POST(makeRequest({ action: 'approve' }), { params: Promise.resolve({ id: 'user-1' }) })
 
     expect(mockSendApproved).toHaveBeenCalledWith(
       'customer@example.com',

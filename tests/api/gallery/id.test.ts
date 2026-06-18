@@ -27,7 +27,7 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockQuery = vi.mocked(query)
 const mockDelete = vi.mocked(deleteGalleryImage)
 
-const params = { params: { id: 'img1' } }
+const params = { params: Promise.resolve({ id: 'img1' }) }
 
 function makeRequest() {
   return new Request('http://localhost/api/gallery/img1', { method: 'DELETE' })

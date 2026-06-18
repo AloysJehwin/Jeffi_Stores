@@ -22,7 +22,7 @@ import { queryOne } from '@/lib/db'
 
 const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['orders'] }
 const ORDER_ID = 'order-uuid-1'
-const PARAMS = { params: { id: ORDER_ID } }
+const PARAMS = { params: Promise.resolve({ id: ORDER_ID }) }
 const DELHIVERY_KEY = 'test-delhivery-key'
 
 function makeReq() {

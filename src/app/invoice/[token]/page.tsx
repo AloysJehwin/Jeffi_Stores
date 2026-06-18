@@ -4,13 +4,14 @@ import InvoiceViewClient from './InvoiceViewClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function InvoiceViewPage({ params }: { params: { token: string } }) {
+export default async function InvoiceViewPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   const order = await queryOne<any>(
     `SELECT o.*, a.full_name, a.address_line1, a.address_line2, a.city, a.state, a.postal_code, a.phone AS address_phone
      FROM orders o
      LEFT JOIN addresses a ON o.shipping_address_id = a.id
      WHERE o.view_token = $1 AND o.invoice_number IS NOT NULL`,
-    [params.token]
+    [token]
   )
   if (!order) notFound()
 
@@ -25,5 +26,5 @@ export default async function InvoiceViewPage({ params }: { params: { token: str
   const s: Record<string, string> = {}
   for (const row of settingsRows) s[row.key] = row.value || ''
 
-  return <InvoiceViewClient order={order} items={items || []} settings={s} token={params.token} />
+  return <InvoiceViewClient order={order} items={items || []} settings={s} token={token} />
 }

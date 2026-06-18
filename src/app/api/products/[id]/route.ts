@@ -4,8 +4,9 @@ import { authenticateAdmin } from '@/lib/jwt'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) {
@@ -13,7 +14,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const productId = params.id
+    const productId = id
 
     const allowedFields: Record<string, unknown> = {}
     if (typeof body.is_active === 'boolean') allowedFields.is_active = body.is_active
@@ -56,7 +57,8 @@ export async function PATCH(
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   return NextResponse.json(
     { error: 'Products cannot be deleted. Set is_active = false to deactivate.' },
     { status: 405 }

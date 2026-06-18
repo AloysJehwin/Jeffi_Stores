@@ -35,14 +35,14 @@ beforeEach(() => { vi.clearAllMocks() })
 describe('GET /api/admin/products/[id]/analytics', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeReq('prod-1'), { params: { id: 'prod-1' } })
+    const res = await GET(makeReq('prod-1'), { params: Promise.resolve({ id: 'prod-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeReq('prod-1'), { params: { id: 'prod-1' } })
+    const res = await GET(makeReq('prod-1'), { params: Promise.resolve({ id: 'prod-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -50,7 +50,7 @@ describe('GET /api/admin/products/[id]/analytics', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockGetAnalytics.mockResolvedValue(null)
-    const res = await GET(makeReq('prod-1'), { params: { id: 'prod-1' } })
+    const res = await GET(makeReq('prod-1'), { params: Promise.resolve({ id: 'prod-1' }) })
     expect(res.status).toBe(404)
   })
 
@@ -59,7 +59,7 @@ describe('GET /api/admin/products/[id]/analytics', () => {
     mockHasScope.mockReturnValue(true)
     const data = { views: 100, revenue: 500 }
     mockGetAnalytics.mockResolvedValue(data as any)
-    const res = await GET(makeReq('prod-1', '30'), { params: { id: 'prod-1' } })
+    const res = await GET(makeReq('prod-1', '30'), { params: Promise.resolve({ id: 'prod-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body).toEqual(data)
@@ -70,9 +70,9 @@ describe('GET /api/admin/products/[id]/analytics', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockGetAnalytics.mockResolvedValue({ ok: true } as any)
-    await GET(makeReq('prod-1', '0'), { params: { id: 'prod-1' } })
+    await GET(makeReq('prod-1', '0'), { params: Promise.resolve({ id: 'prod-1' }) })
     expect(mockGetAnalytics).toHaveBeenCalledWith('prod-1', 1)
-    await GET(makeReq('prod-1', '9999'), { params: { id: 'prod-1' } })
+    await GET(makeReq('prod-1', '9999'), { params: Promise.resolve({ id: 'prod-1' }) })
     expect(mockGetAnalytics).toHaveBeenCalledWith('prod-1', 365)
   })
 })

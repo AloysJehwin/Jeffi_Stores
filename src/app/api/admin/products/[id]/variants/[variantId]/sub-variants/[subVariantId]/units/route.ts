@@ -6,7 +6,7 @@ import { queryMany, queryOne, withTransaction } from '@/lib/db'
 export const dynamic = 'force-dynamic'
 
 interface Params {
-  params: { id: string; variantId: string; subVariantId: string }
+  params: Promise<{ id: string; variantId: string; subVariantId: string }>
 }
 
 async function ensureSubVariant(productId: string, variantId: string, subVariantId: string) {
@@ -19,13 +19,14 @@ async function ensureSubVariant(productId: string, variantId: string, subVariant
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
+  const { id, variantId, subVariantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  if (!(await ensureSubVariant(params.id, params.variantId, params.subVariantId))) {
+  if (!(await ensureSubVariant(id, variantId, subVariantId))) {
     return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
   }
 
@@ -36,20 +37,21 @@ export async function GET(request: NextRequest, { params }: Params) {
      FROM product_units
      WHERE sub_variant_id = $1
      ORDER BY is_base DESC, unit ASC`,
-    [params.subVariantId]
+    [subVariantId]
   )
 
   return NextResponse.json({ units })
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
+  const { id, variantId, subVariantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  if (!(await ensureSubVariant(params.id, params.variantId, params.subVariantId))) {
+  if (!(await ensureSubVariant(id, variantId, subVariantId))) {
     return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
   }
 
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const upserted = await withTransaction(async (client) => {
       if (isBase) {
-        await client.query(`UPDATE product_units SET is_base = FALSE WHERE sub_variant_id = $1`, [params.subVariantId])
+        await client.query(`UPDATE product_units SET is_base = FALSE WHERE sub_variant_id = $1`, [subVariantId])
       }
       const res = await client.query(
         `INSERT INTO product_units (
@@ -97,9 +99,9 @@ export async function POST(request: NextRequest, { params }: Params) {
            updated_at = NOW()
          RETURNING *`,
         [
-          params.id,
-          params.variantId,
-          params.subVariantId,
+          id,
+          variantId,
+          subVariantId,
           unit, factor, dimension,
           conversionMeta ? JSON.stringify(conversionMeta) : null,
           isBase,

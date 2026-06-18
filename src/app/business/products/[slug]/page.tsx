@@ -82,9 +82,10 @@ const getProductBySlug = cache(async (slug: string) => {
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string }
+  params: Promise<{ slug: string }>
 }): Promise<Metadata> {
-  const product = await getProductBySlug(params.slug)
+  const { slug } = await params
+  const product = await getProductBySlug(slug)
   if (!product) return { title: 'Product Not Found' }
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
@@ -289,10 +290,12 @@ export default async function ProductDetailPage({
   params,
   searchParams,
 }: {
-  params: { slug: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const product = await getProductBySlug(params.slug)
+  const { slug } = await params
+  const resolvedSearchParams = await searchParams
+  const product = await getProductBySlug(slug)
 
   if (!product) {
     notFound()
@@ -303,7 +306,7 @@ export default async function ProductDetailPage({
   const relatedProducts = await getRelatedProducts(product.id, product.category_id, product.name)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
   const jsonLd = buildProductJsonLd(product, baseUrl)
-  const skuParam = typeof searchParams.sku === 'string' ? searchParams.sku : undefined
+  const skuParam = typeof resolvedSearchParams.sku === 'string' ? resolvedSearchParams.sku : undefined
 
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
   const hasVariants = product.has_variants && product.product_variants?.length > 0

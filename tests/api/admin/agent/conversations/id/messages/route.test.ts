@@ -16,7 +16,7 @@ const mockQueryMany = vi.mocked(queryMany)
 const mockQueryOne = vi.mocked(queryOne)
 
 const admin = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['agent'] }
-const params = { id: 'conv-uuid-123' }
+const params = Promise.resolve({ id: 'conv-uuid-123' })
 
 function makeRequest() {
   return new NextRequest('http://localhost/api/admin/agent/conversations/conv-uuid-123/messages')

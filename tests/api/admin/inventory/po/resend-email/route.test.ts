@@ -69,14 +69,14 @@ describe('POST /api/admin/inventory/po/[id]/resend-email', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeRequest(), { params: { id: 'po-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeRequest(), { params: { id: 'po-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -84,7 +84,7 @@ describe('POST /api/admin/inventory/po/[id]/resend-email', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeRequest('po-999'), { params: { id: 'po-999' } })
+    const res = await POST(makeRequest('po-999'), { params: Promise.resolve({ id: 'po-999' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -94,7 +94,7 @@ describe('POST /api/admin/inventory/po/[id]/resend-email', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...samplePO, supplier_email: null })
-    const res = await POST(makeRequest(), { params: { id: 'po-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/no email/i)
@@ -107,7 +107,7 @@ describe('POST /api/admin/inventory/po/[id]/resend-email', () => {
     mockQueryMany.mockResolvedValue(sampleItems)
     mockSendPOEmail.mockResolvedValue(undefined as any)
 
-    const res = await POST(makeRequest(), { params: { id: 'po-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -129,7 +129,7 @@ describe('POST /api/admin/inventory/po/[id]/resend-email', () => {
     mockQueryMany.mockResolvedValue(sampleItems)
     mockSendPOEmail.mockRejectedValue(new Error('SMTP error'))
 
-    const res = await POST(makeRequest(), { params: { id: 'po-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'po-1' }) })
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toMatch(/SMTP error/i)

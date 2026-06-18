@@ -38,7 +38,7 @@ const admin = {
 }
 
 const supplierId = 'sup-uuid-1'
-const routeParams = { params: { id: supplierId } }
+const routeParams = { params: Promise.resolve({ id: supplierId }) }
 
 function makeGet() {
   return new NextRequest(`http://localhost/api/admin/inventory/suppliers/${supplierId}`)

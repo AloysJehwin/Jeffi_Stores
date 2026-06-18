@@ -6,16 +6,17 @@ import { logStockMovement } from '@/lib/inventory'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(
       `SELECT id, order_number, status, payment_status, source FROM orders WHERE id = $1`,
-      [params.id]
+      [id]
     )
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (order.source !== 'offline') {
@@ -28,7 +29,7 @@ export async function POST(
     await withTransaction(async (client) => {
       const itemsResult = await client.query(
         `SELECT product_id, variant_id, sub_variant_id, quantity FROM order_items WHERE order_id = $1`,
-        [params.id]
+        [id]
       )
 
       for (const item of itemsResult.rows) {
@@ -74,14 +75,14 @@ export async function POST(
           transactionType: 'return',
           quantityChange: qty,
           referenceType: 'order',
-          referenceId: params.id,
+          referenceId: id,
           currentStock: stockBefore,
         })
       }
 
       await client.query(
         `UPDATE orders SET status = 'cancelled', payment_status = 'cancelled', updated_at = NOW() WHERE id = $1`,
-        [params.id]
+        [id]
       )
     })
 

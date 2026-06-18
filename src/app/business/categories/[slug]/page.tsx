@@ -62,10 +62,12 @@ export default async function BusinessCategoryDetailPage({
   params,
   searchParams,
 }: {
-  params: { slug: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const category = await getCategoryBySlug(params.slug)
+  const { slug } = await params
+  const resolvedSearchParams = await searchParams
+  const category = await getCategoryBySlug(slug)
 
   if (!category) {
     notFound()
@@ -73,7 +75,7 @@ export default async function BusinessCategoryDetailPage({
 
   const host = (await headers()).get('host') ?? ''
 
-  const pageParam = typeof searchParams.page === 'string' ? searchParams.page : '1'
+  const pageParam = typeof resolvedSearchParams.page === 'string' ? resolvedSearchParams.page : '1'
   const page = Math.max(1, parseInt(pageParam, 10) || 1)
 
   const subcategories = await getSubcategories(category.id)
@@ -179,7 +181,7 @@ export default async function BusinessCategoryDetailPage({
             <Pagination
               page={page}
               totalPages={totalPages}
-              buildHref={(p) => p > 1 ? bp(`/business/categories/${params.slug}?page=${p}`, host) : bp(`/business/categories/${params.slug}`, host)}
+              buildHref={(p) => p > 1 ? bp(`/business/categories/${slug}?page=${p}`, host) : bp(`/business/categories/${slug}`, host)}
             />
             </>
           ) : (

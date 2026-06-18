@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic'
 
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
 
-export async function POST(req: NextRequest, { params }: { params: { kind: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'mailer')) {
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { kind: strin
   }
 
   try {
-    const res = await fetch(`${APP_URL}/api/cron/run-campaigns?kind=${params.kind}`, {
+    const res = await fetch(`${APP_URL}/api/cron/run-campaigns?kind=${kind}`, {
       headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
     })
     const data = await res.json()

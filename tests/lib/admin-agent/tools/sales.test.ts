@@ -77,7 +77,7 @@ describe('admin-agent/tools/sales', () => {
   })
 
   // ── get_quotation ────────────────────────────────────────────────────────
-  // Source params: { id, quoteNumber }
+  // Source params: Promise.resolve({ id, quoteNumber })
   // Source returns found: spread of row + items (no ok field)
   // Source returns not found: { error: 'Quotation not found' }
   describe('get_quotation', () => {
@@ -107,7 +107,7 @@ describe('admin-agent/tools/sales', () => {
   })
 
   // ── get_invoice ──────────────────────────────────────────────────────────
-  // Source params: { id, invoiceNumber }
+  // Source params: Promise.resolve({ id, invoiceNumber })
   // Source returns found: spread of row + items (no ok field)
   // Source returns not found: { error: 'Invoice not found' }
   describe('get_invoice', () => {
@@ -137,7 +137,7 @@ describe('admin-agent/tools/sales', () => {
   })
 
   // ── get_cash_sale ────────────────────────────────────────────────────────
-  // Source params: { id, saleNumber, invoiceNumber }
+  // Source params: Promise.resolve({ id, saleNumber, invoiceNumber })
   // Source returns found: spread of row + items (no ok field)
   // Source returns not found: { error: 'Cash sale not found' }
   describe('get_cash_sale', () => {
@@ -265,7 +265,7 @@ describe('admin-agent/tools/sales', () => {
   })
 
   // ── propose_create_quotation ─────────────────────────────────────────────
-  // Source params: { customerEmail (string with @), items (JSON string array) }
+  // Source params: Promise.resolve({ customerEmail (string with @), items (JSON string array) })
   // Source calls queryMany for products, then queryOne for user lookup
   // Returns: { proposed: true, kind, payload, ... } — no ok field
   describe('propose_create_quotation', () => {
@@ -295,7 +295,7 @@ describe('admin-agent/tools/sales', () => {
   })
 
   // ── propose_mark_invoice_paid ────────────────────────────────────────────
-  // Source params: { invoiceId, invoiceNumber, paymentMode, paidAt }
+  // Source params: Promise.resolve({ invoiceId, invoiceNumber, paymentMode, paidAt })
   // Source throws (not returns err) for missing invoiceId/invoiceNumber and bad mode
   describe('propose_mark_invoice_paid', () => {
     it('proposes marking invoice as paid', async () => {
@@ -340,7 +340,7 @@ describe('admin-agent/tools/sales', () => {
   })
 
   // ── propose_update_order_status ──────────────────────────────────────────
-  // Source params: { orderId, orderNumber, newStatus, awbNumber }
+  // Source params: Promise.resolve({ orderId, orderNumber, newStatus, awbNumber })
   // Source throws for missing orderId/orderNumber
   // Source returns { proposed: false } for regressions (does NOT throw)
   describe('propose_update_order_status', () => {

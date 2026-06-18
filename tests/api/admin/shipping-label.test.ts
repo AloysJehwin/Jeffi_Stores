@@ -87,14 +87,14 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeReq(), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toMatch(/unauthorized/i)
   })
 
   it('returns 403 when orders scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeReq(), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/insufficient/i)
   })
@@ -107,14 +107,14 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
 
   it('returns 404 when order not found', async () => {
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeReq(), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Order not found')
   })
 
   it('returns 404 when order has no AWB number', async () => {
     mockQueryOne.mockResolvedValue({ ...sampleOrder, awb_number: null } as any)
-    const res = await GET(makeReq(), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('No AWB number for this order')
   })
@@ -131,7 +131,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
       arrayBuffer: async () => pdfBuffer.buffer,
     } as any)
 
-    const res = await GET(makeReq(), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('application/pdf')
     expect(res.headers.get('Content-Disposition')).toMatch(/attachment.*shipping-label/)
@@ -147,7 +147,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
       arrayBuffer: async () => pdfBuffer.buffer,
     } as any)
 
-    const res = await GET(makeReq({ inline: '1' }), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq({ inline: '1' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Disposition')).toMatch(/^inline/)
   })
@@ -162,7 +162,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
       arrayBuffer: async () => pdfBuffer.buffer,
     } as any)
 
-    const res = await GET(makeReq({ print: '1' }), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq({ print: '1' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toMatch(/text\/html/)
     const html = await res.text()
@@ -185,7 +185,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
         arrayBuffer: async () => fakePdf.buffer,
       } as any)
 
-    const res = await GET(makeReq(), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('application/pdf')
   })
@@ -199,7 +199,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
       json: async () => ({ packages: [{}] }),
     } as any)
 
-    const res = await GET(makeReq(), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(502)
     expect((await res.json()).error).toMatch(/No PDF link/)
   })
@@ -211,7 +211,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
       status: 503,
     } as any)
 
-    const res = await GET(makeReq(), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq(), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(502)
     expect((await res.json()).error).toMatch(/503/)
   })
@@ -226,7 +226,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
       json: async () => ({ packages: [{ sort_code: 'RIP', pin: '492001', name: 'Alice', add: '123 Main', oid: 'ORD-001', prd: 'Hardware', cod: '0', total_amount: '1500.00' }] }),
     } as any)
 
-    const res = await GET(makeReq({ size: '4R' }), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq({ size: '4R' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('application/pdf')
   })
@@ -238,7 +238,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
       status: 404,
     } as any)
 
-    const res = await GET(makeReq({ size: '4R' }), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq({ size: '4R' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(502)
     expect((await res.json()).error).toMatch(/404/)
   })
@@ -251,7 +251,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
       json: async () => ({ packages: [{}] }),
     } as any)
 
-    const res = await GET(makeReq({ size: '4R', print: '1' }), { params: { id: ORDER_ID } })
+    const res = await GET(makeReq({ size: '4R', print: '1' }), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toMatch(/text\/html/)
   })

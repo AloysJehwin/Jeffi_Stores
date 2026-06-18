@@ -6,7 +6,7 @@ import { queryMany, queryOne, query, withTransaction } from '@/lib/db'
 export const dynamic = 'force-dynamic'
 
 interface Params {
-  params: { id: string; variantId: string }
+  params: Promise<{ id: string; variantId: string }>
 }
 
 async function ensureVariant(productId: string, variantId: string) {
@@ -18,13 +18,14 @@ async function ensureVariant(productId: string, variantId: string) {
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
+  const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  if (!(await ensureVariant(params.id, params.variantId))) {
+  if (!(await ensureVariant(id, variantId))) {
     return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
   }
 
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest, { params }: Params) {
      FROM product_units
      WHERE variant_id = $1
      ORDER BY is_base DESC, unit ASC`,
-    [params.variantId]
+    [variantId]
   )
 
   // If no variant-specific rows, fall back to product-level units (inherited)
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest, { params }: Params) {
          FROM product_units
          WHERE product_id = $1 AND variant_id IS NULL
          ORDER BY is_base DESC, unit ASC`,
-        [params.id]
+        [id]
       )
     : variantUnits
 
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
+  const { id, variantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products')) {
@@ -83,7 +85,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'factor must be a positive number' }, { status: 400 })
   }
 
-  if (!(await ensureVariant(params.id, params.variantId))) {
+  if (!(await ensureVariant(id, variantId))) {
     return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
   }
 
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   try {
     const upserted = await withTransaction(async (client) => {
       if (isBase) {
-        await client.query(`UPDATE product_units SET is_base = FALSE WHERE variant_id = $1`, [params.variantId])
+        await client.query(`UPDATE product_units SET is_base = FALSE WHERE variant_id = $1`, [variantId])
       }
       const res = await client.query(
         `INSERT INTO product_units (
@@ -121,8 +123,8 @@ export async function POST(request: NextRequest, { params }: Params) {
            updated_at = NOW()
          RETURNING *`,
         [
-          params.id,
-          params.variantId,
+          id,
+          variantId,
           unit,
           factor,
           dimension,

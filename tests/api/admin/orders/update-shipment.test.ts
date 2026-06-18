@@ -55,7 +55,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: { id: 'ord-1' } })
+    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toMatch(/unauthorized/i)
   })
@@ -63,7 +63,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
   it('returns 403 when scope is missing', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: { id: 'ord-1' } })
+    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/insufficient/i)
   })
@@ -73,7 +73,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
 
-    const res = await POST(makeRequest('ord-999', { name: 'Test' }), { params: { id: 'ord-999' } })
+    const res = await POST(makeRequest('ord-999', { name: 'Test' }), { params: Promise.resolve({ id: 'ord-999' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toMatch(/not found/i)
   })
@@ -83,7 +83,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ awb_number: null })
 
-    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: { id: 'ord-1' } })
+    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toMatch(/awb/i)
   })
@@ -98,7 +98,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
       headers: { 'content-type': 'application/json' },
       body: 'NOT JSON',
     })
-    const res = await POST(req, { params: { id: 'ord-1' } })
+    const res = await POST(req, { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/invalid json/i)
   })
@@ -110,7 +110,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
     const errResp = new Response(JSON.stringify({ error: 'Validation failed' }), { status: 422 })
     mockParseBody.mockReturnValue({ ok: false, response: errResp } as any)
 
-    const res = await POST(makeRequest('ord-1', {}), { params: { id: 'ord-1' } })
+    const res = await POST(makeRequest('ord-1', {}), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(422)
   })
 
@@ -127,7 +127,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
       json: async () => ({ updated: true }),
     })
 
-    const res = await POST(makeRequest('ord-1', { name: 'John Doe' }), { params: { id: 'ord-1' } })
+    const res = await POST(makeRequest('ord-1', { name: 'John Doe' }), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -150,7 +150,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
       json: async () => ({ message: 'Bad request' }),
     })
 
-    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: { id: 'ord-1' } })
+    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(502)
     expect((await res.json()).error).toMatch(/delhivery/i)
   })
@@ -160,7 +160,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockRejectedValue(new Error('connection refused'))
 
-    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: { id: 'ord-1' } })
+    const res = await POST(makeRequest('ord-1', { name: 'Test' }), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/connection refused/i)
   })
@@ -178,7 +178,7 @@ describe('POST /api/admin/orders/[id]/update-shipment', () => {
       json: async () => ({}),
     })
 
-    await POST(makeRequest('ord-1', { name: 'Jane' }), { params: { id: 'ord-1' } })
+    await POST(makeRequest('ord-1', { name: 'Jane' }), { params: Promise.resolve({ id: 'ord-1' }) })
     const fetchCall = mockFetch.mock.calls[0]
     const payload = JSON.parse(fetchCall[1].body as string)
     expect(payload.waybill).toBe('DL-789-XYZ')

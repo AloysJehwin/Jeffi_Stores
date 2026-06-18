@@ -114,35 +114,35 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await POST(makePost('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toBe('Unauthorized')
   })
 
   it('returns 403 when scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makePost('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toBe('Insufficient permissions')
   })
 
   it('returns 404 when order not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await POST(makePost('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Order not found')
   })
 
   it('returns 422 when invoice not yet generated', async () => {
     mockQueryOne.mockResolvedValueOnce({ ...sampleOrder, invoice_number: null } as any)
-    const res = await POST(makePost('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(422)
     expect((await res.json()).error).toBe('Invoice not generated yet')
   })
 
   it('returns 409 when IRN already generated', async () => {
     mockQueryOne.mockResolvedValueOnce({ ...sampleOrder, irn: 'EXISTING-IRN', irn_status: 'generated' } as any)
-    const res = await POST(makePost('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(409)
     const body = await res.json()
     expect(body.error).toBe('IRN already generated')
@@ -158,7 +158,7 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
       .mockResolvedValueOnce(sampleSettings as any) // site settings
     mockGenerateIRN.mockResolvedValueOnce(irnResult as any)
 
-    const res = await POST(makePost('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -176,7 +176,7 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
       .mockResolvedValueOnce(sampleSettings as any)
     mockGenerateIRN.mockResolvedValueOnce(irnResult as any)
 
-    const res = await POST(makePost('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(200)
     // Verify generateIRN was called with B2B
     const callArgs = mockGenerateIRN.mock.calls[0][0]
@@ -192,7 +192,7 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
       .mockResolvedValueOnce(sampleSettings as any)
     mockGenerateIRN.mockResolvedValueOnce(irnResult as any)
 
-    await POST(makePost('ord-1'), { params: { id: 'ord-1' } })
+    await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     const callArgs = mockGenerateIRN.mock.calls[0][0]
     expect(callArgs.supplyType).toBe('B2C')
   })
@@ -204,7 +204,7 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
       .mockResolvedValueOnce(sampleSettings as any)
     mockGenerateIRN.mockRejectedValueOnce(new Error('IRP service unavailable'))
 
-    const res = await POST(makePost('ord-1'), { params: { id: 'ord-1' } })
+    const res = await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('IRP service unavailable')
   })
@@ -221,33 +221,33 @@ describe('DELETE /api/admin/orders/[id]/einvoice', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as any)
-    const res = await DELETE(makeDelete('ord-1'), { params: { id: 'ord-1' } })
+    const res = await DELETE(makeDelete('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await DELETE(makeDelete('ord-1'), { params: { id: 'ord-1' } })
+    const res = await DELETE(makeDelete('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 404 when order not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
-    const res = await DELETE(makeDelete('ord-1'), { params: { id: 'ord-1' } })
+    const res = await DELETE(makeDelete('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Order not found')
   })
 
   it('returns 422 when order has no IRN', async () => {
     mockQueryOne.mockResolvedValueOnce({ irn: null, irn_status: null } as any)
-    const res = await DELETE(makeDelete('ord-1'), { params: { id: 'ord-1' } })
+    const res = await DELETE(makeDelete('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(422)
     expect((await res.json()).error).toBe('No IRN on this order')
   })
 
   it('returns 409 when IRN already cancelled', async () => {
     mockQueryOne.mockResolvedValueOnce({ irn: 'SOME-IRN', irn_status: 'cancelled' } as any)
-    const res = await DELETE(makeDelete('ord-1'), { params: { id: 'ord-1' } })
+    const res = await DELETE(makeDelete('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(409)
     expect((await res.json()).error).toBe('IRN already cancelled')
   })
@@ -258,7 +258,7 @@ describe('DELETE /api/admin/orders/[id]/einvoice', () => {
       .mockResolvedValueOnce(undefined as any)                                           // UPDATE
     mockCancelIRN.mockResolvedValueOnce(undefined as any)
 
-    const res = await DELETE(makeDelete('ord-1', { reason: 1, remark: 'Test cancel' }), { params: { id: 'ord-1' } })
+    const res = await DELETE(makeDelete('ord-1', { reason: 1, remark: 'Test cancel' }), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(mockCancelIRN).toHaveBeenCalledWith('REAL-IRN-001', 1, 'Test cancel')
@@ -269,7 +269,7 @@ describe('DELETE /api/admin/orders/[id]/einvoice', () => {
       .mockResolvedValueOnce({ irn: 'STUB-123456', irn_status: 'generated' } as any)
       .mockResolvedValueOnce(undefined as any)
 
-    const res = await DELETE(makeDelete('ord-1'), { params: { id: 'ord-1' } })
+    const res = await DELETE(makeDelete('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(200)
     expect(mockCancelIRN).not.toHaveBeenCalled()
   })
@@ -280,13 +280,13 @@ describe('DELETE /api/admin/orders/[id]/einvoice', () => {
       .mockResolvedValueOnce(undefined as any)
     mockCancelIRN.mockResolvedValueOnce(undefined as any)
 
-    await DELETE(makeDelete('ord-1', {}), { params: { id: 'ord-1' } })
+    await DELETE(makeDelete('ord-1', {}), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(mockCancelIRN).toHaveBeenCalledWith('REAL-IRN-999', 3, 'Order cancelled')
   })
 
   it('returns 500 on unexpected error', async () => {
     mockQueryOne.mockRejectedValueOnce(new Error('DB failure'))
-    const res = await DELETE(makeDelete('ord-1'), { params: { id: 'ord-1' } })
+    const res = await DELETE(makeDelete('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('DB failure')
   })

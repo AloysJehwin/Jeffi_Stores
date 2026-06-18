@@ -150,7 +150,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
     vi.mocked(requireAdminScope).mockResolvedValue(
       NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
     )
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(401)
   })
 
@@ -158,7 +158,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
     vi.mocked(requireAdminScope).mockResolvedValue(
       NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
     )
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(403)
   })
 
@@ -167,7 +167,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
   it('returns 404 when RFQ not found', async () => {
     vi.mocked(queryOne).mockReset()
     vi.mocked(queryOne).mockResolvedValue(null as any)
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(404)
     const json = await res.json()
     expect(json.error).toBe('Not found')
@@ -179,7 +179,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       ...BASE_RFQ,
       converted_quotation_id: 'existing-qt',
     } as any)
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(409)
     const json = await res.json()
     expect(json.error).toBe('Already converted')
@@ -192,7 +192,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
     vi.mocked(queryMany)
       .mockResolvedValueOnce(BUSINESS_DISCOUNTS as any)
       .mockResolvedValueOnce([] as any) // empty items
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toBe('RFQ has no items')
@@ -201,7 +201,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
   // --- Happy path ---
 
   it('creates quotation and returns quotationId and quoteNumber', async () => {
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     const json = await res.json()
 
     expect(res.status).toBe(200)
@@ -210,7 +210,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
   })
 
   it('inserts quotation_items for each RFQ item', async () => {
-    await POST(postReq(), { params: { id: RFQ_ID } })
+    await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
 
     const insertItemCalls = vi.mocked(query).mock.calls.filter(
       (args: any[]) => typeof args[0] === 'string' && args[0].includes('quotation_items'),
@@ -219,7 +219,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
   })
 
   it('updates RFQ status to converted', async () => {
-    await POST(postReq(), { params: { id: RFQ_ID } })
+    await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
 
     const updateCalls = vi.mocked(query).mock.calls.filter(
       (args: any[]) => typeof args[0] === 'string' && args[0].includes("status='converted'"),
@@ -240,7 +240,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       .mockResolvedValueOnce({ max_seq: '2' } as any)
       .mockResolvedValueOnce(QUOTATION_ROW as any)
 
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -254,14 +254,14 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       .mockResolvedValueOnce({ max_seq: null } as any)
       .mockResolvedValueOnce(QUOTATION_ROW as any)
 
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
   })
 
   // --- Email notification ---
 
   it('sends quotation email when view_token is present', async () => {
-    await POST(postReq(), { params: { id: RFQ_ID } })
+    await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(sendRfqConvertedToQuotationEmail).toHaveBeenCalledWith(
       BASE_RFQ.email,
       BASE_RFQ.company_name,
@@ -280,7 +280,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       .mockResolvedValueOnce({ max_seq: '0' } as any)
       .mockResolvedValueOnce({ ...QUOTATION_ROW, view_token: null } as any)
 
-    await POST(postReq(), { params: { id: RFQ_ID } })
+    await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(sendRfqConvertedToQuotationEmail).not.toHaveBeenCalled()
   })
 
@@ -294,7 +294,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       .mockResolvedValueOnce({ max_seq: '0' } as any)
       .mockResolvedValueOnce(QUOTATION_ROW as any)
 
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -306,7 +306,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       .mockResolvedValueOnce({ max_seq: '0' } as any)
       .mockResolvedValueOnce(QUOTATION_ROW as any)
 
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -331,7 +331,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       .mockResolvedValueOnce(BUSINESS_DISCOUNTS as any)
       .mockResolvedValueOnce([variantItem] as any)
 
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -355,7 +355,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       .mockResolvedValueOnce(BUSINESS_DISCOUNTS as any)
       .mockResolvedValueOnce([svItem] as any)
 
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
   })
 
@@ -369,7 +369,7 @@ describe('POST /api/admin/business/rfqs/[id]/convert-to-quotation', () => {
       .mockResolvedValueOnce({ max_seq: null } as any)
       .mockResolvedValueOnce(QUOTATION_ROW as any)
 
-    const res = await POST(postReq(), { params: { id: RFQ_ID } })
+    const res = await POST(postReq(), { params: Promise.resolve({ id: RFQ_ID }) })
     expect(res.status).toBe(200)
   })
 })

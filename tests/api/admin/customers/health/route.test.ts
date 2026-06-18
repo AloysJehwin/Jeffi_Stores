@@ -63,14 +63,14 @@ describe('GET /api/admin/customers/[id]/health', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeGetRequest(), { params: { id: 'user-1' } })
+    const res = await GET(makeGetRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeGetRequest(), { params: { id: 'user-1' } })
+    const res = await GET(makeGetRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -79,7 +79,7 @@ describe('GET /api/admin/customers/[id]/health', () => {
     mockHasScope.mockReturnValue(true)
     mockGetHealth.mockResolvedValue(sampleHealth as any)
 
-    const res = await GET(makeGetRequest(), { params: { id: 'user-1' } })
+    const res = await GET(makeGetRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.health).toEqual(sampleHealth)
@@ -91,7 +91,7 @@ describe('GET /api/admin/customers/[id]/health', () => {
     mockHasScope.mockReturnValue(true)
     mockGetHealth.mockResolvedValue(null)
 
-    const res = await GET(makeGetRequest(), { params: { id: 'user-1' } })
+    const res = await GET(makeGetRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.health).toBeNull()
@@ -103,14 +103,14 @@ describe('POST /api/admin/customers/[id]/health', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makePostRequest(), { params: { id: 'user-1' } })
+    const res = await POST(makePostRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makePostRequest(), { params: { id: 'user-1' } })
+    const res = await POST(makePostRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -119,7 +119,7 @@ describe('POST /api/admin/customers/[id]/health', () => {
     mockHasScope.mockReturnValue(true)
     mockRecomputeHealth.mockResolvedValue(null)
 
-    const res = await POST(makePostRequest('user-999'), { params: { id: 'user-999' } })
+    const res = await POST(makePostRequest('user-999'), { params: Promise.resolve({ id: 'user-999' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -130,7 +130,7 @@ describe('POST /api/admin/customers/[id]/health', () => {
     mockHasScope.mockReturnValue(true)
     mockRecomputeHealth.mockResolvedValue(sampleHealth as any)
 
-    const res = await POST(makePostRequest(), { params: { id: 'user-1' } })
+    const res = await POST(makePostRequest(), { params: Promise.resolve({ id: 'user-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.health).toEqual(sampleHealth)

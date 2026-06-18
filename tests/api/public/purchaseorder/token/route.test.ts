@@ -13,7 +13,7 @@ import { queryOne, queryMany } from '@/lib/db'
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)
 
-const params = { params: { token: 'po-tok' } }
+const params = { params: Promise.resolve({ token: 'po-tok' }) }
 
 function makeRequest() {
   return new Request('http://localhost/api/public/purchaseorder/po-tok')

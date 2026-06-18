@@ -73,7 +73,7 @@ describe('GET /api/admin/customers/[id]/tasks', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeGetRequest(CUSTOMER_ID), { params: { id: CUSTOMER_ID } })
+    const res = await GET(makeGetRequest(CUSTOMER_ID), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body.error).toMatch(/unauthorized/i)
@@ -82,7 +82,7 @@ describe('GET /api/admin/customers/[id]/tasks', () => {
   it('returns 403 when scope is missing', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeGetRequest(CUSTOMER_ID), { params: { id: CUSTOMER_ID } })
+    const res = await GET(makeGetRequest(CUSTOMER_ID), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toMatch(/insufficient/i)
@@ -92,7 +92,7 @@ describe('GET /api/admin/customers/[id]/tasks', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue(sampleTasks as any)
-    const res = await GET(makeGetRequest(CUSTOMER_ID), { params: { id: CUSTOMER_ID } })
+    const res = await GET(makeGetRequest(CUSTOMER_ID), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.tasks).toEqual(sampleTasks)
@@ -102,7 +102,7 @@ describe('GET /api/admin/customers/[id]/tasks', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue(sampleTasks as any)
-    await GET(makeGetRequest(CUSTOMER_ID, { status: 'open' }), { params: { id: CUSTOMER_ID } })
+    await GET(makeGetRequest(CUSTOMER_ID, { status: 'open' }), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     const callArgs = mockQueryMany.mock.calls[0]
     expect(callArgs[0]).toContain("'pending', 'in_progress'")
   })
@@ -111,7 +111,7 @@ describe('GET /api/admin/customers/[id]/tasks', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
-    await GET(makeGetRequest(CUSTOMER_ID, { status: 'completed' }), { params: { id: CUSTOMER_ID } })
+    await GET(makeGetRequest(CUSTOMER_ID, { status: 'completed' }), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     const callArgs = mockQueryMany.mock.calls[0]
     expect(callArgs[0]).toContain("'completed'")
   })
@@ -120,7 +120,7 @@ describe('GET /api/admin/customers/[id]/tasks', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
-    const res = await GET(makeGetRequest(CUSTOMER_ID), { params: { id: CUSTOMER_ID } })
+    const res = await GET(makeGetRequest(CUSTOMER_ID), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.tasks).toEqual([])
@@ -132,21 +132,21 @@ describe('POST /api/admin/customers/[id]/tasks', () => {
 
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makePostRequest(CUSTOMER_ID, { title: 'Task' }), { params: { id: CUSTOMER_ID } })
+    const res = await POST(makePostRequest(CUSTOMER_ID, { title: 'Task' }), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is missing', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makePostRequest(CUSTOMER_ID, { title: 'Task' }), { params: { id: CUSTOMER_ID } })
+    const res = await POST(makePostRequest(CUSTOMER_ID, { title: 'Task' }), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 400 when title is missing', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const res = await POST(makePostRequest(CUSTOMER_ID, { description: 'No title' }), { params: { id: CUSTOMER_ID } })
+    const res = await POST(makePostRequest(CUSTOMER_ID, { description: 'No title' }), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/title is required/i)
@@ -155,7 +155,7 @@ describe('POST /api/admin/customers/[id]/tasks', () => {
   it('returns 400 when title is blank string', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    const res = await POST(makePostRequest(CUSTOMER_ID, { title: '   ' }), { params: { id: CUSTOMER_ID } })
+    const res = await POST(makePostRequest(CUSTOMER_ID, { title: '   ' }), { params: Promise.resolve({ id: CUSTOMER_ID }) })
     expect(res.status).toBe(400)
   })
 
@@ -165,7 +165,7 @@ describe('POST /api/admin/customers/[id]/tasks', () => {
     mockQuery.mockResolvedValue({ rows: [{ id: 'task-new-1' }], rowCount: 1 } as any)
     const res = await POST(
       makePostRequest(CUSTOMER_ID, { title: 'Call customer', priority: 'high', due_date: '2026-07-01' }),
-      { params: { id: CUSTOMER_ID } }
+      { params: Promise.resolve({ id: CUSTOMER_ID }) }
     )
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -179,7 +179,7 @@ describe('POST /api/admin/customers/[id]/tasks', () => {
     mockQuery.mockResolvedValue({ rows: [{ id: 'task-2' }], rowCount: 1 } as any)
     await POST(
       makePostRequest(CUSTOMER_ID, { title: 'Task', priority: 'extreme' }),
-      { params: { id: CUSTOMER_ID } }
+      { params: Promise.resolve({ id: CUSTOMER_ID }) }
     )
     const callArgs = mockQuery.mock.calls[0]
     expect(callArgs[1]).toContain('medium')
@@ -191,7 +191,7 @@ describe('POST /api/admin/customers/[id]/tasks', () => {
     mockQuery.mockResolvedValue({ rows: [{ id: 'task-3' }], rowCount: 1 } as any)
     await POST(
       makePostRequest(CUSTOMER_ID, { title: 'Task', assigned_to: 'other-admin-id' }),
-      { params: { id: CUSTOMER_ID } }
+      { params: Promise.resolve({ id: CUSTOMER_ID }) }
     )
     const callArgs = mockQuery.mock.calls[0]
     expect(callArgs[1]).toContain('other-admin-id')
@@ -204,7 +204,7 @@ describe('POST /api/admin/customers/[id]/tasks', () => {
     mockLogActivity.mockResolvedValue(undefined)
     await POST(
       makePostRequest(CUSTOMER_ID, { title: 'Follow up call' }),
-      { params: { id: CUSTOMER_ID } }
+      { params: Promise.resolve({ id: CUSTOMER_ID }) }
     )
     expect(mockLogActivity).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'task_created', userId: CUSTOMER_ID })

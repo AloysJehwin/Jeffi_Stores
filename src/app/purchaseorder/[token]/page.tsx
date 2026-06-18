@@ -4,14 +4,15 @@ import PurchaseOrderViewClient from './PurchaseOrderViewClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function PurchaseOrderViewPage({ params }: { params: { token: string } }) {
+export default async function PurchaseOrderViewPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   const po = await queryOne<any>(
     `SELECT po.*, s.name AS supplier_name, s.contact_name, s.email AS supplier_email,
             s.address AS supplier_address, s.gstin AS supplier_gstin
      FROM purchase_orders po
      JOIN suppliers s ON s.id = po.supplier_id
      WHERE po.view_token = $1`,
-    [params.token]
+    [token]
   )
   if (!po) notFound()
 
@@ -32,5 +33,5 @@ export default async function PurchaseOrderViewPage({ params }: { params: { toke
   const s: Record<string, string> = {}
   for (const row of settingsRows) s[row.key] = row.value || ''
 
-  return <PurchaseOrderViewClient po={po} items={items || []} settings={s} token={params.token} />
+  return <PurchaseOrderViewClient po={po} items={items || []} settings={s} token={token} />
 }

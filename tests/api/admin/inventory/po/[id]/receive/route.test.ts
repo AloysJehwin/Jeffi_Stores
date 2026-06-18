@@ -56,7 +56,7 @@ const admin = {
 }
 
 const poId = 'po-uuid-1'
-const params = { params: { id: poId } }
+const params = { params: Promise.resolve({ id: poId }) }
 
 function makePost(body: unknown) {
   return new NextRequest(`http://localhost/api/admin/inventory/po/${poId}/receive`, {

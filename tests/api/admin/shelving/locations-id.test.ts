@@ -20,7 +20,7 @@ import { updateLocation, deleteLocation } from '@/lib/shelf'
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const ADMIN = { adminId: 'a1', role: 'admin', scopes: ['inventory'] }
-const PARAMS = { params: { id: 'loc-123' } }
+const PARAMS = { params: Promise.resolve({ id: 'loc-123' }) }
 const LOCATION = { id: 'loc-123', aisle_code: 'A', rack_code: 'R1', shelf_code: 'S1' }
 
 function makePatch(body: Record<string, unknown>) {

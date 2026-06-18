@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { queryOne, queryMany, query } from '@/lib/db'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await requireAdminScope(request, 'business_rfqs')
   if (admin instanceof NextResponse) return admin
 
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
      LEFT JOIN quotations q ON q.id = r.converted_quotation_id
      LEFT JOIN orders o ON o.id = q.converted_order_id
      WHERE r.id = $1`,
-    [params.id]
+    [id]
   )
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
      LEFT JOIN product_sub_variants psv ON psv.id = ri.sub_variant_id
      WHERE ri.rfq_id = $1
      ORDER BY ri.position, ri.created_at`,
-    [params.id]
+    [id]
   )
 
   const discountRows = await queryMany<{ category_id: string; discount_pct: string }>(
@@ -65,7 +66,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   return NextResponse.json({ rfq, items, discountMap })
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await requireAdminScope(request, 'business_rfqs')
   if (admin instanceof NextResponse) return admin
 
@@ -76,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   await query(
     `UPDATE business_rfqs SET status=$1, admin_note=$2, reviewed_at=NOW() WHERE id=$3`,
-    [status, adminNote || null, params.id]
+    [status, adminNote || null, id]
   )
 
   return NextResponse.json({ ok: true })

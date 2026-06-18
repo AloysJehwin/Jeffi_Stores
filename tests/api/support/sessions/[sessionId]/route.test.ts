@@ -41,7 +41,7 @@ describe('PATCH /api/support/sessions/[sessionId]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(null)
-    const res = await PATCH(makePatch('sess-1') as any, { params: { sessionId: 'sess-1' } })
+    const res = await PATCH(makePatch('sess-1') as any, { params: Promise.resolve({ sessionId: 'sess-1' }) })
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body.error).toMatch(/unauthorized/i)
@@ -50,7 +50,7 @@ describe('PATCH /api/support/sessions/[sessionId]', () => {
   it('returns 404 when session does not belong to user', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue(null)
-    const res = await PATCH(makePatch('sess-x') as any, { params: { sessionId: 'sess-x' } })
+    const res = await PATCH(makePatch('sess-x') as any, { params: Promise.resolve({ sessionId: 'sess-x' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -60,7 +60,7 @@ describe('PATCH /api/support/sessions/[sessionId]', () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockResolvedValue({ id: 'sess-1' })
     mockQuery.mockResolvedValue({ rows: [] })
-    const res = await PATCH(makePatch('sess-1') as any, { params: { sessionId: 'sess-1' } })
+    const res = await PATCH(makePatch('sess-1') as any, { params: Promise.resolve({ sessionId: 'sess-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -79,7 +79,7 @@ describe('PATCH /api/support/sessions/[sessionId]', () => {
   it('returns 500 on db error', async () => {
     mockAuthenticateAnyUser.mockResolvedValue(AUTH_USER)
     mockQueryOne.mockRejectedValue(new Error('db error'))
-    const res = await PATCH(makePatch('sess-1') as any, { params: { sessionId: 'sess-1' } })
+    const res = await PATCH(makePatch('sess-1') as any, { params: Promise.resolve({ sessionId: 'sess-1' }) })
     expect(res.status).toBe(500)
   })
 })

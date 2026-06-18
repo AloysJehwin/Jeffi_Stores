@@ -32,21 +32,21 @@ describe('GET /api/admin/business/customers/[id]', () => {
   it('returns 401 when requireAdminScope returns NextResponse', async () => {
     const errResponse = NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     mockRequireAdminScope.mockResolvedValue(errResponse)
-    const res = await GET(makeReq('u1'), { params: { id: 'u1' } })
+    const res = await GET(makeReq('u1'), { params: Promise.resolve({ id: 'u1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when requireAdminScope returns 403 NextResponse', async () => {
     const errResponse = NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     mockRequireAdminScope.mockResolvedValue(errResponse)
-    const res = await GET(makeReq('u1'), { params: { id: 'u1' } })
+    const res = await GET(makeReq('u1'), { params: Promise.resolve({ id: 'u1' }) })
     expect(res.status).toBe(403)
   })
 
   it('returns 404 when customer not found', async () => {
     mockRequireAdminScope.mockResolvedValue(admin)
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeReq('u1'), { params: { id: 'u1' } })
+    const res = await GET(makeReq('u1'), { params: Promise.resolve({ id: 'u1' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toBe('Not found')
@@ -58,7 +58,7 @@ describe('GET /api/admin/business/customers/[id]', () => {
     const discounts = [{ id: 'd1', category_id: 'c1', category_name: 'Bolts', discount_pct: 10 }]
     mockQueryOne.mockResolvedValue(customer)
     mockQueryMany.mockResolvedValue(discounts)
-    const res = await GET(makeReq('u1'), { params: { id: 'u1' } })
+    const res = await GET(makeReq('u1'), { params: Promise.resolve({ id: 'u1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.customer).toEqual(customer)

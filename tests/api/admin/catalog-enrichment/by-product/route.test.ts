@@ -36,14 +36,14 @@ beforeEach(() => { vi.clearAllMocks() })
 describe('GET /api/admin/catalog-enrichment/by-product/[productId]', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeReq('p1'), { params: { productId: 'p1' } })
+    const res = await GET(makeReq('p1'), { params: Promise.resolve({ productId: 'p1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeReq('p1'), { params: { productId: 'p1' } })
+    const res = await GET(makeReq('p1'), { params: Promise.resolve({ productId: 'p1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -51,7 +51,7 @@ describe('GET /api/admin/catalog-enrichment/by-product/[productId]', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeReq('p1'), { params: { productId: 'p1' } })
+    const res = await GET(makeReq('p1'), { params: Promise.resolve({ productId: 'p1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.item).toBeNull()
@@ -62,7 +62,7 @@ describe('GET /api/admin/catalog-enrichment/by-product/[productId]', () => {
     mockHasScope.mockReturnValue(true)
     const row = { id: 'e1', product_id: 'p1', ai_description: 'Test', status: 'proposed' }
     mockQueryOne.mockResolvedValue(row)
-    const res = await GET(makeReq('p1'), { params: { productId: 'p1' } })
+    const res = await GET(makeReq('p1'), { params: Promise.resolve({ productId: 'p1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.item).toEqual(row)

@@ -17,7 +17,7 @@ function makeRequest(body: object = {}) {
   })
 }
 
-const params = { params: { id: 'prod1' } }
+const params = { params: Promise.resolve({ id: 'prod1' }) }
 
 describe('POST /api/products/[id]/buy-now-quote', () => {
   beforeEach(() => { vi.clearAllMocks() })

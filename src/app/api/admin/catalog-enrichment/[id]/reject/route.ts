@@ -5,7 +5,8 @@ import { query, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'catalog_enrichment')) {
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const row = await queryOne<{ id: string; status: string }>(
     `SELECT id::text, status FROM product_ai_enrichment_log WHERE id = $1::uuid`,
-    [params.id]
+    [id]
   )
   if (!row) return NextResponse.json({ error: 'Enrichment not found' }, { status: 404 })
   if (row.status !== 'proposed') {
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     `UPDATE product_ai_enrichment_log
         SET status = 'rejected', decided_at = NOW(), decided_by_admin_id = $1::uuid
       WHERE id = $2::uuid`,
-    [admin.adminId, params.id]
+    [admin.adminId, id]
   )
   return NextResponse.json({ ok: true, status: 'rejected' })
 }

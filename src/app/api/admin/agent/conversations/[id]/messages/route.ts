@@ -5,7 +5,8 @@ import { queryMany, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'agent')) {
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const owner = await queryOne<{ admin_id: string }>(
     `SELECT admin_id::text FROM admin_agent_messages
       WHERE conversation_id = $1::uuid LIMIT 1`,
-    [params.id]
+    [id]
   )
   if (!owner) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
   if (owner.admin_id !== admin.adminId) {
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
        FROM admin_agent_messages
       WHERE conversation_id = $1::uuid
       ORDER BY created_at ASC`,
-    [params.id]
+    [id]
   )
 
   return NextResponse.json({ messages })

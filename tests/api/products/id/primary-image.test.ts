@@ -18,7 +18,7 @@ function makeRequest(variantId?: string) {
   return new NextRequest(url)
 }
 
-const params = { params: { id: 'prod1' } }
+const params = { params: Promise.resolve({ id: 'prod1' }) }
 
 describe('GET /api/products/[id]/primary-image', () => {
   beforeEach(() => { vi.clearAllMocks() })

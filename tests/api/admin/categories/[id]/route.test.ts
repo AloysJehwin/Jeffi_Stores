@@ -66,14 +66,14 @@ describe('PATCH /api/admin/categories/[id]', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await PATCH(makeReq({ name: 'Test' }), { params: { id: CAT_ID } })
+    const res = await PATCH(makeReq({ name: 'Test' }), { params: Promise.resolve({ id: CAT_ID }) })
     expect(res.status).toBe(401)
     expect((await res.json()).error).toMatch(/unauthorized/i)
   })
 
   it('returns 403 when categories scope is missing', async () => {
     mockHasScope.mockReturnValue(false)
-    const res = await PATCH(makeReq({ name: 'Test' }), { params: { id: CAT_ID } })
+    const res = await PATCH(makeReq({ name: 'Test' }), { params: Promise.resolve({ id: CAT_ID }) })
     expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/insufficient/i)
   })
@@ -81,13 +81,13 @@ describe('PATCH /api/admin/categories/[id]', () => {
   // ── Validation ───────────────────────────────────────────────────────────
 
   it('returns 400 when name is missing', async () => {
-    const res = await PATCH(makeReq({ description: 'desc' }), { params: { id: CAT_ID } })
+    const res = await PATCH(makeReq({ description: 'desc' }), { params: Promise.resolve({ id: CAT_ID }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/name required/i)
   })
 
   it('returns 400 when name is empty string', async () => {
-    const res = await PATCH(makeReq({ name: '   ' }), { params: { id: CAT_ID } })
+    const res = await PATCH(makeReq({ name: '   ' }), { params: Promise.resolve({ id: CAT_ID }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/name required/i)
   })
@@ -97,7 +97,7 @@ describe('PATCH /api/admin/categories/[id]', () => {
   it('updates category and returns updated row', async () => {
     const res = await PATCH(
       makeReq({ name: 'Fasteners', description: 'All fasteners', is_active: true }),
-      { params: { id: CAT_ID } }
+      { params: Promise.resolve({ id: CAT_ID }) }
     )
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -113,7 +113,7 @@ describe('PATCH /api/admin/categories/[id]', () => {
 
     const res = await PATCH(
       makeReq({ name: 'Bolts', icon_name: 'bolt' }),
-      { params: { id: CAT_ID } }
+      { params: Promise.resolve({ id: CAT_ID }) }
     )
     expect(res.status).toBe(200)
     // suggestIcon should NOT be called when icon_name is provided
@@ -123,7 +123,7 @@ describe('PATCH /api/admin/categories/[id]', () => {
   it('calls suggestIcon when icon_name is not provided', async () => {
     const res = await PATCH(
       makeReq({ name: 'Nuts' }),
-      { params: { id: CAT_ID } }
+      { params: Promise.resolve({ id: CAT_ID }) }
     )
     expect(res.status).toBe(200)
     expect(mockSuggestIcon).toHaveBeenCalledWith('Nuts')
@@ -138,7 +138,7 @@ describe('PATCH /api/admin/categories/[id]', () => {
         replacement_allowed: false,
         replacement_window_days: 7,
       }),
-      { params: { id: CAT_ID } }
+      { params: Promise.resolve({ id: CAT_ID }) }
     )
     expect(res.status).toBe(200)
     expect(mockQuery).toHaveBeenCalledOnce()
@@ -147,7 +147,7 @@ describe('PATCH /api/admin/categories/[id]', () => {
   it('passes sku_prefix uppercased and sanitised', async () => {
     const res = await PATCH(
       makeReq({ name: 'Drill Bits', sku_prefix: 'dr-b!' }),
-      { params: { id: CAT_ID } }
+      { params: Promise.resolve({ id: CAT_ID }) }
     )
     expect(res.status).toBe(200)
     // query should have been called — prefix normalised inside the route

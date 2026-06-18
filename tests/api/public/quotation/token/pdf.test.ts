@@ -18,7 +18,7 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)
 const mockGeneratePDF = vi.mocked(generateQuotationPDF)
 
-const params = { params: { token: 'qt-tok' } }
+const params = { params: Promise.resolve({ token: 'qt-tok' }) }
 
 function makeRequest() {
   return new Request('http://localhost/api/public/quotation/qt-tok/pdf')

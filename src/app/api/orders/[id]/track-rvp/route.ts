@@ -6,15 +6,16 @@ const TOKEN = process.env.DELHIVERY_API_KEY
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const rr = await queryOne<{ rvp_awb_number: string | null }>(
       `SELECT rvp_awb_number FROM return_requests WHERE order_id = $1 AND user_id = $2 ORDER BY created_at DESC LIMIT 1`,
-      [params.id, authUser.userId]
+      [id, authUser.userId]
     )
 
     if (!rr?.rvp_awb_number) return NextResponse.json({ tracking: null })

@@ -19,7 +19,7 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockWithTransaction = vi.mocked(withTransaction)
 const mockUpload = vi.mocked(uploadGalleryImage)
 
-const params = { params: { slug: 'review-form' } }
+const params = { params: Promise.resolve({ slug: 'review-form' }) }
 
 function makeFormData(fields: Record<string, string | File>) {
   const fd = new FormData()

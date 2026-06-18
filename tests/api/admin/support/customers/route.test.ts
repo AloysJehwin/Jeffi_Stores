@@ -36,14 +36,14 @@ beforeEach(() => { vi.clearAllMocks() })
 describe('GET /api/admin/support/customers/[userId]', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await GET(makeReq('u1'), { params: { userId: 'u1' } })
+    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope missing', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(false)
-    const res = await GET(makeReq('u1'), { params: { userId: 'u1' } })
+    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -51,7 +51,7 @@ describe('GET /api/admin/support/customers/[userId]', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await GET(makeReq('u1'), { params: { userId: 'u1' } })
+    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.session).toBeNull()
@@ -62,7 +62,7 @@ describe('GET /api/admin/support/customers/[userId]', () => {
     mockHasScope.mockReturnValue(true)
     const session = { id: 's1', status: 'open', created_at: '2024-01-01', admin_name: 'Admin' }
     mockQueryOne.mockResolvedValue(session)
-    const res = await GET(makeReq('u1'), { params: { userId: 'u1' } })
+    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.session).toEqual(session)
@@ -72,7 +72,7 @@ describe('GET /api/admin/support/customers/[userId]', () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockRejectedValue(new Error('DB down'))
-    const res = await GET(makeReq('u1'), { params: { userId: 'u1' } })
+    const res = await GET(makeReq('u1'), { params: Promise.resolve({ userId: 'u1' }) })
     expect(res.status).toBe(500)
   })
 })

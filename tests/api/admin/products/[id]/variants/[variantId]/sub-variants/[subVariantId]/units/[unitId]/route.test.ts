@@ -27,7 +27,7 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockWithTx = vi.mocked(withTransaction)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['products'] }
-const params = { id: 'prod-1', variantId: 'var-1', subVariantId: 'sv-1', unitId: 'unit-1' }
+const params = Promise.resolve({ id: 'prod-1', variantId: 'var-1', subVariantId: 'sv-1', unitId: 'unit-1' })
 const baseUrl = 'http://localhost/api/admin/products/prod-1/variants/var-1/sub-variants/sv-1/units/unit-1'
 
 function makePatchReq(body: unknown) {

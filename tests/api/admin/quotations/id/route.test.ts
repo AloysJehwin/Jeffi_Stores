@@ -32,7 +32,7 @@ const mockSendEmail = vi.mocked(sendQuotationFinalizedEmail)
 
 const ADMIN = { adminId: 'a1', role: 'super_admin', scopes: ['quotations'] }
 const QT_ID = 'qt-id-001'
-const PARAMS = { params: { id: QT_ID } }
+const PARAMS = { params: Promise.resolve({ id: QT_ID }) }
 
 const draftQt = {
   id: QT_ID, status: 'draft', quote_number: 'QT/24-25/001',

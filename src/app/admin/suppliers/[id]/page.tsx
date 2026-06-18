@@ -6,7 +6,8 @@ import { ap } from '@/lib/admin-path'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SupplierDetailPage({ params }: { params: { id: string } }) {
+export default async function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const host = (await headers()).get('host') ?? ''
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
@@ -14,5 +15,5 @@ export default async function SupplierDetailPage({ params }: { params: { id: str
 
   try { await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
 
-  return <SupplierDetailClient id={params.id} />
+  return <SupplierDetailClient id={id} />
 }

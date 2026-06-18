@@ -21,7 +21,7 @@ import { updateWarehouse, deleteWarehouse } from '@/lib/shelf'
 
 const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['inventory'] }
 const WH_ID = 'wh-uuid-1'
-const PARAMS = { params: { id: WH_ID } }
+const PARAMS = { params: Promise.resolve({ id: WH_ID }) }
 
 function makePatch(body: object) {
   return new NextRequest(`http://localhost/api/admin/shelving/warehouses/${WH_ID}`, {

@@ -63,14 +63,14 @@ describe('POST /api/admin/orders/[id]/retry-email', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is insufficient', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(403)
   })
 
@@ -78,7 +78,7 @@ describe('POST /api/admin/orders/[id]/retry-email', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeRequest('order-999'), { params: { id: 'order-999' } })
+    const res = await POST(makeRequest('order-999'), { params: Promise.resolve({ id: 'order-999' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -88,7 +88,7 @@ describe('POST /api/admin/orders/[id]/retry-email', () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...recentFailedOrder, payment_status: 'paid' })
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/failed or unpaid/i)
@@ -102,7 +102,7 @@ describe('POST /api/admin/orders/[id]/retry-email', () => {
       created_at: new Date(Date.now() - 25 * 3600000).toISOString(), // 25h ago
     }
     mockQueryOne.mockResolvedValue(oldOrder)
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/older than 24 hours/i)
@@ -114,7 +114,7 @@ describe('POST /api/admin/orders/[id]/retry-email', () => {
     mockQueryOne.mockResolvedValue(recentFailedOrder)
     mockSendEmail.mockResolvedValue({ success: true })
 
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
@@ -132,7 +132,7 @@ describe('POST /api/admin/orders/[id]/retry-email', () => {
     mockQueryOne.mockResolvedValue({ ...recentFailedOrder, payment_status: 'unpaid' })
     mockSendEmail.mockResolvedValue({ success: true })
 
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(200)
   })
 
@@ -142,7 +142,7 @@ describe('POST /api/admin/orders/[id]/retry-email', () => {
     mockQueryOne.mockResolvedValue(recentFailedOrder)
     mockSendEmail.mockResolvedValue({ success: false })
 
-    const res = await POST(makeRequest(), { params: { id: 'order-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-1' }) })
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toMatch(/failed to send/i)

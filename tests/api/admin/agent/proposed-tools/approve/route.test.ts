@@ -63,14 +63,14 @@ describe('POST /api/admin/agent/proposed-tools/[id]/approve', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
-    const res = await POST(makeRequest(), { params: { id: 'tool-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'tool-1' }) })
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when agent scope is missing', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
     mockHasScope.mockReturnValue(false)
-    const res = await POST(makeRequest(), { params: { id: 'tool-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'tool-1' }) })
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toMatch(/insufficient/i)
@@ -79,7 +79,7 @@ describe('POST /api/admin/agent/proposed-tools/[id]/approve', () => {
   it('returns 403 when role is not super_admin', async () => {
     mockAuth.mockResolvedValue(regularAdminPayload)
     mockHasScope.mockReturnValue(true)
-    const res = await POST(makeRequest(), { params: { id: 'tool-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'tool-1' }) })
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toMatch(/super_admin/i)
@@ -89,7 +89,7 @@ describe('POST /api/admin/agent/proposed-tools/[id]/approve', () => {
     mockAuth.mockResolvedValue(superAdminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(null)
-    const res = await POST(makeRequest('tool-999'), { params: { id: 'tool-999' } })
+    const res = await POST(makeRequest('tool-999'), { params: Promise.resolve({ id: 'tool-999' }) })
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toMatch(/not found/i)
@@ -99,7 +99,7 @@ describe('POST /api/admin/agent/proposed-tools/[id]/approve', () => {
     mockAuth.mockResolvedValue(superAdminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue({ ...proposedTool, status: 'approved' })
-    const res = await POST(makeRequest(), { params: { id: 'tool-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'tool-1' }) })
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/already approved/i)
@@ -112,7 +112,7 @@ describe('POST /api/admin/agent/proposed-tools/[id]/approve', () => {
       ...proposedTool,
       proposed_by_admin_id: 'admin-super', // same as approver
     })
-    const res = await POST(makeRequest(), { params: { id: 'tool-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'tool-1' }) })
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toMatch(/separation of duties/i)
@@ -124,7 +124,7 @@ describe('POST /api/admin/agent/proposed-tools/[id]/approve', () => {
     mockQueryOne.mockResolvedValue(proposedTool)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const res = await POST(makeRequest(), { params: { id: 'tool-1' } })
+    const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'tool-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
