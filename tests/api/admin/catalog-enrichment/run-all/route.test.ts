@@ -141,10 +141,10 @@ describe('POST /api/admin/catalog-enrichment/run-all', () => {
     await new Promise(r => setTimeout(r, 0))
 
     expect(mockQuery).toHaveBeenCalled()
-    const [sql, params] = mockQuery.mock.calls[0]
+    const [sql, params] = mockQuery.mock.calls[0]!
     expect(sql).toContain('INSERT INTO product_ai_enrichment_log')
-    expect(params[0]).toBe('p1')
-    expect(params[3]).toContain('high-strength M6 hex bolt')
+    expect(params![0]).toBe('p1')
+    expect(params![3]).toContain('high-strength M6 hex bolt')
   })
 
   it('background loop skips DB insert when fetch returns ok=false', async () => {

@@ -31,7 +31,7 @@ const mockParseBody = vi.mocked(parseBody)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', role: 'super_admin', scopes: ['inventory'] }
+const admin = { adminId: 'admin-1', username: 'testadmin', role: 'super_admin', scopes: ['inventory'] }
 
 function makeGet(params: Record<string, string> = {}) {
   const url = new URL('http://localhost/api/admin/inventory/suppliers')

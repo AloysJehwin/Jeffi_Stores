@@ -78,7 +78,7 @@ describe('POST /api/orders/create-direct', () => {
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
         query: vi.fn().mockResolvedValue({
-          rows: [{ id: 'order-created', order_number: 'ORD-001', order_number: 'ORD-001', total_amount: '1000', status: 'pending' }],
+          rows: [{ id: 'order-created', order_number: 'ORD-001', total_amount: '1000', status: 'pending' }],
         }),
       }
       return fn(client)

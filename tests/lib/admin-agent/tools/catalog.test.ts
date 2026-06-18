@@ -47,7 +47,7 @@ describe('admin-agent/tools/catalog', () => {
       mockQueryMany.mockResolvedValueOnce([
         { id: 'p1', name: 'Widget', is_featured: true },
       ])
-      const result = await getTool('list_featured_products').handler({})
+      const result = await getTool('list_featured_products').handler({}) as any
       // ok() wraps with { ok: true, ... }
       expect(result.ok).toBe(true)
     })
@@ -60,7 +60,7 @@ describe('admin-agent/tools/catalog', () => {
         { id: 'b1', name: 'Acme', slug: 'acme' },
         { id: 'b2', name: 'Beta', slug: 'beta' },
       ])
-      const result = await getTool('list_brands').handler({})
+      const result = await getTool('list_brands').handler({}) as any
       expect(Array.isArray(result.brands)).toBe(true)
       expect(result.count).toBe(2)
     })
@@ -71,14 +71,14 @@ describe('admin-agent/tools/catalog', () => {
   describe('get_brand', () => {
     it('returns brand by id', async () => {
       mockQueryOne.mockResolvedValueOnce({ id: 'b1', name: 'Acme' })
-      const result = await getTool('get_brand').handler({ id: 'b1' })
+      const result = await getTool('get_brand').handler({ id: 'b1' }) as any
       expect(result).toHaveProperty('id', 'b1')
       expect(result).toHaveProperty('name', 'Acme')
     })
 
     it('returns error object when brand not found', async () => {
       mockQueryOne.mockResolvedValueOnce(null)
-      const result = await getTool('get_brand').handler({ id: 'bad' })
+      const result = await getTool('get_brand').handler({ id: 'bad' }) as any
       expect(result).toHaveProperty('error')
     })
   })
@@ -87,7 +87,7 @@ describe('admin-agent/tools/catalog', () => {
   describe('list_categories', () => {
     it('returns categories list', async () => {
       mockQueryMany.mockResolvedValueOnce([{ id: 'c1', name: 'Tools' }])
-      const result = await getTool('list_categories').handler({})
+      const result = await getTool('list_categories').handler({}) as any
       expect(Array.isArray(result.categories)).toBe(true)
       expect(result.count).toBe(1)
     })
@@ -102,14 +102,14 @@ describe('admin-agent/tools/catalog', () => {
         .mockResolvedValueOnce({ id: 'c1', name: 'Tools', slug: 'tools' }) // category row
         .mockResolvedValueOnce({ n: 5 })                                   // product count
       mockQueryMany.mockResolvedValueOnce([])                              // subcategories
-      const result = await getTool('get_category').handler({ id: 'c1' })
+      const result = await getTool('get_category').handler({ id: 'c1' }) as any
       expect(result).toHaveProperty('id', 'c1')
       expect(result).toHaveProperty('name', 'Tools')
     })
 
     it('returns error object when not found', async () => {
       mockQueryOne.mockResolvedValueOnce(null)
-      const result = await getTool('get_category').handler({ id: 'bad' })
+      const result = await getTool('get_category').handler({ id: 'bad' }) as any
       expect(result).toHaveProperty('error')
     })
   })
@@ -120,14 +120,14 @@ describe('admin-agent/tools/catalog', () => {
       mockQueryMany.mockResolvedValueOnce([
         { id: 'p1', name: 'Widget', stock: 2 },
       ])
-      const result = await getTool('list_inventory_low').handler({})
+      const result = await getTool('list_inventory_low').handler({}) as any
       expect(Array.isArray(result.products)).toBe(true)
       expect(result.count).toBe(1)
     })
 
     it('accepts threshold parameter', async () => {
       mockQueryMany.mockResolvedValueOnce([])
-      const result = await getTool('list_inventory_low').handler({ threshold: 5 })
+      const result = await getTool('list_inventory_low').handler({ threshold: 5 }) as any
       expect(Array.isArray(result.products)).toBe(true)
       expect(result.threshold).toBe(5)
     })

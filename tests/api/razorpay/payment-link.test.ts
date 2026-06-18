@@ -81,7 +81,7 @@ describe('POST /api/razorpay/payment-link', () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(undefined) // UPDATE returns undefined via queryOne
+      .mockResolvedValueOnce(null) // UPDATE returns null via queryOne
     const mockCreate = vi.fn().mockResolvedValue(MOCK_PAYMENT_LINK)
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
       paymentLink: { create: mockCreate },
@@ -123,7 +123,7 @@ describe('POST /api/razorpay/payment-link', () => {
     }
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(orderWithExpiredLink)
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(null)
     const mockFetch = vi.fn().mockResolvedValue({ status: 'expired' })
     const mockCreate = vi.fn().mockResolvedValue(MOCK_PAYMENT_LINK)
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
@@ -138,7 +138,7 @@ describe('POST /api/razorpay/payment-link', () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(null)
     const mockCreate = vi.fn().mockResolvedValue(MOCK_PAYMENT_LINK)
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
       paymentLink: { create: mockCreate },

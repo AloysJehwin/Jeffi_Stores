@@ -51,10 +51,10 @@ describe('types/index — structural smoke tests', () => {
     expect(v.product_id).toBe('p1')
   })
 
-  it('ProductImage type has id and url', () => {
-    const img = { id: 'img1', url: 'https://example.com/img.jpg' } as unknown as ProductImage
+  it('ProductImage type has id and image_url', () => {
+    const img = { id: 'img1', image_url: 'https://example.com/img.jpg' } as unknown as ProductImage
     expect(img.id).toBe('img1')
-    expect(img.url).toContain('http')
+    expect(img.image_url).toContain('http')
   })
 
   it('Category type has id, name, slug', () => {
@@ -77,9 +77,9 @@ describe('types/index — structural smoke tests', () => {
     expect(u.email).toBe('test@example.com')
   })
 
-  it('AdminSession type has adminId and role', () => {
-    const s = { adminId: 'adm1', role: 'super_admin' } as unknown as AdminSession
-    expect(s.adminId).toBe('adm1')
+  it('AdminSession type has username and role', () => {
+    const s = { username: 'adm1', role: 'super_admin' } as unknown as AdminSession
+    expect(s.username).toBe('adm1')
     expect(s.role).toBe('super_admin')
   })
 

@@ -308,7 +308,7 @@ describe('PATCH /api/admin/inventory/stock', () => {
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Lock timeout')
     // ROLLBACK was attempted
-    const rbCall = client.query.mock.calls.find(([sql]: [string]) => sql === 'ROLLBACK')
+    const rbCall = client.query.mock.calls.find((c: any[]) => c[0] === 'ROLLBACK')
     expect(rbCall).toBeDefined()
     expect(client.release).toHaveBeenCalled()
   })

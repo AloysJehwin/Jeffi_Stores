@@ -9,7 +9,7 @@ vi.mock('@/lib/jwt', () => ({
 vi.mock('@/lib/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
-    constructor(message: string) { super(message) }
+    constructor(message: string, public readonly provider: string = 'unknown') { super(message) }
   },
 }))
 vi.mock('@/lib/customer-agent/tools', () => ({
@@ -169,7 +169,7 @@ describe('POST /api/customer-agent/chat', () => {
 
   it('returns 502 when aiChat throws AiClientError', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    mockAiChat.mockRejectedValueOnce(new AiClientError('Model unavailable'))
+    mockAiChat.mockRejectedValueOnce(new AiClientError('Model unavailable', 'anthropic'))
 
     const res = await POST(makeRequest({ message: 'Hello there' }) as any)
     expect(res.status).toBe(502)

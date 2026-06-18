@@ -219,16 +219,16 @@ describe('diffOf', () => {
   })
 
   it('detects change from null to a value', () => {
-    const before = { code: null }
-    const after  = { code: 'ABC' }
-    const result = diffOf(before, after, ['code'])
+    const before = { code: null as string | null }
+    const after  = { code: 'ABC' as string | null }
+    const result = diffOf<{ code: string | null }>(before, after, ['code'])
     expect(result.code).toEqual({ from: null, to: 'ABC' })
   })
 
   it('detects change from a value to null', () => {
-    const before = { code: 'ABC' }
-    const after  = { code: null }
-    const result = diffOf(before, after, ['code'])
+    const before = { code: 'ABC' as string | null }
+    const after  = { code: null as string | null }
+    const result = diffOf<{ code: string | null }>(before, after, ['code'])
     expect(result.code).toEqual({ from: 'ABC', to: null })
   })
 

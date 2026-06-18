@@ -140,7 +140,7 @@ describe('generateClientCertificate', () => {
     await generateClientCertificate('testadmin', 'aid1')
     const writeCall = mockWriteFileSync.mock.calls.find((c: any) => String(c[0]).includes('ext.cnf'))
     expect(writeCall).toBeDefined()
-    const content = String(writeCall[1])
+    const content = String(writeCall![1])
     expect(content).toContain('clientAuth')
     expect(content).toContain('CA:FALSE')
   })

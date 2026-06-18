@@ -112,9 +112,9 @@ describe('POST /api/admin/products/draft', () => {
     mockQueryOne.mockResolvedValue({ id: 'prod-draft-2' })
 
     await POST(makeRequest({ name: 'Test Slug Product' }))
-    const callArgs = mockQueryOne.mock.calls[0]
+    const callArgs = mockQueryOne.mock.calls[0]!
     // slug should be lowercase with dashes + timestamp
-    expect(callArgs[1][1]).toMatch(/^test-slug-product-[a-z0-9]+$/)
+    expect(callArgs[1]![1]).toMatch(/^test-slug-product-[a-z0-9]+$/)
   })
 
   it('strips name to 16 chars for the SKU prefix', async () => {
@@ -124,8 +124,8 @@ describe('POST /api/admin/products/draft', () => {
     mockQueryOne.mockResolvedValue({ id: 'prod-draft-3' })
 
     await POST(makeRequest({ name: 'A Very Long Product Name That Exceeds Limit' }))
-    const callArgs = mockQueryOne.mock.calls[0]
-    const sku: string = callArgs[1][2]
+    const callArgs = mockQueryOne.mock.calls[0]!
+    const sku: string = callArgs[1]![2]
     // SKU prefix is max 16 chars + dash + 4 char suffix
     const prefix = sku.split('-').slice(0, -1).join('-')
     expect(prefix.length).toBeLessThanOrEqual(16 + 5) // a bit of slack for dashes
@@ -139,8 +139,8 @@ describe('POST /api/admin/products/draft', () => {
 
     // Name with only special characters -> nameSlug becomes empty
     await POST(makeRequest({ name: '---' }))
-    const callArgs = mockQueryOne.mock.calls[0]
-    const sku: string = callArgs[1][2]
+    const callArgs = mockQueryOne.mock.calls[0]!
+    const sku: string = callArgs[1]![2]
     expect(sku).toMatch(/^DRAFT-/)
   })
 

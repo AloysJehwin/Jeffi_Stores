@@ -24,7 +24,7 @@ const mockLogActivity = vi.mocked(logActivity)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', id: 'admin-uuid-1', role: 'super_admin', scopes: ['customers'] }
+const admin = { adminId: 'admin-1', username: 'testadmin', id: 'admin-uuid-1', role: 'super_admin', scopes: ['customers'] }
 
 function makePatch(customerId: string, taskId: string, body: unknown) {
   return new NextRequest(`http://localhost/api/admin/customers/${customerId}/tasks/${taskId}`, {

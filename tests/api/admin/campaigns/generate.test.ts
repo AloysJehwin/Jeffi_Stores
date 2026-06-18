@@ -28,7 +28,7 @@ const mockAiChat = vi.mocked(aiChat)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', role: 'super_admin', scopes: ['mailer'] }
+const admin = { adminId: 'admin-1', username: 'testadmin', role: 'super_admin', scopes: ['mailer'] }
 
 function makeRequest(body: unknown) {
   return new NextRequest('http://localhost/api/admin/campaigns/generate', {

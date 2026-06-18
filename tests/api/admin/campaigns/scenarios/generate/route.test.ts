@@ -24,7 +24,7 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
 vi.mock('@/lib/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
-    constructor(message: string) {
+    constructor(message: string, public readonly provider: string = 'unknown') {
       super(message)
       this.name = 'AiClientError'
     }
@@ -156,7 +156,7 @@ describe('POST /api/admin/campaigns/scenarios/generate', () => {
       (args: any[]) => typeof args[0] === 'string' && args[0].includes('scenario_audit_log') && args[0].includes('ai_generate'),
     )
     expect(auditCall).toBeDefined()
-    expect(auditCall![1][0]).toBe('admin-1')
+    expect(auditCall![1]![0]).toBe('admin-1')
   })
 
   // --- kind sanitization ---
@@ -182,7 +182,7 @@ describe('POST /api/admin/campaigns/scenarios/generate', () => {
   // --- AI failure ---
 
   it('returns 502 when aiChat throws AiClientError', async () => {
-    vi.mocked(aiChat).mockRejectedValue(new AiClientError('Rate limit exceeded'))
+    vi.mocked(aiChat).mockRejectedValue(new AiClientError('Rate limit exceeded', 'anthropic'))
 
     const res = await POST(postReq({ prompt: 'test' }))
     expect(res.status).toBe(502)
@@ -200,7 +200,7 @@ describe('POST /api/admin/campaigns/scenarios/generate', () => {
   })
 
   it('writes ai_generate_failed audit log on aiChat failure', async () => {
-    vi.mocked(aiChat).mockRejectedValue(new AiClientError('Quota exceeded'))
+    vi.mocked(aiChat).mockRejectedValue(new AiClientError('Quota exceeded', 'anthropic'))
 
     await POST(postReq({ prompt: 'test scenario' }))
 

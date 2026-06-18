@@ -117,7 +117,7 @@ const parsedOrderData = {
 
 function setupGstMocks(igst = false) {
   mockIsInterState.mockReturnValue(igst)
-  mockCalculateGST.mockReturnValue({ taxableAmount: 100, cgst: 9, sgst: 9, igst: 0 })
+  mockCalculateGST.mockReturnValue({ taxableAmount: 100, cgst: 9, sgst: 9, igst: 0, totalTax: 18 })
   mockLineItem.mockReturnValue(118)
   mockGetFY.mockReturnValue('2024-25')
   mockGenInvNum.mockReturnValue('JS/2024-25/0001')
@@ -269,7 +269,7 @@ describe('POST /api/admin/orders/create', () => {
     mockHasScope.mockReturnValue(true)
     mockParseBody.mockReturnValue({ ok: true, data: igstBody } as any)
     setupGstMocks(true)
-    mockCalculateGST.mockReturnValue({ taxableAmount: 100, cgst: 0, sgst: 0, igst: 18 })
+    mockCalculateGST.mockReturnValue({ taxableAmount: 100, cgst: 0, sgst: 0, igst: 18, totalTax: 18 })
 
     const client = buildMockTxClient()
     mockWithTx.mockImplementation(async (fn: any) => fn(client))

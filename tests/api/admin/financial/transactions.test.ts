@@ -20,7 +20,7 @@ const mockQueryMany = vi.mocked(queryMany)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', role: 'super_admin', scopes: ['financial'] }
+const admin = { adminId: 'admin-1', username: 'testadmin', role: 'super_admin', scopes: ['financial'] }
 
 function makeGet(params: Record<string, string> = {}) {
   const url = new URL('http://localhost/api/admin/financial/transactions')

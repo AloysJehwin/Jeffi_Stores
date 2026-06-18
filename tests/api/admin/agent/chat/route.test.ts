@@ -13,7 +13,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/ai-client', () => ({
   aiChat: vi.fn(),
   AiClientError: class AiClientError extends Error {
-    constructor(message: string) {
+    constructor(message: string, public readonly provider: string = 'unknown') {
       super(message)
       this.name = 'AiClientError'
     }
@@ -490,7 +490,7 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    mockAiChat.mockRejectedValue(new AiClientError('AI service unavailable'))
+    mockAiChat.mockRejectedValue(new AiClientError('AI service unavailable', 'anthropic'))
 
     const res = await POST(makePost({ message: 'hello' }))
     expect(res.status).toBe(502)

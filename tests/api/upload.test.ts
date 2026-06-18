@@ -10,7 +10,17 @@ vi.mock('@/lib/jwt', () => ({
 }))
 
 vi.mock('@/lib/s3', () => ({
-  uploadProductImage: vi.fn().mockResolvedValue({ url: 'https://cdn.example.com/img.jpg', key: 'products/img.jpg' }),
+  uploadProductImage: vi.fn().mockResolvedValue({
+    url: 'https://cdn.example.com/img.jpg',
+    thumbnailUrl: 'https://cdn.example.com/img-thumb.jpg',
+    s3Key: 'products/img.jpg',
+    s3ThumbnailKey: 'products/img-thumb.jpg',
+    fileName: 'img.jpg',
+    fileSize: 1024,
+    mimeType: 'image/jpeg',
+    width: 800,
+    height: 600,
+  }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -41,7 +51,14 @@ beforeEach(() => {
   mockAuthenticateAdmin.mockResolvedValue(VALID_ADMIN as any)
   mockUploadProductImage.mockResolvedValue({
     url: 'https://cdn.example.com/img.jpg',
-    key: 'products/img.jpg',
+    thumbnailUrl: 'https://cdn.example.com/img-thumb.jpg',
+    s3Key: 'products/img.jpg',
+    s3ThumbnailKey: 'products/img-thumb.jpg',
+    fileName: 'img.jpg',
+    fileSize: 1024,
+    mimeType: 'image/jpeg',
+    width: 800,
+    height: 600,
   })
 })
 

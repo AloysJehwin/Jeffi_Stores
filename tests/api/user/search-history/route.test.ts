@@ -101,8 +101,8 @@ describe('POST /api/user/search-history', () => {
 
     const res = await POST(makePost({ query: longQuery }) as any)
     expect(res.status).toBe(200)
-    const insertCall = vi.mocked(db.queryOne).mock.calls[1]
-    expect(insertCall[1][1].length).toBe(200)
+    const insertCall = vi.mocked(db.queryOne).mock.calls[1]!
+    expect(insertCall[1]![1].length).toBe(200)
   })
 })
 

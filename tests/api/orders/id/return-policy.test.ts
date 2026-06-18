@@ -14,6 +14,7 @@ import { GET } from '@/app/api/orders/[id]/return-policy/route'
 import * as jwt from '@/lib/jwt'
 import * as db from '@/lib/db'
 import * as returnPolicy from '@/lib/return-policy'
+import type { OrderItemPolicy } from '@/lib/return-policy'
 
 const USER = { userId: 'user-1' }
 const PARAMS = { params: { id: 'order-123' } }
@@ -25,9 +26,11 @@ const MOCK_ORDER_DELIVERED = {
   updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
 }
 
-const MOCK_ITEMS_ELIGIBLE = [
+const MOCK_ITEMS_ELIGIBLE: OrderItemPolicy[] = [
   {
+    product_id: 'prod-1',
     product_name: 'Test Product',
+    source: 'default',
     return_allowed: true,
     replacement_allowed: true,
     return_window_days: 7,
@@ -35,9 +38,11 @@ const MOCK_ITEMS_ELIGIBLE = [
   },
 ]
 
-const MOCK_ITEMS_NO_RETURN = [
+const MOCK_ITEMS_NO_RETURN: OrderItemPolicy[] = [
   {
+    product_id: 'prod-1',
     product_name: 'Non-Returnable Product',
+    source: 'default',
     return_allowed: false,
     replacement_allowed: true,
     return_window_days: 7,

@@ -5,7 +5,7 @@ vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/db', () => ({ queryMany: vi.fn() }))
 vi.mock('@/lib/search', () => ({
-  buildSearchClause: vi.fn().mockReturnValue({ clause: 'TRUE', params: [] }),
+  buildSearchClause: vi.fn().mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 1 }),
 }))
 
 import { GET } from '@/app/api/admin/customers/search/route'
@@ -35,7 +35,7 @@ const sampleCustomers = [
 describe('GET /api/admin/customers/search', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockBuildSearchClause.mockReturnValue({ clause: 'TRUE', params: [] })
+    mockBuildSearchClause.mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 1 })
   })
 
   it('returns 401 when not authenticated', async () => {

@@ -29,7 +29,7 @@ const mockQueryMany = vi.mocked(queryMany)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-uuid-1', role: 'super_admin', scopes: ['catalog_enrichment'] }
+const admin = { adminId: 'admin-uuid-1', username: 'testadmin', role: 'super_admin', scopes: ['catalog_enrichment'] }
 
 function makeRequest(body: unknown) {
   return new NextRequest('http://localhost/api/admin/catalog-enrichment/bulk-approve', {

@@ -121,7 +121,7 @@ describe('POST /api/shipping/rate', () => {
     mockQueryMany.mockResolvedValueOnce([mockVariantRow])
     mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 1000 }] as any)
-    mockFallbackRate.mockReturnValueOnce({ charge: 60, zone: 'B' })
+    mockFallbackRate.mockReturnValueOnce({ charge: 60, zone: 'B', source: 'fallback' })
     mockApplyRules.mockReturnValueOnce({ charge: 60, source: 'as_is' } as any)
 
     const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
@@ -136,7 +136,7 @@ describe('POST /api/shipping/rate', () => {
     mockQueryMany.mockResolvedValueOnce([mockVariantRow])
     mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
-    mockFallbackRate.mockReturnValueOnce({ charge: 60, zone: 'A' })
+    mockFallbackRate.mockReturnValueOnce({ charge: 60, zone: 'A', source: 'fallback' })
     mockApplyRules.mockReturnValueOnce({ charge: 100, source: 'as_is' } as any)
 
     const res = await POST(makeRequest({
@@ -159,7 +159,7 @@ describe('POST /api/shipping/rate', () => {
     mockQueryMany.mockResolvedValueOnce([mockProductRow])
     mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 300 }] as any)
-    mockFallbackRate.mockReturnValueOnce({ charge: 50, zone: 'A' })
+    mockFallbackRate.mockReturnValueOnce({ charge: 50, zone: 'A', source: 'fallback' })
     mockApplyRules.mockReturnValueOnce({ charge: 50, source: 'as_is' } as any)
 
     const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [productCartItem] }) as any)
@@ -203,7 +203,7 @@ describe('POST /api/shipping/rate', () => {
     mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
     mockFetch.mockRejectedValueOnce(new Error('network error'))
-    mockFallbackRate.mockReturnValueOnce({ charge: 60, zone: 'B' })
+    mockFallbackRate.mockReturnValueOnce({ charge: 60, zone: 'B', source: 'fallback' })
     mockApplyRules.mockReturnValueOnce({ charge: 60, source: 'as_is' } as any)
 
     const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
@@ -223,8 +223,8 @@ describe('POST /api/shipping/rate', () => {
     ] as any)
     mockFetch.mockRejectedValueOnce(new Error('fail'))
     mockFallbackRate
-      .mockReturnValueOnce({ charge: 60, zone: 'B' })
-      .mockReturnValueOnce({ charge: 40, zone: 'B' })
+      .mockReturnValueOnce({ charge: 60, zone: 'B', source: 'fallback' })
+      .mockReturnValueOnce({ charge: 40, zone: 'B', source: 'fallback' })
     mockApplyRules.mockReturnValueOnce({ charge: 100, source: 'as_is' } as any)
 
     const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)

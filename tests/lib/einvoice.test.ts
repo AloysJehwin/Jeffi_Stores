@@ -64,7 +64,7 @@ function clearEnvVars() {
 }
 
 // Helper: mock a successful auth response followed by a generate/cancel response
-function mockAuthThen(...responses: Parameters<typeof vi.mocked<typeof fetch>>[0]['mockResolvedValueOnce'][]) {
+function mockAuthThen(...responses: any[]) {
   const mockFetch = vi.mocked(global.fetch)
   // Always prepend a fresh auth call so the module fetches a new token
   // (force-expire by using a past time — we can't reset the module cache directly)
