@@ -61,7 +61,6 @@ interface Category {
 
 type SearchMode = 'name' | 'sku' | 'category'
 
-const UNITS = ['PCS', 'NOS', 'KG', 'MTR', 'LTR', 'BOX', 'SET', 'PKT', 'PAIR', 'RFT', 'SFT']
 
 export function newLineItem(): LineItem {
   return {
@@ -74,17 +73,31 @@ export function newLineItem(): LineItem {
   }
 }
 
-async function fetchProductUnits(productId: string): Promise<SellUnit[]> {
+async function fetchProductUnits(productId: string, variantId?: string | null): Promise<SellUnit[]> {
+  const toUnits = (rows: any[]) => rows.map((u: any) => ({
+    unit: u.unit,
+    display_label: u.display_label || u.unit,
+    factor: Number(u.factor) || 1,
+    dimension: u.dimension || 'count',
+  }))
   try {
+    // Try variant-specific units first when a variant is selected
+    if (variantId) {
+      const vres = await fetch(
+        `/api/admin/products/${productId}/units?variant_id=${variantId}`,
+        { credentials: 'include' }
+      )
+      if (vres.ok) {
+        const vdata = await vres.json()
+        const vunits = toUnits(vdata.units || [])
+        if (vunits.length) return vunits
+      }
+    }
+    // Fall back to product-level units
     const res = await fetch(`/api/admin/products/${productId}/units`, { credentials: 'include' })
     if (!res.ok) return []
     const data = await res.json()
-    return (data.units || []).map((u: any) => ({
-      unit: u.unit,
-      display_label: u.display_label || u.unit,
-      factor: Number(u.factor) || 1,
-      dimension: u.dimension || 'count',
-    }))
+    return toUnits(data.units || [])
   } catch {
     return []
   }
@@ -218,8 +231,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
 
   async function populateUnits(populated: LineItem): Promise<LineItem> {
     if (!populated.product_id) return populated
-    const units = await fetchProductUnits(populated.product_id)
-    if (!units.length) return populated
+    const units = await fetchProductUnits(populated.product_id, populated.variant_id)
+    if (!units.length) return { ...populated, available_units: [], buy_unit: null }
     const defaultUnit = units[0]
     return {
       ...populated,
@@ -490,10 +503,10 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                 <div>
                   <label className={labelCls}>Unit</label>
                   {item.available_units.length > 0 ? (
-                    <select
+                    <AdminSelect
                       value={item.buy_unit ?? ''}
-                      onChange={e => {
-                        const u = item.available_units.find(u => u.unit === e.target.value)
+                      onChange={v => {
+                        const u = item.available_units.find(u => u.unit === v)
                         if (!u) return
                         onChange(items.map(it => it.id === item.id ? {
                           ...it,
@@ -504,31 +517,21 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                           unit: u.display_label.toUpperCase(),
                         } : it))
                       }}
-                      className={inputCls}
-                    >
-                      {item.available_units.map(u => (
-                        <option key={u.unit} value={u.unit}>
-                          {u.display_label}
-                          {u.dimension === 'count' && u.factor > 1 ? ` (${u.factor} pcs)` : ''}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="— Unit —"
+                      options={item.available_units.map(u => ({
+                        value: u.unit,
+                        label: u.display_label + (u.dimension === 'count' && u.factor > 1 ? ` (${u.factor} pcs)` : ''),
+                      }))}
+                    />
                   ) : (
-                    <div className="flex items-center gap-0.5 w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary">
-                      <button type="button" onClick={() => {
-                        const i = UNITS.indexOf(item.unit)
-                        updateItem(item.id, 'unit', UNITS[(i - 1 + UNITS.length) % UNITS.length])
-                      }} className="text-foreground-secondary hover:text-foreground transition-colors">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                      </button>
-                      <span className="text-sm font-medium text-foreground flex-1 text-center tabular-nums">{item.unit || 'PCS'}</span>
-                      <button type="button" onClick={() => {
-                        const i = UNITS.indexOf(item.unit)
-                        updateItem(item.id, 'unit', UNITS[(i + 1) % UNITS.length])
-                      }} className="text-foreground-secondary hover:text-foreground transition-colors">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                      </button>
-                    </div>
+                    <input
+                      type="text"
+                      value={item.product_id ? (item.unit || '') : ''}
+                      readOnly={!!item.product_id}
+                      placeholder={item.product_id ? '—' : ''}
+                      onChange={e => !item.product_id && updateItem(item.id, 'unit', e.target.value)}
+                      className={inputCls + ' text-center font-medium'}
+                    />
                   )}
                 </div>
                 <div>
