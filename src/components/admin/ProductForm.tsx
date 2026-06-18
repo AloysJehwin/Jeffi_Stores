@@ -33,7 +33,7 @@ interface VariantRow {
   discount_pct: string
   priceLockSide?: 'incl' | 'excl' | null
   mrpLockSide?: 'incl' | 'excl' | null
-  stock_quantity: string
+  stock_status: string
   mpn: string
   gtin: string
   pricing_type: 'unit'
@@ -150,7 +150,7 @@ function emptyVariant(pricing_type: 'unit', unit: string): VariantRow {
   return {
     id: `temp-${Math.random().toString(36).slice(2, 11)}`,
     variant_name: '', price: '', mrp: '', mrp_ex_gst: '', price_ex_gst: '', discount_pct: '',
-    stock_quantity: '0', mpn: '', gtin: '',
+    stock_status: 'In Stock', mpn: '', gtin: '',
     pricing_type, unit, numeric_value: '',
     weight_grams: '', package_type: '', length_cm: '', breadth_cm: '', height_cm: '',
     sub_variant_type: '', sub_variant_type_on: false,
@@ -181,7 +181,7 @@ function inclToEx(inclVal: string, rate: number): string {
 
 function sumSubVariantStock(svs: any[] | undefined): number {
   if (!svs || svs.length === 0) return 0
-  return svs.reduce((acc, sv) => acc + (Number(sv.stock_quantity) || 0), 0)
+  return svs.filter(sv => sv.stock_status !== 'Out of Stock').length
 }
 
 function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: () => void; title?: string }) {
@@ -326,7 +326,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         discount_pct: product.discount_pct != null ? String(product.discount_pct) : '0',
         priceLockSide: null,
         mrpLockSide: null,
-        stock_quantity: String(v.stock_quantity || 0),
+        stock_status: v.stock_status || 'In Stock',
         mpn: v.mpn || '',
         gtin: v.gtin || '',
         pricing_type: v.pricing_type || 'unit',
@@ -688,7 +688,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         price_ex_gst: draft.price_ex_gst ? parseFloat(draft.price_ex_gst) : null,
         mrp_ex_gst: draft.mrp_ex_gst ? parseFloat(draft.mrp_ex_gst) : null,
         discount_pct: parseFloat(discountPct) || 0,
-        stock_quantity: draft.stock ? parseInt(draft.stock) : 0,
+        stock_status: draft.stock || 'In Stock',
         sku: draft.sku || undefined,
       }),
     })
@@ -747,11 +747,13 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (hasVariants) {
         const convertedVariants = variants.map(v => {
           const grp = groups.find(g => g.pricing_type === v.pricing_type)
-          const stockQty = v.sub_variant_type_on ? String(sumSubVariantStock(subVariantsMap[v.id || ''])) : v.stock_quantity
+          const stockStatus = v.sub_variant_type_on
+            ? (sumSubVariantStock(subVariantsMap[v.id || '']) > 0 ? 'In Stock' : 'Out of Stock')
+            : v.stock_status
           return {
             ...v,
             variant_type: grp?.variant_type || v.variant_type || '',
-            stock_quantity: stockQty,
+            stock_status: stockStatus,
             price: v.price,
             mrp: v.mrp,
             mrp_ex_gst: v.mrp_ex_gst,
@@ -1127,40 +1129,25 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
           )}
 
-          {/* Stock & Low Stock — hidden when has variants */}
+          {/* Stock Status — hidden when has variants */}
           {!hasVariants && (
             <>
               <div>
-                <label htmlFor="stock_quantity" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Listed Stock *
+                <label htmlFor="stock_status" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Stock Status *
                 </label>
-                <input
-                  type="number"
-                  id="stock_quantity"
-                  name="stock_quantity"
+                <select
+                  id="stock_status"
+                  name="stock_status"
                   required={!hasVariants}
-                  min="0"
-                  defaultValue={product?.stock_quantity || 0}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  placeholder="0"
-                />
-                <p className="text-xs text-foreground-muted mt-1">Display stock shown to customers. Inventory is managed separately under Inventory.</p>
-              </div>
-
-              <div>
-                <label htmlFor="low_stock_threshold" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Low Stock Threshold *
-                </label>
-                <input
-                  type="number"
-                  id="low_stock_threshold"
-                  name="low_stock_threshold"
-                  required={!hasVariants}
-                  min="0"
-                  defaultValue={product?.low_stock_threshold || 10}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                  placeholder="10"
-                />
+                  defaultValue={product?.stock_status || 'In Stock'}
+                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                >
+                  <option value="In Stock">In Stock</option>
+                  <option value="Low Stock">Low Stock</option>
+                  <option value="Out of Stock">Out of Stock</option>
+                </select>
+                <p className="text-xs text-foreground-muted mt-1">Availability shown to customers. Inventory quantity is managed separately.</p>
               </div>
             </>
           )}
@@ -1405,11 +1392,15 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="Auto-calculated" />
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">{variant.sub_variant_type_on ? 'Listed Stock (sum)' : 'Listed Stock *'}</label>
+                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">{variant.sub_variant_type_on ? 'Stock Status (from sub-variants)' : 'Stock Status *'}</label>
                                   {variant.sub_variant_type_on ? (
-                                    <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="0" />
+                                    <input type="text" value={sumSubVariantStock(subVariantsMap[variant.id || '']) > 0 ? 'In Stock' : 'Out of Stock'} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} />
                                   ) : (
-                                    <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className={inputCls} placeholder="0" required />
+                                    <select value={variant.stock_status} onChange={(e) => updateVariant(index, 'stock_status', e.target.value)} className={inputCls} required>
+                                      <option value="In Stock">In Stock</option>
+                                      <option value="Low Stock">Low Stock</option>
+                                      <option value="Out of Stock">Out of Stock</option>
+                                    </select>
                                   )}
                                 </div>
                                 <div>
@@ -1594,9 +1585,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   )}
                                   <td className="py-2 px-3">
                                     {variant.sub_variant_type_on ? (
-                                      <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="0" title="Sum of sub-variants" />
+                                      <input type="text" value={sumSubVariantStock(subVariantsMap[variant.id || '']) > 0 ? 'In Stock' : 'Out of Stock'} readOnly className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" title="Derived from sub-variants" />
                                     ) : (
-                                      <input type="number" min="0" value={variant.stock_quantity} onChange={(e) => updateVariant(index, 'stock_quantity', e.target.value)} className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="0" required />
+                                      <select value={variant.stock_status} onChange={(e) => updateVariant(index, 'stock_status', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" required>
+                                        <option value="In Stock">In Stock</option>
+                                        <option value="Low Stock">Low Stock</option>
+                                        <option value="Out of Stock">Out of Stock</option>
+                                      </select>
                                     )}
                                   </td>
                                   <td className="py-2 px-3">
@@ -2159,7 +2154,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
                                   {/* Price (Ex. GST) — locked */}
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price_ex_gst} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
-                                  <td className="py-1 pr-1"><input type="number" step="1" min="0" value={ed.stock} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, stock: e.target.value }))} className={svInputCls} /></td>
+                                  <td className="py-1 pr-1">
+                                    <select value={ed.stock} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, stock: e.target.value }))} className={svInputCls}>
+                                      <option value="In Stock">In Stock</option>
+                                      <option value="Low Stock">Low Stock</option>
+                                      <option value="Out of Stock">Out of Stock</option>
+                                    </select>
+                                  </td>
                                   <td className="py-1 pr-1"><input type="text" value={ed.sku} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, sku: e.target.value }))} className={`${svInputCls} w-20`} /></td>
                                   <td className="py-1 pl-1 flex items-center gap-1">
                                     <button type="button" onClick={async () => {
@@ -2167,11 +2168,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`, {
                                         method: 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, discount_pct: parseFloat(discountPct) || 0, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || null }),
+                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, discount_pct: parseFloat(discountPct) || 0, stock_status: ed.stock || 'In Stock', sku: ed.sku || null }),
                                       })
                                       if (res.ok) {
                                         const updated = await res.json()
-                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, stock_quantity: ed.stock ? parseInt(ed.stock) : 0, sku: ed.sku || s.sku }) : s) }))
+                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, stock_status: ed.stock || 'In Stock', sku: ed.sku || s.sku }) : s) }))
                                       }
                                       setSubVariantEditId(null); setSubVariantEditDraft(null)
                                     }} className="text-green-500 hover:text-green-700 leading-none" aria-label="Save"><Check className="w-3.5 h-3.5" /></button>
@@ -2184,10 +2185,10 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1.5 pr-2">{sv.mrp != null ? `₹${sv.mrp}` : '—'}</td>
                                   <td className="py-1.5 pr-2">{sv.price != null ? `₹${sv.price}` : '—'}</td>
                                   <td className="py-1.5 pr-2">{sv.price_ex_gst != null ? `₹${sv.price_ex_gst}` : '—'}</td>
-                                  <td className="py-1.5 pr-2">{sv.stock_quantity}</td>
+                                  <td className="py-1.5 pr-2">{sv.stock_status || '—'}</td>
                                   <td className="py-1.5 pr-2 font-mono text-foreground-muted">{sv.sku}</td>
                                   <td className="py-1.5 flex items-center gap-2">
-                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', discount_pct: sv.discount_pct != null ? String(sv.discount_pct) : '', stock: String(sv.stock_quantity ?? 0), sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
+                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', discount_pct: sv.discount_pct != null ? String(sv.discount_pct) : '', stock: sv.stock_status || 'In Stock', sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
                                     <button type="button" onClick={() => setExpandedSvUnits(s => { const n = new Set(s); n.has(sv.id) ? n.delete(sv.id) : n.add(sv.id); return n })} className="text-foreground-muted hover:text-accent-500 leading-none text-xs font-medium">Unit</button>
                                     <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none" aria-label="Delete"><X className="w-3.5 h-3.5" /></button>
                                   </td>

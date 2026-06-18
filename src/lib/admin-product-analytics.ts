@@ -1,8 +1,8 @@
 import { queryOne, queryMany } from './db'
 
 export async function getProductAnalyticsData(productId: string, days: number) {
-  const product = await queryOne<{ id: string; name: string; sku: string; slug: string; brand_name: string | null; stock_quantity: number; base_price: string }>(
-    `SELECT p.id, p.name, p.sku, p.slug, b.name AS brand_name, p.stock_quantity, p.base_price
+  const product = await queryOne<{ id: string; name: string; sku: string; slug: string; brand_name: string | null; stock_status: string; inventory_quantity: number; base_price: string }>(
+    `SELECT p.id, p.name, p.sku, p.slug, b.name AS brand_name, p.stock_status, p.inventory_quantity, p.base_price
      FROM products p LEFT JOIN brands b ON b.id = p.brand_id
      WHERE p.id = $1`,
     [productId]
@@ -104,7 +104,7 @@ export async function getProductAnalyticsData(productId: string, days: number) {
       sku: product.sku,
       slug: product.slug,
       brandName: product.brand_name,
-      stock: product.stock_quantity,
+      stock: product.inventory_quantity ?? 0,
       basePrice: parseFloat(product.base_price),
     },
     days,
