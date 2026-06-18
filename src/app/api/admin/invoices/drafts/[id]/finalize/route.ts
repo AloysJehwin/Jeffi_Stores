@@ -17,16 +17,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(
-      `SELECT id, status, customer_name, customer_email, total_amount, order_number FROM orders WHERE id = $1`,
+      `SELECT id, status, source, customer_name, customer_email, total_amount, order_number FROM orders WHERE id = $1`,
       [id]
     )
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
-    if (order.status !== 'draft' && order.status !== 'confirmed') {
+    const allowedStatuses = ['draft', 'confirmed', 'delivered']
+    if (!allowedStatuses.includes(order.status)) {
       return NextResponse.json({ error: 'Invoice is already finalized' }, { status: 400 })
     }
 
-    const isOnlineOrder = order.status === 'confirmed'
-    const targetStatus = isOnlineOrder ? 'processing' : 'delivered'
+    const isOnlineOrder = order.source === 'online' || order.source === 'business'
+    // If already delivered, keep status unchanged; otherwise move online/business→processing, offline→delivered
+    const targetStatus = order.status === 'delivered' ? 'delivered' : (isOnlineOrder ? 'processing' : 'delivered')
 
     const result = await withTransaction(async (client) => {
       await client.query(`SELECT id FROM orders WHERE id = $1 FOR UPDATE`, [id])
