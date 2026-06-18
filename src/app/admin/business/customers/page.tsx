@@ -82,7 +82,7 @@ export default async function BusinessCustomersPage({
 }: {
   searchParams: { [key: string]: string | undefined }
 }) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))

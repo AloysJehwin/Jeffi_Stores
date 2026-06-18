@@ -8,7 +8,7 @@ import RFQDetailClient from './RFQDetailClient'
 import { ap } from '@/lib/admin-path'
 
 export default async function BusinessRFQDetailPage({ params }: { params: { id: string } }) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))

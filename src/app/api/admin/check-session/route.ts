@@ -5,7 +5,7 @@ import { verifyToken } from '@/lib/jwt'
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const token = cookieStore.get('admin_token')
 
     const hostname = request.nextUrl.hostname || request.headers.get('host') || ''

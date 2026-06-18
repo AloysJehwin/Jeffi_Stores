@@ -24,7 +24,7 @@ async function getAllAdmins() {
 }
 
 export default async function SettingsPage() {
-  const headersList = headers()
+  const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
 
   const adminInfo = await getAdminInfo(adminId)

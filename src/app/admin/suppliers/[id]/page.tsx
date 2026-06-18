@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function SupplierDetailPage({ params }: { params: { id: string } }) {
   const host = (await headers()).get('host') ?? ''
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   if (!token) redirect(ap('/admin/login', host))
 

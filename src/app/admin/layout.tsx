@@ -13,7 +13,7 @@ export const metadata = {
 }
 
 async function getAdminSession() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   if (!token) return null
   try {
@@ -28,9 +28,9 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const headersList = headers()
+  const headersList = await headers()
   const pathname = headersList.get('x-pathname') || ''
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
 
   const session = await getAdminSession()
 

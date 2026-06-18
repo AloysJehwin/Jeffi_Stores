@@ -5,7 +5,7 @@ import CatalogEnrichmentClient from './CatalogEnrichmentClient'
 import AccessDenied from '@/components/admin/AccessDenied'
 
 export default async function CatalogEnrichmentPage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   let role = ''
   let scopes: string[] = []

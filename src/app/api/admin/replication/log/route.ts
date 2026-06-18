@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 // Admin-scoped; same auth pattern as other /api/admin/* routes.
 // -----------------------------------------------------------------------------
 export async function GET(request: NextRequest) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   let role = ''
   let scopes: string[] = []

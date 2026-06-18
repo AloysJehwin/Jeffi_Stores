@@ -13,7 +13,7 @@ export const metadata = {
 
 export default async function BusinessLandingPage() {
   const host = (await headers()).get('host') ?? ''
-  const token = cookies().get('business_auth_token')?.value
+  const token = (await cookies()).get('business_auth_token')?.value
   let authState: 'guest' | 'pending' | 'approved' | 'rejected' = 'guest'
   if (token) {
     const payload = await verifyToken(token).catch(() => null)
