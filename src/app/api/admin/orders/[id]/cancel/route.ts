@@ -28,12 +28,27 @@ export async function POST(
 
     await withTransaction(async (client) => {
       const itemsResult = await client.query(
-        `SELECT product_id, variant_id, sub_variant_id, quantity FROM order_items WHERE order_id = $1`,
+        `SELECT product_id, variant_id, sub_variant_id, quantity, buy_unit FROM order_items WHERE order_id = $1`,
         [id]
       )
 
       for (const item of itemsResult.rows) {
-        const qty = parseFloat(item.quantity)
+        const rawQty = parseFloat(item.quantity)
+
+        // Resolve unit factor so restore matches what was originally deducted
+        const unitRow = await client.query<{ factor: string; dimension: string }>(
+          `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                  COALESCE(puv.dimension, pup.dimension) AS dimension
+           FROM (SELECT 1) x
+           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+          [item.buy_unit, item.product_id, item.variant_id || null]
+        )
+        const u = unitRow.rows[0]
+        const qty = (u?.dimension === 'count' && u?.factor)
+          ? rawQty * parseFloat(u.factor)
+          : rawQty
+
         let stockBefore = 0
 
         if (item.sub_variant_id) {
