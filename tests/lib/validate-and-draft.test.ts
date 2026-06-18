@@ -504,24 +504,22 @@ describe('parseBody dev-mode logging branch', () => {
   const schema = z.object({ name: z.string().min(1) })
 
   it('executes the dev log path on failure when NODE_ENV=development (no context)', () => {
-    const prev = process.env.NODE_ENV
-    Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', writable: true, configurable: true })
+    vi.stubEnv('NODE_ENV', 'development')
     try {
       const r = parseBody(schema, { name: '' })
       expect(r.ok).toBe(false)
     } finally {
-      Object.defineProperty(process.env, 'NODE_ENV', { value: prev, writable: true, configurable: true })
+      vi.unstubAllEnvs()
     }
   })
 
   it('executes the dev log path on failure when NODE_ENV=development (with context)', () => {
-    const prev = process.env.NODE_ENV
-    Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', writable: true, configurable: true })
+    vi.stubEnv('NODE_ENV', 'development')
     try {
       const r = parseBody(schema, { name: '' }, 'dev-ctx')
       expect(r.ok).toBe(false)
     } finally {
-      Object.defineProperty(process.env, 'NODE_ENV', { value: prev, writable: true, configurable: true })
+      vi.unstubAllEnvs()
     }
   })
 })
