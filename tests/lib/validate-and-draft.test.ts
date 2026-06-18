@@ -2,7 +2,7 @@
 // The module-level `new TextEncoder().encode(process.env.JWT_SECRET ?? throw)` in
 // order-draft.ts will see the value from vitest config before any import runs.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { z } from 'zod'
 import {
   zUuid,
