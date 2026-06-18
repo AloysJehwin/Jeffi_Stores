@@ -36,7 +36,7 @@ function buildRedirectUrl(request: NextRequest, path: string): URL {
 }
 
 export async function middleware(request: NextRequest) {
-  const hostname = request.headers.get('host') || ''
+  const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.hostname || ''
   const pathname = request.nextUrl.pathname
 
   if (hostname.startsWith('www.jeffistores.in')) {
@@ -148,6 +148,8 @@ export async function middleware(request: NextRequest) {
     '/api/admin/mfa/verify',
   ]
   if (isAdminApiPath && publicApiPaths.some(path => pathname.startsWith(path))) {
+    const limited = await applyRateLimit(request)
+    if (limited) return limited
     return addSecurityHeaders(NextResponse.next())
   }
 

@@ -49,7 +49,8 @@ export async function verifyIntent(token: string): Promise<CheckoutIntentPayload
       buyMode: (payload.buyMode as string) || 'unit',
       buyUnit: (payload.buyUnit as string) || null,
     }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

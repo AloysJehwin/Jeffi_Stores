@@ -173,7 +173,7 @@ CREATE FUNCTION public.update_product_stock_status() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    NEW.is_in_stock := NEW.stock_quantity > 0;
+    NEW.stock_status := COALESCE(NEW.stock_status, 'In Stock');
     RETURN NEW;
 END;
 $$;

@@ -5,11 +5,25 @@ import { uploadInvoicePDF } from '@/lib/s3'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
 
+/**
+ * Creates a placeholder invoice row (status='draft', no invoice number) when an
+ * online order is placed. The row is finalized (number assigned, PDF generated)
+ * only when an admin processes the order via the finalize route.
+ */
+export async function createDraftInvoice(orderId: string): Promise<void> {
+  const existing = await queryOne('SELECT id FROM invoices WHERE order_id = $1', [orderId])
+  if (existing) return
+  await queryOne(
+    `INSERT INTO invoices (order_id, status) VALUES ($1, 'draft') RETURNING id`,
+    [orderId]
+  )
+}
+
 export async function generateOrderInvoice(orderId: string): Promise<Buffer | null> {
   if (!isGSTEnabled) return null
 
   const existingInvoice = await queryOne(
-    'SELECT id FROM invoices WHERE order_id = $1',
+    `SELECT id FROM invoices WHERE order_id = $1 AND status = 'finalized'`,
     [orderId]
   )
   if (existingInvoice) return null
@@ -90,7 +104,14 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     )
 
     await client.query(
-      'INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)',
+      `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number, status)
+       VALUES ($1, $2, $3, $4, 'finalized')
+       ON CONFLICT (order_id) DO UPDATE
+         SET invoice_number = EXCLUDED.invoice_number,
+             financial_year = EXCLUDED.financial_year,
+             sequence_number = EXCLUDED.sequence_number,
+             status = 'finalized',
+             updated_at = NOW()`,
       [orderId, invoiceNumber, fy, seq]
     )
 

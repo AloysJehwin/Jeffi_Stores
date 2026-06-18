@@ -22,7 +22,7 @@ interface SubVariant {
   price: number | null
   mrp: number | null
   price_ex_gst: number | null
-  stock_quantity: number
+  stock_status: string
   is_active: boolean
 }
 
@@ -34,7 +34,7 @@ interface Variant {
   mrp: number | null
   mrp_ex_gst: number | null
   price_ex_gst: number | null
-  stock_quantity: number
+  stock_status: string
   pricing_type?: string
   unit?: string
   numeric_value?: number | null
@@ -64,7 +64,7 @@ interface ProductActionsProps {
   productId: string
   productName: string
   sku: string
-  stockQuantity: number
+  stockStatus: string
   basePrice: number
   salePrice: number | null
   mrp: number | null
@@ -102,7 +102,7 @@ function getPerUnitRate(price: number, numeric_value: number, unit: string): str
 }
 
 export default function ProductActions({
-  productId, productName, sku, stockQuantity,
+  productId, productName, sku, stockStatus,
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onSelectionChange, categoryId,
@@ -156,7 +156,7 @@ export default function ProductActions({
     }) || variants.filter(v => (v.pricing_type || 'unit') === (variants[0]?.pricing_type || 'unit'))[0] || variants[0]
     const subs = initialVariant?.sub_variants || []
     if (subs.length > 0) {
-      const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
+      const firstActive = subs.find(s => s.is_active && s.stock_status !== 'Out of Stock') || subs.find(s => s.is_active) || subs[0]
       return firstActive?.id ?? null
     }
     return null
@@ -191,7 +191,7 @@ export default function ProductActions({
     if (subs.length > 0) {
       const currentStillValid = subs.find(s => s.id === selectedSubVariantId)
       if (!currentStillValid) {
-        const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
+        const firstActive = subs.find(s => s.is_active && s.stock_status !== 'Out of Stock') || subs.find(s => s.is_active) || subs[0]
         setSelectedSubVariantId(firstActive?.id ?? null)
       }
     } else {
@@ -244,8 +244,8 @@ export default function ProductActions({
     ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))
     : mrp
   const effectiveStock = hasVariants
-    ? (selectedSubVariant ? selectedSubVariant.stock_quantity : (selectedVariant?.stock_quantity ?? 0))
-    : stockQuantity
+    ? ((selectedSubVariant ? selectedSubVariant.stock_status : selectedVariant?.stock_status) !== 'Out of Stock' ? 1 : 0)
+    : (stockStatus !== 'Out of Stock' ? 1 : 0)
 
   const mrpDiscount = effectiveMrp && effectiveMrp > effectivePrice
     ? Math.round(((effectiveMrp - effectivePrice) / effectiveMrp) * 100)
@@ -412,14 +412,14 @@ export default function ProductActions({
                         className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                           selectedVariantId === variant.id
                             ? 'bg-accent-500 text-white border-accent-500'
-                            : variant.stock_quantity > 0
+                            : variant.stock_status !== 'Out of Stock'
                               ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
                               : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
                         }`}
-                        disabled={variant.stock_quantity === 0}
+                        disabled={variant.stock_status === 'Out of Stock'}
                       >
                         {variant.variant_name}
-                        {variant.stock_quantity === 0 && ' (Out of Stock)'}
+                        {variant.stock_status === 'Out of Stock' && ' (Out of Stock)'}
                       </button>
                     ))}
                   </div>
@@ -458,18 +458,18 @@ export default function ProductActions({
                         <button
                           key={sv.id}
                           type="button"
-                          disabled={sv.stock_quantity === 0}
+                          disabled={sv.stock_status === 'Out of Stock'}
                           onClick={() => setSelectedSubVariantId(sv.id)}
                           className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                             selectedSubVariantId === sv.id
                               ? 'bg-accent-500 text-white border-accent-500'
-                              : sv.stock_quantity > 0
+                              : sv.stock_status !== 'Out of Stock'
                                 ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
                                 : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
                           }`}
                         >
                           {sv.sub_variant_name}
-                          {sv.stock_quantity === 0 && ' (Out of Stock)'}
+                          {sv.stock_status === 'Out of Stock' && ' (Out of Stock)'}
                         </button>
                       ))}
                     </div>
@@ -594,7 +594,7 @@ export default function ProductActions({
                 <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock{effectiveStock < 10 ? ` (${effectiveStock} left)` : ''}</span>
+                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">

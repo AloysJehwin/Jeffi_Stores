@@ -1,0 +1,152 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextRequest, NextResponse } from 'next/server'
+
+// ── Mocks ─────────────────────────────────────────────────────────────────────
+
+vi.mock('@/lib/jwt', () => ({
+  requireAdminScope: vi.fn(),
+}))
+
+vi.mock('@/lib/db', () => ({
+  query: vi.fn(),
+  queryOne: vi.fn(),
+}))
+
+vi.mock('@/lib/email-business', () => ({
+  sendBusinessAccountApprovedEmail: vi.fn(),
+  sendBusinessAccountRejectedEmail: vi.fn(),
+}))
+
+// ── Imports (after mocks) ─────────────────────────────────────────────────────
+
+import { POST } from '@/app/api/admin/business/customers/[id]/approve/route'
+import { requireAdminScope } from '@/lib/jwt'
+import { query, queryOne } from '@/lib/db'
+import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } from '@/lib/email-business'
+
+const mockRequireScope = vi.mocked(requireAdminScope)
+const mockQuery = vi.mocked(query)
+const mockQueryOne = vi.mocked(queryOne)
+const mockSendApproved = vi.mocked(sendBusinessAccountApprovedEmail)
+const mockSendRejected = vi.mocked(sendBusinessAccountRejectedEmail)
+
+const adminPayload = {
+  adminId: 'admin-1',
+  username: 'testadmin',
+  role: 'super_admin',
+  scopes: ['business_customers'],
+}
+
+function makeRequest(body: Record<string, unknown>) {
+  return new NextRequest('http://localhost/api/admin/business/customers/user-1/approve', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie: 'admin_token=valid' },
+    body: JSON.stringify(body),
+  })
+}
+
+const userInfo = {
+  email: 'customer@example.com',
+  first_name: 'Jane',
+  last_name: 'Doe',
+  company_name: 'Acme Corp',
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('POST /api/admin/business/customers/[id]/approve', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns 401/403 when requireAdminScope rejects', async () => {
+    const unauthorizedResponse = NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    mockRequireScope.mockResolvedValue(unauthorizedResponse)
+    const res = await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 400 for invalid action value', async () => {
+    mockRequireScope.mockResolvedValue(adminPayload as any)
+    const res = await POST(makeRequest({ action: 'invalid' }), { params: { id: 'user-1' } })
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/approve.*reject/i)
+  })
+
+  it('returns 404 when business profile not found', async () => {
+    mockRequireScope.mockResolvedValue(adminPayload as any)
+    mockQueryOne.mockResolvedValueOnce(null)
+    const res = await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+    expect(res.status).toBe(404)
+    const body = await res.json()
+    expect(body.error).toMatch(/not found/i)
+  })
+
+  it('approves the business profile and sends email', async () => {
+    mockRequireScope.mockResolvedValue(adminPayload as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ id: 'bp-1' })
+      .mockResolvedValueOnce(userInfo)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockSendApproved.mockResolvedValue(undefined as any)
+
+    const res = await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.action).toBe('approve')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("approval_status='approved'"),
+      expect.any(Array),
+    )
+  })
+
+  it('rejects the business profile and sends rejection email', async () => {
+    mockRequireScope.mockResolvedValue(adminPayload as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ id: 'bp-1' })
+      .mockResolvedValueOnce(userInfo)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockSendRejected.mockResolvedValue(undefined as any)
+
+    const res = await POST(
+      makeRequest({ action: 'reject', rejectionNote: 'Incomplete docs' }),
+      { params: { id: 'user-1' } },
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.action).toBe('reject')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("approval_status='rejected'"),
+      expect.arrayContaining(['Incomplete docs']),
+    )
+  })
+
+  it('still succeeds when userInfo has no email (skips email send)', async () => {
+    mockRequireScope.mockResolvedValue(adminPayload as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ id: 'bp-1' })
+      .mockResolvedValueOnce({ email: null, first_name: null, last_name: null, company_name: null })
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+
+    const res = await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+    expect(res.status).toBe(200)
+    expect(mockSendApproved).not.toHaveBeenCalled()
+  })
+
+  it('uses full name when both first and last names are present', async () => {
+    mockRequireScope.mockResolvedValue(adminPayload as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ id: 'bp-1' })
+      .mockResolvedValueOnce(userInfo)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockSendApproved.mockResolvedValue(undefined as any)
+
+    await POST(makeRequest({ action: 'approve' }), { params: { id: 'user-1' } })
+
+    expect(mockSendApproved).toHaveBeenCalledWith(
+      'customer@example.com',
+      'Jane Doe',
+      'Acme Corp',
+    )
+  })
+})

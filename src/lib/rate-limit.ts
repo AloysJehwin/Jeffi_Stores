@@ -6,6 +6,8 @@ export interface RateLimitConfig {
 }
 
 const TIERS: Array<{ pattern: RegExp; config: RateLimitConfig }> = [
+  { pattern: /^\/api\/admin\/login/,          config: { windowSecs: 60,  max: 5   } },
+  { pattern: /^\/api\/admin\/mfa\//,          config: { windowSecs: 60,  max: 10  } },
   { pattern: /^\/api\/auth\/send-otp/,        config: { windowSecs: 60,  max: 5   } },
   { pattern: /^\/api\/auth\/verify-otp/,      config: { windowSecs: 60,  max: 10  } },
   { pattern: /^\/api\/auth\/login/,           config: { windowSecs: 60,  max: 10  } },
@@ -63,7 +65,8 @@ async function redisIncrExpire(key: string, windowSecs: number): Promise<{ count
     const count = data?.[0]?.result
     if (typeof count !== 'number') return null
     return { count, ttl: windowSecs }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

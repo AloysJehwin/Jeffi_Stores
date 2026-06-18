@@ -299,11 +299,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
     : Number(p.inventory_quantity || 0)
   const listedQty = p.has_variants
     ? Number(p.variant_stock_total || 0)
-    : Number(p.stock_quantity || 0)
+    : (p.stock_status !== 'Out of Stock' ? 1 : 0)
 
   const stockColor = inventoryQty === 0
     ? 'text-red-600 dark:text-red-400'
-    : inventoryQty <= (p.low_stock_threshold || 5)
+    : p.stock_status === 'Low Stock'
     ? 'text-orange-600 dark:text-orange-400'
     : 'text-green-600 dark:text-green-400'
 
@@ -439,9 +439,6 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   <span className="font-semibold text-foreground">{listedQty}</span>
                 </div>
               )}
-              {!p.has_variants && p.low_stock_threshold != null && (
-                <Field label="Low Stock At" value={p.low_stock_threshold} />
-              )}
               <Field label="Weight" value={p.weight ? `${p.weight} kg` : null} />
               <Field label="Weight (g)" value={p.weight_grams} />
               <Field label="Dimensions" value={p.dimensions} />
@@ -568,8 +565,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   const subVariants: any[] = v.sub_variants || []
                   const hasSubs = subVariants.length > 0
                   const vInventory = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.inventory_quantity || 0)
-                  const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
-                  const vStockColor = vInventory === 0 ? 'text-red-600 dark:text-red-400' : vInventory <= (v.low_stock_threshold || 3) ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
+                  const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : (v.stock_status !== 'Out of Stock' ? 1 : 0)
+                  const vStockColor = vInventory === 0 ? 'text-red-600 dark:text-red-400' : v.stock_status === 'Low Stock' ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
                   const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
                   const vShelf = hasSubs ? [] : shelfFor(v.id, null)
                   return (
@@ -606,7 +603,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
                                             Inv: {Number(sv.inventory_quantity || 0)}
                                           </span>
                                           <span className="text-foreground-muted">
-                                            Listed: {Number(sv.stock_quantity || 0)}
+                                            Listed: {sv.stock_status || '—'}
                                           </span>
                                         </div>
                                       </div>
@@ -653,7 +650,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
                     </tr>
                     {hasSubs && subVariants.map((sv: any) => {
                       const svInventory = Number(sv.inventory_quantity || 0)
-                      const svListed = Number(sv.stock_quantity || 0)
+                      const svListed = sv.stock_status || '—'
                       const svStockColor = svInventory === 0 ? 'text-red-600 dark:text-red-400' : svInventory <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
                       const svShelf = shelfFor(v.id, sv.id)
                       return (

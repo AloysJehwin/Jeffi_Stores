@@ -185,7 +185,8 @@ function renderAddressBlock(
 async function buildQRBuffer(data: string, size: number): Promise<Buffer | null> {
   try {
     return await QRCode.toBuffer(data, { type: 'png', width: size, margin: 1 })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

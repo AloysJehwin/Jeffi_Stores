@@ -50,6 +50,8 @@ export interface IRNResult {
 
 let cachedToken: { token: string; expiresAt: number } | null = null
 
+export function __resetTokenCacheForTests(): void { cachedToken = null }
+
 function isConfigured(): boolean {
   return !!(
     process.env.EINVOICE_CLIENT_ID &&

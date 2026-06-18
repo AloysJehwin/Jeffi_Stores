@@ -118,7 +118,8 @@ export async function recordSent(params: {
       ]
     )
     return result.rows[0]?.id ?? null
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -175,7 +176,8 @@ export async function generateCouponForCampaign(params: {
       await query(`UPDATE campaigns SET coupon_id = $1 WHERE kind = $2`, [couponId, params.campaignKind])
     }
     return code
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

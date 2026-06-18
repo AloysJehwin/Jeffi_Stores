@@ -34,7 +34,8 @@ export async function verifyMfaTicket(token: string, expectedPurpose: MfaPurpose
     if (payload.purpose !== expectedPurpose) return null
     if (!payload.adminId || typeof payload.adminId !== 'string') return null
     return payload as MfaTicketPayload
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -77,7 +78,8 @@ export async function verifyTotp(secret: string, code: string): Promise<boolean>
   try {
     const result = await verify({ token: code.trim(), secret, epochTolerance: 30 })
     return !!result.valid
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return false
   }
 }

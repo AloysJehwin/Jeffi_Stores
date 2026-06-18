@@ -127,7 +127,7 @@ export default async function BrandDetailPage({
                   const displayPrice = hasVariants && product.variant_min_price
                     ? product.variant_min_price
                     : (product.price_ex_gst || product.base_price)
-                  const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                  const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
                   const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
                   const inclPrice = hasVariants && product.variant_min_price
                     ? Number(product.variant_min_price)

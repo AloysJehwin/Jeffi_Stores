@@ -26,13 +26,7 @@ export class AiClientError extends Error {
   }
 }
 
-const PROVIDER = (process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'ollama'
-const FALLBACK_ENABLED = process.env.OLLAMA_FALLBACK_TO_OPENAI === 'true'
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '')
-const OLLAMA_AGENT_MODEL = process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
-const OLLAMA_SQL_MODEL = process.env.OLLAMA_SQL_MODEL || OLLAMA_AGENT_MODEL
-const OLLAMA_COPY_MODEL = process.env.OLLAMA_COPY_MODEL || OLLAMA_AGENT_MODEL
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini'
 const OLLAMA_HEALTH_TIMEOUT_MS = 2000
 const OLLAMA_REQUEST_TIMEOUT_MS = 120_000
 
@@ -43,17 +37,19 @@ async function isOllamaReachable(): Promise<boolean> {
     const res = await fetch(`${OLLAMA_BASE_URL}/api/tags`, { signal: ctrl.signal })
     clearTimeout(t)
     return res.ok
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return false
   }
 }
 
 async function callOllama(req: AiChatRequest): Promise<{ content: string; model: string }> {
+  const agentModel = process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
   const model = req.modelHint === 'sql'
-    ? OLLAMA_SQL_MODEL
+    ? (process.env.OLLAMA_SQL_MODEL || agentModel)
     : req.modelHint === 'agent'
-      ? OLLAMA_AGENT_MODEL
-      : OLLAMA_COPY_MODEL
+      ? agentModel
+      : (process.env.OLLAMA_COPY_MODEL || agentModel)
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), OLLAMA_REQUEST_TIMEOUT_MS)
   try {
@@ -96,11 +92,12 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
 async function callOpenAi(req: AiChatRequest): Promise<{ content: string; model: string }> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new AiClientError('OPENAI_API_KEY not configured', 'openai')
+  const openaiModel = process.env.OPENAI_MODEL || 'gpt-4o-mini'
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: OPENAI_MODEL,
+      model: openaiModel,
       messages: req.messages,
       temperature: req.temperature ?? 0.2,
       max_tokens: req.maxTokens ?? 2000,
@@ -114,23 +111,25 @@ async function callOpenAi(req: AiChatRequest): Promise<{ content: string; model:
   const data = await res.json()
   const content = data?.choices?.[0]?.message?.content
   if (typeof content !== 'string') throw new AiClientError('OpenAI response missing choices[0].message.content', 'openai')
-  return { content, model: OPENAI_MODEL }
+  return { content, model: openaiModel }
 }
 
 export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
   const start = Date.now()
+  const provider = (process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'ollama'
+  const fallbackEnabled = process.env.OLLAMA_FALLBACK_TO_OPENAI === 'true'
 
-  if (PROVIDER === 'ollama') {
+  if (provider === 'ollama') {
     const reachable = await isOllamaReachable()
     if (reachable) {
       try {
         const r = await callOllama(req)
         return { content: r.content, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
       } catch (err) {
-        if (!FALLBACK_ENABLED) throw err
+        if (!fallbackEnabled) throw err
       }
     }
-    if (FALLBACK_ENABLED) {
+    if (fallbackEnabled) {
       const r = await callOpenAi(req)
       return { content: r.content, provider: 'openai', model: r.model, latencyMs: Date.now() - start, fallbackUsed: true }
     }
@@ -142,5 +141,5 @@ export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
 }
 
 export function getAiProvider(): 'openai' | 'ollama' {
-  return PROVIDER
+  return (process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'ollama'
 }

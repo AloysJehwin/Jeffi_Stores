@@ -29,8 +29,7 @@ interface CartItem {
     price_ex_gst: number | null
     mrp: number | null
     gst_percentage: number | null
-    stock_quantity: number
-    is_in_stock: boolean
+    stock_status: string
     brand_name: string | null
     category_id: string | null
     product_images: Array<{
@@ -46,7 +45,7 @@ interface CartItem {
     price: number | null
     mrp: number | null
     price_ex_gst: number | null
-    stock_quantity: number
+    stock_status: string
     pricing_type?: string
     unit?: string | null
     numeric_value?: number | null
@@ -59,7 +58,7 @@ interface CartItem {
     mrp: number | null
     price_ex_gst: number | null
     mrp_ex_gst: number | null
-    stock_quantity: number
+    stock_status: string
     inventory_quantity: number
   } | null
 }

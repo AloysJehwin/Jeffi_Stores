@@ -27,7 +27,7 @@ interface ProductInfo {
   brand_name: string | null
   category_name: string | null
   gtin: string | null
-  stock_quantity: number
+  stock_status: string
   inventory_quantity: number
   is_active: boolean
   has_variants: boolean
@@ -477,7 +477,7 @@ export default function ScanClient() {
                   </div>
                   <div className="flex justify-between items-center mt-1">
                     <span className="text-xs text-gray-400">Listed</span>
-                    <span className="text-sm text-gray-300">{product.stock_quantity}</span>
+                    <span className="text-sm text-gray-300">{product.stock_status || '—'}</span>
                   </div>
                 </div>
               </div>

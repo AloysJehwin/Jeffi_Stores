@@ -533,7 +533,6 @@ function CheckoutReviewPage() {
                     const showMrp = mrp !== null && Number(mrp) > Number(price)
                     const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
                     const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
-                    const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
                     const gstRate = Number(item.products.gst_percentage || 0)
                     const itemGst = gstRate > 0 ? itemTotal - (itemTotal / (1 + gstRate / 100)) : 0
 
@@ -590,9 +589,6 @@ function CheckoutReviewPage() {
                             <p className="text-[11px] text-foreground-muted mt-0.5">
                               incl. ₹{itemGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })} GST @ {gstRate}%
                             </p>
-                          )}
-                          {stockQty < Number(item.quantity) && (
-                            <p className="text-xs text-red-600 dark:text-red-400 mt-1">Only {stockQty} left in stock</p>
                           )}
                         </div>
                       </div>

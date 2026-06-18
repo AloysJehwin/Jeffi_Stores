@@ -25,7 +25,7 @@ interface SubVariant {
   price: number | null
   mrp: number | null
   price_ex_gst: number | null
-  stock_quantity: number
+  stock_status: string
   is_active: boolean
 }
 
@@ -37,7 +37,7 @@ interface Variant {
   mrp: number | null
   mrp_ex_gst: number | null
   price_ex_gst: number | null
-  stock_quantity: number
+  stock_status: string
   pricing_type?: string
   unit?: string
   numeric_value?: number | null
@@ -57,7 +57,7 @@ interface ProductDetailClientProps {
     mrp?: number | null
     price_ex_gst?: number | null
     gst_percentage?: number | null
-    stock_quantity: number
+    stock_status: string
     has_variants: boolean
     variant_type?: string | null
     discount_pct?: number | null
@@ -363,13 +363,13 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             </div>
 
             <div className="mb-6">
-              {product.stock_quantity > 0 ? (
+              {product.stock_status !== 'Out of Stock' ? (
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                   <span className="text-green-700 dark:text-green-400 font-semibold">
-                    In Stock{product.stock_quantity < 10 ? ` (${product.stock_quantity} left)` : ''}
+                    In Stock
                   </span>
                 </div>
               ) : (
@@ -388,7 +388,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           productId={product.id}
           productName={product.name}
           sku={product.sku}
-          stockQuantity={product.stock_quantity}
+          stockStatus={product.stock_status}
           basePrice={displayPrice}
           salePrice={null}
           mrp={mrp}
@@ -406,8 +406,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
         {(() => {
           const primaryImage = product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
           const overallStockQty = hasVariants
-            ? product.product_variants?.reduce((sum: number, v: any) => sum + Number(v.stock_quantity ?? 0), 0) ?? 0
-            : Number(product.stock_quantity ?? 0)
+            ? product.product_variants?.reduce((sum: number, v: any) => sum + (v.stock_status !== 'Out of Stock' ? 1 : 0), 0) ?? 0
+            : (product.stock_status !== 'Out of Stock' ? 1 : 0)
           return (
             <RequestQuoteButton
               items={[{

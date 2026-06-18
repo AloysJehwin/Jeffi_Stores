@@ -152,7 +152,7 @@ export default async function CategoryDetailPage({
                 const displayPrice = hasVariants && product.variant_min_price
                   ? Number(product.variant_min_price)
                   : Number(product.base_price)
-                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
                 const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
                 const mrpDiscount = mrp && mrp > displayPrice
                   ? Math.round(((mrp - displayPrice) / mrp) * 100)

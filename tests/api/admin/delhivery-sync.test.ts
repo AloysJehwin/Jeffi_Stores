@@ -1,0 +1,581 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { NextRequest } from 'next/server'
+
+// ── Mocks (must precede imports) ───────────────────────────────────────────
+
+vi.mock('@/lib/db', () => ({
+  query: vi.fn().mockResolvedValue(undefined),
+  queryMany: vi.fn(),
+}))
+
+vi.mock('@/lib/email', () => ({
+  sendOrderStatusUpdate: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('@/lib/auto-tasks', () => ({
+  createAutoTask: vi.fn().mockResolvedValue(undefined),
+  completeAutoTask: vi.fn().mockResolvedValue(undefined),
+}))
+
+// ── Imports ────────────────────────────────────────────────────────────────
+
+import { POST } from '@/app/api/admin/delhivery/sync-statuses/route'
+import { query, queryMany } from '@/lib/db'
+import { sendOrderStatusUpdate } from '@/lib/email'
+import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const mockQuery = vi.mocked(query)
+const mockQueryMany = vi.mocked(queryMany)
+const mockSendStatusUpdate = vi.mocked(sendOrderStatusUpdate)
+const mockCreateAutoTask = vi.mocked(createAutoTask)
+const mockCompleteAutoTask = vi.mocked(completeAutoTask)
+
+function makeReq(overrides: { auth?: string } = {}) {
+  const auth = overrides.auth !== undefined
+    ? overrides.auth
+    : `Bearer ${process.env.CRON_SECRET}`
+  return new NextRequest('http://localhost/api/admin/delhivery/sync-statuses', {
+    method: 'POST',
+    headers: auth ? { authorization: auth } : {},
+  })
+}
+
+const sampleOrder = {
+  id: 'order-1',
+  awb_number: 'AWB111',
+  status: 'shipped',
+  order_number: 'ORD-001',
+  customer_name: 'Alice Smith',
+  customer_email: 'alice@example.com',
+  user_id: 'user-1',
+}
+
+function makeShipmentResponse(awb: string, statusType: string, statusLabel = 'In Transit') {
+  return {
+    ShipmentData: [{
+      Shipment: {
+        AWB: awb,
+        Status: {
+          StatusType: statusType,
+          Status: statusLabel,
+          StatusDateTime: '2024-01-15T10:00:00',
+        },
+        Scans: [],
+        DestRecieveDate: null,
+        ReturnedDate: null,
+      },
+    }],
+  }
+}
+
+// ── Tests ──────────────────────────────────────────────────────────────────
+
+describe('POST /api/admin/delhivery/sync-statuses', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Reset the queryMany Once-queue so stale entries from prior tests don't bleed in
+    mockQueryMany.mockReset()
+    mockQuery.mockReset()
+    // Default: no orders, no RVP requests
+    mockQueryMany.mockResolvedValue([])
+    mockQuery.mockResolvedValue(undefined)
+  })
+
+  // ── Auth ─────────────────────────────────────────────────────────────────
+
+  it('returns 401 when authorization header is missing', async () => {
+    const req = new NextRequest('http://localhost/api/admin/delhivery/sync-statuses', {
+      method: 'POST',
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(401)
+    expect((await res.json()).error).toMatch(/unauthorized/i)
+  })
+
+  it('returns 401 when Bearer token is wrong', async () => {
+    const res = await POST(makeReq({ auth: 'Bearer wrong-secret' }))
+    expect(res.status).toBe(401)
+    expect((await res.json()).error).toMatch(/unauthorized/i)
+  })
+
+  it('returns 401 when authorization is not Bearer format', async () => {
+    const res = await POST(makeReq({ auth: 'Basic abc123' }))
+    expect(res.status).toBe(401)
+  })
+
+  // ── No orders ────────────────────────────────────────────────────────────
+
+  it('returns synced:0 when no active AWB orders exist', async () => {
+    // orders empty → early return, rvp queryMany never called
+    mockQueryMany.mockResolvedValueOnce([])
+    const res = await POST(makeReq())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ synced: 0, total: 0 })
+  })
+
+  // ── Successful sync ──────────────────────────────────────────────────────
+
+  it('syncs shipped → out_for_delivery status (OD)', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB111', 'OD', 'Out for Delivery'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.synced).toBe(1)
+    expect(body.results[0].syncedTo).toBe('out_for_delivery')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE orders'),
+      expect.any(Array)
+    )
+  })
+
+  it('syncs to delivered status (DL)', async () => {
+    const order = { ...sampleOrder, status: 'out_for_delivery' }
+    mockQueryMany
+      .mockResolvedValueOnce([order])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB111', 'DL', 'Delivered'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.results[0].syncedTo).toBe('delivered')
+  })
+
+  it('syncs processing → shipped status (PU)', async () => {
+    const order = { ...sampleOrder, status: 'processing' }
+    mockQueryMany
+      .mockResolvedValueOnce([order])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB111', 'PU', 'Picked Up'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.results[0].syncedTo).toBe('shipped')
+  })
+
+  it('sends email notification on status change', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB111', 'OD', 'Out for Delivery'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    await POST(makeReq())
+    await new Promise(r => setTimeout(r, 0))
+    expect(mockSendStatusUpdate).toHaveBeenCalledWith(
+      'alice@example.com',
+      'Alice Smith',
+      'ORD-001',
+      'order-1',
+      'out_for_delivery',
+      'shipped'
+    )
+  })
+
+  it('skips status update when onlyIfCurrent does not match', async () => {
+    // DL requires onlyIfCurrent: out_for_delivery/shipped/processing/confirmed
+    // Order is already 'delivered' so skip
+    const order = { ...sampleOrder, status: 'delivered' }
+    mockQueryMany
+      .mockResolvedValueOnce([order])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB111', 'DL', 'Delivered'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.synced).toBe(0)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('skips unknown status types', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB111', 'XX', 'Unknown'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.synced).toBe(0)
+  })
+
+  it('skips shipment whose AWB does not match any order in batch', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB999', 'OD', 'Out for Delivery'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.synced).toBe(0)
+  })
+
+  // ── RTO handling ─────────────────────────────────────────────────────────
+
+  it('creates auto task when RTO status is received and user_id is set', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB111', 'RTO', 'Returned'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    await POST(makeReq())
+    await new Promise(r => setTimeout(r, 0))
+    expect(mockCreateAutoTask).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceKind: 'address_rto', userId: 'user-1' })
+    )
+  })
+
+  it('does not create auto task for RTO when user_id is null', async () => {
+    const order = { ...sampleOrder, user_id: null }
+    mockQueryMany
+      .mockResolvedValueOnce([order])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB111', 'RTO', 'Returned'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    await POST(makeReq())
+    await new Promise(r => setTimeout(r, 0))
+    expect(mockCreateAutoTask).not.toHaveBeenCalled()
+  })
+
+  it('clears AWB on RTO-DL (returned to origin)', async () => {
+    const order = { ...sampleOrder, status: 'shipped' }
+    mockQueryMany
+      .mockResolvedValueOnce([order])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => makeShipmentResponse('AWB111', 'RTO-DL', 'Returned'),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.results[0].syncedTo).toBe('returned')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('awb_number = NULL'),
+      expect.any(Array)
+    )
+  })
+
+  // ── Exception type resolution ─────────────────────────────────────────────
+
+  it('resolves UD exception type to DL when status label is "delivered"', async () => {
+    const order = { ...sampleOrder, status: 'out_for_delivery' }
+    mockQueryMany
+      .mockResolvedValueOnce([order])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ShipmentData: [{
+            Shipment: {
+              AWB: 'AWB111',
+              Status: { StatusType: 'UD', Status: 'Delivered', StatusDateTime: null },
+              Scans: [],
+            },
+          }],
+        }),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.results[0].syncedTo).toBe('delivered')
+  })
+
+  it('resolves NDR exception to OD when status label is "out for delivery"', async () => {
+    const order = { ...sampleOrder, status: 'shipped' }
+    mockQueryMany
+      .mockResolvedValueOnce([order])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ShipmentData: [{
+            Shipment: {
+              AWB: 'AWB111',
+              Status: { StatusType: 'NDR', Status: 'Out for Delivery', StatusDateTime: null },
+              Scans: [],
+            },
+          }],
+        }),
+      } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.results[0].syncedTo).toBe('out_for_delivery')
+  })
+
+  // ── Delhivery API errors ─────────────────────────────────────────────────
+
+  it('records error and continues when Delhivery returns non-ok', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 503 } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.synced).toBe(0)
+    expect(body.errors).toHaveLength(1)
+    expect(body.errors[0].error).toContain('503')
+  })
+
+  it('records error and continues when fetch throws', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockRejectedValueOnce(new Error('Network timeout'))
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.errors[0].error).toContain('Network timeout')
+  })
+
+  it('handles empty ShipmentData array gracefully', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.synced).toBe(0)
+  })
+
+  it('handles missing ShipmentData key gracefully', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.synced).toBe(0)
+  })
+
+  // ── RVP (reverse pickup) ─────────────────────────────────────────────────
+  // NOTE: route returns early when orders.length === 0, so rvp queryMany is
+  // never reached. All RVP tests must supply at least one order (with an AWB
+  // that won't match the forward-shipment fetch response) so execution reaches
+  // the rvp section.
+
+  const noMatchOrder = { ...sampleOrder, awb_number: 'NOMATCH' }
+
+  it('marks return request as received when DestRecieveDate is set', async () => {
+    const rvpRequest = {
+      id: 'rr-1',
+      rvp_awb_number: 'RVP111',
+      order_id: 'order-1',
+      user_id: 'user-1',
+      order_number: 'ORD-001',
+    }
+    // First fetch: forward order status (returns empty ShipmentData so no sync)
+    // Second fetch: RVP tracking
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ShipmentData: [{
+            Shipment: {
+              AWB: 'RVP111',
+              Status: { StatusType: 'DL', Status: 'Delivered', StatusDateTime: '2024-01-15T10:00:00' },
+              DestRecieveDate: '2024-01-15',
+              ReturnedDate: null,
+            },
+          }],
+        }),
+      } as any)
+    mockQueryMany
+      .mockResolvedValueOnce([noMatchOrder])
+      .mockResolvedValueOnce([rvpRequest])
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.rvp.received).toBe(1)
+    expect(body.rvp.results[0].returnRequestId).toBe('rr-1')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE return_requests'),
+      expect.any(Array)
+    )
+  })
+
+  it('creates inspect_refund auto task after RVP received', async () => {
+    const rvpRequest = {
+      id: 'rr-1',
+      rvp_awb_number: 'RVP111',
+      order_id: 'order-1',
+      user_id: 'user-1',
+      order_number: 'ORD-001',
+    }
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ShipmentData: [{
+            Shipment: {
+              AWB: 'RVP111',
+              Status: { Status: 'Delivered', StatusType: 'DL', StatusDateTime: null },
+              DestRecieveDate: '2024-01-15',
+              ReturnedDate: null,
+            },
+          }],
+        }),
+      } as any)
+    mockQueryMany
+      .mockResolvedValueOnce([noMatchOrder])
+      .mockResolvedValueOnce([rvpRequest])
+
+    await POST(makeReq())
+    await new Promise(r => setTimeout(r, 0))
+    expect(mockCompleteAutoTask).toHaveBeenCalledWith('schedule_pickup', 'order-1')
+    expect(mockCreateAutoTask).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceKind: 'inspect_refund', userId: 'user-1' })
+    )
+  })
+
+  it('does not mark RVP received when none of the received signals are present', async () => {
+    const rvpRequest = {
+      id: 'rr-1',
+      rvp_awb_number: 'RVP111',
+      order_id: 'order-1',
+      user_id: 'user-1',
+      order_number: 'ORD-001',
+    }
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ShipmentData: [{
+            Shipment: {
+              AWB: 'RVP111',
+              Status: { Status: 'In Transit', StatusType: 'IT', StatusDateTime: null },
+              DestRecieveDate: null,
+              ReturnedDate: null,
+            },
+          }],
+        }),
+      } as any)
+    mockQueryMany
+      .mockResolvedValueOnce([noMatchOrder])
+      .mockResolvedValueOnce([rvpRequest])
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.rvp.received).toBe(0)
+    expect(mockQuery).not.toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE return_requests'),
+      expect.any(Array)
+    )
+  })
+
+  it('records rvp error when Delhivery returns non-ok for RVP batch', async () => {
+    const rvpRequest = {
+      id: 'rr-1',
+      rvp_awb_number: 'RVP111',
+      order_id: 'order-1',
+      user_id: 'user-1',
+      order_number: 'ORD-001',
+    }
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+      .mockResolvedValueOnce({ ok: false, status: 500 } as any)
+    mockQueryMany
+      .mockResolvedValueOnce([noMatchOrder])
+      .mockResolvedValueOnce([rvpRequest])
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body.rvp.received).toBe(0)
+    expect(body.rvp.errors).toHaveLength(1)
+    expect(body.rvp.errors[0].error).toContain('500')
+  })
+
+  // ── Response structure ───────────────────────────────────────────────────
+
+  it('returns correct top-level response shape', async () => {
+    mockQueryMany
+      .mockResolvedValueOnce([sampleOrder])
+      .mockResolvedValueOnce([])
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+
+    const res = await POST(makeReq())
+    const body = await res.json()
+    expect(body).toMatchObject({
+      total: 1,
+      synced: expect.any(Number),
+      results: expect.any(Array),
+      rvp: expect.objectContaining({ total: 0, received: 0 }),
+    })
+    // errors key should be absent when empty
+    expect(body.errors).toBeUndefined()
+  })
+})

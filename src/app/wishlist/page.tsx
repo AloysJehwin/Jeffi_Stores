@@ -22,8 +22,7 @@ interface WishlistItem {
     price_ex_gst: number | null
     mrp: number | null
     has_variants: boolean
-    stock_quantity: number
-    is_in_stock: boolean
+    stock_status: string
     variant_stock_total: number
     variant_min_price: number | null
     variant_min_mrp: number | null
@@ -55,7 +54,7 @@ function WishlistInner() {
   const filteredItems = useMemo(() => {
     if (filterStock === 'all') return wishlistItems
     return wishlistItems.filter(i => {
-      const inStock = (i.products.has_variants ? Number(i.products.variant_stock_total) : i.products.stock_quantity) > 0
+      const inStock = i.products.has_variants ? Number(i.products.variant_stock_total) > 0 : i.products.stock_status !== 'Out of Stock'
       return filterStock === 'in' ? inStock : !inStock
     })
   }, [wishlistItems, filterStock])
@@ -180,7 +179,7 @@ function WishlistInner() {
             const price = hasVariants && item.products.variant_min_price
               ? item.products.variant_min_price
               : (item.products.price_ex_gst || item.products.base_price)
-            const effectiveStock = hasVariants ? Number(item.products.variant_stock_total) : item.products.stock_quantity
+            const effectiveStock = hasVariants ? Number(item.products.variant_stock_total) : (item.products.stock_status !== 'Out of Stock' ? 1 : 0)
             const isInStock = effectiveStock > 0
             const mrp = item.products.mrp ? Number(item.products.mrp) : (item.products.variant_min_mrp ? Number(item.products.variant_min_mrp) : null)
             const inclPrice = hasVariants && item.products.variant_min_price
