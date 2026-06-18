@@ -210,7 +210,7 @@ export default function CashSaleClient() {
       setFormError('All items must be selected from inventory — free-typed names are not allowed')
       return
     }
-    const overstock = items.find(it => it.inventory_quantity !== null && Number(it.quantity) > it.inventory_quantity)
+    const overstock = items.find(it => it.inventory_quantity !== null && Number(it.quantity) * (it.sell_unit_factor || 1) > it.inventory_quantity)
     if (overstock) {
       setFormError(`Insufficient stock for "${overstock.product_name}" — available: ${overstock.inventory_quantity}, required: ${overstock.quantity}`)
       return

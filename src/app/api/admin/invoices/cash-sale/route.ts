@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
         gst_rate: gstRate,
         quantity: qty,
         buy_unit: item.buy_unit || null,
+        buy_mode: item.buy_mode || 'unit',
         unit_price: unitPrice,
         total_price: lineTotal,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
@@ -151,13 +152,14 @@ export async function POST(request: NextRequest) {
         await client.query(
           `INSERT INTO cash_sale_items (
             sale_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
+            hsn_code, gst_rate, quantity, buy_unit, buy_mode, unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14,$15,$16,$17)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,0,$14,$15,$16,$17,$18,$19)`,
           [
             saleId, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name,
-            item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
+            item.hsn_code, item.gst_rate, item.quantity, item.buy_unit || null, item.buy_mode || 'unit',
+            item.unit_price,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
           ]
@@ -169,8 +171,12 @@ export async function POST(request: NextRequest) {
         const rawQty = item.quantity
 
         const unitRow = await client.query<{ factor: number; dimension: string }>(
-          `SELECT factor, dimension FROM product_units WHERE unit = $1 AND product_id = $2 LIMIT 1`,
-          [item.buy_unit, item.product_id]
+          `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                  COALESCE(puv.dimension, pup.dimension) AS dimension
+           FROM (SELECT 1) x
+           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+          [item.buy_unit, item.product_id, item.variant_id || null]
         )
         const u = unitRow.rows[0]
         const qty = (u?.dimension === 'count' && u?.factor)
