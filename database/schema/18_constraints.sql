@@ -80,11 +80,11 @@ ALTER TABLE ONLY public.cart_items
 
 
 --
--- Name: cart_items cart_items_user_id_product_id_variant_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: cart_items cart_items_user_product_variant_subvariant_mode_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.cart_items
-    ADD CONSTRAINT cart_items_user_id_product_id_variant_id_key UNIQUE (user_id, product_id, variant_id);
+    ADD CONSTRAINT cart_items_user_product_variant_subvariant_mode_key UNIQUE NULLS NOT DISTINCT (user_id, product_id, variant_id, sub_variant_id, buy_mode);
 
 
 --

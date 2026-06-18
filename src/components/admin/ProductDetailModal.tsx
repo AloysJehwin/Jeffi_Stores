@@ -81,7 +81,6 @@ export default function ProductDetailModal({ product, onClose }: Props) {
   const activeImg = images[imgIdx] || primaryImg
   const variants: any[] = detail?.product_variants || []
   const stock = p.has_variants ? Number(p.variant_inventory_total ?? 0) : Number(p.inventory_quantity ?? 0)
-  const isLow = stock > 0 && stock <= (p.low_stock_threshold ?? 5)
 
   if (typeof document === 'undefined') return null
 
@@ -171,10 +170,10 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                   {p.is_featured && (
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
                   )}
-                  {stock === 0 && (
+                  {p.stock_status === 'Out of Stock' && (
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Out of Stock</span>
                   )}
-                  {isLow && (
+                  {p.stock_status === 'Low Stock' && (
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">Low Stock</span>
                   )}
                 </div>
@@ -220,7 +219,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                   {!p.has_variants && (
                     <div>
                       <p className="text-xs text-foreground-muted">Listed (Online)</p>
-                      <p className="text-foreground font-medium">{Number(p.stock_quantity ?? 0)}</p>
+                      <p className="text-foreground font-medium">{p.stock_status || '—'}</p>
                     </div>
                   )}
                   <div>
@@ -344,7 +343,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                         const subs: any[] = v.sub_variants || []
                         const hasSubs = subs.length > 0
                         const vInventory = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.inventory_quantity || 0)
-                        const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.stock_quantity || 0)
+                        const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : (v.stock_status !== 'Out of Stock' ? 1 : 0)
                         const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
                         return (
                           <React.Fragment key={v.id}>
@@ -371,7 +370,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                                 <td className="px-3 py-1.5 truncate text-foreground-muted" title={sv.sku}>{sv.sku || '—'}</td>
                                 <td className="px-3 py-1.5 text-foreground">{sv.price ? `Rs. ${Number(sv.price).toLocaleString('en-IN')}` : '—'}</td>
                                 <td className="px-3 py-1.5 text-foreground font-medium">{sv.inventory_quantity ?? 0}</td>
-                                <td className="px-3 py-1.5 text-foreground-muted">{sv.stock_quantity ?? 0}</td>
+                                <td className="px-3 py-1.5 text-foreground-muted">{sv.stock_status || '—'}</td>
                                 <td className="px-3 py-1.5">
                                   <span className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${sv.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
                                     {sv.is_active ? 'Active' : 'Off'}

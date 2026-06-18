@@ -50,7 +50,8 @@ export async function authenticateBusiness(request: NextRequest): Promise<UserJW
       approvalStatus: payload.approvalStatus as string | undefined,
       scopes: (payload.scopes as string[] | undefined) ?? [],
     }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -79,7 +80,8 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     return payload as JWTPayload
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -102,7 +104,8 @@ export async function authenticateUser(request: NextRequest): Promise<UserJWTPay
     // Reject tokens that belong to business or admin
     if (payload.type !== 'customer') return null
     return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -155,7 +158,8 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
       } catch {}
     }
     return result
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

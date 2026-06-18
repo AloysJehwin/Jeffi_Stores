@@ -64,13 +64,15 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
       try {
         const pr = await client.query<{ product_id: string; name: string; slug: string | null; image_url: string | null; price: number | null }>(productValidation.normalized)
         products = pr.rows
-      } catch {
+      } catch (err) {
+        console.error('[route]', err)
         products = []
       }
     }
 
     await client.query('ROLLBACK')
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     try { await client.query('ROLLBACK') } catch {}
     return result
   } finally {

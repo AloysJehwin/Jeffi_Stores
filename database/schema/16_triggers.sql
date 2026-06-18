@@ -87,7 +87,7 @@ CREATE TRIGGER update_products_search_vector BEFORE INSERT OR UPDATE ON public.p
 -- Name: products update_products_stock_status; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER update_products_stock_status BEFORE INSERT OR UPDATE OF stock_quantity ON public.products FOR EACH ROW EXECUTE FUNCTION public.update_product_stock_status();
+CREATE TRIGGER update_products_stock_status BEFORE INSERT OR UPDATE OF stock_status ON public.products FOR EACH ROW EXECUTE FUNCTION public.update_product_stock_status();
 
 
 --

@@ -127,13 +127,8 @@ async function getProducts(searchParams: any) {
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
       ) AS product_images,
-      COALESCE((SELECT SUM(
-        CASE
-          WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
-          THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
-          ELSE pv.stock_quantity
-        END
-      ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
+      COALESCE((SELECT COUNT(CASE WHEN pv.stock_status != 'Out of Stock' THEN 1 END)
+      FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
       (SELECT MIN(price) FROM (
         SELECT pv.price
         FROM product_variants pv
@@ -450,7 +445,7 @@ export default async function ProductsPage({
                     const displayPrice = hasVariants && product.variant_min_price
                       ? product.variant_min_price
                       : (product.price_ex_gst || product.base_price)
-                    const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                    const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
                     const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
                     const inclPrice = hasVariants && product.variant_min_price
                       ? Number(product.variant_min_price)

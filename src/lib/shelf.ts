@@ -229,7 +229,7 @@ async function syncCentralInventory(
   const total = totalRow.rows[0].total
 
   if (subVariantId) {
-    await client.query(`UPDATE product_sub_variants SET stock_quantity = $1, updated_at = now() WHERE id = $2`, [total, subVariantId])
+    await client.query(`UPDATE product_sub_variants SET stock_status = $1, updated_at = now() WHERE id = $2`, [total > 0 ? 'In Stock' : 'Out of Stock', subVariantId])
   } else if (variantId) {
     await client.query(`UPDATE product_variants SET inventory_quantity = $1, updated_at = now() WHERE id = $2`, [total, variantId])
   } else {

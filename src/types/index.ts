@@ -15,9 +15,7 @@ export interface Product {
   hsn_code?: string
   mpn?: string
   gtin?: string
-  stock_quantity: number
-  low_stock_threshold: number
-  is_in_stock: boolean
+  stock_status: 'In Stock' | 'Low Stock' | 'Out of Stock'
   weight?: number
   dimensions?: string
   material?: string
@@ -46,7 +44,7 @@ export interface ProductVariant {
   price: number | null
   mrp?: number | null
   price_ex_gst?: number | null
-  stock_quantity: number
+  stock_status: 'In Stock' | 'Low Stock' | 'Out of Stock'
   mpn?: string
   gtin?: string
   attributes: Record<string, string> | null

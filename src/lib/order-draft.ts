@@ -69,7 +69,8 @@ export async function verifyDraftToken(token: string): Promise<DraftPayload | nu
       notes: (payload.notes as string) || null,
       paymentMethod: 'razorpay',
     }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

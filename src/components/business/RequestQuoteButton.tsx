@@ -15,7 +15,7 @@ interface SubVariantOption {
   sku?: string | null
   price?: number | null
   mrp?: number | null
-  stock_quantity?: number
+  stock_status?: string
   is_active?: boolean
 }
 
@@ -25,7 +25,7 @@ interface VariantOption {
   sku?: string | null
   price?: number | null
   mrp?: number | null
-  stock_quantity?: number
+  stock_status?: string
   unit?: string | null
   sub_variants?: SubVariantOption[]
 }
@@ -141,8 +141,8 @@ function resolveItemState(item: QuoteItem, f: FieldState) {
     ? (discPct > 0 ? applyDiscount(Number(rawPrice), discPct) : Number(rawPrice))
     : item.currentPrice ?? null
   const sku = subVariant?.sku || variant?.sku || item.sku || null
-  const stockQty = subVariant?.stock_quantity ?? variant?.stock_quantity ?? null
-  const stockStatus: 'in' | 'out' | null = stockQty != null ? (stockQty > 0 ? 'in' : 'out') : item.stockStatus ?? null
+  const itemStockStatus = subVariant?.stock_status ?? variant?.stock_status ?? null
+  const stockStatus: 'in' | 'out' | null = itemStockStatus != null ? (itemStockStatus !== 'Out of Stock' ? 'in' : 'out') : item.stockStatus ?? null
   const descParts = [item.description.split(' — ')[0], variant?.variant_name, subVariant?.sub_variant_name].filter(Boolean)
   return {
     currentPrice,

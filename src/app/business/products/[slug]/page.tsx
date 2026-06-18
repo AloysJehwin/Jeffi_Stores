@@ -36,7 +36,7 @@ const getProductBySlug = cache(async (slug: string) => {
            jsonb_build_object(
              'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
              'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
-             'stock_quantity', pv.stock_quantity,
+             'stock_status', pv.stock_status,
              'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value,
              'sub_variant_type', pv.sub_variant_type,
              'variant_type', pv.variant_type,
@@ -125,7 +125,7 @@ function buildProductJsonLd(product: any, baseUrl: string) {
           ...(v.gtin && { gtin: v.gtin }),
           price: price != null ? Number(price) : undefined,
           priceCurrency: 'INR',
-          availability: v.stock_quantity > 0
+          availability: v.stock_status !== 'Out of Stock'
             ? 'https://schema.org/InStock'
             : 'https://schema.org/OutOfStock',
           itemCondition: 'https://schema.org/NewCondition',
@@ -138,7 +138,7 @@ function buildProductJsonLd(product: any, baseUrl: string) {
           sku: product.sku,
           price: Number(product.base_price),
           priceCurrency: 'INR',
-          availability: product.stock_quantity > 0
+          availability: product.stock_status !== 'Out of Stock'
             ? 'https://schema.org/InStock'
             : 'https://schema.org/OutOfStock',
           itemCondition: 'https://schema.org/NewCondition',
@@ -331,7 +331,7 @@ export default async function ProductDetailPage({
         inStock={
           product.has_variants
             ? Number(product.variant_stock_total ?? 0) > 0
-            : Number(product.stock_quantity ?? 0) > 0
+            : product.stock_status !== 'Out of Stock'
         }
         image={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
       />
@@ -410,7 +410,7 @@ export default async function ProductDetailPage({
                   : 0
                 const relatedStock = relatedHasVariants
                   ? Number(relatedProduct.variant_stock_total ?? 0)
-                  : Number(relatedProduct.stock_quantity ?? 0)
+                  : (relatedProduct.stock_status !== 'Out of Stock' ? 1 : 0)
 
                 return (
                   <ProductCard

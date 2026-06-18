@@ -29,9 +29,9 @@ export async function logStockMovement(
   if (params.currentStock !== undefined) {
     currentStockRaw = params.currentStock
   } else if (subVariantId) {
-    const row = await queryOne<{ stock_quantity: number }>(
+    const row = await queryOne<{ inventory_quantity: number }>(
       'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1', [subVariantId])
-    currentStockRaw = parseFloat(row?.stock_quantity as any) || 0
+    currentStockRaw = parseFloat(row?.inventory_quantity as any) || 0
   } else if (variantId) {
     const row = await queryOne<{ inventory_quantity: number }>(
       'SELECT inventory_quantity FROM product_variants WHERE id = $1', [variantId])

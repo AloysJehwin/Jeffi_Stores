@@ -245,7 +245,8 @@ export async function recommendProducts(userId: string, userQuery: string): Prom
   try {
     candidates = await searchCandidatesViaRag(userQuery, 20)
     if (candidates.length > 0) source = 'rag'
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     candidates = []
   }
 

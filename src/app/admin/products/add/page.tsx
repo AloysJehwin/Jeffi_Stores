@@ -27,8 +27,7 @@ async function createProduct(formData: FormData) {
   const hsnCode = formData.get('hsn_code') as string || null
   const mpn = formData.get('mpn') as string || null
   const gtin = formData.get('gtin') as string || null
-  const stockQuantity = hasVariants ? 0 : parseInt(formData.get('stock_quantity') as string)
-  const lowStockThreshold = hasVariants ? 0 : parseInt(formData.get('low_stock_threshold') as string)
+  const stockStatus = hasVariants ? 'In Stock' : formData.get('stock_status') as string
   const weight = formData.get('weight') ? parseFloat(formData.get('weight') as string) : null
   const dimensions = formData.get('dimensions') as string || null
   const weightGrams = formData.get('weight_grams') ? parseInt(formData.get('weight_grams') as string) : null
@@ -64,15 +63,15 @@ async function createProduct(formData: FormData) {
       `INSERT INTO products (
         name, slug, sku, description, category_id, brand_id,
         base_price, mrp, mrp_ex_gst, price_ex_gst, gst_percentage, hsn_code, mpn, gtin,
-        stock_quantity, low_stock_threshold, weight, dimensions, is_active, is_featured,
+        stock_status, weight, dimensions, is_active, is_featured,
         has_variants, variant_type, sub_variant_type,
         weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price, discount_pct
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
       RETURNING *`,
       [
         name, slug, sku, description, categoryId, brandId || null,
         basePrice, mrp, mrpExGst, salePrice, gstPercentage, hsnCode, mpn, gtin,
-        stockQuantity, lowStockThreshold, weight, dimensions, isActive, isFeatured,
+        stockStatus, weight, dimensions, isActive, isFeatured,
         hasVariants, variantType, subVariantType,
         weightGrams, packageType, lengthCm, breadthCm, heightCm, costPrice, discountPct,
       ]
@@ -164,7 +163,7 @@ async function createProduct(formData: FormData) {
           if (!variant.variant_name) continue
           const variantSku = generateVariantSku(sku, variant.variant_name)
           await query(
-            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, is_active)
+            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, is_active)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, true)`,
             [
               data.id,
@@ -175,7 +174,7 @@ async function createProduct(formData: FormData) {
               variant.mrp_ex_gst ? Math.round(parseFloat(variant.mrp_ex_gst) * 100) / 100 : null,
               variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100
                 : variant.price ? Math.round(parseFloat(variant.price) / (1 + gstPercentage / 100) * 100) / 100 : null,
-              parseInt(variant.stock_quantity) || 0,
+              variant.stock_status || 'In Stock',
               variant.mpn || null,
               variant.gtin || null,
               variant.pricing_type || 'unit',

@@ -121,8 +121,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
         {products && products.length > 0 ? (
           products.map((product: any) => {
             const stock = product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)
-            const listedStock = product.has_variants ? Number(product.variant_stock_total) : Number(product.stock_quantity ?? 0)
-            const isLow = stock > 0 && stock <= product.low_stock_threshold
+            const listedStock = product.has_variants ? Number(product.variant_stock_total) : null
+            const isLow = product.stock_status === 'Low Stock' || (product.has_variants && stock > 0 && stock <= 3)
             return (
               <div
                 key={product.id}
@@ -177,7 +177,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: { [
                     Inv: {stock}
                     {isLow && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Low</span>}
                     {stock === 0 && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Out</span>}
-                    {listedStock !== stock && <span className="ml-1 text-xs text-foreground-muted">/ {listedStock}</span>}
+                    {listedStock !== null && listedStock !== stock && <span className="ml-1 text-xs text-foreground-muted">/ {listedStock}</span>}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-foreground-muted">

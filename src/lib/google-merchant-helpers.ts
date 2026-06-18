@@ -40,7 +40,7 @@ export function buildProductDetails(product: any): Array<{ section: string; attr
   return details
 }
 
-export function buildCustomLabels(product: any, variantStockQty?: number): [string, string, string, string, string] {
+export function buildCustomLabels(product: any, variantStockStatus?: string): [string, string, string, string, string] {
   const sellingPrice = Number(product.base_price ?? 0)
 
   // custom_label_0: Category name
@@ -58,10 +58,10 @@ export function buildCustomLabels(product: any, variantStockQty?: number): [stri
   const label2 = product.brands?.name || 'unbranded'
 
   // custom_label_3: Stock status
-  const stockQty = variantStockQty ?? (product.stock_quantity ?? 0)
+  const status = variantStockStatus ?? product.stock_status ?? 'In Stock'
   let label3 = 'in-stock'
-  if (stockQty === 0) label3 = 'out-of-stock'
-  else if (stockQty <= (product.low_stock_threshold ?? 10)) label3 = 'low-stock'
+  if (status === 'Out of Stock') label3 = 'out-of-stock'
+  else if (status === 'Low Stock') label3 = 'low-stock'
 
   // custom_label_4: Featured flag
   const label4 = product.is_featured ? 'featured' : 'standard'

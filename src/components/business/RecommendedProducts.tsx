@@ -14,7 +14,7 @@ interface Product {
   variant_min_price: number | null
   variant_min_mrp: number | null
   variant_stock_total: number | null
-  stock_quantity: number | null
+  stock_status: string | null
   product_images: Array<{ image_url: string; thumbnail_url: string; is_primary: boolean }>
   brands?: { name: string } | null
   categories?: { name: string; id: string } | null
@@ -51,7 +51,7 @@ export default function BusinessRecommendedProducts({ title = 'You Might Also Li
             : Number(product.base_price)
           const effectiveStock = hasVariants
             ? Number(product.variant_stock_total ?? 0)
-            : Number(product.stock_quantity ?? 0)
+            : (product.stock_status !== 'Out of Stock' ? 1 : 0)
           const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
           const mrpDiscount = mrp && mrp > displayPrice
             ? Math.round(((mrp - displayPrice) / mrp) * 100)

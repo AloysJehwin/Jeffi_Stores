@@ -95,7 +95,8 @@ async function logMail(opts: {
         opts.metadata ? JSON.stringify(opts.metadata) : null,
       ]
     )
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     // Audit must never block real mail flow.
   }
 }

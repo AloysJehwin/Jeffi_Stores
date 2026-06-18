@@ -155,7 +155,7 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ productId }) => {
       const rows = await queryMany(
         `SELECT id::text, variant_name, sku, price::text, mrp::text,
-                stock_quantity, inventory_quantity, is_active
+                stock_status, inventory_quantity, is_active
          FROM product_variants WHERE product_id = $1::uuid ORDER BY variant_name`,
         [productId]
       )

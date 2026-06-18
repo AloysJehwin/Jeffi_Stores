@@ -597,7 +597,6 @@ function CheckoutPage() {
                       const showMrp = mrp !== null && Number(mrp) > Number(price)
                       const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
                       const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
-                      const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
                       return (
                         <div key={item.id} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0">
                           <div className="w-20 h-20 bg-surface-elevated rounded-lg overflow-hidden flex-shrink-0 border border-border-default">
@@ -645,9 +644,6 @@ function CheckoutPage() {
                             <p className="text-sm font-semibold text-foreground mt-1">
                               ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </p>
-                            {stockQty < Number(item.quantity) && (
-                              <p className="text-xs text-red-600 dark:text-red-400 mt-1">Only {stockQty} left in stock</p>
-                            )}
                           </div>
                         </div>
                       )

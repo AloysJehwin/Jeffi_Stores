@@ -101,13 +101,13 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
       if (sellingPrice == null) continue
       const variantMrp = variant.mrp ? Number(variant.mrp) : (product.mrp ? Number(product.mrp) : null)
       const hasSalePrice = variantMrp && variantMrp > Number(sellingPrice)
-      const [cl0, cl1, cl2, cl3, cl4] = buildCustomLabels(product, variant.stock_quantity)
+      const [cl0, cl1, cl2, cl3, cl4] = buildCustomLabels(product, variant.stock_status)
 
       rows.push([
         variant.sku,
         `${product.name} - ${variant.variant_name}`,
         description,
-        variant.stock_quantity > 0 ? 'in_stock' : 'out_of_stock',
+        variant.stock_status !== 'Out of Stock' ? 'in_stock' : 'out_of_stock',
         '',
         '',
         `${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(variant.sku)}`,
@@ -141,7 +141,7 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
         '',
         '',
         product.sku,
-        String(variant.stock_quantity || 0),
+        variant.stock_status || 'In Stock',
         googleProductCat,
         productType,
         cl0,
@@ -162,7 +162,7 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
       product.sku,
       product.name,
       description,
-      product.stock_quantity > 0 ? 'in_stock' : 'out_of_stock',
+      product.stock_status !== 'Out of Stock' ? 'in_stock' : 'out_of_stock',
       '',
       '',
       `${baseUrl}/products/${product.slug}`,
@@ -196,7 +196,7 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
       '',
       '',
       '',
-      String(product.stock_quantity || 0),
+      product.stock_status || 'In Stock',
       googleProductCat,
       productType,
       cl0,

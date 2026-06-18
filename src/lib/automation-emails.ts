@@ -89,7 +89,8 @@ export async function sendCampaignEmail(params: {
       metadata: { sentId, referenceId },
     })
     return { ok: true, sentId }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return { ok: false, reason: 'send_failed' }
   }
 }

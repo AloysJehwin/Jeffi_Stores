@@ -600,7 +600,6 @@ function CheckoutPage() {
                       const showMrp = mrp !== null && Number(mrp) > Number(price)
                       const discountPct = showMrp ? mrpDiscountPct(Number(mrp), Number(price)) : 0
                       const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
-                      const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
                       const unitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
                       const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
                       return (
@@ -650,9 +649,6 @@ function CheckoutPage() {
                             <p className="text-sm font-semibold text-foreground mt-1">
                               ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </p>
-                            {stockQty < Number(item.quantity) && (
-                              <p className="text-xs text-red-600 dark:text-red-400 mt-1">Only {stockQty} left in stock</p>
-                            )}
                           </div>
                         </div>
                       )
