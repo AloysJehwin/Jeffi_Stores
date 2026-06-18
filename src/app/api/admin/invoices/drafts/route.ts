@@ -21,10 +21,15 @@ export async function GET(request: NextRequest) {
       `WITH item_stock AS (
          SELECT
            oi.order_id,
-           -- For count-dimension selling units (box, set, etc.), multiply qty by factor
-           -- to get the actual number of individual pieces that will be deducted from inventory
+           oi.product_name,
+           oi.variant_name,
+           oi.buy_unit,
+           oi.quantity::numeric                                     AS raw_qty,
+           -- Match unit by variant_id first, fall back to product-level unit
            (oi.quantity::numeric * COALESCE(
-             CASE WHEN pu.dimension = 'count' THEN pu.factor ELSE 1 END,
+             CASE WHEN COALESCE(puv.dimension, pup.dimension) = 'count'
+                  THEN COALESCE(puv.factor, pup.factor)
+                  ELSE 1 END,
              1
            ))                                                      AS req_qty,
            -- Target the most-specific stock level; do NOT fall through to a broader
@@ -39,14 +44,35 @@ export async function GET(request: NextRequest) {
          LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
          LEFT JOIN product_variants     pv  ON pv.id  = oi.variant_id
          LEFT JOIN products             p   ON p.id   = oi.product_id
-         LEFT JOIN product_units        pu  ON pu.unit = oi.buy_unit AND pu.product_id = oi.product_id
+         -- Variant-specific unit row (most precise)
+         LEFT JOIN product_units puv ON puv.unit = oi.buy_unit
+                                    AND puv.product_id = oi.product_id
+                                    AND puv.variant_id = oi.variant_id
+         -- Product-level fallback unit row
+         LEFT JOIN product_units pup ON pup.unit = oi.buy_unit
+                                    AND pup.product_id = oi.product_id
+                                    AND pup.variant_id IS NULL
        ),
        draft_stock AS (
          SELECT
            order_id,
            COUNT(*) FILTER (WHERE tracked)                         AS total_tracked_items,
            COUNT(*) FILTER (WHERE tracked AND avail_qty < req_qty) AS short_items,
-           COUNT(*) FILTER (WHERE tracked AND avail_qty <= 0)      AS out_of_stock_items
+           COUNT(*) FILTER (WHERE tracked AND avail_qty <= 0)      AS out_of_stock_items,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'product_name', product_name,
+                 'variant_name', variant_name,
+                 'buy_unit',     buy_unit,
+                 'raw_qty',      raw_qty,
+                 'req_qty',      req_qty,
+                 'avail_qty',    avail_qty,
+                 'ok',           avail_qty >= req_qty
+               ) ORDER BY product_name, variant_name
+             ) FILTER (WHERE tracked),
+             '[]'
+           )                                                       AS stock_lines
          FROM item_stock
          GROUP BY order_id
        )
@@ -55,7 +81,8 @@ export async function GET(request: NextRequest) {
          o.total_amount, o.source, o.created_at, o.updated_at,
          COALESCE(ds.total_tracked_items, 0)::int  AS total_items,
          COALESCE(ds.short_items, 0)::int          AS short_items,
-         COALESCE(ds.out_of_stock_items, 0)::int   AS out_of_stock_items
+         COALESCE(ds.out_of_stock_items, 0)::int   AS out_of_stock_items,
+         COALESCE(ds.stock_lines, '[]'::json)      AS stock_lines
        FROM orders o
        LEFT JOIN draft_stock ds ON ds.order_id = o.id
        WHERE (o.status = 'draft' AND o.source != 'cash_sale')

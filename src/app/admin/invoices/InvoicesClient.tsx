@@ -1385,46 +1385,65 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
 }
 
 // Inline stock-availability pill for the Draft Invoices table.
-// Backend returns total_items / short_items / out_of_stock_items per draft,
-// computed at sub_variant > variant > product level. We render one of:
-//   - "All in stock" (green)   when nothing is short
-//   - "N out of stock" (red)   when any line has zero inventory
-//   - "N short" (amber)        when stock exists but is below requested qty
-//   - "—" (neutral)            when no items have a product_id (free-text invoice)
+// Backend returns total_items / short_items / out_of_stock_items / stock_lines per draft.
+// Hovering shows a per-item breakdown popup.
 function DraftStockPill({ draft }: { draft: any }) {
   const total = Number(draft?.total_items ?? 0)
   const short = Number(draft?.short_items ?? 0)
   const oos   = Number(draft?.out_of_stock_items ?? 0)
+  const lines: Array<{ product_name: string; variant_name?: string; buy_unit?: string; raw_qty: number; req_qty: number; avail_qty: number; ok: boolean }> =
+    Array.isArray(draft?.stock_lines) ? draft.stock_lines : []
 
-  if (total === 0) {
-    return <span className="text-xs text-foreground-muted">—</span>
-  }
-  if (short === 0) {
-    return (
+  const pill = (() => {
+    if (total === 0) return <span className="text-xs text-foreground-muted">—</span>
+    if (short === 0) return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
         <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
         All {total} in stock
       </span>
     )
-  }
-  if (oos > 0) {
-    return (
-      <span
-        title={`${oos} item${oos > 1 ? 's' : ''} out of stock, ${short - oos} short of full qty`}
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-      >
+    if (oos > 0) return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
         <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
         {oos} of {total} out of stock
       </span>
     )
-  }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+        {short} of {total} short
+      </span>
+    )
+  })()
+
+  if (total === 0 || lines.length === 0) return pill
+
   return (
-    <span
-      title={`${short} item${short > 1 ? 's' : ''} below required quantity`}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-    >
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-      {short} of {total} short
+    <span className="relative group inline-flex">
+      {pill}
+      {/* Hover popup — shown below pill to avoid being clipped at page top */}
+      <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
+        w-72 rounded-lg border border-border-default bg-surface shadow-lg p-2
+        opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        <span className="block text-xs font-semibold text-foreground mb-1.5">Stock breakdown</span>
+        {lines.map((l, i) => {
+          const name = l.variant_name ? `${l.product_name} — ${l.variant_name}` : l.product_name
+          const avail = Number(l.avail_qty)
+          const req   = Number(l.req_qty)
+          const raw   = Number(l.raw_qty)
+          const isBulkUnit = l.buy_unit && l.buy_unit !== 'pc' && l.buy_unit !== 'pcs' && req !== raw
+          const statusColor = avail <= 0 ? 'text-red-600 dark:text-red-400' : avail < req ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'
+          return (
+            <span key={i} className="flex items-start justify-between gap-2 py-1 border-t border-border-default first:border-0">
+              <span className="text-xs text-foreground leading-snug truncate max-w-[150px]" title={name}>{name}</span>
+              <span className={`text-xs font-medium whitespace-nowrap shrink-0 ${statusColor}`}>
+                {isBulkUnit ? `${raw} ${l.buy_unit} = ${req} pcs` : `${req} pcs`}
+                {' · '}stock: {avail}
+              </span>
+            </span>
+          )
+        })}
+      </span>
     </span>
   )
 }
