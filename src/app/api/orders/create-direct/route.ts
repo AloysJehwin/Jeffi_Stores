@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
     }]
 
     if (!isRazorpayPayment) {
-      sendOrderConfirmationEmail(user.email, order, orderItems, null).catch(() => {})
+      sendOrderConfirmationEmail(user.email, order, orderItems).catch(() => {})
       sendNewOrderNotification(order, orderItems, user).catch(() => {})
     }
 
@@ -274,7 +274,6 @@ export async function POST(request: NextRequest) {
       requiresPayment: isRazorpayPayment,
     })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
