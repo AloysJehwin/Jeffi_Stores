@@ -100,48 +100,6 @@ export async function POST(request: NextRequest) {
       return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
     }, 0)
 
-    let appliedDiscount = 0
-    if (couponId) {
-      const coupon = await queryOne<{
-        id: string; discount_type: string; discount_value: number;
-        min_purchase_amount: number | null; max_discount_amount: number | null;
-        usage_limit: number | null; usage_limit_per_user: number | null;
-        times_used: number; valid_from: string | null; valid_until: string | null; is_active: boolean
-      }>(`SELECT * FROM coupons WHERE id = $1`, [couponId])
-
-      if (coupon && coupon.is_active) {
-        const now = new Date()
-        const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null
-        const validUntil = coupon.valid_until ? new Date(coupon.valid_until) : null
-        const withinWindow = (!validFrom || validFrom <= now) && (!validUntil || validUntil >= now)
-        const underGlobalLimit = coupon.usage_limit === null || coupon.times_used < coupon.usage_limit
-
-        let underPerUserLimit = true
-        if (coupon.usage_limit_per_user !== null) {
-          const usage = await queryOne<{ cnt: string }>(
-            `SELECT COUNT(*) AS cnt FROM coupon_usage WHERE coupon_id = $1 AND user_id = $2`,
-            [coupon.id, userId]
-          )
-          underPerUserLimit = !usage || parseInt(usage.cnt) < coupon.usage_limit_per_user
-        }
-
-        const meetsMinPurchase = coupon.min_purchase_amount === null || subtotal >= coupon.min_purchase_amount
-
-        if (withinWindow && underGlobalLimit && underPerUserLimit && meetsMinPurchase) {
-          if (coupon.discount_type === 'percentage') {
-            appliedDiscount = (subtotal * Number(coupon.discount_value)) / 100
-            if (coupon.max_discount_amount !== null) {
-              appliedDiscount = Math.min(appliedDiscount, Number(coupon.max_discount_amount))
-            }
-          } else {
-            appliedDiscount = Number(coupon.discount_value)
-          }
-          appliedDiscount = Math.min(appliedDiscount, subtotal)
-          appliedDiscount = Math.round(appliedDiscount * 100) / 100
-        }
-      }
-    }
-
     const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
     const appliedShipping = destinationPin
       ? await quoteShipping({
@@ -151,8 +109,6 @@ export async function POST(request: NextRequest) {
           isCod,
         })
       : 0
-
-    const total = subtotal - appliedDiscount + appliedShipping
 
     const order = await withTransaction(async (client) => {
       let shippingAddressId = null
@@ -256,13 +212,51 @@ export async function POST(request: NextRequest) {
 
       const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
+      let appliedDiscount = 0
+      if (couponId) {
+        const couponRes = await client.query(
+          `SELECT * FROM coupons WHERE id = $1 FOR UPDATE`,
+          [couponId]
+        )
+        const coupon = couponRes.rows[0]
+        if (coupon && coupon.is_active) {
+          const now = new Date()
+          const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null
+          const validUntil = coupon.valid_until ? new Date(coupon.valid_until) : null
+          const withinWindow = (!validFrom || validFrom <= now) && (!validUntil || validUntil >= now)
+          const underGlobalLimit = coupon.usage_limit === null || coupon.times_used < coupon.usage_limit
+          let underPerUserLimit = true
+          if (coupon.usage_limit_per_user !== null) {
+            const usageRes = await client.query(
+              `SELECT COUNT(*) AS cnt FROM coupon_usage WHERE coupon_id = $1 AND user_id = $2`,
+              [coupon.id, userId]
+            )
+            underPerUserLimit = parseInt(usageRes.rows[0]?.cnt || '0') < coupon.usage_limit_per_user
+          }
+          const meetsMinPurchase = coupon.min_purchase_amount === null || subtotal >= coupon.min_purchase_amount
+          if (withinWindow && underGlobalLimit && underPerUserLimit && meetsMinPurchase) {
+            if (coupon.discount_type === 'percentage') {
+              appliedDiscount = (subtotal * Number(coupon.discount_value)) / 100
+              if (coupon.max_discount_amount !== null) {
+                appliedDiscount = Math.min(appliedDiscount, Number(coupon.max_discount_amount))
+              }
+            } else {
+              appliedDiscount = Number(coupon.discount_value)
+            }
+            appliedDiscount = Math.min(appliedDiscount, subtotal)
+            appliedDiscount = Math.round(appliedDiscount * 100) / 100
+          }
+        }
+      }
+      const txTotal = Math.max(0, subtotal - appliedDiscount + appliedShipping)
+
       const orderResult = await client.query(
         `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, Math.max(0, total), shippingAddressId, billingAddressId,
+         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, txTotal, shippingAddressId, billingAddressId,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
