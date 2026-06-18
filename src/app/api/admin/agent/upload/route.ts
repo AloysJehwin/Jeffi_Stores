@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
   let form: FormData
   try {
     form = await req.formData()
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 })
   }
 

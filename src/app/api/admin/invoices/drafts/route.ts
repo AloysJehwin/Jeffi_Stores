@@ -51,7 +51,10 @@ export async function GET(request: NextRequest) {
          COALESCE(ds.out_of_stock_items, 0)::int   AS out_of_stock_items
        FROM orders o
        LEFT JOIN draft_stock ds ON ds.order_id = o.id
-       WHERE o.status = 'draft' AND o.source != 'cash_sale'
+       WHERE (o.status = 'draft' AND o.source != 'cash_sale')
+          OR (o.status = 'confirmed' AND EXISTS (
+               SELECT 1 FROM invoices i WHERE i.order_id = o.id AND i.status = 'draft'
+             ))
        ORDER BY o.updated_at DESC
        LIMIT 100`
     )

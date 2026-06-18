@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     )
 
     return NextResponse.json({ session: session || null })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

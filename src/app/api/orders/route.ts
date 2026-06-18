@@ -87,7 +87,8 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({ orders, total, page, pageSize: PAGE_SIZE })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

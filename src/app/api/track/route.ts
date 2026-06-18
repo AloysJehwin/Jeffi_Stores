@@ -32,7 +32,8 @@ export async function POST(req: NextRequest) {
     )
 
     return NextResponse.json({ ok: true })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ ok: false }, { status: 500 })
   }
 }

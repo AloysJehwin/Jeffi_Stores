@@ -22,7 +22,7 @@ export async function GET(
                'id', pv.id, 'sku', pv.sku, 'variant_name', pv.variant_name,
                'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
                'mrp_ex_gst', pv.mrp_ex_gst,
-               'stock_quantity', pv.stock_quantity, 'pricing_type', pv.pricing_type,
+               'stock_status', pv.stock_status, 'pricing_type', pv.pricing_type,
                'unit', pv.unit, 'numeric_value', pv.numeric_value,
                'attributes', pv.attributes, 'is_active', pv.is_active,
                'variant_images', COALESCE(
@@ -92,7 +92,8 @@ export async function GET(
     }
 
     return NextResponse.json({ product })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

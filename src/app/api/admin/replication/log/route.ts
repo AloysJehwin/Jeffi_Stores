@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
   }
   try {
     body = await request.json()
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
@@ -98,7 +99,8 @@ export async function GET(request: NextRequest) {
       role = payload?.role || ''
       scopes = payload?.scopes || []
     }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     /* fall through to scope check */
   }
 

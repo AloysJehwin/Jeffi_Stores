@@ -531,7 +531,8 @@ export async function DELETE(
     await query('DELETE FROM orders WHERE id = $1 AND user_id = $2', [params.id, authUser.userId])
 
     return NextResponse.json({ success: true, deleted: true })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 })
   }
 }

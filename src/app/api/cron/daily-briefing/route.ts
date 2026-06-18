@@ -74,7 +74,8 @@ export async function GET(req: NextRequest) {
     try {
       await transporter.sendMail({ from: BRIEFING_FROM, to, subject, html })
       sent++
-    } catch {
+    } catch (err) {
+      console.error('[route]', err)
       failed++
     }
   }

@@ -210,7 +210,7 @@ export async function syncProductToMerchant(productId: string): Promise<void> {
     for (const sku of skusToDelete) {
       try {
         await deleteProductByOfferId(sku.replace(/[^a-zA-Z0-9_:.-]/g, '_'))
-      } catch {}
+      } catch (err) { console.error("[route]", err) }
     }
     return
   }
@@ -227,7 +227,8 @@ export async function getLastSyncStatus(): Promise<any> {
       `SELECT * FROM merchant_sync_log ORDER BY started_at DESC LIMIT 1`,
       []
     )
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -257,5 +258,5 @@ export async function sendSyncFailureEmail(result: SyncResult): Promise<void> {
         <h3>Errors</h3><ul>${errorList}</ul>${more}
       `,
     })
-  } catch {}
+  } catch (err) { console.error("[route]", err) }
 }

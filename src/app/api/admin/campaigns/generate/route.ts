@@ -118,7 +118,8 @@ If the scenario is one of these built-in kinds, follow the convention:
   let parsed: { name?: string; kind?: string; subject_template?: string; body_template?: string }
   try {
     parsed = JSON.parse(text)
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 502 })
   }
 

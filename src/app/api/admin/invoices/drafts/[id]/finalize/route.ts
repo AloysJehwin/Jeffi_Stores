@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
+import { generateOrderInvoice } from '@/lib/invoice'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       [params.id]
     )
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
-    if (order.status !== 'draft') return NextResponse.json({ error: 'Invoice is already finalized' }, { status: 400 })
+    if (order.status !== 'draft' && order.status !== 'confirmed') {
+      return NextResponse.json({ error: 'Invoice is already finalized' }, { status: 400 })
+    }
+
+    const isOnlineOrder = order.status === 'confirmed'
+    const targetStatus = isOnlineOrder ? 'processing' : 'delivered'
 
     const result = await withTransaction(async (client) => {
       await client.query(`SELECT id FROM orders WHERE id = $1 FOR UPDATE`, [params.id])
@@ -64,7 +70,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           )
           let stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
           if (inv.rows[0]?.has_sub_variants) {
-            // variant delegates stock to sub_variants — sum them
             const svStock = await client.query<{ total: number }>(
               `SELECT COALESCE(SUM(inventory_quantity), 0) AS total FROM product_sub_variants WHERE variant_id = $1 AND is_active = true`,
               [item.variant_id]
@@ -78,7 +83,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             )
           }
           if (inv.rows[0]?.has_sub_variants) {
-            // deduct from the sub_variant matching by SKU
             await client.query(
               `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1
                WHERE variant_id = $2 AND sku = $3 AND is_active = true`,
@@ -132,27 +136,44 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         const invoiceDate = new Date().toISOString()
 
         await client.query(
-          `UPDATE orders SET invoice_number = $1, invoice_date = $2, status = 'delivered', updated_at = NOW() WHERE id = $3`,
-          [invoiceNumber, invoiceDate, params.id]
+          `UPDATE orders SET invoice_number = $1, invoice_date = $2, status = $3, updated_at = NOW() WHERE id = $4`,
+          [invoiceNumber, invoiceDate, targetStatus, params.id]
         )
-        await client.query(
-          `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)`,
-          [params.id, invoiceNumber, fy, seq]
-        )
+
+        if (isOnlineOrder) {
+          // Update the existing draft invoice row rather than inserting a new one
+          await client.query(
+            `UPDATE invoices SET invoice_number = $1, financial_year = $2, sequence_number = $3, status = 'finalized', updated_at = NOW()
+             WHERE order_id = $4 AND status = 'draft'`,
+            [invoiceNumber, fy, seq, params.id]
+          )
+        } else {
+          await client.query(
+            `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)`,
+            [params.id, invoiceNumber, fy, seq]
+          )
+        }
       } else {
         await client.query(
-          `UPDATE orders SET status = 'delivered', invoice_date = NOW(), updated_at = NOW() WHERE id = $1`,
-          [params.id]
+          `UPDATE orders SET status = $1, invoice_date = NOW(), updated_at = NOW() WHERE id = $2`,
+          [targetStatus, params.id]
         )
       }
 
       return { invoiceNumber, orderId: params.id }
     })
 
-    if (result.invoiceNumber && order.customer_email) {
-      try {
-        await sendInvoiceFinalizedEmail(order.customer_email, order.customer_name, result.invoiceNumber, Number(order.total_amount), order.order_number)
-      } catch (_) {}
+    if (result.invoiceNumber) {
+      if (isOnlineOrder && order.customer_email) {
+        // Generate PDF and send processing email for online orders
+        try {
+          await generateOrderInvoice(params.id)
+        } catch (_) {}
+      } else if (!isOnlineOrder && order.customer_email) {
+        try {
+          await sendInvoiceFinalizedEmail(order.customer_email, order.customer_name, result.invoiceNumber, Number(order.total_amount), order.order_number)
+        } catch (_) {}
+      }
     }
 
     return NextResponse.json({

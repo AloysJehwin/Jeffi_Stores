@@ -44,7 +44,8 @@ export async function verifyAdminCredentials(username: string, password: string)
         last_name: admin.users.last_name,
       },
     }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return { success: false, error: 'Authentication failed' }
   }
 }
@@ -113,19 +114,6 @@ export function hasAdminRole(session: any, requiredRole: string = 'admin') {
   const requiredRoleLevel = roleHierarchy[requiredRole] || 0
 
   return userRoleLevel >= requiredRoleLevel
-}
-
-export function createSessionToken(admin: any) {
-  return {
-    id: admin.id,
-    user_id: admin.user_id,
-    username: admin.username,
-    first_name: admin.first_name || undefined,
-    last_name: admin.last_name || undefined,
-    role: admin.role,
-    email: admin.email,
-    exp: Date.now() + 30 * 60 * 1000,
-  }
 }
 
 export function isSessionValid(session: any) {

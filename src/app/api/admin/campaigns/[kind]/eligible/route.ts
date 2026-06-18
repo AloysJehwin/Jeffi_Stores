@@ -64,7 +64,8 @@ async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
   if (typeof scenario.findSuppressed === 'function') {
     try {
       suppressed = await scenario.findSuppressed({ campaign, params: resolvedParams })
-    } catch {
+    } catch (err) {
+      console.error('[route]', err)
       suppressed = []
     }
   }

@@ -273,7 +273,8 @@ export async function POST(request: NextRequest) {
       },
       requiresPayment: isRazorpayPayment,
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

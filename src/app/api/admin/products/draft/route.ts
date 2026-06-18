@@ -30,8 +30,8 @@ export async function POST(request: NextRequest) {
     const sku = (nameSlug || 'DRAFT') + '-' + Date.now().toString(36).toUpperCase().slice(-4)
 
     const product = await queryOne<{ id: string }>(
-      `INSERT INTO products (name, slug, sku, base_price, mrp, gst_percentage, stock_quantity, low_stock_threshold, is_active, is_featured, has_variants)
-       VALUES ($1, $2, $3, 0, 0, 18, 0, 0, false, false, false)
+      `INSERT INTO products (name, slug, sku, base_price, mrp, gst_percentage, is_active, is_featured, has_variants)
+       VALUES ($1, $2, $3, 0, 0, 18, false, false, false)
        RETURNING id`,
       [trimmed, slug, sku]
     )

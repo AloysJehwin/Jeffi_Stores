@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
     })()
 
     return NextResponse.json({ products: productsArr, categories: categoriesArr })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ products: [], categories: [] }, { status: 500 })
   }
 }

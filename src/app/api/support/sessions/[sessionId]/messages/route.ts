@@ -49,7 +49,8 @@ export async function GET(
     }))
 
     return NextResponse.json({ messages: messagesWithMeta, admin_name: session.admin_name })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
@@ -99,7 +100,8 @@ export async function POST(
     }).catch(() => {})
 
     return NextResponse.json({ message: msg })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

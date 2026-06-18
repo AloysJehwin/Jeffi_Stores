@@ -22,7 +22,8 @@ export async function POST() {
       res.headers.append('Set-Cookie', `admin_token=; Domain=.jeffistores.in; ${flags}`)
     }
     return res
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

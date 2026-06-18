@@ -400,7 +400,8 @@ export async function GET(request: NextRequest) {
 
     const items = await handlers[type](q)
     return NextResponse.json({ items })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ items: [] }, { status: 500 })
   }
 }

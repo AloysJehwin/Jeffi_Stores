@@ -38,7 +38,8 @@ export async function GET(
       state: first.State as string,
       postOffices,
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Lookup failed' }, { status: 502 })
   }
 }

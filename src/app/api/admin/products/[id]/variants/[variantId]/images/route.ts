@@ -75,7 +75,8 @@ export async function POST(request: NextRequest, { params }: Params) {
             error: `Gallery image file is missing from storage (HTTP ${head.status}). The original file may have been deleted. Please re-upload it.`
           }, { status: 410 })
         }
-      } catch {
+      } catch (err) {
+        console.error('[route]', err)
         return NextResponse.json({ error: 'Could not reach gallery image storage. Try again or re-upload the image.' }, { status: 502 })
       }
       const image = await queryOne(

@@ -31,7 +31,8 @@ export async function PATCH(
     )
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

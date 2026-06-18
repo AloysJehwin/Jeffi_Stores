@@ -289,7 +289,8 @@ export async function POST(
               }
 
               return NextResponse.json({ success: true, newStatus: 'returned', refundFailed: false })
-            } catch {
+            } catch (err) {
+              console.error('[route]', err)
               refundFailed = true
             }
           }

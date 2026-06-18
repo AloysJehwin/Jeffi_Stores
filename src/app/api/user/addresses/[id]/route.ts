@@ -88,7 +88,8 @@ export async function PATCH(
     }).catch(() => {})
 
     return NextResponse.json({ address })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -136,7 +137,8 @@ export async function DELETE(
     }).catch(() => {})
 
     return NextResponse.json({ message: 'Address deleted successfully' })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

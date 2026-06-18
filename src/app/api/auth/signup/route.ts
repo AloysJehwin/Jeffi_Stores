@@ -119,7 +119,8 @@ export async function POST(request: NextRequest) {
         phone: newUser.phone,
       },
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
   }
 }

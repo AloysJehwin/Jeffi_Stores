@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { quoteShipping } from '@/lib/order-commit'
+import { createDraftInvoice } from '@/lib/invoice'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 
 const CreateOrderSchema = z.object({
@@ -41,22 +42,6 @@ export async function POST(request: NextRequest) {
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = false
 
-    const existingUnpaidOrder = await queryOne(
-      `SELECT o.id, o.order_number FROM orders o
-       INNER JOIN payments p ON p.order_id = o.id AND p.payment_gateway = 'razorpay'
-       WHERE o.user_id = $1 AND o.payment_status = 'unpaid' AND o.status = 'pending'
-       ORDER BY o.created_at DESC LIMIT 1`,
-      [userId]
-    )
-
-    if (existingUnpaidOrder) {
-      return NextResponse.json({
-        error: 'You have an unpaid order. Please complete or cancel it before placing a new one.',
-        existingOrderId: existingUnpaidOrder.id,
-        existingOrderNumber: existingUnpaidOrder.order_number,
-      }, { status: 409 })
-    }
-
     const cartUserId = userId
 
     const cartItems = await queryMany(`
@@ -66,20 +51,20 @@ export async function POST(request: NextRequest) {
           'id', p.id, 'name', p.name, 'sku', p.sku,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
-          'stock_quantity', p.stock_quantity, 'inventory_quantity', p.inventory_quantity, 'is_in_stock', p.is_in_stock
+          'stock_status', p.stock_status, 'inventory_quantity', p.inventory_quantity
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'price_ex_gst', pv.price_ex_gst,
-            'stock_quantity', pv.stock_quantity, 'inventory_quantity', pv.inventory_quantity
+            'stock_status', pv.stock_status, 'inventory_quantity', pv.inventory_quantity
           )
         ELSE NULL END AS variant,
         CASE WHEN ci.sub_variant_id IS NOT NULL THEN
           json_build_object(
             'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
             'price', psv.price, 'price_ex_gst', psv.price_ex_gst,
-            'stock_quantity', psv.stock_quantity, 'inventory_quantity', psv.inventory_quantity
+            'stock_status', psv.stock_status, 'inventory_quantity', psv.inventory_quantity
           )
         ELSE NULL END AS sub_variant
       FROM cart_items ci
@@ -258,6 +243,19 @@ export async function POST(request: NextRequest) {
         addrSnapshot = addrRow.rows[0] || null
       }
 
+      const existingUnpaidResult = await client.query(
+        `SELECT o.id, o.order_number FROM orders o
+         INNER JOIN payments p ON p.order_id = o.id AND p.payment_gateway = 'razorpay'
+         WHERE o.user_id = $1 AND o.payment_status = 'unpaid' AND o.status = 'pending'
+         ORDER BY o.created_at DESC LIMIT 1
+         FOR UPDATE`,
+        [userId]
+      )
+      if (existingUnpaidResult.rows[0]) {
+        const existing = existingUnpaidResult.rows[0]
+        throw Object.assign(new Error('EXISTING_UNPAID_ORDER'), { existingOrderId: existing.id, existingOrderNumber: existing.order_number })
+      }
+
       const orderResult = await client.query(
         `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
@@ -340,7 +338,8 @@ export async function POST(request: NextRequest) {
     })
 
     if (!isRazorpayPayment) {
-      sendOrderConfirmationEmail(user.email, order, orderItems, null).catch(() => {})
+      createDraftInvoice(order.id).catch(() => {})
+      sendOrderConfirmationEmail(user.email, order, orderItems).catch(() => {})
       sendNewOrderNotification(order, orderItems, user).catch(() => {})
     }
 
@@ -377,7 +376,14 @@ export async function POST(request: NextRequest) {
       },
       requiresPayment: isRazorpayPayment,
     })
-  } catch {
+  } catch (err: any) {
+    if (err?.message === 'EXISTING_UNPAID_ORDER') {
+      return NextResponse.json({
+        error: 'You have an unpaid order. Please complete or cancel it before placing a new one.',
+        existingOrderId: err.existingOrderId,
+        existingOrderNumber: err.existingOrderNumber,
+      }, { status: 409 })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

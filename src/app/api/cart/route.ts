@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
           'id', p.id, 'name', p.name, 'slug', p.slug, 'sku', p.sku,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst, 'mrp', p.mrp,
           'gst_percentage', p.gst_percentage,
-          'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
+          'stock_status', p.stock_status,
           'brand_name', b.name, 'category_id', p.category_id,
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'image_url', pi.image_url, 'is_primary', pi.is_primary))
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
-            'stock_quantity', pv.stock_quantity,
+            'stock_status', pv.stock_status,
             'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value
           )
         ELSE NULL END AS variant,
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
             'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
             'price', psv.price, 'mrp', psv.mrp, 'price_ex_gst', psv.price_ex_gst,
             'mrp_ex_gst', psv.mrp_ex_gst,
-            'stock_quantity', psv.stock_quantity, 'inventory_quantity', psv.inventory_quantity
+            'stock_status', psv.stock_status, 'inventory_quantity', psv.inventory_quantity
           )
         ELSE NULL END AS sub_variant,
         COALESCE(
@@ -120,7 +120,8 @@ export async function GET(request: NextRequest) {
     `, [userId])
 
     return NextResponse.json({ items: cartItems || [] })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to fetch cart' }, { status: 500 })
   }
 }
@@ -197,36 +198,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const existingItem = await queryOne(
-      'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3 AND sub_variant_id IS NOT DISTINCT FROM $4 AND buy_mode = $5',
-      [userId, productId, variantId || null, subVariantId || null, buyMode]
-    )
-
-    if (existingItem) {
-      const newQuantity = Number(existingItem.quantity) + Number(quantity)
-      await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [newQuantity, existingItem.id])
-      recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
-      const authResult1 = await authenticateUser(request)
-      const realUserId1 = authResult1?.userId
-      if (realUserId1) {
-        logActivity({
-          userId: realUserId1,
-          kind: 'cart_item_added',
-          referenceId: productId,
-          referenceType: 'products',
-          summary: `Added "${product.name}" to cart${quantity > 1 ? ` (×${quantity})` : ''}`,
-          metadata: { productId, quantity, variantId: variantId || null, buyMode },
-        }).catch(() => {})
-      }
-      return NextResponse.json({ message: 'Cart updated', quantity: newQuantity })
-    }
-
-    await query(
-      'INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+    const upsertResult = await query(
+      `INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (user_id, product_id, variant_id, sub_variant_id, buy_mode)
+       DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity, updated_at = NOW()
+       RETURNING quantity, (xmax = 0) AS inserted`,
       [userId, productId, variantId || null, subVariantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
     )
-    recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
+    const newQuantity = upsertResult.rows[0]?.quantity
+    const wasInserted = upsertResult.rows[0]?.inserted
 
+    recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
     const authResult2 = await authenticateUser(request)
     const realUserId2 = authResult2?.userId
     if (realUserId2) {
@@ -240,8 +223,12 @@ export async function POST(request: NextRequest) {
       }).catch(() => {})
     }
 
-    return NextResponse.json({ message: 'Item added to cart' })
-  } catch {
+    return NextResponse.json({
+      message: wasInserted ? 'Item added to cart' : 'Cart updated',
+      quantity: newQuantity,
+    })
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to add to cart' }, { status: 500 })
   }
 }
@@ -278,7 +265,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'No valid update fields provided' }, { status: 400 })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to update cart' }, { status: 500 })
   }
 }
@@ -311,7 +299,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({ message: 'Item removed from cart' })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to remove from cart' }, { status: 500 })
   }
 }

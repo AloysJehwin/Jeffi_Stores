@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     const { customers, total } = await getCustomers({ search, status, page, limit })
 
     return NextResponse.json({ customers, total, page, limit })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to fetch customers' }, { status: 500 })
   }
 }

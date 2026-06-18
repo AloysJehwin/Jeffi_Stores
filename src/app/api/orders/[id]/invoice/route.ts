@@ -228,7 +228,8 @@ export async function GET(
         'Content-Length': String(pdfBuffer.length),
       },
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to generate invoice' }, { status: 500 })
   }
 }
@@ -271,7 +272,8 @@ export async function POST(
     const updated = await queryOne('SELECT invoice_number FROM orders WHERE id = $1', [orderId])
 
     return NextResponse.json({ success: true, invoiceNumber: updated?.invoice_number || null })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to generate invoice' }, { status: 500 })
   }
 }
