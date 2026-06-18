@@ -11,6 +11,9 @@ export interface SellUnit {
   display_label: string
   factor: number
   dimension: string
+  min_qty: number
+  max_qty: number | null
+  qty_step: number
 }
 
 export interface LineItem {
@@ -79,6 +82,9 @@ async function fetchProductUnits(productId: string, variantId?: string | null): 
     display_label: u.display_label || u.unit,
     factor: Number(u.factor) || 1,
     dimension: u.dimension || 'count',
+    min_qty: Number(u.min_qty) || 1,
+    max_qty: u.max_qty != null ? Number(u.max_qty) : null,
+    qty_step: Number(u.qty_step) || 1,
   }))
   try {
     // Try variant-specific units first when a variant is selected
@@ -497,42 +503,45 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                 </div>
                 <div>
                   <label className={labelCls}>Quantity <span className="text-red-500">*</span></label>
-                  <input type="number" min="0.001" step="any" value={item.quantity}
-                    onChange={e => updateItem(item.id, 'quantity', e.target.value)} required className={inputCls} />
+                  {(() => {
+                    const su = item.available_units[0] ?? null
+                    const qMin  = su ? su.min_qty  : 0.001
+                    const qStep = su ? su.qty_step : 1
+                    const stockMax = item.inventory_quantity != null ? item.inventory_quantity / (su?.factor ?? 1) : undefined
+                    const qMax  = su?.max_qty != null
+                      ? (stockMax != null ? Math.min(su.max_qty, stockMax) : su.max_qty)
+                      : stockMax
+                    return (
+                      <div>
+                        <input
+                          type="number"
+                          min={qMin}
+                          step={qStep}
+                          max={qMax}
+                          value={item.quantity}
+                          onChange={e => updateItem(item.id, 'quantity', e.target.value)}
+                          required
+                          className={inputCls}
+                        />
+                        {su && su.factor > 1 && Number(item.quantity) > 0 && (
+                          <p className="text-[10px] text-foreground-secondary mt-0.5">
+                            {Math.round(Number(item.quantity) * su.factor)} pcs total
+                          </p>
+                        )}
+                        {qMax != null && (
+                          <p className="text-[10px] text-foreground-secondary mt-0.5">
+                            max {qMax} {su?.display_label ?? ''}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
                 <div>
                   <label className={labelCls}>Unit</label>
-                  {item.available_units.length > 0 ? (
-                    <AdminSelect
-                      value={item.buy_unit ?? ''}
-                      onChange={v => {
-                        const u = item.available_units.find(u => u.unit === v)
-                        if (!u) return
-                        onChange(items.map(it => it.id === item.id ? {
-                          ...it,
-                          buy_unit: u.unit,
-                          buy_mode: u.dimension,
-                          sell_unit_factor: u.factor,
-                          sell_unit_dimension: u.dimension,
-                          unit: u.display_label.toUpperCase(),
-                        } : it))
-                      }}
-                      placeholder="— Unit —"
-                      options={item.available_units.map(u => ({
-                        value: u.unit,
-                        label: u.display_label + (u.dimension === 'count' && u.factor > 1 ? ` (${u.factor} pcs)` : ''),
-                      }))}
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      value={item.product_id ? (item.unit || '') : ''}
-                      readOnly={!!item.product_id}
-                      placeholder={item.product_id ? '—' : ''}
-                      onChange={e => !item.product_id && updateItem(item.id, 'unit', e.target.value)}
-                      className={inputCls + ' text-center font-medium'}
-                    />
-                  )}
+                  <div className={inputCls + ' flex items-center justify-center font-medium text-center select-none bg-surface-secondary text-foreground'}>
+                    {item.buy_unit ? (item.available_units[0]?.display_label ?? item.buy_unit) : (item.unit || '—')}
+                  </div>
                 </div>
                 <div>
                   <label className={labelCls}>MRP (incl. GST) <span className="text-red-500">*</span></label>
