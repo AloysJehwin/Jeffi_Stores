@@ -104,6 +104,8 @@ export async function POST(
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
+        buy_unit: item.buy_unit || null,
+        buy_mode: 'unit',
         unit_price: Math.round(discountedRate * (1 + gstRate / 100) * 100) / 100,
         total_price: Math.round(incGstLineTotal * 100) / 100,
         taxable_amount: Math.round(exGstLineTotal * 100) / 100,
@@ -232,13 +234,14 @@ export async function POST(
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, total_price,
+            hsn_code, gst_rate, quantity, buy_unit, buy_mode, unit_price, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
           [
             newOrder.id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
-            item.quantity, item.unit_price, item.total_price,
+            item.quantity, item.buy_unit || null, item.buy_mode || 'unit',
+            item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
           ]
         )
@@ -247,7 +250,19 @@ export async function POST(
       if (!saveAsDraft) {
         for (const item of processedItems) {
           if (!item.product_id) continue
-          const qty = item.quantity
+          // Resolve unit factor (prefer variant-scoped row) to get base-unit qty
+          const unitRow = await client.query<{ factor: string; dimension: string }>(
+            `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                    COALESCE(puv.dimension, pup.dimension) AS dimension
+             FROM (SELECT 1) x
+             LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+             LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+            [item.buy_unit, item.product_id, item.variant_id || null]
+          )
+          const u = unitRow.rows[0]
+          const qty = (u?.dimension === 'count' && u?.factor)
+            ? item.quantity * parseFloat(u.factor)
+            : item.quantity
           let stockBefore = 0
           if (item.sub_variant_id) {
             const row = await client.query<{ inventory_quantity: string }>(

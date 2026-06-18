@@ -296,6 +296,11 @@ export default function QuotationsClient() {
           discount_pct: discPct,
           mrp,
           inventory_quantity: i.inventory_quantity ?? null,
+          buy_unit: i.buy_unit || null,
+          buy_mode: i.buy_mode || null,
+          sell_unit_factor: 1,
+          sell_unit_dimension: null,
+          available_units: [],
         }
       })
       setItems(loadedItems.length ? loadedItems : [newLineItem()])
@@ -386,6 +391,7 @@ export default function QuotationsClient() {
             gst_rate: gstRate,
             quantity: i.quantity,
             unit: i.unit,
+            buy_unit: i.buy_unit || null,
             rate: rateExGst,
             discount_pct: discPct,
             amount: lineItemExGst(Number(i.quantity) || 0, rateExGst, discPct),
