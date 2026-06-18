@@ -497,6 +497,9 @@ export default function ProductActions({
                 <span className="text-base font-semibold text-foreground">
                   Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                 </span>
+                <span className="text-xs text-foreground-muted ml-2">
+                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                </span>
               </div>
             )}
 
