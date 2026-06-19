@@ -393,17 +393,24 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                       <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {item.product_sku && <p className="text-xs text-foreground-muted font-mono">{item.product_sku}</p>}
-                        {item.inventory_quantity !== null && (
-                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
-                            item.inventory_quantity === 0
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              : item.inventory_quantity <= 5
-                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                              : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          }`}>
-                            {item.inventory_quantity === 0 ? 'Out of stock' : `Stock: ${item.inventory_quantity}`}
-                          </span>
-                        )}
+                        {item.inventory_quantity !== null && (() => {
+                          const factor = (item.sell_unit_dimension === 'count' && item.sell_unit_factor > 1) ? item.sell_unit_factor : 1
+                          const stockInUnits = factor > 1 ? Math.floor(item.inventory_quantity / factor) : item.inventory_quantity
+                          const unitLabel = factor > 1 ? (item.buy_unit || 'units') : 'pcs'
+                          const isOut = stockInUnits === 0
+                          const isLow = !isOut && stockInUnits <= 5
+                          return (
+                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                              isOut
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                : isLow
+                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            }`}>
+                              {isOut ? 'Out of stock' : `Stock: ${stockInUnits} ${unitLabel}`}
+                            </span>
+                          )
+                        })()}
                       </div>
                     </div>
                     <button type="button"
