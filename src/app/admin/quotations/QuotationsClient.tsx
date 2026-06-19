@@ -298,8 +298,8 @@ export default function QuotationsClient() {
           inventory_quantity: i.inventory_quantity ?? null,
           buy_unit: i.buy_unit || null,
           buy_mode: i.buy_mode || null,
-          sell_unit_factor: 1,
-          sell_unit_dimension: null,
+          sell_unit_factor: Number(i.sell_unit_factor) || 1,
+          sell_unit_dimension: i.sell_unit_dimension || null,
           available_units: [],
         }
       })
