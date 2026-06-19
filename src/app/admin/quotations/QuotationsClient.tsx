@@ -737,10 +737,15 @@ export default function QuotationsClient() {
                                 const res = await fetch(`/api/admin/quotations/${q.id}`)
                                 const data = await res.json()
                                 const qItems: any[] = data.items || []
-                                const stockIssue = qItems.some(item =>
-                                  item.product_id && item.inventory_quantity !== null && item.inventory_quantity !== undefined &&
-                                  parseFloat(item.inventory_quantity) < parseFloat(item.quantity)
-                                )
+                                const stockIssue = qItems.some(item => {
+                                  if (!item.product_id || item.inventory_quantity === null || item.inventory_quantity === undefined) return false
+                                  const rawQty = parseFloat(item.quantity)
+                                  const factor = parseFloat(item.sell_unit_factor)
+                                  const baseQty = (item.sell_unit_dimension === 'count' && factor > 1)
+                                    ? rawQty * factor
+                                    : rawQty
+                                  return parseFloat(item.inventory_quantity) < baseQty
+                                })
                                 setConvertHasStockIssue(stockIssue)
                                 if (stockIssue) setConvertPaymentMode('credit')
                               } catch (_) {
@@ -976,10 +981,15 @@ export default function QuotationsClient() {
                 setConvertQrImageUrl(null)
                 setConvertSavedAsDraft(false)
                 setConvertInsufficientItems([])
-                const stockIssue = items.some(item =>
-                  item.product_id && item.inventory_quantity !== null && item.inventory_quantity !== undefined &&
-                  parseFloat(String(item.inventory_quantity)) < parseFloat(String(item.quantity))
-                )
+                const stockIssue = items.some(item => {
+                  if (!item.product_id || item.inventory_quantity === null || item.inventory_quantity === undefined) return false
+                  const rawQty = parseFloat(String(item.quantity))
+                  const factor = parseFloat(String(item.sell_unit_factor))
+                  const baseQty = (item.sell_unit_dimension === 'count' && factor > 1)
+                    ? rawQty * factor
+                    : rawQty
+                  return parseFloat(String(item.inventory_quantity)) < baseQty
+                })
                 setConvertHasStockIssue(stockIssue)
                 if (stockIssue) setConvertPaymentMode('credit')
                 setConvertQrTotal(items.reduce((sum, i) => {

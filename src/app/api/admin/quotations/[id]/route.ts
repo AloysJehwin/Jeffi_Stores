@@ -30,11 +30,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     const items = await queryMany(`
       SELECT qi.*,
-        COALESCE(sv.inventory_quantity, pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
+        COALESCE(sv.inventory_quantity, pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity,
+        COALESCE(puv.factor, pup.factor) AS sell_unit_factor,
+        COALESCE(puv.dimension, pup.dimension) AS sell_unit_dimension
       FROM quotation_items qi
       LEFT JOIN product_sub_variants sv ON sv.id = qi.sub_variant_id
       LEFT JOIN product_variants pv ON pv.id = qi.variant_id
       LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL AND qi.sub_variant_id IS NULL
+      LEFT JOIN product_units puv ON puv.unit = qi.buy_unit AND puv.product_id = qi.product_id AND puv.variant_id = qi.variant_id
+      LEFT JOIN product_units pup ON pup.unit = qi.buy_unit AND pup.product_id = qi.product_id AND pup.variant_id IS NULL
+        AND (qi.variant_id IS NULL OR puv.id IS NULL)
       WHERE qi.quotation_id = $1
       ORDER BY qi.position
     `, [id])
@@ -116,11 +121,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const savedItems = await queryMany(`
       SELECT qi.*,
-        COALESCE(sv.inventory_quantity, pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity
+        COALESCE(sv.inventory_quantity, pv.inventory_quantity, p.inventory_quantity) AS inventory_quantity,
+        COALESCE(puv.factor, pup.factor) AS sell_unit_factor,
+        COALESCE(puv.dimension, pup.dimension) AS sell_unit_dimension
       FROM quotation_items qi
       LEFT JOIN product_sub_variants sv ON sv.id = qi.sub_variant_id
       LEFT JOIN product_variants pv ON pv.id = qi.variant_id
       LEFT JOIN products p ON p.id = qi.product_id AND qi.variant_id IS NULL AND qi.sub_variant_id IS NULL
+      LEFT JOIN product_units puv ON puv.unit = qi.buy_unit AND puv.product_id = qi.product_id AND puv.variant_id = qi.variant_id
+      LEFT JOIN product_units pup ON pup.unit = qi.buy_unit AND pup.product_id = qi.product_id AND pup.variant_id IS NULL
+        AND (qi.variant_id IS NULL OR puv.id IS NULL)
       WHERE qi.quotation_id = $1
       ORDER BY qi.position
     `, [id])
