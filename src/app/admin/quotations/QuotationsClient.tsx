@@ -385,6 +385,10 @@ export default function QuotationsClient() {
           // rate = MRP ex-GST (anchor); fall back to unit_price ex-GST if no MRP set
           const mrpInclGst = Number(i.mrp) || unitPrice
           const rateExGst = mrpInclGst / (1 + gstRate / 100)
+          // apply sell unit factor for count-dimension units (rate is per-piece)
+          const su = i.available_units[0] ?? null
+          const factor = (su && su.dimension === 'count' && su.factor > 1) ? su.factor : 1
+          const effectiveQty = (Number(i.quantity) || 0) * factor
           return {
             description: i.product_name,
             hsn_code: i.hsn_code || null,
@@ -394,7 +398,7 @@ export default function QuotationsClient() {
             buy_unit: i.buy_unit || null,
             rate: rateExGst,
             discount_pct: discPct,
-            amount: lineItemExGst(Number(i.quantity) || 0, rateExGst, discPct),
+            amount: lineItemExGst(effectiveQty, rateExGst, discPct),
             product_id: i.product_id || null,
             variant_id: i.variant_id || null,
             sub_variant_id: i.sub_variant_id || null,
@@ -1132,7 +1136,7 @@ export default function QuotationsClient() {
       </div>
 
       <div className="mb-4">
-        <LineItemsSection items={isFinal ? items : items} onChange={isFinal ? () => {} : setItems} ratePerBuyUnit={true} />
+        <LineItemsSection items={isFinal ? items : items} onChange={isFinal ? () => {} : setItems} />
       </div>
 
       <div className="flex flex-wrap gap-3 justify-end items-center">

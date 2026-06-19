@@ -65,9 +65,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     let totals = { subtotal: existing.subtotal, cgst_amount: existing.cgst_amount, sgst_amount: existing.sgst_amount, total_amount: existing.total_amount }
 
     if (Array.isArray(items)) {
+      // amount is pre-computed client-side (applies sell_unit_factor for count dimensions)
       const computedItems = items.map((item: any) => ({
         ...item,
-        amount: lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
+        amount: Number(item.amount) || lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
       }))
       totals = calcTotals(computedItems)
 
