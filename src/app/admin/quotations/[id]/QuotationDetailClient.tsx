@@ -287,16 +287,16 @@ export default function QuotationDetailClient({ id }: { id: string }) {
                 <tr key={idx} className="hover:bg-surface-secondary/40 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{item.description}</div>
-                    {item.sell_unit_dimension === 'count' && Number(item.sell_unit_factor) > 1 && (
-                      <div className="text-xs text-foreground-secondary mt-0.5">
-                        {item.quantity} {item.buy_unit || item.unit} × {item.sell_unit_factor} = {Math.round(Number(item.quantity) * Number(item.sell_unit_factor))} pcs
-                      </div>
-                    )}
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">{item.hsn_code || '—'}</td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.unit || 'PCS'}</td>
-                  <td className="px-4 py-3 text-center text-foreground">{item.quantity}</td>
+                  <td className="px-4 py-3 text-center text-foreground">
+                    <div>{parseFloat(item.quantity)}</div>
+                    {item.sell_unit_dimension === 'count' && Number(item.sell_unit_factor) > 1 && (
+                      <div className="text-xs text-foreground-secondary mt-0.5">× {item.sell_unit_factor} = {Math.round(Number(item.quantity) * Number(item.sell_unit_factor))} pcs</div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.rate))}</td>
                   <td className="px-4 py-3 text-right text-foreground-secondary">{item.discount_pct ? `${item.discount_pct}%` : '—'}</td>
                   <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(item.amount))}</td>
