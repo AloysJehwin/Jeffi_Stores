@@ -146,6 +146,7 @@ export async function middleware(request: NextRequest) {
     '/api/admin/mfa/enroll-start',
     '/api/admin/mfa/enroll-confirm',
     '/api/admin/mfa/verify',
+    '/api/admin/replication/log',
   ]
   if (isAdminApiPath && publicApiPaths.some(path => pathname.startsWith(path))) {
     const limited = await applyRateLimit(request)
