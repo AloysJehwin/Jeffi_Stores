@@ -109,15 +109,16 @@ async function fetchProductUnits(productId: string, variantId?: string | null): 
   }
 }
 
-function calcLine(it: LineItem) {
+function calcLine(it: LineItem, ratePerBuyUnit = false) {
   const qty = Number(it.quantity) || 0
   const mrpIncl = Number(it.unit_price) || 0
   const gstRate = Number(it.gst_rate) || 0
   const discPct = Number(it.discount_pct) || 0
   const mrpEx = mrpIncl / (1 + gstRate / 100)
   // For count-dimension units, MRP is per piece; multiply qty by factor
+  // Skip when ratePerBuyUnit=true (quotation mode — rate is already per buy-unit)
   const su = it.available_units[0] ?? null
-  const effectiveQty = (su && su.dimension === 'count' && su.factor > 1)
+  const effectiveQty = (!ratePerBuyUnit && su && su.dimension === 'count' && su.factor > 1)
     ? qty * su.factor
     : qty
   return lineItemInclGst(effectiveQty, mrpEx, discPct, gstRate)
@@ -156,9 +157,10 @@ const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 interface LineItemsSectionProps {
   items: LineItem[]
   onChange: (items: LineItem[]) => void
+  ratePerBuyUnit?: boolean
 }
 
-export default function LineItemsSection({ items, onChange }: LineItemsSectionProps) {
+export default function LineItemsSection({ items, onChange, ratePerBuyUnit = false }: LineItemsSectionProps) {
   const [searchModes, setSearchModes] = useState<Record<string, SearchMode>>({})
   const [nameInputs, setNameInputs] = useState<Record<string, string>>({})
   const [skuInputs, setSkuInputs] = useState<Record<string, string>>({})
@@ -342,16 +344,26 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     onChange(items.map(it => it.id === id ? { ...it, [field]: value } : it))
   }
 
-  const rawTotal = items.reduce((s, it) => s + calcLine(it), 0)
+  const rawTotal = items.reduce((s, it) => s + calcLine(it, ratePerBuyUnit), 0)
   const taxableValue = items.reduce((s, it) => {
+    const qty = Number(it.quantity) || 0
     const gstRate = Number(it.gst_rate) || 0
     const mrpEx = (Number(it.unit_price) || 0) / (1 + gstRate / 100)
-    return s + lineItemInclGst(Number(it.quantity) || 0, mrpEx, Number(it.discount_pct) || 0, 0)
+    const su = it.available_units[0] ?? null
+    const effectiveQty = (!ratePerBuyUnit && su && su.dimension === 'count' && su.factor > 1)
+      ? qty * su.factor
+      : qty
+    return s + lineItemInclGst(effectiveQty, mrpEx, Number(it.discount_pct) || 0, 0)
   }, 0)
   const cgst = items.reduce((s, it) => {
+    const qty = Number(it.quantity) || 0
     const gstRate = Number(it.gst_rate) || 0
     const mrpEx = (Number(it.unit_price) || 0) / (1 + gstRate / 100)
-    const exAmt = lineItemInclGst(Number(it.quantity) || 0, mrpEx, Number(it.discount_pct) || 0, 0)
+    const su = it.available_units[0] ?? null
+    const effectiveQty = (!ratePerBuyUnit && su && su.dimension === 'count' && su.factor > 1)
+      ? qty * su.factor
+      : qty
+    const exAmt = lineItemInclGst(effectiveQty, mrpEx, Number(it.discount_pct) || 0, 0)
     return s + exAmt * gstRate / 200
   }, 0)
   const sgst = cgst
@@ -651,10 +663,10 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                     <span>
                       MRP: <span className="line-through text-foreground-muted">₹{fmt(Number(item.unit_price))}</span>
                       {' · '}Disc: <span className="text-green-600 dark:text-green-400 font-medium">{item.discount_pct}%</span>
-                      {' · '}Net: <span className="font-medium text-foreground">₹{fmt(calcLine({ ...item, quantity: 1 }))}</span>
+                      {' · '}Net: <span className="font-medium text-foreground">₹{fmt(calcLine({ ...item, quantity: 1 }, ratePerBuyUnit))}</span>
                     </span>
                   ) : <span />}
-                  <span>Line total: <span className="font-semibold text-foreground">₹{fmt(calcLine(item))}</span></span>
+                  <span>Line total: <span className="font-semibold text-foreground">₹{fmt(calcLine(item, ratePerBuyUnit))}</span></span>
                 </div>
               )}
             </div>

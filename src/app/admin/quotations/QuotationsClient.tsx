@@ -1132,7 +1132,7 @@ export default function QuotationsClient() {
       </div>
 
       <div className="mb-4">
-        <LineItemsSection items={isFinal ? items : items} onChange={isFinal ? () => {} : setItems} />
+        <LineItemsSection items={isFinal ? items : items} onChange={isFinal ? () => {} : setItems} ratePerBuyUnit={true} />
       </div>
 
       <div className="flex flex-wrap gap-3 justify-end items-center">
