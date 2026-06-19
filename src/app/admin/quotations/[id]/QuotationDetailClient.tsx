@@ -294,7 +294,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
                   <td className="px-4 py-3 text-center text-foreground">
                     <div>{parseFloat(item.quantity)}</div>
                     {item.sell_unit_dimension === 'count' && Number(item.sell_unit_factor) > 1 && (
-                      <div className="text-xs text-foreground-secondary mt-0.5">× {item.sell_unit_factor} = {Math.round(Number(item.quantity) * Number(item.sell_unit_factor))} pcs</div>
+                      <div className="text-xs text-foreground-secondary mt-0.5">× {parseFloat(item.sell_unit_factor)} = {Math.round(Number(item.quantity) * Number(item.sell_unit_factor))} pcs</div>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.rate))}</td>
