@@ -143,28 +143,40 @@ export async function POST(
       const insufficientItems: string[] = []
       for (const item of processedItems) {
         if (!item.product_id) continue
-        const qty = item.quantity
+        // Resolve unit factor so check uses base-unit qty (same logic as deduction below)
+        const unitRow = await client.query<{ factor: string; dimension: string }>(
+          `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                  COALESCE(puv.dimension, pup.dimension) AS dimension
+           FROM (SELECT 1) x
+           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+          [item.buy_unit, item.product_id, item.variant_id || null]
+        )
+        const u = unitRow.rows[0]
+        const baseQty = (u?.dimension === 'count' && u?.factor)
+          ? item.quantity * parseFloat(u.factor)
+          : item.quantity
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE',
             [item.sub_variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < qty) insufficientItems.push(`${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${qty})`)
+          if (stock < baseQty) insufficientItems.push(`${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`)
         } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE',
             [item.variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < qty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${qty})`)
+          if (stock < baseQty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
         } else {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE',
             [item.product_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < qty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${qty})`)
+          if (stock < baseQty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
         }
       }
 
