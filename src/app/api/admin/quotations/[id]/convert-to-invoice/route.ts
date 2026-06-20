@@ -20,7 +20,7 @@ export async function POST(
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const quotation = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [id])
     if (!quotation) return NextResponse.json({ error: 'Quotation not found' }, { status: 404 })
@@ -60,6 +60,23 @@ export async function POST(
       ? (quotation.consignee_email || quotation.buyer_email || null)
       : (quotation.buyer_email || quotation.consignee_email || null)
 
+    // Fetch unit factor for every quotation item (needed to compute effectiveQty = qty × factor for count-dimension units)
+    const unitFactorRows = await queryMany<any>(
+      `SELECT
+         qi.id AS item_id,
+         COALESCE(puv.factor, pup.factor, 1)::numeric AS factor,
+         COALESCE(puv.dimension, pup.dimension, 'count') AS dimension
+       FROM quotation_items qi
+       LEFT JOIN product_units puv ON puv.unit = qi.buy_unit AND puv.product_id = qi.product_id AND puv.variant_id = qi.variant_id
+       LEFT JOIN product_units pup ON pup.unit = qi.buy_unit AND pup.product_id = qi.product_id AND pup.variant_id IS NULL
+         AND (qi.variant_id IS NULL OR puv.id IS NULL)
+       WHERE qi.quotation_id = $1`,
+      [id]
+    )
+    const unitFactorMap = new Map<string, { factor: number; dimension: string }>(
+      (unitFactorRows || []).map((r: any) => [r.item_id, { factor: parseFloat(r.factor) || 1, dimension: r.dimension }])
+    )
+
     let subtotal = 0
     let totalTaxable = 0
     let totalCgst = 0
@@ -67,9 +84,13 @@ export async function POST(
     let totalIgst = 0
 
     const processedItems = qItems.map((item: any) => {
-      const qty = parseFloat(item.quantity)
+      const rawQty = parseFloat(item.quantity)
+      const unitInfo = unitFactorMap.get(item.id)
+      const effectiveQty = (unitInfo?.dimension === 'count' && unitInfo.factor > 1)
+        ? rawQty * unitInfo.factor
+        : rawQty
       const rate = parseFloat(item.rate)
-      const exGstLineTotal = lineItemExGst(qty, rate, parseFloat(item.discount_pct) || 0)
+      const exGstLineTotal = lineItemExGst(effectiveQty, rate, parseFloat(item.discount_pct) || 0)
       const gstRate = parseFloat(item.gst_rate || '18')
 
       let cgst = 0, sgst = 0, igst = 0
@@ -103,7 +124,7 @@ export async function POST(
         variant_name: null,
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
-        quantity: qty,
+        quantity: rawQty,
         buy_unit: item.buy_unit || null,
         buy_mode: 'unit',
         unit_price: Math.round(discountedRate * (1 + gstRate / 100) * 100) / 100,

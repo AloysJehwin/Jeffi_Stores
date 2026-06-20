@@ -16,7 +16,7 @@ export default async function CashSalePage() {
   let session: any = null
   try { session = await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
 
-  if (!hasScope(session?.role || '', session?.scopes || [], 'invoices')) {
+  if (!hasScope(session?.role || '', session?.scopes || [], 'invoices:read')) {
     redirect(ap('/admin/dashboard', host))
   }
 

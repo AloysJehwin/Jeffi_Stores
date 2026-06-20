@@ -13,7 +13,7 @@ export async function GET(
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { id } = await params
 
@@ -65,6 +65,7 @@ export async function GET(
       sgst_amount: parseFloat(it.sgst_amount || '0'),
       igst_amount: parseFloat(it.igst_amount || '0'),
       gst_rate: parseFloat(it.gst_rate || '18'),
+      buy_unit: it.buy_unit || null,
     }))
 
     const pdfBuffer = await generateReceiptPDF(receiptOrder, receiptItems, business)

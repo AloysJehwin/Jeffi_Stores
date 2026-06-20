@@ -375,10 +375,10 @@ export function generateQuotationPDF(
         item.description,
         item.hsn_code || '',
         `${fmtQty(item.quantity)} ${item.unit}`,
-        fmt4(item.rate),
+        fmt2(item.rate),
         item.unit,
         disc,
-        fmt4(item.amount),
+        fmt2(item.amount),
       ]
       for (let j = 0; j < cols.length; j++) {
         const col = cols[j]
@@ -393,24 +393,24 @@ export function generateQuotationPDF(
     pageBreak(summaryH)
     y += rowH  // blank row between last item and subtotal
     hline(doc, LM, R, y)
-    doc.font(FB).fontSize(7).text(fmt4(subtotal), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
+    doc.font(FB).fontSize(7).text(fmt2(subtotal), amtX + 2, y + 3, { width: amtW - 4, align: 'right' })
     y += rowH
 
     const labelAreaW = amtX - (LM + slW) - 10  // extra right padding to clear the divider line
     hline(doc, LM, R, y)
     doc.font(FBI).fontSize(7.5).text('CGST', LM + slW + 2, y + 4, { width: labelAreaW, align: 'right', lineBreak: false })
-    doc.font(F).fontSize(7).text(fmt4(cgst), amtX + 2, y + 4, { width: amtW - 4, align: 'right' })
+    doc.font(F).fontSize(7).text(fmt2(cgst), amtX + 2, y + 4, { width: amtW - 4, align: 'right' })
     y += rowH
 
     hline(doc, LM, R, y)
     doc.font(FBI).fontSize(7.5).text('SGST', LM + slW + 2, y + 4, { width: labelAreaW, align: 'right', lineBreak: false })
-    doc.font(F).fontSize(7).text(fmt4(sgst), amtX + 2, y + 4, { width: amtW - 4, align: 'right' })
+    doc.font(F).fontSize(7).text(fmt2(sgst), amtX + 2, y + 4, { width: amtW - 4, align: 'right' })
     y += rowH
 
     if (hasRound) {
       hline(doc, LM, R, y)
       doc.font(FBI).fontSize(7.5).text('Round Off', LM + slW + 2, y + 4, { width: labelAreaW, align: 'right', lineBreak: false })
-      doc.font(F).fontSize(7).text(fmt4(roundOff), amtX + 2, y + 4, { width: amtW - 4, align: 'right' })
+      doc.font(F).fontSize(7).text(fmt2(roundOff), amtX + 2, y + 4, { width: amtW - 4, align: 'right' })
       y += rowH
     }
 
@@ -498,7 +498,7 @@ export function generateQuotationPDF(
       const tot  = v.cgstAmt + v.sgstAmt
       totTaxable += v.taxable; totCgst += v.cgstAmt; totSgst += v.sgstAmt
       cx = LM
-      const row = [hsn, fmt4(v.taxable), `${hr}%`, fmt4(v.cgstAmt), `${hr}%`, fmt4(v.sgstAmt), fmt4(tot)]
+      const row = [hsn, fmt2(v.taxable), `${hr}%`, fmt2(v.cgstAmt), `${hr}%`, fmt2(v.sgstAmt), fmt2(tot)]
       for (let j = 0; j < hc.length; j++) {
         doc.text(row[j], cx + 2, y + 2, { width: hc[j].w - 4, align: hc[j].align })
         cx += hc[j].w
@@ -510,12 +510,12 @@ export function generateQuotationPDF(
     cx = LM
     doc.font(FB).fontSize(7)
     doc.text('Total', cx + 2, y + 2, { width: hc[0].w - 4, align: 'right' }); cx += hc[0].w
-    doc.text(fmt4(totTaxable), cx + 2, y + 2, { width: hc[1].w - 4, align: 'right' }); cx += hc[1].w
+    doc.text(fmt2(totTaxable), cx + 2, y + 2, { width: hc[1].w - 4, align: 'right' }); cx += hc[1].w
     cx += hc[2].w
-    doc.text(fmt4(totCgst), cx + 2, y + 2, { width: hc[3].w - 4, align: 'right' }); cx += hc[3].w
+    doc.text(fmt2(totCgst), cx + 2, y + 2, { width: hc[3].w - 4, align: 'right' }); cx += hc[3].w
     cx += hc[4].w
-    doc.text(fmt4(totSgst), cx + 2, y + 2, { width: hc[5].w - 4, align: 'right' }); cx += hc[5].w
-    doc.text(fmt4(totCgst + totSgst), cx + 2, y + 2, { width: hc[6].w - 4, align: 'right' })
+    doc.text(fmt2(totSgst), cx + 2, y + 2, { width: hc[5].w - 4, align: 'right' }); cx += hc[5].w
+    doc.text(fmt2(totCgst + totSgst), cx + 2, y + 2, { width: hc[6].w - 4, align: 'right' })
     y += 14
     rect(doc, LM, hsnY, pw, y - hsnY)
 

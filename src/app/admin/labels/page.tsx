@@ -24,7 +24,7 @@ export default async function LabelsPage() {
     redirect(ap('/admin/login', host))
   }
 
-  if (!hasScope(session?.role || '', session?.scopes || [], 'labels')) {
+  if (!hasScope(session?.role || '', session?.scopes || [], 'labels:read')) {
     redirect(ap('/admin/dashboard', host))
   }
 

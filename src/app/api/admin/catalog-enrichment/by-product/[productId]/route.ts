@@ -9,7 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prod
   const { productId } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'catalog_enrichment')) {
+  if (!hasScope(admin.role, admin.scopes, 'catalog_enrichment:read')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 

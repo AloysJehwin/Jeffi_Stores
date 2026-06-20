@@ -11,7 +11,7 @@ export async function POST(
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
-    if (!admin || !hasScope(admin.role, admin.scopes, 'customers')) {
+    if (!admin || !hasScope(admin.role, admin.scopes, 'customers:write')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

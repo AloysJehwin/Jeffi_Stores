@@ -17,7 +17,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
   let session: any = null
   try { session = await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
 
-  if (!hasScope(session?.role || '', session?.scopes || [], 'quotations')) {
+  if (!hasScope(session?.role || '', session?.scopes || [], 'quotations:read')) {
     redirect(ap('/admin/dashboard', host))
   }
 

@@ -53,7 +53,7 @@ export default async function BusinessRFQsPage({
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
-  if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs')) redirect(ap('/admin/dashboard', host))
+  if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs:read')) redirect(ap('/admin/dashboard', host))
 
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const status = resolvedSearchParams.status

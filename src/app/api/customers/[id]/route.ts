@@ -13,7 +13,7 @@ export async function GET(
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
-    if (!admin || !hasScope(admin.role, admin.scopes, 'customers')) {
+    if (!admin || !hasScope(admin.role, admin.scopes, 'customers:read')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -31,7 +31,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
-    if (!admin || !hasScope(admin.role, admin.scopes, 'customers')) {
+    if (!admin || !hasScope(admin.role, admin.scopes, 'customers:write')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
