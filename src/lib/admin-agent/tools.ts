@@ -32,14 +32,16 @@ const SQL_DML_RE = /\b(insert|update|delete|drop|truncate|alter|create|grant|rev
 let _readonlyPool: Pool | null = null
 function getReadonlyPool(): Pool {
   if (!_readonlyPool) {
-    const conn = process.env.DATABASE_URL
-    if (!conn) throw new Error('DATABASE_URL not configured')
+    const password = process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
     _readonlyPool = new Pool({
-      connectionString: conn,
+      host: process.env.RAG_PG_HOST || '100.82.208.8',
+      port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
+      user: process.env.RAG_PG_USER || 'postgres',
+      password,
+      database: process.env.RAG_PG_DB || 'jeffi_replica',
       max: 2,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
-      ssl: /amazonaws|sslmode=require/.test(conn) ? { rejectUnauthorized: false } : undefined,
     })
     _readonlyPool.on('error', () => {})
   }
