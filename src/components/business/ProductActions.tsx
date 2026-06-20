@@ -75,7 +75,7 @@ interface ProductActionsProps {
   discountPct?: number | null
   onVariantChange?: (variant: Variant | null) => void
   onSelectionChange?: (variantId: string | null, subVariantId: string | null) => void
-  onUnitChange?: (unitKey: string, unitLabel: string | null) => void
+  onUnitChange?: (unitKey: string, unitLabel: string | null, unitMeta: { min: number; max: number | null; step: number; factor: number }) => void
   categoryId?: string | null
   productUnits?: ProductUnit[]
 }
@@ -309,7 +309,12 @@ export default function ProductActions({
   }, [effectiveUnitKey])
 
   useEffect(() => {
-    onUnitChange?.(effectiveUnitKey, effectiveUnitLabel ?? null)
+    onUnitChange?.(effectiveUnitKey, effectiveUnitLabel ?? null, {
+      min: qtyMin,
+      max: qtyMax ?? null,
+      step: qtyStep,
+      factor: unitFactor,
+    })
   }, [effectiveUnitKey, effectiveUnitLabel])
 
   const handleAddToCart = async () => {

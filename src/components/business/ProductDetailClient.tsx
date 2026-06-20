@@ -198,7 +198,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
-  const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null }>({ key: 'Nos', label: null })
+  const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null; min: number; max: number | null; step: number; factor: number }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1 })
   const { user } = useAuth()
   const { showToast } = useToast()
 
@@ -400,7 +400,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           onVariantChange={handleVariantChange}
           onSelectionChange={(vId, svId) => { setSelectedVariantId(vId); setSelectedSubVariantId(svId) }}
-          onUnitChange={(key, label) => setSelectedUnit({ key, label })}
+          onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
           categoryId={categoryId ?? null}
           productUnits={product.product_units ?? []}
         />
@@ -419,6 +419,10 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                 description: product.name,
                 quantity: 1,
                 unit: selectedUnit.key,
+                unitMin: selectedUnit.min,
+                unitMax: selectedUnit.max ?? undefined,
+                unitStep: selectedUnit.step,
+                unitFactor: selectedUnit.factor,
                 currentPrice: hasVariants ? null : displayPrice,
                 imageUrl: primaryImage?.image_url ?? null,
                 brandName: product.brands?.name ?? null,
