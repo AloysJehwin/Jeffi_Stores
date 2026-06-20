@@ -503,18 +503,23 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                       </div>
                     )}
 
-                    {/* Quantity */}
+                    {/* Quantity + Unit */}
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">
                         Quantity <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={activeField.quantity}
-                        onChange={e => updateField(activeIdx, 'quantity', e.target.value)}
-                        className="w-full px-3 py-[10px] text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          value={activeField.quantity}
+                          onChange={e => updateField(activeIdx, 'quantity', e.target.value)}
+                          className="flex-1 px-3 py-[10px] text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        />
+                        <span className="inline-flex items-center px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-sm font-medium text-foreground-secondary whitespace-nowrap">
+                          {activeField.unit || 'Nos'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Target price */}
