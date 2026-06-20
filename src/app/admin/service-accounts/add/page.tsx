@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { ADMIN_SCOPES } from '@/lib/scopes'
@@ -283,11 +283,11 @@ curl --cert cert.pem --key key.pem \\
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0 text-xs font-medium">
-              <button type="button" onClick={selectAll} className="px-2.5 py-1 rounded-md text-secondary-500 hover:bg-surface-secondary transition-colors">
+              <button type="button" onClick={selectAll} className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors">
                 Select All
               </button>
-              <span className="text-foreground-muted">|</span>
-              <button type="button" onClick={clearAll} className="px-2.5 py-1 rounded-md text-secondary-500 hover:bg-surface-secondary transition-colors">
+              <span className="text-foreground-secondary">|</span>
+              <button type="button" onClick={clearAll} className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors">
                 Clear All
               </button>
             </div>
@@ -302,42 +302,34 @@ curl --cert cert.pem --key key.pem \\
                     <div key={read?.key ?? write?.key} className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {/* Read */}
                       {read ? (
-                        <label className={`flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${
-                          selectedScopes.includes(read.key)
-                            ? 'border-secondary-400/60 bg-secondary-500/5 dark:bg-secondary-500/10'
-                            : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/40'
-                        }`}>
-                          <input
-                            type="checkbox"
-                            checked={selectedScopes.includes(read.key)}
-                            onChange={() => toggleScope(read.key)}
-                            className="mt-0.5 rounded border-border-default text-secondary-500 focus:ring-secondary-400 shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-foreground leading-tight">{read.label}</p>
-                            <p className="text-xs text-foreground-muted mt-0.5 leading-snug">{read.description}</p>
-                          </div>
-                        </label>
+                        <button
+                          type="button"
+                          onClick={() => toggleScope(read.key)}
+                          className={`text-left rounded-xl border px-4 py-3 transition-all ${
+                            selectedScopes.includes(read.key)
+                              ? 'border-secondary-400 bg-secondary-500/10 dark:bg-secondary-500/15 shadow-sm'
+                              : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/50'
+                          }`}
+                        >
+                          <p className={`text-sm font-semibold leading-tight ${selectedScopes.includes(read.key) ? 'text-secondary-400' : 'text-foreground'}`}>{read.label}</p>
+                          <p className="text-xs text-foreground-muted mt-0.5 leading-snug">{read.description}</p>
+                        </button>
                       ) : <div />}
 
                       {/* Write */}
                       {write ? (
-                        <label className={`flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors ${
-                          selectedScopes.includes(write.key)
-                            ? 'border-amber-400/60 bg-amber-500/5 dark:bg-amber-500/10'
-                            : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/40'
-                        }`}>
-                          <input
-                            type="checkbox"
-                            checked={selectedScopes.includes(write.key)}
-                            onChange={() => toggleScope(write.key)}
-                            className="mt-0.5 rounded border-border-default text-amber-500 focus:ring-amber-400 shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-foreground leading-tight">{write.label}</p>
-                            <p className="text-xs text-foreground-muted mt-0.5 leading-snug">{write.description}</p>
-                          </div>
-                        </label>
+                        <button
+                          type="button"
+                          onClick={() => toggleScope(write.key)}
+                          className={`text-left rounded-xl border px-4 py-3 transition-all ${
+                            selectedScopes.includes(write.key)
+                              ? 'border-amber-400 bg-amber-500/10 dark:bg-amber-500/15 shadow-sm'
+                              : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/50'
+                          }`}
+                        >
+                          <p className={`text-sm font-semibold leading-tight ${selectedScopes.includes(write.key) ? 'text-amber-400' : 'text-foreground'}`}>{write.label}</p>
+                          <p className="text-xs text-foreground-muted mt-0.5 leading-snug">{write.description}</p>
+                        </button>
                       ) : <div />}
                     </div>
                   ))}
