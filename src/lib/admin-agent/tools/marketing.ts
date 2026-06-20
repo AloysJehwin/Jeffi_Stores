@@ -289,11 +289,12 @@ export const MARKETING_TOOLS: ToolDef[] = [
   },
   {
     name: 'propose_send_mailer_broadcast',
-    description: 'Propose a one-off broadcast email (custom subject + HTML body) to a chosen audience. Admin must approve before fan-out. Audience: "all_opted_in", "recent_buyers", or "test_only:email@..".',
+    description: 'Propose a one-off broadcast email (custom subject + HTML body) to a chosen audience. Admin must approve before fan-out. Audience: "all_opted_in", "recent_buyers", or "test_only". When audience=test_only, also pass testEmail.',
     inputSchema: {
       type: 'object',
       properties: {
-        audience: { type: 'string', description: 'all_opted_in | recent_buyers | test_only:email@example.com' },
+        audience: { type: 'string', description: 'all_opted_in | recent_buyers | test_only' },
+        testEmail: { type: 'string', description: 'Required when audience=test_only. The address to send to.' },
         subject: { type: 'string', description: 'Email subject (1-160 chars).' },
         body: { type: 'string', description: 'HTML body of the email (1-50,000 chars).' },
         fromName: { type: 'string', description: 'Optional display name for the From header. Default "Jeffi Stores".' },
@@ -301,7 +302,7 @@ export const MARKETING_TOOLS: ToolDef[] = [
       required: ['audience', 'subject', 'body'],
     },
     mutating: true,
-    handler: async ({ audience, subject, body, fromName }) => {
+    handler: async ({ audience, testEmail: testEmailArg, subject, body, fromName }) => {
       const subj = String(subject || '').trim()
       const html = String(body || '')
       if (!subj || subj.length > 160) throw new Error('subject required (1-160 chars)')
@@ -309,14 +310,19 @@ export const MARKETING_TOOLS: ToolDef[] = [
       const aRaw = String(audience || '').trim().toLowerCase()
       let audKey: 'all_opted_in' | 'recent_buyers' | 'test_only' = 'all_opted_in'
       let testEmail: string | null = null
+      // Accept both "test_only" + testEmail field AND legacy "test_only:email@.." colon format
       if (aRaw.startsWith('test_only:')) {
         audKey = 'test_only'
         testEmail = aRaw.slice('test_only:'.length).trim()
         if (!testEmail.includes('@')) throw new Error('test_only audience needs a valid email after the colon')
+      } else if (aRaw === 'test_only') {
+        audKey = 'test_only'
+        testEmail = String(testEmailArg || '').trim()
+        if (!testEmail.includes('@')) throw new Error('testEmail is required when audience=test_only')
       } else if (aRaw === 'all_opted_in' || aRaw === 'recent_buyers') {
         audKey = aRaw
       } else {
-        throw new Error('audience must be all_opted_in, recent_buyers, or test_only:email@..')
+        throw new Error('audience must be all_opted_in, recent_buyers, or test_only')
       }
 
       let count = 0

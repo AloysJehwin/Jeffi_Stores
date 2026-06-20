@@ -143,6 +143,7 @@ Quotation flow: DO NOT call propose_create_quotation with text. Always call matc
 
 Marketing emails:
 - "send featured products email" or "product announcement" → estimate_email_audience then propose_product_announcement_email. Single-address test: audience="test_only", testEmail=<address>. intro = ONE plain sentence. NO markdown.
+- "send a broadcast email" / "mailer blast" → propose_send_mailer_broadcast. Use audience="test_only" + testEmail="addr" for a test send (NOT the legacy "test_only:email" colon format).
 - "test campaign" (abandoned_cart / post_purchase / etc.) → send_test_email(campaignKind, toEmail). Valid kinds: abandoned_cart, abandoned_checkout, post_purchase, price_drop, restock, review_reminder, thank_you_for_your_purchase, winback_90, winback_180.
 - CRITICAL: "featured_products" is NOT a valid campaignKind. NEVER pass it to send_test_email.
 
@@ -160,11 +161,7 @@ function parseToolCalls(text: string): { calls: { name: string; rawInput: string
 
   if (calls.length === 0) {
     const plainRe = new RegExp(
-      '(?:^|\\n)(' + ['search_products','get_featured_products','search_customers','get_customer',
-      'get_order','search_orders','get_recent_orders','run_sql_readonly','describe_schema',
-      'update_product','update_order_status','propose_create_quotation','match_quotation_items',
-      'list_featured_products','estimate_email_audience','propose_product_announcement_email']
-      .join('|') + ')\\s*\\n(\\{[\\s\\S]*?\\})(?=\\n|$)',
+      '(?:^|\\n)(' + TOOLS.map(t => t.name).join('|') + ')\\s*\\n(\\{[\\s\\S]*?\\})(?=\\n|$)',
       'g'
     )
     let pm
