@@ -75,6 +75,7 @@ interface ProductActionsProps {
   discountPct?: number | null
   onVariantChange?: (variant: Variant | null) => void
   onSelectionChange?: (variantId: string | null, subVariantId: string | null) => void
+  onUnitChange?: (unitKey: string, unitLabel: string | null) => void
   categoryId?: string | null
   productUnits?: ProductUnit[]
 }
@@ -105,7 +106,7 @@ export default function ProductActions({
   productId, productName, sku, stockStatus,
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
-  onVariantChange, onSelectionChange, categoryId,
+  onVariantChange, onSelectionChange, onUnitChange, categoryId,
   productUnits: productUnitsProp,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
@@ -306,6 +307,10 @@ export default function ProductActions({
     setQuantity(initial)
     setQuantityRaw(isContinuous ? Number(initial.toFixed(6)).toString() : String(initial))
   }, [effectiveUnitKey])
+
+  useEffect(() => {
+    onUnitChange?.(effectiveUnitKey, effectiveUnitLabel ?? null)
+  }, [effectiveUnitKey, effectiveUnitLabel])
 
   const handleAddToCart = async () => {
     setIsAddingToCart(true)

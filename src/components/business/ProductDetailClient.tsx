@@ -198,6 +198,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
+  const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null }>({ key: 'Nos', label: null })
   const { user } = useAuth()
   const { showToast } = useToast()
 
@@ -399,6 +400,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           onVariantChange={handleVariantChange}
           onSelectionChange={(vId, svId) => { setSelectedVariantId(vId); setSelectedSubVariantId(svId) }}
+          onUnitChange={(key, label) => setSelectedUnit({ key, label })}
           categoryId={categoryId ?? null}
           productUnits={product.product_units ?? []}
         />
@@ -416,7 +418,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                 subVariantId: selectedSubVariantId || undefined,
                 description: product.name,
                 quantity: 1,
-                unit: 'Nos',
+                unit: selectedUnit.key,
                 currentPrice: hasVariants ? null : displayPrice,
                 imageUrl: primaryImage?.image_url ?? null,
                 brandName: product.brands?.name ?? null,
