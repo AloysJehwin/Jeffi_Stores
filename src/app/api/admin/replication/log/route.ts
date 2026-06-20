@@ -1,26 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { query, queryMany } from '@/lib/db'
-import { verifyToken } from '@/lib/jwt'
+import { authenticateAdmin, authenticateServiceAccount } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 
 export const dynamic = 'force-dynamic'
 
 // -----------------------------------------------------------------------------
 // POST — called by the Razer ML box at the end of every replication run.
-// Gated by CRON_SECRET, same pattern as /api/cron/* endpoints.
+// Auth: mTLS service account (cert serial validated against DB) OR CRON_SECRET.
+// Never trusts x-service-account-id from the caller — that header is internal only.
 // -----------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
-  const serviceAccountId = request.headers.get('x-service-account-id')
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  const authorized =
-    !!serviceAccountId ||
-    (!!cronSecret && authHeader === `Bearer ${cronSecret}`)
+  const sa = await authenticateServiceAccount(request)
+  const cronOk = !!cronSecret && authHeader === `Bearer ${cronSecret}`
 
-  if (!authorized) {
+  if (!sa && !cronOk) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  if (sa && !sa.allowed_scopes.includes('replication:write') && !sa.allowed_scopes.includes('replication:read') && !sa.allowed_scopes.includes('replication')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
   let body: {
@@ -94,21 +96,9 @@ export async function POST(request: NextRequest) {
 // Admin-scoped; same auth pattern as other /api/admin/* routes.
 // -----------------------------------------------------------------------------
 export async function GET(request: NextRequest) {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
-  let role = ''
-  let scopes: string[] = []
-  try {
-    if (token) {
-      const payload = await verifyToken(token.value)
-      role = payload?.role || ''
-      scopes = payload?.scopes || []
-    }
-  } catch {
-    /* fall through to scope check */
-  }
-
-  if (!hasScope(role, scopes, 'replication:read')) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'replication:read')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
