@@ -171,8 +171,9 @@ export interface ServiceAccountPayload {
 }
 
 export async function authenticateServiceAccount(request: NextRequest): Promise<ServiceAccountPayload | null> {
-  const certSerial = request.headers.get('x-client-cert-serial') || ''
-  if (!certSerial) return null
+  const certSerial = (request.headers.get('x-client-cert-serial') || '').trim()
+  // Cert serials are hex strings. Reject anything that isn't.
+  if (!certSerial || !/^[0-9a-fA-F]+$/.test(certSerial)) return null
 
   const { queryOne } = await import('./db')
   const sa = await queryOne<ServiceAccountPayload>(
