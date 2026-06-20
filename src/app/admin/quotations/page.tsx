@@ -22,7 +22,7 @@ export default async function QuotationsPage() {
     redirect(ap('/admin/login', host))
   }
 
-  if (!hasScope(session?.role || '', session?.scopes || [], 'quotations')) {
+  if (!hasScope(session?.role || '', session?.scopes || [], 'quotations:read')) {
     redirect(ap('/admin/dashboard', host))
   }
 

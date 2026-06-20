@@ -11,9 +11,15 @@ export const dynamic = 'force-dynamic'
 // Gated by CRON_SECRET, same pattern as /api/cron/* endpoints.
 // -----------------------------------------------------------------------------
 export async function POST(request: NextRequest) {
+  const serviceAccountId = request.headers.get('x-service-account-id')
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+
+  const authorized =
+    !!serviceAccountId ||
+    (!!cronSecret && authHeader === `Bearer ${cronSecret}`)
+
+  if (!authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -29,8 +35,7 @@ export async function POST(request: NextRequest) {
   }
   try {
     body = await request.json()
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
@@ -99,12 +104,11 @@ export async function GET(request: NextRequest) {
       role = payload?.role || ''
       scopes = payload?.scopes || []
     }
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     /* fall through to scope check */
   }
 
-  if (!hasScope(role, scopes, 'replication')) {
+  if (!hasScope(role, scopes, 'replication:read')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 

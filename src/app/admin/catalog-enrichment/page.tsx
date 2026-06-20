@@ -17,7 +17,7 @@ export default async function CatalogEnrichmentPage() {
     }
   } catch {}
 
-  if (!hasScope(role, scopes, 'catalog_enrichment')) {
+  if (!hasScope(role, scopes, 'catalog_enrichment:read')) {
     return <AccessDenied scopeKey="catalog_enrichment" scopeLabel="Catalog Enrichment" />
   }
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { withTransaction } from '@/lib/db'
+import { withTransaction, queryMany } from '@/lib/db'
 import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
@@ -23,6 +23,9 @@ const cashSaleItemSchema = z.object({
   gst_rate: z.coerce.number().optional(),
   unit_price: z.coerce.number().min(0),
   quantity: z.coerce.number().positive(),
+  buy_unit: z.string().nullable().optional(),
+  buy_mode: z.string().optional(),
+  discount_pct: z.coerce.number().optional(),
 })
 
 const cashSaleSchema = z.object({
@@ -35,7 +38,7 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
 
@@ -51,6 +54,27 @@ export async function POST(request: NextRequest) {
 
     const orderIsIgst = false
 
+    // Fetch unit factors for all items that have a product_id + buy_unit
+    const itemsWithUnits = items.filter((i: any) => i.product_id && i.buy_unit)
+    type UnitInfo = { factor: number; dimension: string }
+    const unitFactorMap = new Map<string, UnitInfo>()
+    if (itemsWithUnits.length) {
+      const unitRows = await queryMany<any>(
+        `SELECT
+           inp.product_id, inp.variant_id, inp.buy_unit,
+           COALESCE(puv.factor, pup.factor, 1)::numeric AS factor,
+           COALESCE(puv.dimension, pup.dimension, 'count') AS dimension
+         FROM (VALUES ${itemsWithUnits.map((_: any, i: number) => `($${i * 3 + 1}::uuid, $${i * 3 + 2}::uuid, $${i * 3 + 3})`).join(',')}) AS inp(product_id, variant_id, buy_unit)
+         LEFT JOIN product_units puv ON puv.unit = inp.buy_unit AND puv.product_id = inp.product_id AND puv.variant_id = inp.variant_id
+         LEFT JOIN product_units pup ON pup.unit = inp.buy_unit AND pup.product_id = inp.product_id AND pup.variant_id IS NULL
+           AND (inp.variant_id IS NULL OR puv.id IS NULL)`,
+        itemsWithUnits.flatMap((i: any) => [i.product_id, i.variant_id || null, i.buy_unit])
+      )
+      for (const r of (unitRows || [])) {
+        unitFactorMap.set(`${r.product_id}:${r.variant_id ?? ''}:${r.buy_unit}`, { factor: parseFloat(r.factor) || 1, dimension: r.dimension })
+      }
+    }
+
     let subtotal = 0
     let totalTaxable = 0
     let totalCgst = 0
@@ -59,10 +83,12 @@ export async function POST(request: NextRequest) {
 
     const processedItems = items.map((item: any) => {
       const unitPrice = parseFloat(item.unit_price) || 0
-      const qty = parseFloat(item.quantity) || 0
+      const rawQty = parseFloat(item.quantity) || 0
       const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
-      const lineTotal = Math.round(lineItemFromMrpIncl(qty, unitPrice, discPct, gstRate) * 100) / 100
+      const unitInfo = unitFactorMap.get(`${item.product_id}:${item.variant_id ?? ''}:${item.buy_unit}`)
+      const effectiveQty = (unitInfo?.dimension === 'count' && unitInfo.factor > 1) ? rawQty * unitInfo.factor : rawQty
+      const lineTotal = Math.round(lineItemFromMrpIncl(effectiveQty, unitPrice, discPct, gstRate) * 100) / 100
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
       subtotal += lineTotal
@@ -80,7 +106,7 @@ export async function POST(request: NextRequest) {
         variant_name: item.variant_name || null,
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
-        quantity: qty,
+        quantity: rawQty,
         buy_unit: item.buy_unit || null,
         buy_mode: item.buy_mode || 'unit',
         unit_price: unitPrice,

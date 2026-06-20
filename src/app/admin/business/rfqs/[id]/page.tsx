@@ -14,7 +14,7 @@ export default async function BusinessRFQDetailPage({ params }: { params: Promis
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
-  if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs')) redirect(ap('/admin/dashboard', host))
+  if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs:read')) redirect(ap('/admin/dashboard', host))
 
   return <RFQDetailClient id={id} />
 }

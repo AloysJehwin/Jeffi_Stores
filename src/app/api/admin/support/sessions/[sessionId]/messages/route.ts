@@ -13,7 +13,7 @@ export async function GET(
     const { sessionId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const messages = await queryMany(
       `SELECT id, sender, message, created_at FROM support_messages
@@ -36,7 +36,7 @@ export async function POST(
     const { sessionId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const session = await queryOne<{ id: string; admin_name: string | null; user_id: string }>(
       `SELECT id, admin_name, user_id FROM support_sessions WHERE id = $1 AND status = 'open'`,

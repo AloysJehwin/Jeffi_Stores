@@ -146,7 +146,6 @@ export async function middleware(request: NextRequest) {
     '/api/admin/mfa/enroll-start',
     '/api/admin/mfa/enroll-confirm',
     '/api/admin/mfa/verify',
-    '/api/admin/replication/log',
   ]
   if (isAdminApiPath && publicApiPaths.some(path => pathname.startsWith(path))) {
     const limited = await applyRateLimit(request)
@@ -198,6 +197,38 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAdminApiPath) {
+    // Machine-to-machine endpoints authenticated by Bearer token — skip cookie check.
+    const bearerOnlyPaths = ['/api/admin/replication/log']
+    if (bearerOnlyPaths.some(p => pathname.startsWith(p)) && request.method === 'POST') {
+      return addSecurityHeaders(NextResponse.next())
+    }
+
+    // Service account auth via mTLS client certificate serial.
+    // nginx passes $ssl_client_serial as X-Client-Cert-Serial; we look it up in
+    // service_accounts and bypass the admin_token cookie check if valid.
+    const certSerial = request.headers.get('x-client-cert-serial') || ''
+    if (certSerial) {
+      const { queryOne: saQuery } = await import('./lib/db')
+      const sa = await saQuery<{ id: string; name: string; allowed_scopes: string[] }>(
+        `SELECT id, name, allowed_scopes FROM service_accounts
+         WHERE LOWER(serial_number) = $1 AND is_revoked = false`,
+        [certSerial.toLowerCase()]
+      )
+      if (!sa) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      const requiredScope = getScopeForPath(pathname)
+      if (requiredScope && !sa.allowed_scopes.includes(requiredScope)) {
+        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+      }
+      saQuery(`UPDATE service_accounts SET last_used_at = NOW() WHERE id = $1`, [sa.id]).catch(() => {})
+      const saRes = addSecurityHeaders(NextResponse.next())
+      saRes.headers.set('x-service-account-id', sa.id)
+      saRes.headers.set('x-service-account-name', sa.name)
+      saRes.headers.set('x-service-account-scopes', JSON.stringify(sa.allowed_scopes))
+      return saRes
+    }
+
     const token = request.cookies.get('admin_token')?.value
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

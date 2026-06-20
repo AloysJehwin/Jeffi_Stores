@@ -20,7 +20,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const { unitId, subVariantId } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products')) {
+  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -119,7 +119,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   const { unitId, subVariantId } = await params
   const admin = await authenticateAdmin(_request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products')) {
+  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 

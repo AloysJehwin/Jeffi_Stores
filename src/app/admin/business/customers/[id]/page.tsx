@@ -14,7 +14,7 @@ export default async function BusinessCustomerDetailPage({ params }: { params: P
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
-  if (!session || !hasScope(session.role, session.scopes || [], 'business_customers')) redirect(ap('/admin/dashboard', host))
+  if (!session || !hasScope(session.role, session.scopes || [], 'business_customers:read')) redirect(ap('/admin/dashboard', host))
 
   return <BusinessCustomerDetailClient id={id} />
 }

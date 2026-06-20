@@ -6,7 +6,7 @@ import { getCustomers } from '@/lib/queries'
 export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
-    if (!admin || !hasScope(admin.role, admin.scopes, 'customers')) {
+    if (!admin || !hasScope(admin.role, admin.scopes, 'customers:read')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

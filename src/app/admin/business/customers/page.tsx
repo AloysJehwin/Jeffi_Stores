@@ -88,7 +88,7 @@ export default async function BusinessCustomersPage({
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
-  if (!session || !hasScope(session.role, session.scopes || [], 'business_customers')) redirect(ap('/admin/dashboard', host))
+  if (!session || !hasScope(session.role, session.scopes || [], 'business_customers:read')) redirect(ap('/admin/dashboard', host))
 
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const { customers, total } = await getBusinessCustomers({
