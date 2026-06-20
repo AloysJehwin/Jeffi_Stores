@@ -263,19 +263,8 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-foreground-secondary">Scopes</label>
-          <div className="flex gap-2">
-            <button type="button" onClick={selectAllScopes} className="text-xs text-accent-500 hover:text-accent-600 dark:text-accent-400">
-              Select All
-            </button>
-            <span className="text-xs text-foreground-muted">|</span>
-            <button type="button" onClick={clearAllScopes} className="text-xs text-foreground-muted hover:text-foreground-secondary">
-              Clear All
-            </button>
-          </div>
-        </div>
-        <ScopeGrid selected={form.scopes} onToggle={toggleScope} variant="button" />
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">Scopes</label>
+        <ScopeGrid selected={form.scopes} onToggle={toggleScope} onSelectAll={selectAllScopes} onClearAll={clearAllScopes} />
       </div>
 
       <div className="flex gap-3 pt-2">

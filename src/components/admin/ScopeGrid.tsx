@@ -2,83 +2,94 @@
 
 import { ADMIN_SCOPES } from '@/lib/scopes'
 
-const UNGROUPED_LABEL = 'General'
-
 interface Props {
   selected: string[]
   onToggle: (key: string) => void
+  onSelectAll?: () => void
+  onClearAll?: () => void
   variant?: 'card' | 'button'
 }
 
-export default function ScopeGrid({ selected, onToggle, variant = 'card' }: Props) {
-  const groups = ADMIN_SCOPES.reduce<Record<string, typeof ADMIN_SCOPES>>((acc, scope) => {
-    const g = scope.group || UNGROUPED_LABEL
-    acc[g] = acc[g] ? [...acc[g], scope] : [scope]
-    return acc
-  }, {})
+function buildScopeGrid() {
+  const byBase: Record<string, { read?: typeof ADMIN_SCOPES[0]; write?: typeof ADMIN_SCOPES[0] }> = {}
+  for (const s of ADMIN_SCOPES) {
+    const base = s.key.replace(/:read$|:write$/, '')
+    byBase[base] = byBase[base] || {}
+    if (s.key.endsWith(':read')) byBase[base].read = s
+    else if (s.key.endsWith(':write')) byBase[base].write = s
+  }
 
-  const groupOrder = [UNGROUPED_LABEL, 'Catalogue', 'Operations', 'Finance', 'Marketing', 'Business', 'AI', 'Settings'].filter(g => groups[g])
+  const groups: Record<string, { read?: typeof ADMIN_SCOPES[0]; write?: typeof ADMIN_SCOPES[0] }[]> = {}
+  for (const pair of Object.values(byBase)) {
+    const ref = pair.read || pair.write!
+    const group = ref.group || 'General'
+    groups[group] = groups[group] || []
+    groups[group].push(pair)
+  }
+  return groups
+}
+
+const SCOPE_GRID = buildScopeGrid()
+const GROUP_ORDER = ['Dashboard', 'Catalogue', 'Sales', 'Fulfilment', 'Finance', 'Marketing', 'AI', 'Business', 'Settings', 'General']
+
+export default function ScopeGrid({ selected, onToggle, onSelectAll, onClearAll }: Props) {
+  const orderedGroups = GROUP_ORDER.filter(g => SCOPE_GRID[g])
 
   return (
-    <div className="space-y-4">
-      {groupOrder.map(groupName => (
-        <div key={groupName}>
-          <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-2">{groupName}</p>
-          <div className="grid grid-cols-2 gap-2">
-            {groups[groupName].map(scope => {
-              const active = selected.includes(scope.key)
-              if (variant === 'button') {
-                return (
+    <div className="space-y-8">
+      {(onSelectAll || onClearAll) && (
+        <div className="flex items-center gap-1 text-xs font-medium">
+          {onSelectAll && (
+            <button type="button" onClick={onSelectAll} className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors">
+              Select All
+            </button>
+          )}
+          {onSelectAll && onClearAll && <span className="text-foreground-secondary">|</span>}
+          {onClearAll && (
+            <button type="button" onClick={onClearAll} className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors">
+              Clear All
+            </button>
+          )}
+        </div>
+      )}
+
+      {orderedGroups.map(group => (
+        <div key={group}>
+          <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">{group}</p>
+          <div className="space-y-2">
+            {SCOPE_GRID[group].map(({ read, write }) => (
+              <div key={read?.key ?? write?.key} className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {read ? (
                   <button
-                    key={scope.key}
                     type="button"
-                    onClick={() => onToggle(scope.key)}
-                    className={`flex items-start gap-2.5 p-3 rounded-xl border text-left transition-colors ${
-                      active
-                        ? 'border-accent-500 bg-accent-500/10 dark:bg-accent-500/15'
-                        : 'border-border-default bg-surface hover:border-border-secondary hover:bg-surface-secondary'
+                    onClick={() => onToggle(read.key)}
+                    className={`text-left rounded-xl border px-4 py-3 transition-all ${
+                      selected.includes(read.key)
+                        ? 'border-secondary-400 bg-secondary-500/10 dark:bg-secondary-500/15 shadow-sm'
+                        : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/50'
                     }`}
                   >
-                    <span className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded flex items-center justify-center border ${
-                      active ? 'bg-accent-500 border-accent-500' : 'border-border-secondary bg-surface'
-                    }`}>
-                      {active && (
-                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </span>
-                    <span>
-                      <span className={`block text-xs font-semibold ${active ? 'text-accent-600 dark:text-accent-400' : 'text-foreground'}`}>
-                        {scope.label}
-                      </span>
-                      <span className="block text-xs text-foreground-muted leading-relaxed mt-0.5">{scope.description}</span>
-                    </span>
+                    <p className={`text-sm font-semibold leading-tight ${selected.includes(read.key) ? 'text-secondary-400' : 'text-foreground'}`}>{read.label}</p>
+                    <p className="text-xs text-foreground-muted mt-0.5 leading-snug">{read.description}</p>
                   </button>
-                )
-              }
-              return (
-                <label
-                  key={scope.key}
-                  className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    active
-                      ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                      : 'border-border-default hover:border-border-secondary'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={active}
-                    onChange={() => onToggle(scope.key)}
-                    className="mt-0.5 accent-accent-500"
-                  />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{scope.label}</p>
-                    <p className="text-xs text-foreground-muted">{scope.description}</p>
-                  </div>
-                </label>
-              )
-            })}
+                ) : <div />}
+
+                {write ? (
+                  <button
+                    type="button"
+                    onClick={() => onToggle(write.key)}
+                    className={`text-left rounded-xl border px-4 py-3 transition-all ${
+                      selected.includes(write.key)
+                        ? 'border-amber-400 bg-amber-500/10 dark:bg-amber-500/15 shadow-sm'
+                        : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/50'
+                    }`}
+                  >
+                    <p className={`text-sm font-semibold leading-tight ${selected.includes(write.key) ? 'text-amber-400' : 'text-foreground'}`}>{write.label}</p>
+                    <p className="text-xs text-foreground-muted mt-0.5 leading-snug">{write.description}</p>
+                  </button>
+                ) : <div />}
+              </div>
+            ))}
           </div>
         </div>
       ))}
