@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { aiChat, AiClientError } from '@/lib/ai-client'
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
+import { findSimilar } from '@/lib/rag'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -45,8 +46,24 @@ function buildSystemPrompt(): string {
   return buildSystemPromptBody(compactToolList(), '')
 }
 
-async function buildSystemPromptWithDynamic(): Promise<string> {
-  return buildSystemPromptBody(compactToolList(), '')
+async function buildSystemPromptWithDynamic(userMessage?: string): Promise<string> {
+  let ragContext = ''
+  if (userMessage) {
+    try {
+      const results = await findSimilar(userMessage, { limit: 12, minSimilarity: 0.3 })
+      if (results.length > 0) {
+        ragContext = '\n\n## STORE DATA CONTEXT\n' +
+          'The following records from the store database are semantically relevant to this query. ' +
+          'Use them to answer directly when the data is sufficient — only call a tool if you need fresher or more specific data.\n\n' +
+          results.map(r =>
+            `[${r.source_table}:${r.source_id}] ${r.content}`
+          ).join('\n')
+      }
+    } catch {
+      // RAG unavailable — fall through to tool-only mode
+    }
+  }
+  return buildSystemPromptBody(compactToolList(), ragContext)
 }
 
 function buildSystemPromptBody(toolList: string, dynamicList: string): string {
@@ -185,7 +202,7 @@ export async function POST(req: NextRequest) {
     [conversationId, HISTORY_TRUNCATE]
   )
 
-  const systemPrompt = await buildSystemPromptWithDynamic()
+  const systemPrompt = await buildSystemPromptWithDynamic(userMessage)
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
     { role: 'system', content: systemPrompt },
   ]
