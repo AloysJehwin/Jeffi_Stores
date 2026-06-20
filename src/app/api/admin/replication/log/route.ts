@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (sa && !sa.allowed_scopes.includes('replication:write') && !sa.allowed_scopes.includes('replication:read') && !sa.allowed_scopes.includes('replication')) {
+  if (sa && !sa.allowed_scopes.includes('replication:write') && !sa.allowed_scopes.includes('replication')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 

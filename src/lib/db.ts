@@ -35,7 +35,7 @@ function getPool(): Pool {
       config.port = port
       config.user = user
       config.database = dbName
-      config.ssl = { rejectUnauthorized: false }
+      config.ssl = { rejectUnauthorized: true }
       config.password = makeRdsSigner(host, port, user, region)
     } else {
       config.connectionString = dbUrl
@@ -72,7 +72,9 @@ async function getRequestAdminId(): Promise<string | null> {
     const token = (await cookies()).get('admin_token')?.value
     if (!token) return null
     const { jwtVerify } = await import('jose')
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || '')
+    const jwtSecret = process.env.JWT_SECRET
+    if (!jwtSecret) return null
+    const secret = new TextEncoder().encode(jwtSecret)
     const { payload } = await jwtVerify(token, secret)
     return typeof payload.adminId === 'string' ? payload.adminId : null
   } catch (err) {

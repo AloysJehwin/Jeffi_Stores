@@ -67,7 +67,7 @@ export interface AdminJWTPayload {
 }
 
 export async function generateToken(payload: JWTPayload): Promise<string> {
-  const token = await new SignJWT(payload)
+  const token = await new SignJWT({ ...payload, type: 'admin_session' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(JWT_EXPIRES_IN)
@@ -79,6 +79,7 @@ export async function generateToken(payload: JWTPayload): Promise<string> {
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
+    if (payload.type !== 'admin_session') return null
     return payload as JWTPayload
   } catch (err) {
     console.error('[route]', err)
@@ -143,6 +144,7 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     if (!payload.adminId || typeof payload.adminId !== 'string') return null
+    if (payload.type !== 'admin_session') return null
     const result = {
       adminId: payload.adminId as string,
       username: payload.username as string,
