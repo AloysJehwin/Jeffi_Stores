@@ -56,6 +56,17 @@ export async function middleware(request: NextRequest) {
     if (limited) return limited
   }
 
+  // Strip any inbound x-user-* / x-service-account-* headers that clients could forge.
+  // Middleware sets these itself below after verifying the token — they must not arrive untouched.
+  const stripped = new Headers(request.headers)
+  stripped.delete('x-user-id')
+  stripped.delete('x-username')
+  stripped.delete('x-user-role')
+  stripped.delete('x-user-scopes')
+  stripped.delete('x-service-account-id')
+  stripped.delete('x-service-account-name')
+  stripped.delete('x-service-account-scopes')
+
   if (hostname.startsWith('forms.')) {
     if (pathname.startsWith('/api/')) {
       return addSecurityHeaders(NextResponse.next())
