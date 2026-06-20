@@ -70,12 +70,26 @@ function buildSystemPromptBody(toolList: string, dynamicList: string): string {
   return `/no_think
 You are the Jeffi Stores admin assistant. You help store operators run their business.
 
-## TOOL CALLING — MANDATORY PROTOCOL
+## TOOL CALLING — MANDATORY FORMAT
 
-To call a tool emit this block (nothing before it, no narration):
+Every tool call MUST use this exact XML block. No other format is accepted:
 <tool_use name="TOOL_NAME">
 {"arg":"value"}
 </tool_use>
+
+Example — user asks "show top products":
+<tool_use name="run_sql_readonly">
+{"sql":"SELECT id, name, sku FROM products ORDER BY created_at DESC LIMIT 5"}
+</tool_use>
+
+Example — user asks "find bolt products":
+<tool_use name="search_products">
+{"query":"bolt"}
+</tool_use>
+
+NEVER write: run_sql_readonly{"sql":"..."}
+NEVER write: search_products\n{"query":"..."}
+ALWAYS write the full <tool_use name="..."> opening tag, JSON body, and </tool_use> closing tag.
 
 After each tool result you will decide the next step. Max ${MAX_ITERATIONS} tool calls per turn. When done, write the final answer — no XML.
 
@@ -97,6 +111,7 @@ ${toolList}${dynamicList}
 Data queries:
 - search_products → natural language ("hex bolts for steel"). NOT for filters like featured/low-stock/top-sellers — use run_sql_readonly for those (or list_featured_products for featured).
 - run_sql_readonly → ad-hoc SELECTs. Use describe_schema first if unsure of column names. Tables: products, orders, order_items, users, categories, brands, campaigns, email_campaigns_sent.
+- Time-based customer/order queries (joined today, last 48h, recent orders) MUST use run_sql_readonly with a WHERE created_at >= NOW() - INTERVAL filter. Exclude guest accounts: AND email NOT LIKE 'guest\_%@temporary.local'.
 - Products with has_variants=true: stock lives in product_variants, not inventory_quantity. Price = COALESCE(NULLIF(MIN(pv.price),0), p.base_price, 0).
 - Effective stock formula for variants: SUM of sub_variant inventory_quantity when sub-variants exist, else pv.inventory_quantity.
 
@@ -124,13 +139,29 @@ Currency: INR (₹). Dates: Asia/Kolkata.`
 
 function parseToolCalls(text: string): { calls: { name: string; rawInput: string }[]; remainder: string } {
   const calls: { name: string; rawInput: string }[] = []
-  const re = /<tool_use\s+name="([^"]+)">\s*([\s\S]*?)\s*<\/tool_use>/g
+  const xmlRe = /<tool_use\s+name="([^"]+)">\s*([\s\S]*?)\s*<\/tool_use>/g
   let m
-  let remainder = text
-  while ((m = re.exec(text)) !== null) {
+  while ((m = xmlRe.exec(text)) !== null) {
     calls.push({ name: m[1], rawInput: m[2] })
   }
-  remainder = text.replace(re, '').trim()
+  let remainder = text.replace(xmlRe, '').trim()
+
+  if (calls.length === 0) {
+    const plainRe = new RegExp(
+      '(?:^|\\n)(' + ['search_products','get_featured_products','search_customers','get_customer',
+      'get_order','search_orders','get_recent_orders','run_sql_readonly','describe_schema',
+      'update_product','update_order_status','propose_create_quotation','match_quotation_items',
+      'list_featured_products','estimate_email_audience','propose_product_announcement_email']
+      .join('|') + ')\\s*\\n(\\{[\\s\\S]*?\\})(?=\\n|$)',
+      'g'
+    )
+    let pm
+    while ((pm = plainRe.exec(text)) !== null) {
+      calls.push({ name: pm[1], rawInput: pm[2] })
+    }
+    if (calls.length > 0) remainder = text.replace(plainRe, '').trim()
+  }
+
   return { calls, remainder }
 }
 
@@ -143,7 +174,7 @@ function parseUiBlocks(text: string): { blocks: any[]; remainder: string } {
       const parsed = JSON.parse(m[1])
       if (Array.isArray(parsed)) blocks = blocks.concat(parsed)
       else if (parsed && Array.isArray(parsed.blocks)) blocks = blocks.concat(parsed.blocks)
-    } catch (err) { console.error("[route]", err) }
+    } catch { /* malformed ui_blocks JSON — skip */ }
   }
   const remainder = text.replace(re, '').trim()
   return { blocks, remainder }
@@ -265,7 +296,7 @@ export async function POST(req: NextRequest) {
       for (const c of calls) {
         const tool = getTool(c.name)
         let parsed: Record<string, unknown> = {}
-        try { parsed = JSON.parse(c.rawInput || '{}') } catch (err) { console.error("[route]", err) }
+        try { parsed = JSON.parse(c.rawInput || '{}') } catch { /* invalid JSON input — use empty object */ }
 
         if (!tool) {
           const err = `Unknown tool: ${c.name}`
