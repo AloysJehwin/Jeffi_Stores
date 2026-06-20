@@ -87,6 +87,15 @@ Example — user asks "find bolt products":
 {"query":"bolt"}
 </tool_use>
 
+Example — user asks "send test featured products email to x@y.com":
+<tool_use name="list_featured_products">
+{"limit":10}
+</tool_use>
+[after getting productIds from result]
+<tool_use name="propose_product_announcement_email">
+{"productIds":["<id1>","<id2>"],"audience":"test_only","testEmail":"x@y.com","subject":"Featured Products","intro":"Check out our featured products."}
+</tool_use>
+
 NEVER write: run_sql_readonly{"sql":"..."}
 NEVER write: search_products\n{"query":"..."}
 ALWAYS write the full <tool_use name="..."> opening tag, JSON body, and </tool_use> closing tag.
@@ -132,7 +141,10 @@ Output format — use ui_blocks for any data display:
 
 Quotation flow: DO NOT call propose_create_quotation with text. Always call match_quotation_items first to resolve product names → ids, then propose_create_quotation with productIds only.
 
-Marketing emails: ALWAYS call estimate_email_audience before propose_product_announcement_email. intro field = ONE plain sentence, no markdown links/images.
+Marketing emails:
+- "send featured products email" or "product announcement" → estimate_email_audience then propose_product_announcement_email. Single-address test: audience="test_only", testEmail=<address>. intro = ONE plain sentence. NO markdown.
+- "test campaign" (abandoned_cart / post_purchase / etc.) → send_test_email(campaignKind, toEmail). Valid kinds: abandoned_cart, abandoned_checkout, post_purchase, price_drop, restock, review_reminder, thank_you_for_your_purchase, winback_90, winback_180.
+- CRITICAL: "featured_products" is NOT a valid campaignKind. NEVER pass it to send_test_email.
 
 Currency: INR (₹). Dates: Asia/Kolkata.`
 }
@@ -272,14 +284,27 @@ export async function POST(req: NextRequest) {
         const isShortPromise = text.length < 320 && stallRe.test(text)
         // Detect hallucinated answers: model answered with product/order/price data without calling a tool
         const looksLikeDataAnswer = iter === 0 && /\b(₹|\bsku\b|in stock|out of stock|\bprice\b.*\d|\bstock\b.*\d|\border number\b)/i.test(text)
-        const shouldRetry = (isShortPromise || looksLikeDataAnswer) && consecutiveStalls < 2 && iter < MAX_ITERATIONS - 1
+        // Detect false proposal claim: model says "I've proposed" but no proposed action was actually created
+        const claimsProposed = /i'?ve proposed|review the action card|has been proposed/i.test(text)
+        const falseProposal = claimsProposed && proposedActions.length === 0 && consecutiveStalls < 2 && iter < MAX_ITERATIONS - 1
+        const shouldRetry = (isShortPromise || looksLikeDataAnswer || falseProposal) && consecutiveStalls < 2 && iter < MAX_ITERATIONS - 1
         if (shouldRetry) {
           consecutiveStalls++
           messages.push({ role: 'assistant', content: r.content })
-          messages.push({
-            role: 'user',
-            content: '[system] You answered without calling a tool. That data is INVENTED — it does not come from this store\'s database. You MUST call a tool to get real data. Emit the <tool_use> block now. Do not write any text before it.',
-          })
+          // For false proposals: extract productIds from prior tool results to give glm4 a concrete nudge
+          let nudge: string
+          if (falseProposal) {
+            const featuredCall = toolCallRecords.find(tc => tc.tool === 'list_featured_products' && !tc.isError)
+            const productIds: string[] = featuredCall
+              ? ((featuredCall.output as any)?.data?.products ?? []).map((p: any) => p.id).filter(Boolean)
+              : []
+            nudge = productIds.length > 0
+              ? `[system] No action was proposed yet. Call propose_product_announcement_email now with these productIds: ${JSON.stringify(productIds)}, audience="test_only", testEmail from the user message, subject="Featured Products", intro="Check out our featured products."  Emit only the <tool_use> block.`
+              : '[system] No action was proposed yet. Call the appropriate mutating tool (propose_product_announcement_email) with the correct arguments. Emit only the <tool_use> block.'
+          } else {
+            nudge = '[system] You answered without calling a tool. That data is INVENTED — it does not come from this store\'s database. You MUST call a tool to get real data. Emit the <tool_use> block now. Do not write any text before it.'
+          }
+          messages.push({ role: 'user', content: nudge })
           continue
         }
         consecutiveStalls = 0
