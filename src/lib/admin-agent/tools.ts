@@ -390,8 +390,12 @@ export const TOOLS: ToolDef[] = [
     mutating: true,
     handler: async ({ campaignKind, toEmail }) => {
       if (!campaignKind || !toEmail || !String(toEmail).includes('@')) throw new Error('Invalid args')
+      const PRODUCT_ANNOUNCEMENT_KINDS = ['featured_products', 'product_announcement', 'featured', 'products']
+      if (PRODUCT_ANNOUNCEMENT_KINDS.includes(String(campaignKind).toLowerCase())) {
+        throw new Error('send_test_email is for automated campaign templates only. To send a featured products email to one address, call list_featured_products to get productIds, then propose_product_announcement_email with audience="test_only" and testEmail set.')
+      }
       const c = await queryOne(`SELECT kind, name FROM campaigns WHERE kind = $1`, [campaignKind])
-      if (!c) throw new Error(`Unknown campaign: ${campaignKind}`)
+      if (!c) throw new Error(`Unknown campaign kind "${campaignKind}". Valid kinds: abandoned_cart, abandoned_checkout, post_purchase, price_drop, restock, review_reminder, thank_you_for_your_purchase, winback_90, winback_180`)
       return {
         proposed: true,
         kind: 'send_test_email',
