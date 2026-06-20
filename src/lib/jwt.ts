@@ -164,6 +164,28 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
   }
 }
 
+export interface ServiceAccountPayload {
+  id: string
+  name: string
+  allowed_scopes: string[]
+}
+
+export async function authenticateServiceAccount(request: NextRequest): Promise<ServiceAccountPayload | null> {
+  const certSerial = request.headers.get('x-client-cert-serial') || ''
+  if (!certSerial) return null
+
+  const { queryOne } = await import('./db')
+  const sa = await queryOne<ServiceAccountPayload>(
+    `SELECT id, name, allowed_scopes FROM service_accounts
+     WHERE LOWER(serial_number) = $1 AND is_revoked = false`,
+    [certSerial.toLowerCase()]
+  )
+  if (!sa) return null
+
+  queryOne(`UPDATE service_accounts SET last_used_at = NOW() WHERE id = $1`, [sa.id]).catch(() => {})
+  return sa
+}
+
 export async function requireUserScope(
   request: NextRequest,
   scope: string

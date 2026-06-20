@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/jwt'
+import { authenticateAdmin, authenticateServiceAccount } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryMany } from '@/lib/db'
 import { generateClientCertificate } from '@/lib/certificates'
@@ -7,6 +7,20 @@ import { generateClientCertificate } from '@/lib/certificates'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const sa = await authenticateServiceAccount(request)
+  if (sa) {
+    if (!sa.allowed_scopes.includes('service_accounts:read')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+    const rows = await queryMany(
+      `SELECT id, name, common_name, allowed_scopes, is_revoked, revoked_at,
+              p12_downloaded, created_at, last_used_at
+       FROM service_accounts
+       ORDER BY created_at DESC`
+    )
+    return NextResponse.json({ service_accounts: rows })
+  }
+
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'service_accounts:read')) {

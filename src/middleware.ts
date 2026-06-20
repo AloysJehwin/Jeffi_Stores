@@ -204,29 +204,12 @@ export async function middleware(request: NextRequest) {
     }
 
     // Service account auth via mTLS client certificate serial.
-    // nginx passes $ssl_client_serial as X-Client-Cert-Serial; we look it up in
-    // service_accounts and bypass the admin_token cookie check if valid.
+    // nginx passes $ssl_client_serial as X-Client-Cert-Serial. The edge runtime
+    // cannot use pg (Node.js crypto), so we pass the request through and let the
+    // route handler validate via authenticateServiceAccount() in jwt.ts.
     const certSerial = request.headers.get('x-client-cert-serial') || ''
     if (certSerial) {
-      const { queryOne: saQuery } = await import('./lib/db')
-      const sa = await saQuery<{ id: string; name: string; allowed_scopes: string[] }>(
-        `SELECT id, name, allowed_scopes FROM service_accounts
-         WHERE LOWER(serial_number) = $1 AND is_revoked = false`,
-        [certSerial.toLowerCase()]
-      )
-      if (!sa) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-      const requiredScope = getScopeForPath(pathname)
-      if (requiredScope && !sa.allowed_scopes.includes(requiredScope)) {
-        return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-      }
-      saQuery(`UPDATE service_accounts SET last_used_at = NOW() WHERE id = $1`, [sa.id]).catch(() => {})
-      const saRes = addSecurityHeaders(NextResponse.next())
-      saRes.headers.set('x-service-account-id', sa.id)
-      saRes.headers.set('x-service-account-name', sa.name)
-      saRes.headers.set('x-service-account-scopes', JSON.stringify(sa.allowed_scopes))
-      return saRes
+      return addSecurityHeaders(NextResponse.next())
     }
 
     const token = request.cookies.get('admin_token')?.value
