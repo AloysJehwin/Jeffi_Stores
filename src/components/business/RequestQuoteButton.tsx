@@ -37,6 +37,10 @@ interface QuoteItem {
   description: string
   quantity: number
   unit?: string
+  unitMin?: number
+  unitMax?: number
+  unitStep?: number
+  unitFactor?: number
   currentPrice?: number | null
   imageUrl?: string | null
   brandName?: string | null
@@ -115,6 +119,10 @@ function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
 type FieldState = {
   quantity: number
   unit: string
+  unitMin: number
+  unitMax: number | null
+  unitStep: number
+  unitFactor: number
   requested_price: string
   discount_pct: string
   notes: string
@@ -171,6 +179,10 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
     items.map(item => ({
       quantity: item.quantity || 1,
       unit: item.unit || 'Nos',
+      unitMin: item.unitMin ?? 1,
+      unitMax: item.unitMax ?? null,
+      unitStep: item.unitStep ?? 1,
+      unitFactor: item.unitFactor ?? 1,
       requested_price: '',
       discount_pct: '',
       notes: '',
@@ -206,6 +218,10 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
     setFields(items.map(item => ({
       quantity: item.quantity || 1,
       unit: item.unit || 'Nos',
+      unitMin: item.unitMin ?? 1,
+      unitMax: item.unitMax ?? null,
+      unitStep: item.unitStep ?? 1,
+      unitFactor: item.unitFactor ?? 1,
       requested_price: '',
       discount_pct: '',
       notes: '',
@@ -511,7 +527,9 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                       <div className="flex gap-2">
                         <input
                           type="number"
-                          min={1}
+                          min={activeField.unitMin}
+                          max={activeField.unitMax ?? undefined}
+                          step={activeField.unitStep}
                           value={activeField.quantity}
                           onChange={e => updateField(activeIdx, 'quantity', e.target.value)}
                           className="flex-1 px-3 py-[10px] text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
@@ -520,6 +538,16 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                           {activeField.unit || 'Nos'}
                         </span>
                       </div>
+                      {activeField.unitFactor > 1 && (
+                        <p className="mt-1 text-[11px] text-foreground-muted">
+                          = {Math.round(Number(activeField.quantity) * activeField.unitFactor)} pcs
+                        </p>
+                      )}
+                      {(activeField.unitMin > 1 || activeField.unitMax != null || activeField.unitStep !== 1) && (
+                        <p className="mt-0.5 text-[11px] text-foreground-muted">
+                          Min {activeField.unitMin}{activeField.unitMax != null ? ` · Max ${activeField.unitMax}` : ''}{activeField.unitStep !== 1 ? ` · Step ${activeField.unitStep}` : ''}
+                        </p>
+                      )}
                     </div>
 
                     {/* Target price */}
