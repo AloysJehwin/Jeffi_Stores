@@ -336,6 +336,21 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                       / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
                     </span>
                   </div>
+                  {mrp && mrp > displayPrice && (
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
+                        {mrpDiscount}% off
+                      </span>
+                      <span className="text-sm text-foreground-secondary">
+                        You save Rs.&nbsp;{(mrp - displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                      {mrp > baseDisplayPrice && (
+                        <span className="text-xs text-foreground-muted">
+                          ({Math.round(((mrp - baseDisplayPrice) / mrp) * 100)}% MRP discount + {businessDiscountPct}% business discount)
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="flex items-baseline gap-3 mb-2 flex-wrap">
@@ -360,21 +375,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                   <span className="text-xs text-foreground-muted ml-2">
                     (1 <UnitLabel label={selectedUnit.label ?? selectedUnit.key} /> = {selectedUnit.factor} pc × Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                   </span>
-                </div>
-              )}
-              {mrp && mrp > displayPrice && (
-                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
-                    {mrpDiscount}% off
-                  </span>
-                  <span className="text-sm text-foreground-secondary">
-                    You save Rs.&nbsp;{(mrp - displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                  {businessDiscountPct > 0 && mrp > baseDisplayPrice && (
-                    <span className="text-xs text-foreground-muted">
-                      ({Math.round(((mrp - baseDisplayPrice) / mrp) * 100)}% MRP discount + {businessDiscountPct}% business discount)
-                    </span>
-                  )}
                 </div>
               )}
               <p className="text-xs text-foreground-muted">
