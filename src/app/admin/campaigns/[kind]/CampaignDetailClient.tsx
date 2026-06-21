@@ -798,11 +798,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                       <p className="text-[10px] text-foreground-muted">{new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {Number(s.send_count) > 1 && (
-                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-                          #{Number(s.send_count)} sends
-                        </span>
-                      )}
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                        {Number(s.send_count) === 1 ? '1 send' : `${Number(s.send_count)} sends`}
+                      </span>
                       <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
                     </div>
                   </div>
