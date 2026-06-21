@@ -519,7 +519,7 @@ export default function ProductActions({
                       {` / `}<UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} />
                     </span>
                     {effectiveMrp && effectiveMrp > rawEffectivePrice && (
-                      <span className="text-sm text-foreground-muted line-through tabular-nums">
+                      <span className="text-sm text-foreground-muted tabular-nums">
                         MRP Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                     )}

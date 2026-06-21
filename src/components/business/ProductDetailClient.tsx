@@ -326,9 +326,10 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                       <span className="text-base text-foreground-muted line-through tabular-nums">
                         Rs.&nbsp;{baseDisplayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? ' / pc' : ''}
                       </span>
                       {mrp && mrp > baseDisplayPrice && (
-                        <span className="text-sm text-foreground-muted line-through tabular-nums">
+                        <span className="text-sm text-foreground-muted tabular-nums">
                           MRP Rs.&nbsp;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </span>
                       )}
