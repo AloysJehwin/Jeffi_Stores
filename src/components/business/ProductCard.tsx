@@ -117,7 +117,7 @@ export default function ProductCard({
               </div>
             )}
             {discountPct > 0 && (
-              <div className="absolute top-4 right-[-30px] w-36 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[10px] font-bold text-center py-1 shadow-md pointer-events-none select-none z-10">
+              <div className="absolute top-8 right-[-32px] w-36 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[10px] font-bold text-center py-1 shadow-md pointer-events-none select-none z-10">
                 {discountPct}% off
               </div>
             )}
@@ -128,8 +128,8 @@ export default function ProductCard({
               </div>
             )}
 
-            {/* Share icon — top right */}
-            <div className="absolute top-2 right-2 flex flex-col gap-1.5">
+            {/* Share icon — top right, below ribbon */}
+            <div className="absolute top-16 right-2 flex flex-col gap-1.5">
               <button
                 onClick={handleShare}
                 aria-label="Share product"
