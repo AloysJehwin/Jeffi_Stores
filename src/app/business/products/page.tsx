@@ -8,6 +8,7 @@ import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/business/ProductCard'
+import BusinessDiscountBanner from '@/components/business/BusinessDiscountBanner'
 import { bp } from '@/lib/business-path'
 
 const PAGE_SIZE = 21
@@ -425,6 +426,8 @@ export default async function ProductsPage({
                 <MobileFilterSheet categories={allCats} brands={brands as any[]} basePath={bp('/business/products', host)} />
               </div>
             </div>
+            {/* Business discount banner */}
+            <BusinessDiscountBanner />
             {/* Sort Bar */}
             <div className="flex items-center justify-between mb-6">
               <p className="text-foreground-secondary text-sm">
