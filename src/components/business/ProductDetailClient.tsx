@@ -277,11 +277,18 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
     <>
       {/* Image column — order-1 on mobile, natural on desktop */}
       <div className="order-1 lg:order-none">
-        <ProductImageGallery
-          images={product.product_images || []}
-          productName={product.name}
-          variantImages={variantImages}
-        />
+        <div className="relative overflow-hidden rounded-xl">
+          <ProductImageGallery
+            images={product.product_images || []}
+            productName={product.name}
+            variantImages={variantImages}
+          />
+          {businessDiscountPct > 0 && (
+            <div className="absolute top-6 right-[-36px] w-44 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[11px] font-bold text-center py-1.5 shadow-md pointer-events-none select-none z-10">
+              🏷️ {businessDiscountPct}% off
+            </div>
+          )}
+        </div>
 
         <div className="hidden lg:block mt-4">
           <DeliveryInfo {...policy} />
