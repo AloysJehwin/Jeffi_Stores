@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
         ecs.converted_at, ecs.unsubscribed_at, ecs.bounced_at,
         u.email AS user_email,
         COALESCE(u.first_name || ' ' || u.last_name, u.email) AS user_name,
-        COALESCE(csc.send_count, 1) AS send_count
+        COALESCE(csc.send_count, 1)::integer AS send_count
       FROM email_campaigns_sent ecs
       LEFT JOIN users u ON u.id = ecs.user_id
       LEFT JOIN campaign_send_counts csc ON csc.campaign_kind = ecs.campaign_kind AND csc.user_id = ecs.user_id
