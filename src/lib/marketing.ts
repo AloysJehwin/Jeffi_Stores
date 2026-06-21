@@ -70,8 +70,8 @@ export async function canSendMarketing(userId: string, campaignKind: CampaignKin
 
   const recent = await queryOne<{ cnt: string }>(
     `SELECT COUNT(*)::text AS cnt FROM email_campaigns_sent
-     WHERE user_id = $1 AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`,
-    [userId]
+     WHERE user_id = $1 AND campaign_kind = $2 AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`,
+    [userId, campaignKind]
   )
   if (recent && parseInt(recent.cnt, 10) >= 1) {
     return { ok: false, reason: 'frequency_cap' }
@@ -118,8 +118,7 @@ export async function recordSent(params: {
       ]
     )
     return result.rows[0]?.id ?? null
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return null
   }
 }
@@ -176,8 +175,7 @@ export async function generateCouponForCampaign(params: {
       await query(`UPDATE campaigns SET coupon_id = $1 WHERE kind = $2`, [couponId, params.campaignKind])
     }
     return code
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return null
   }
 }
