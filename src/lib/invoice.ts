@@ -158,6 +158,7 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     tax_amount: parseFloat(order.tax_amount),
     total_amount: parseFloat(order.total_amount),
     discount_amount: parseFloat(order.discount_amount || '0'),
+    business_discount_amount: parseFloat(order.business_discount_amount || '0'),
     shipping_amount: parseFloat(order.shipping_amount || '0'),
     taxable_amount: invoiceData.taxableAmount,
     cgst_amount: invoiceData.cgstAmount,

@@ -169,6 +169,12 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                 <p className="text-sm font-semibold text-red-500">−₹{Number(o.discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
               </div>
             )}
+            {Number(o.business_discount_amount) > 0 && (
+              <div>
+                <p className="text-xs text-foreground-muted">Business Discount</p>
+                <p className="text-sm font-semibold text-red-500">−₹{Number(o.business_discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              </div>
+            )}
             {Number(o.shipping_amount) > 0 && (
               <div>
                 <p className="text-xs text-foreground-muted">Shipping</p>

@@ -22,6 +22,7 @@ export interface CartLine {
     price_ex_gst: number | null
     gst_percentage: string | number | null
     hsn_code: string | null
+    category_id: string | null
   }
   variant: { id: string; variant_name: string; sku: string; price: number | null; price_ex_gst: number | null } | null
   sub_variant: { id: string; sub_variant_name: string; sku: string | null; price: number | null; price_ex_gst: number | null } | null
@@ -35,7 +36,8 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
       json_build_object(
         'id', p.id, 'name', p.name, 'sku', p.sku,
         'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
-        'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code
+        'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
+        'category_id', p.category_id
       ) AS products,
       CASE WHEN ci.variant_id IS NOT NULL THEN
         json_build_object(
@@ -306,8 +308,7 @@ export async function quoteShipping(input: {
     const data = await res.json()
     const charge = Number(data?.charge)
     return Number.isFinite(charge) && charge >= 0 ? Math.round(charge * 100) / 100 : 0
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return 0
   }
 }
@@ -338,6 +339,7 @@ export interface CartCommitInput extends CommitInput {
   subtotal: number
   taxAmount: number
   appliedDiscount: number
+  businessDiscountAmount: number
 }
 
 export interface BuyNowCommitInput extends CommitInput {
@@ -349,6 +351,7 @@ export interface BuyNowCommitInput extends CommitInput {
   subtotal: number
   taxAmount: number
   appliedDiscount: number
+  businessDiscountAmount: number
 }
 
 interface InsertedOrder {
@@ -368,7 +371,7 @@ async function ensureAddressOnOrder(client: PoolClient, userId: string, addressI
 
 export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): Promise<InsertedOrder> {
   const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-  const total = Math.max(0, input.subtotal - input.appliedDiscount + input.shippingAmount)
+  const total = Math.max(0, input.subtotal - input.appliedDiscount - input.businessDiscountAmount + input.shippingAmount)
 
   return withTransaction(async (client) => {
     const address = await ensureAddressOnOrder(client, input.userId, input.addressId)
@@ -496,17 +499,20 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     const orderResult = await client.query(
       `INSERT INTO orders (
         order_number, user_id, customer_email, customer_phone, customer_name,
-        status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount,
+        status, payment_status, subtotal, discount_amount, business_discount_amount,
+        tax_amount, shipping_amount, total_amount,
         shipping_address_id, billing_address_id, notes,
         taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst,
         order_type, shipping_address_snapshot, billing_address_snapshot
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
       RETURNING id, order_number, total_amount, status`,
       [
         orderNumber, input.userId, input.user.email, input.user.phone, customerName,
         orderStatus, paymentStatus,
-        input.subtotal, Math.round(input.appliedDiscount * 100) / 100,
+        input.subtotal,
+        Math.round(input.appliedDiscount * 100) / 100,
+        Math.round(input.businessDiscountAmount * 100) / 100,
         Math.round(input.taxAmount * 100) / 100, input.shippingAmount, total,
         input.addressId, input.addressId, input.notes,
         isGSTEnabled ? orderTaxableAmount : 0,

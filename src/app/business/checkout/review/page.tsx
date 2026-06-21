@@ -44,7 +44,9 @@ function CheckoutReviewPage() {
   const searchParams = useSearchParams()
 
   const intentToken = searchParams.get('intent')
-  const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(null)
+  const [intentMode, setIntentMode] = useState<'cart' | 'buyNow' | null>(
+    intentToken ? 'buyNow' : null
+  )
   const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
 
   const authWasLoading = useRef(false)
@@ -62,6 +64,8 @@ function CheckoutReviewPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<CouponResult | null>(null)
   const [couponError, setCouponError] = useState('')
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
+
+  const [businessDiscountAmount, setBusinessDiscountAmount] = useState(0)
 
   const [shippingCharge, setShippingCharge] = useState<number | null>(null)
   const [shippingMeta, setShippingMeta] = useState<{
@@ -313,7 +317,41 @@ function CheckoutReviewPage() {
       .catch(() => {})
   }, [searchParams, cartSubtotal])
 
-  const finalTotal = Math.max(0, cartSubtotal - discountAmount + (shippingCharge ?? 0))
+  useEffect(() => {
+    if (!user) return
+    if (isBuyNow) {
+      if (!buyNowItem) return
+      fetch('/api/business/discount-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+        credentials: 'include',
+        body: JSON.stringify({
+          mode: 'buyNow',
+          productId: buyNowItem.productId,
+          variantId: buyNowItem.variantId,
+          subVariantId: buyNowItem.subVariantId,
+          qty: buyNowItem.qty,
+          price: buyNowItem.price,
+        }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.businessDiscountAmount != null) setBusinessDiscountAmount(d.businessDiscountAmount) })
+        .catch(() => {})
+    } else {
+      if (cartCount === 0) return
+      fetch('/api/business/discount-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+        credentials: 'include',
+        body: JSON.stringify({ mode: 'cart' }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.businessDiscountAmount != null) setBusinessDiscountAmount(d.businessDiscountAmount) })
+        .catch(() => {})
+    }
+  }, [user, isBuyNow, buyNowItem, cartCount])
+
+  const finalTotal = Math.max(0, cartSubtotal - discountAmount - businessDiscountAmount + (shippingCharge ?? 0))
 
   const handleProceedToCheckout = () => {
     if (!selectedAddress) {
@@ -663,6 +701,12 @@ function CheckoutReviewPage() {
                   <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                     <span>Coupon ({appliedCoupon.code})</span>
                     <span>−₹{appliedCoupon.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {businessDiscountAmount > 0 && (
+                  <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
+                    <span>Business Discount</span>
+                    <span>−₹{businessDiscountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-foreground-secondary">

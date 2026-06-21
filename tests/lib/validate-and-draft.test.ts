@@ -296,6 +296,7 @@ const BASE_PAYLOAD: DraftPayload = {
   addressId: 'addr-456',
   couponId: null,
   shippingAmount: 0,
+  businessDiscountAmount: 0,
   cartHash: 'abc123',
   cartItemIds: ['item-1', 'item-2'],
   buyNowItem: null,

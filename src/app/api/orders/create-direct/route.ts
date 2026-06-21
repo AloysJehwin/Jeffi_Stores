@@ -6,6 +6,7 @@ import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/emai
 import { isInterState, calculateGST } from '@/lib/gst'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { resolveBuyNowItem, quoteShipping, validateCouponForUser, loadAddress } from '@/lib/order-commit'
+import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { parseBody, zUuid } from '@/lib/validate'
 
 const DirectItemSchema = z.object({
@@ -109,6 +110,15 @@ export async function POST(request: NextRequest) {
       if (result.ok) appliedDiscount = result.appliedDiscount
     }
 
+    let businessDiscountAmount = 0
+    const bizDiscountMap = await getBusinessDiscountMap(userId)
+    if (product.category_id && Object.keys(bizDiscountMap).length > 0) {
+      const pct = bizDiscountMap[product.category_id] ?? 0
+      if (pct > 0) {
+        businessDiscountAmount = Math.round(subtotal * pct / 100 * 100) / 100
+      }
+    }
+
     const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
     const appliedShipping = destinationPin
       ? await quoteShipping({
@@ -142,7 +152,7 @@ export async function POST(request: NextRequest) {
       taxAmount = Math.round((itemTotal - (itemTotal / (1 + gstRate / 100))) * 100) / 100
     }
 
-    const total = Math.max(0, subtotal - appliedDiscount + appliedShipping)
+    const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
     const order = await withTransaction(async (client) => {
@@ -190,12 +200,12 @@ export async function POST(request: NextRequest) {
       }
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 'direct', $21, $22)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 'direct', $22, $23)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, total,
+         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(businessDiscountAmount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, total,
          shippingAddressId, billingAddressId,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
