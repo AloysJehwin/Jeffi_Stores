@@ -511,29 +511,20 @@ export default function ProductActions({
           <div className="bg-surface rounded-lg p-6">
             {businessDiscountPct > 0 ? (
               <>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-sm text-foreground-secondary shrink-0">Regular price</span>
-                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                {/* MRP struck through as single reference */}
+                {effectiveMrp && effectiveMrp > effectivePrice && (
+                  <div className="mb-2">
                     <span className="text-base text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{rawEffectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      {` / `}<UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} />
+                      MRP Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                    {effectiveMrp && effectiveMrp > rawEffectivePrice && (
-                      <span className="text-sm text-foreground-muted tabular-nums">
-                        MRP Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    )}
                   </div>
-                </div>
-                {/* Big orange = base unit price (discounted) */}
+                )}
+                {/* Big orange = effective price */}
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                   <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap shrink-0">
-                    ✦ {businessDiscountPct}% off
-                  </span>
                 </div>
                 {/* Selling unit price + factor explanation on own line */}
                 {showPerBasePrice && (
@@ -555,6 +546,20 @@ export default function ProductActions({
                     Rs.&nbsp;{(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
+                {/* Combined discount breakdown */}
+                {effectiveMrp && effectiveMrp > effectivePrice && (
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
+                      {mrpDiscount}% off
+                    </span>
+                    <span className="text-sm text-foreground-secondary">
+                      You save Rs.&nbsp;{(effectiveMrp - effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-xs text-foreground-muted">
+                      ({Math.round(((effectiveMrp - rawEffectivePrice) / effectiveMrp) * 100)}% MRP discount + {businessDiscountPct}% business discount)
+                    </span>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -596,16 +601,6 @@ export default function ProductActions({
               <p className="text-sm font-medium text-accent-600 dark:text-accent-400 mb-2">
                 {perUnitRate}
               </p>
-            )}
-            {mrpDiscount > 0 && (
-              <div className="flex items-center gap-2 mb-2">
-                <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
-                  {mrpDiscount}% off
-                </span>
-                <span className="text-sm text-foreground-secondary">
-                  You save Rs. {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
             )}
             <p className="text-xs text-foreground-muted">
               Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
