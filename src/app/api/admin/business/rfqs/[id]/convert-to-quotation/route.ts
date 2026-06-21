@@ -201,6 +201,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       gst_rate: gstRate,
       quantity: qty,
       unit: item.unit_display_label || item.unit || 'Nos',
+      buy_unit: item.unit || null,
+      sold_unit_factor: unitFactor !== 1 ? unitFactor : null,
       rate: baseRateExGst,       // pre-discount rate, so admin can see original and adjust
       discount_pct: discountPct,  // business discount shown separately on the quotation
       amount,
@@ -247,9 +249,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const li = lineItems[idx]
     await query(
       `INSERT INTO quotation_items
-         (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [qt!.id, idx, li.description, li.hsn_code, li.gst_rate, li.quantity, li.unit, li.rate, li.discount_pct, li.amount, li.product_id, li.variant_id, li.sub_variant_id]
+         (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, buy_unit, sold_unit_factor, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      [qt!.id, idx, li.description, li.hsn_code, li.gst_rate, li.quantity, li.unit, li.buy_unit, li.sold_unit_factor, li.rate, li.discount_pct, li.amount, li.product_id, li.variant_id, li.sub_variant_id]
     )
   }
 
