@@ -136,8 +136,8 @@ export default async function EditCouponPage({ params, searchParams }: { params:
       throw new Error('Failed to update coupon')
     }
     revalidatePath('/admin/coupons')
-    const { headers: getHeaders } = await import('next/headers')
-    const host = (await getHeaders()).get('host') ?? ''
+    
+    const host = (await headers()).get('host') ?? ''
     redirect(ap('/admin/coupons', host))
   }
 

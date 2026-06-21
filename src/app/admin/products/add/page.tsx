@@ -199,8 +199,7 @@ async function createProduct(formData: FormData) {
     const { syncProductToMerchant } = await import('@/lib/merchant/sync')
     syncProductToMerchant(data.id).catch(() => {})
 
-    const { headers: getHeaders } = await import('next/headers')
-    const host = (await getHeaders()).get('host') ?? ''
+    const host = (await headers()).get('host') ?? ''
     redirect(ap('/admin/products', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
