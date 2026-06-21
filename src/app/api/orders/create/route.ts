@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { quoteShipping } from '@/lib/order-commit'
+import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { createDraftInvoice } from '@/lib/invoice'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 
@@ -51,7 +52,8 @@ export async function POST(request: NextRequest) {
           'id', p.id, 'name', p.name, 'sku', p.sku,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
-          'stock_status', p.stock_status, 'inventory_quantity', p.inventory_quantity
+          'stock_status', p.stock_status, 'inventory_quantity', p.inventory_quantity,
+          'category_id', p.category_id
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
@@ -90,6 +92,23 @@ export async function POST(request: NextRequest) {
     const minOrderAmount = minOrderSetting ? parseFloat(minOrderSetting.value) || 0 : 0
     if (minOrderAmount > 0 && subtotal < minOrderAmount) {
       return NextResponse.json({ error: `Minimum order value is ₹${minOrderAmount}` }, { status: 400 })
+    }
+
+    let businessDiscountAmount = 0
+    const bizDiscountMap = await getBusinessDiscountMap(userId)
+    if (Object.keys(bizDiscountMap).length > 0) {
+      for (const item of cartItems) {
+        const catId = (item as any).products?.category_id
+        const pct = catId ? (bizDiscountMap[catId] ?? 0) : 0
+        if (pct > 0) {
+          const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+          const linePrice = isCustomQty
+            ? parseFloat(item.price_at_addition)
+            : parseFloat((item as any).sub_variant?.price ?? (item as any).variant?.price ?? (item as any).products.base_price)
+          businessDiscountAmount += linePrice * parseFloat(item.quantity) * pct / 100
+        }
+      }
+      businessDiscountAmount = Math.round(businessDiscountAmount * 100) / 100
     }
 
     const taxAmount = cartItems.reduce((sum: number, item: any) => {
@@ -248,15 +267,15 @@ export async function POST(request: NextRequest) {
           }
         }
       }
-      const txTotal = Math.max(0, subtotal - appliedDiscount + appliedShipping)
+      const txTotal = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, txTotal, shippingAddressId, billingAddressId,
+         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(businessDiscountAmount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, txTotal, shippingAddressId, billingAddressId,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,

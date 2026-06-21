@@ -42,6 +42,7 @@ export interface InvoiceOrder {
   tax_amount: number
   total_amount: number
   discount_amount: number
+  business_discount_amount?: number
   shipping_amount: number
   taxable_amount: number
   cgst_amount: number
@@ -185,8 +186,7 @@ function renderAddressBlock(
 async function buildQRBuffer(data: string, size: number): Promise<Buffer | null> {
   try {
     return await QRCode.toBuffer(data, { type: 'png', width: size, margin: 1 })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return null
   }
 }
@@ -447,12 +447,19 @@ export async function generateInvoicePDF(
       y += rowH
     }
 
-    const roundOff = order.total_amount - (order.taxable_amount + order.cgst_amount + order.sgst_amount + order.igst_amount + (order.shipping_amount || 0) - (order.discount_amount || 0))
+    const roundOff = order.total_amount - (order.taxable_amount + order.cgst_amount + order.sgst_amount + order.igst_amount + (order.shipping_amount || 0) - (order.discount_amount || 0) - (order.business_discount_amount || 0))
     if (order.discount_amount > 0) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
       doc.font(FBI).fontSize(8).text('DISCOUNT', descLabelX, y + 2, { width: itemCols[1].w - 12 })
       doc.font(F).fontSize(7).text(`-${fmt(order.discount_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      y += rowH
+    }
+    if ((order.business_discount_amount || 0) > 0) {
+      checkPageBreak(rowH)
+      drawHLine(doc, LM, R, y)
+      doc.font(FBI).fontSize(8).text('BUSINESS DISCOUNT', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc.font(F).fontSize(7).text(`-${fmt(order.business_discount_amount!)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
       y += rowH
     }
 

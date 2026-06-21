@@ -68,6 +68,7 @@ function makeCartLine(overrides: Partial<CartLine> = {}): CartLine {
       price_ex_gst: null,
       gst_percentage: '18',
       hsn_code: '8501',
+      category_id: null,
     },
     variant: null,
     sub_variant: null,
@@ -674,6 +675,7 @@ describe('commitOrder — cart mode', () => {
       subtotal: 200,
       taxAmount: 30,
       appliedDiscount: 0,
+      businessDiscountAmount: 0,
       ...overrides,
     }
   }
@@ -845,6 +847,7 @@ describe('commitOrder — buyNow mode', () => {
       subtotal: 500,
       taxAmount: 53.57,
       appliedDiscount: 0,
+      businessDiscountAmount: 0,
       ...overrides,
     }
   }

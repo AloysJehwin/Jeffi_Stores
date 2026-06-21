@@ -39,6 +39,7 @@ function makeProduct(overrides: Partial<CartLine['products']> = {}): CartLine['p
     price_ex_gst: 847.46,
     gst_percentage: '18',
     hsn_code: '8443',
+    category_id: null,
     ...overrides,
   }
 }

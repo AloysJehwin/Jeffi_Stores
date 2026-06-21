@@ -132,7 +132,7 @@ async function commitDraft(args: {
     if (r.ok) appliedDiscount = r.appliedDiscount
   }
 
-  const expectedAmountPaise = Math.round((Math.max(0, subtotal - appliedDiscount + draft.shippingAmount)) * 100)
+  const expectedAmountPaise = Math.round((Math.max(0, subtotal - appliedDiscount - draft.businessDiscountAmount + draft.shippingAmount)) * 100)
 
   const created = draft.mode === 'cart'
     ? await commitOrder({
@@ -147,6 +147,7 @@ async function commitDraft(args: {
         subtotal,
         taxAmount,
         appliedDiscount,
+        businessDiscountAmount: draft.businessDiscountAmount,
         paymentRecord: {
           gatewayOrderId: args.razorpay_order_id,
           paymentId: args.razorpay_payment_id,
@@ -169,6 +170,7 @@ async function commitDraft(args: {
         subtotal,
         taxAmount,
         appliedDiscount,
+        businessDiscountAmount: draft.businessDiscountAmount,
         paymentRecord: {
           gatewayOrderId: args.razorpay_order_id,
           paymentId: args.razorpay_payment_id,

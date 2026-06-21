@@ -41,6 +41,7 @@ interface OrderDetails {
   subtotal: number
   taxAmount: number
   discountAmount: number
+  businessDiscountAmount: number
   shippingAmount: number
   status: string
   paymentStatus: string
@@ -507,6 +508,12 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                   <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-medium">
                     <span>Discount</span>
                     <span>−{order.discountAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
+                  </div>
+                )}
+                {order.businessDiscountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-medium">
+                    <span>Business Discount</span>
+                    <span>−{order.businessDiscountAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
                   </div>
                 )}
                 {order.shippingAmount > 0 && (
