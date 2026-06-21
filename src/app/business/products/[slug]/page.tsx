@@ -324,6 +324,7 @@ export default async function ProductDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
       />
+
       <TrackRecentlyViewed
         id={product.id}
         name={product.name}
