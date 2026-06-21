@@ -41,6 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             psv.price AS sub_variant_price,
             psv.mrp AS sub_variant_mrp,
             psv.price_ex_gst AS sub_variant_price_ex_gst,
+            COALESCE(pu.factor, 1) AS unit_factor,
             (SELECT pi.image_url FROM product_images pi
              WHERE pi.product_id = p.id
              ORDER BY pi.is_primary DESC, pi.display_order ASC
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
      LEFT JOIN products p ON p.id = ri.product_id
      LEFT JOIN product_variants pv ON pv.id = ri.variant_id
      LEFT JOIN product_sub_variants psv ON psv.id = ri.sub_variant_id
+     LEFT JOIN product_units pu ON pu.product_id = ri.product_id AND pu.unit = ri.unit
      WHERE ri.rfq_id = $1
      ORDER BY ri.position, ri.created_at`,
     [id]

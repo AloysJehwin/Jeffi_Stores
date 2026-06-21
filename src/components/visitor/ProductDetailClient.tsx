@@ -10,6 +10,13 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 interface ProductImage {
   id: string
   image_url: string
@@ -42,6 +49,7 @@ interface Variant {
   unit?: string
   numeric_value?: number | null
   sub_variant_type?: string | null
+  sell_unit_id?: string | null
   variant_images?: ProductImage[]
   sub_variants?: SubVariant[]
 }
@@ -90,11 +98,14 @@ interface ProductDetailClientProps {
       unit: string
       factor: number
       is_base: boolean
-      is_sell_default: boolean
       is_purchase_default: boolean
       display_label: string | null
       dimension: string
+      min_qty?: number | null
+      max_qty?: number | null
+      qty_step?: number | null
     }>
+    sell_unit_id?: string | null
   }
   initialSkuParam?: string
 }
@@ -198,6 +209,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
+  const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null; min: number; max: number | null; step: number; factor: number; dimension: string }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
   const router = useRouter()
@@ -338,9 +350,13 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
         {!hasVariants && (
           <>
             <div className="bg-surface rounded-lg p-4 sm:p-6 mb-6">
-              <div className="flex items-baseline gap-3 mb-2">
+              {/* Per-base-unit price (e.g. Rs. 424.80 / pc) */}
+              <div className="flex items-baseline gap-3 flex-wrap mb-1">
                 <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
                   Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-sm text-foreground-secondary">
+                  / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
                 </span>
                 {mrp && mrp > displayPrice && (
                   <span className="text-xl text-foreground-muted line-through">
@@ -348,6 +364,17 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                   </span>
                 )}
               </div>
+              {/* Per-sell-unit price when factor > 1 (e.g. Rs. 31,860 / pack) */}
+              {selectedUnit.dimension === 'count' && selectedUnit.factor !== 1 && (
+                <div className="mb-1">
+                  <span className="text-base font-semibold text-foreground">
+                    Rs. {(displayPrice * selectedUnit.factor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />
+                  </span>
+                  <span className="text-xs text-foreground-muted ml-2">
+                    (1 <UnitLabel label={selectedUnit.label ?? selectedUnit.key} /> = {selectedUnit.factor} pc × Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  </span>
+                </div>
+              )}
               {mrpDiscount > 0 && (
                 <div className="flex items-center gap-2 mb-2">
                   <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
@@ -401,7 +428,9 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           initialSkuParam={initialSkuParam}
           discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           onVariantChange={handleVariantChange}
+          onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
           productUnits={product.product_units ?? []}
+          sellUnitId={product.sell_unit_id ?? null}
         />
 
 

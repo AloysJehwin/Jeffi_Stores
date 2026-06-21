@@ -24,7 +24,6 @@ export interface ProductUnit {
   factor: number
   is_base: boolean
   is_purchase_default: boolean
-  is_sell_default: boolean
   display_label: string | null
 }
 

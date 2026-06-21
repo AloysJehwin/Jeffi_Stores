@@ -17,7 +17,6 @@ interface CartItem {
     display_label: string | null
     factor: number
     is_base: boolean
-    is_sell_default: boolean
     dimension: string | null
   } | null
   products: {

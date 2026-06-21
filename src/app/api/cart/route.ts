@@ -85,7 +85,6 @@ export async function GET(request: NextRequest) {
              'display_label', pu.display_label,
              'factor', pu.factor,
              'is_base', pu.is_base,
-             'is_sell_default', pu.is_sell_default,
              'dimension', pu.dimension
            )
            FROM product_units pu

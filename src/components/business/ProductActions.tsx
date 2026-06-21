@@ -40,6 +40,7 @@ interface Variant {
   numeric_value?: number | null
   variant_type?: string | null
   sub_variant_type?: string | null
+  sell_unit_id?: string | null
   variant_images?: VariantImage[]
   sub_variants?: SubVariant[]
 }
@@ -51,7 +52,6 @@ interface ProductUnit {
   unit: string
   factor: number
   is_base: boolean
-  is_sell_default: boolean
   is_purchase_default: boolean
   display_label: string | null
   dimension: string
@@ -75,9 +75,10 @@ interface ProductActionsProps {
   discountPct?: number | null
   onVariantChange?: (variant: Variant | null) => void
   onSelectionChange?: (variantId: string | null, subVariantId: string | null) => void
-  onUnitChange?: (unitKey: string, unitLabel: string | null, unitMeta: { min: number; max: number | null; step: number; factor: number }) => void
+  onUnitChange?: (unitKey: string, unitLabel: string | null, unitMeta: { min: number; max: number | null; step: number; factor: number; dimension: string }) => void
   categoryId?: string | null
   productUnits?: ProductUnit[]
+  sellUnitId?: string | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -107,7 +108,7 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onSelectionChange, onUnitChange, categoryId,
-  productUnits: productUnitsProp,
+  productUnits: productUnitsProp, sellUnitId,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -258,23 +259,24 @@ export default function ProductActions({
     : null
 
   const units = productUnitsProp ?? []
+  const effectiveSellUnitId = (variants.find(v => v.id === selectedVariantId)?.sell_unit_id) ?? sellUnitId ?? null
   const sellUnit = (() => {
-    if (!selectedVariantId) {
-      return units.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_sell_default)
-        ?? units.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
-        ?? null
+    if (effectiveSellUnitId) {
+      const u = units.find(u => u.id === effectiveSellUnitId)
+      if (u) return u
     }
     if (selectedSubVariantId) {
-      const svUnit = units.find(u => u.sub_variant_id === selectedSubVariantId && u.is_sell_default)
-        ?? units.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base)
+      const u = units.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base)
         ?? units.find(u => u.sub_variant_id === selectedSubVariantId)
-      if (svUnit) return svUnit
+      if (u) return u
     }
-    return units.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_sell_default)
-      ?? units.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base)
-      ?? units.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
-      ?? units.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_sell_default)
-      ?? units.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
+    if (selectedVariantId) {
+      const u = units.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base)
+        ?? units.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
+      if (u) return u
+    }
+    return units.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
+      ?? units[0]
       ?? null
   })()
   const effectiveUnitKey = sellUnit?.unit ?? 'unit'
@@ -314,8 +316,9 @@ export default function ProductActions({
       max: qtyMax ?? null,
       step: qtyStep,
       factor: unitFactor,
+      dimension: sellUnit?.dimension ?? 'count',
     })
-  }, [effectiveUnitKey, effectiveUnitLabel])
+  }, [effectiveUnitKey, effectiveUnitLabel, qtyMin, qtyMax, qtyStep, unitFactor, sellUnit?.dimension])
 
   const handleAddToCart = async () => {
     setIsAddingToCart(true)
@@ -528,15 +531,21 @@ export default function ProductActions({
                     Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                   <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
-                  {showPerBasePrice && (
-                    <span className="text-base font-semibold text-foreground tabular-nums">
-                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
-                    </span>
-                  )}
                   <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap shrink-0">
                     ✦ {businessDiscountPct}% off
                   </span>
                 </div>
+                {/* Selling unit price + factor explanation on own line */}
+                {showPerBasePrice && (
+                  <div className="mb-1">
+                    <span className="text-base font-semibold text-foreground tabular-nums">
+                      Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                    </span>
+                    <span className="text-xs text-foreground-muted ml-2">
+                      (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                    </span>
+                  </div>
+                )}
                 {/* Total price */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm text-foreground-secondary">
@@ -555,18 +564,23 @@ export default function ProductActions({
                     Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                   <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
-                  {/* Selling unit price in white next to it */}
-                  {showPerBasePrice && (
-                    <span className="text-base font-semibold text-foreground tabular-nums">
-                      ₹{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
-                    </span>
-                  )}
                   {effectiveMrp && effectiveMrp > effectivePrice && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
                       Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   )}
                 </div>
+                {/* Selling unit price + factor explanation on own line */}
+                {showPerBasePrice && (
+                  <div className="mb-1">
+                    <span className="text-base font-semibold text-foreground tabular-nums">
+                      Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                    </span>
+                    <span className="text-xs text-foreground-muted ml-2">
+                      (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                    </span>
+                  </div>
+                )}
                 {/* Total = selling unit price × qty */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm text-foreground-secondary">

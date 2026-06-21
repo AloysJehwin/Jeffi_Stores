@@ -18,7 +18,6 @@ function makeBaseUnit(overrides: Partial<ProductUnit> = {}): ProductUnit {
     factor: 1,
     is_base: true,
     is_purchase_default: true,
-    is_sell_default: true,
     display_label: 'Piece',
     ...overrides,
   }
@@ -33,7 +32,6 @@ function makeUnit(overrides: Partial<ProductUnit>): ProductUnit {
     factor: 12,
     is_base: false,
     is_purchase_default: false,
-    is_sell_default: false,
     display_label: 'Box of 12',
     ...overrides,
   }
