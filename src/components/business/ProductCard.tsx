@@ -123,13 +123,13 @@ export default function ProductCard({
             )}
 
             {shownDiscount > 0 && (
-              <div className="absolute top-2 left-2 bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+              <div className="absolute top-2 left-12 bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                 {shownDiscount}% off
               </div>
             )}
 
-            {/* Share icon — top right, below ribbon */}
-            <div className="absolute top-16 right-2 flex flex-col gap-1.5">
+            {/* Share icon — top left */}
+            <div className="absolute top-2 left-2 flex flex-col gap-1.5">
               <button
                 onClick={handleShare}
                 aria-label="Share product"
