@@ -19,14 +19,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const items = await queryMany<any>(
     `SELECT ri.id, ri.description, ri.quantity, ri.unit, ri.requested_price, ri.notes,
-            ri.product_id, ri.variant_id,
+            ri.product_id, ri.variant_id, ri.sub_variant_id,
             p.slug AS product_slug,
             p.category_id,
             p.base_price AS catalog_price,
             p.mrp AS catalog_mrp,
-            pv.price AS variant_price,
-            pv.mrp AS variant_mrp,
-            pv.sku AS variant_sku,
+            COALESCE(psv.price, pv.price) AS variant_price,
+            COALESCE(psv.mrp, pv.mrp)   AS variant_mrp,
+            COALESCE(psv.sku, pv.sku)   AS variant_sku,
+            COALESCE(pu.factor, 1)       AS unit_factor,
             (SELECT pi.image_url FROM product_images pi
              WHERE pi.product_id = p.id
              ORDER BY pi.is_primary DESC, pi.display_order ASC LIMIT 1) AS image_url,
@@ -36,6 +37,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
      FROM business_rfq_items ri
      LEFT JOIN products p ON p.id = ri.product_id
      LEFT JOIN product_variants pv ON pv.id = ri.variant_id
+     LEFT JOIN product_sub_variants psv ON psv.id = ri.sub_variant_id
+     LEFT JOIN product_units pu ON pu.product_id = ri.product_id AND pu.unit = ri.unit
      LEFT JOIN quotation_items qi
        ON qi.quotation_id = $2
       AND qi.product_id = ri.product_id

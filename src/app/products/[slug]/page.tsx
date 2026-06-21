@@ -35,7 +35,7 @@ const getProductBySlug = cache(async (slug: string) => {
              'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
              'stock_status', pv.stock_status,
              'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value,
-             'sub_variant_type', pv.sub_variant_type,
+             'sub_variant_type', pv.sub_variant_type, 'sell_unit_id', pv.sell_unit_id,
              'variant_type', pv.variant_type,
              'variant_images', COALESCE(
                (SELECT json_agg(vi ORDER BY vi.display_order)
@@ -59,10 +59,10 @@ const getProductBySlug = cache(async (slug: string) => {
         (SELECT json_agg(
            json_build_object(
              'id', pu.id, 'variant_id', pu.variant_id, 'sub_variant_id', pu.sub_variant_id, 'unit', pu.unit,
-             'factor', pu.factor, 'is_base', pu.is_base, 'is_sell_default', pu.is_sell_default,
+             'factor', pu.factor, 'is_base', pu.is_base,
              'is_purchase_default', pu.is_purchase_default, 'display_label', pu.display_label,
              'dimension', pu.dimension, 'min_qty', pu.min_qty, 'max_qty', pu.max_qty, 'qty_step', pu.qty_step
-           ) ORDER BY pu.is_sell_default DESC, pu.is_base DESC
+           ) ORDER BY pu.is_base DESC
          )
          FROM product_units pu WHERE pu.product_id = p.id
         ),

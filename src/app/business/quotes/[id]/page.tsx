@@ -24,6 +24,7 @@ interface RFQItem {
   variant_price: number | null
   variant_mrp: number | null
   variant_sku: string | null
+  unit_factor: number
   image_url: string | null
   quoted_rate: number | null
   quoted_discount_pct: number | null
@@ -472,11 +473,14 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                 <div className="divide-y divide-border-default">
                   {items.map((item, i) => {
                     const offered = counterMap[item.id]
-                    const catalogUnit = item.variant_price ?? item.catalog_price
+                    const unitFactor = item.unit_factor > 1 ? item.unit_factor : 1
+                    const rawCatalogUnit = item.variant_price ?? item.catalog_price
+                    const catalogUnit = rawCatalogUnit != null ? Number(rawCatalogUnit) * unitFactor : null
                     const discountPct = item.category_id ? (discountMap[item.category_id] ?? 0) : 0
                     const businessUnitPrice = catalogUnit && discountPct > 0 ? applyDiscount(catalogUnit, discountPct) : null
                     const shownCatalogPrice = businessUnitPrice ?? catalogUnit
-                    const catalogMrp = item.variant_mrp ?? item.catalog_mrp
+                    const rawCatalogMrp = item.variant_mrp ?? item.catalog_mrp
+                    const catalogMrp = rawCatalogMrp != null ? Number(rawCatalogMrp) * unitFactor : null
 
                     // "Offered" = quoted_rate (finalized quotation, ex-GST → convert back to incl-GST after discount) or counter offer from messages (already incl-GST)
                     const quotedGstRate = item.quoted_gst_rate != null ? Number(item.quoted_gst_rate) : 18
@@ -793,7 +797,9 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                         <div className="space-y-1.5">
                           {latestCounter.counter_items!.map(ci => {
                             const item = items.find(it => it.id === ci.rfq_item_id)
-                            const catalogUnit = item ? (item.variant_price ?? item.catalog_price) : null
+                            const uf = item ? (item.unit_factor > 1 ? item.unit_factor : 1) : 1
+                            const rawCatalogUnit = item ? (item.variant_price ?? item.catalog_price) : null
+                            const catalogUnit = rawCatalogUnit != null ? Number(rawCatalogUnit) * uf : null
                             const discountPct = item?.category_id ? (discountMap[item.category_id] ?? 0) : 0
                             const businessPrice = catalogUnit && discountPct > 0 ? applyDiscount(catalogUnit, discountPct) : catalogUnit
                             const savingPct = businessPrice && businessPrice > 0

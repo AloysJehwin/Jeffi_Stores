@@ -4,6 +4,13 @@ import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import ProductImageGallery from '@/components/visitor/ProductImageGallery'
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 import ProductActions from '@/components/business/ProductActions'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 import { useAuth } from '@/contexts/AuthContext'
@@ -42,6 +49,7 @@ interface Variant {
   unit?: string
   numeric_value?: number | null
   sub_variant_type?: string | null
+  sell_unit_id?: string | null
   variant_images?: ProductImage[]
   sub_variants?: SubVariant[]
 }
@@ -90,11 +98,14 @@ interface ProductDetailClientProps {
       unit: string
       factor: number
       is_base: boolean
-      is_sell_default: boolean
       is_purchase_default: boolean
       display_label: string | null
       dimension: string
+      min_qty?: number | null
+      max_qty?: number | null
+      qty_step?: number | null
     }>
+    sell_unit_id?: string | null
   }
   initialSkuParam?: string
 }
@@ -198,7 +209,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
-  const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null; min: number; max: number | null; step: number; factor: number }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1 })
+  const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null; min: number; max: number | null; step: number; factor: number; dimension: string }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
   const { user } = useAuth()
   const { showToast } = useToast()
 
@@ -329,6 +340,9 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                       <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                         Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
+                      <span className="text-sm text-foreground-secondary">
+                        / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
+                      </span>
                       <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap shrink-0">
                         ✦ {businessDiscountPct}% off
                       </span>
@@ -340,11 +354,24 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                   <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
+                  <span className="text-sm text-foreground-secondary">
+                    / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
+                  </span>
                   {mrp && mrp > displayPrice && (
                     <span className="text-lg text-foreground-muted line-through tabular-nums">
                       Rs.&nbsp;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   )}
+                </div>
+              )}
+              {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 && (
+                <div className="mb-2">
+                  <span className="text-base font-semibold text-foreground">
+                    Rs.&nbsp;{(displayPrice * selectedUnit.factor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />
+                  </span>
+                  <span className="text-xs text-foreground-muted ml-2">
+                    (1 <UnitLabel label={selectedUnit.label ?? selectedUnit.key} /> = {selectedUnit.factor} pc × Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  </span>
                 </div>
               )}
               {mrpDiscount > 0 && (
@@ -403,6 +430,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
           categoryId={categoryId ?? null}
           productUnits={product.product_units ?? []}
+          sellUnitId={product.sell_unit_id ?? null}
         />
 
         {(() => {
@@ -423,6 +451,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                 unitMax: selectedUnit.max ?? undefined,
                 unitStep: selectedUnit.step,
                 unitFactor: selectedUnit.factor,
+                unitDimension: selectedUnit.dimension,
                 currentPrice: hasVariants ? null : displayPrice,
                 imageUrl: primaryImage?.image_url ?? null,
                 brandName: product.brands?.name ?? null,
@@ -433,6 +462,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                 businessDiscountPct: businessDiscountPct > 0 ? businessDiscountPct : undefined,
               }]}
               className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
+              unitMeta={selectedUnit}
+              productUnits={product.product_units ?? []}
             />
           )
         })()}

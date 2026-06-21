@@ -38,6 +38,7 @@ interface Variant {
   numeric_value?: number | null
   variant_type?: string | null
   sub_variant_type?: string | null
+  sell_unit_id?: string | null
   variant_images?: VariantImage[]
   sub_variants?: SubVariant[]
 }
@@ -49,7 +50,6 @@ interface ProductUnit {
   unit: string
   factor: number
   is_base: boolean
-  is_sell_default: boolean
   is_purchase_default: boolean
   display_label: string | null
   dimension: string
@@ -72,7 +72,9 @@ interface ProductActionsProps {
   initialSkuParam?: string
   discountPct?: number | null
   onVariantChange?: (variant: Variant | null) => void
+  onUnitChange?: (unitKey: string, unitLabel: string | null, unitMeta: { min: number; max: number | null; step: number; factor: number; dimension: string }) => void
   productUnits?: ProductUnit[]
+  sellUnitId?: string | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -101,7 +103,7 @@ export default function ProductActions({
   productId, productName, sku, stockStatus,
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
-  onVariantChange, productUnits: productUnitsProp,
+  onVariantChange, onUnitChange, productUnits: productUnitsProp, sellUnitId,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -240,23 +242,24 @@ export default function ProductActions({
     : null
 
   const productUnits = productUnitsProp ?? []
+  const effectiveSellUnitId = selectedVariant?.sell_unit_id ?? sellUnitId ?? null
   const sellUnit = (() => {
-    if (!selectedVariantId) {
-      return productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_sell_default)
-        ?? productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
-        ?? null
+    if (effectiveSellUnitId) {
+      const u = productUnits.find(u => u.id === effectiveSellUnitId)
+      if (u) return u
     }
     if (selectedSubVariantId) {
-      const svUnit = productUnits.find(u => u.sub_variant_id === selectedSubVariantId && u.is_sell_default)
-        ?? productUnits.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base)
+      const u = productUnits.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base)
         ?? productUnits.find(u => u.sub_variant_id === selectedSubVariantId)
-      if (svUnit) return svUnit
+      if (u) return u
     }
-    return productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_sell_default)
-      ?? productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base)
-      ?? productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
-      ?? productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_sell_default)
-      ?? productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
+    if (selectedVariantId) {
+      const u = productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base)
+        ?? productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
+      if (u) return u
+    }
+    return productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
+      ?? productUnits[0]
       ?? null
   })()
   const effectiveUnitKey = sellUnit?.unit ?? 'unit'
@@ -289,6 +292,16 @@ export default function ProductActions({
     setQuantity(initial)
     setQuantityRaw(isContinuous ? Number(initial.toFixed(6)).toString() : String(initial))
   }, [effectiveUnitKey])
+
+  useEffect(() => {
+    onUnitChange?.(effectiveUnitKey, effectiveUnitLabel ?? null, {
+      min: qtyMin,
+      max: qtyMax ?? null,
+      step: qtyStep,
+      factor: unitFactor,
+      dimension: sellUnit?.dimension ?? 'count',
+    })
+  }, [effectiveUnitKey, effectiveUnitLabel, qtyMin, qtyMax, qtyStep, unitFactor, sellUnit?.dimension])
 
   const handleAddToCart = async () => {
     setIsAddingToCart(true)

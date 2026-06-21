@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import CustomSelect from '@/components/visitor/CustomSelect'
+import QuantityInput from '@/components/shared/QuantityInput'
 import { applyDiscount } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
 
@@ -41,6 +42,7 @@ interface QuoteItem {
   unitMax?: number
   unitStep?: number
   unitFactor?: number
+  unitDimension?: string
   currentPrice?: number | null
   imageUrl?: string | null
   brandName?: string | null
@@ -51,19 +53,37 @@ interface QuoteItem {
   businessDiscountPct?: number
 }
 
+interface ProductUnit {
+  id: string
+  variant_id: string | null
+  sub_variant_id: string | null
+  unit: string
+  factor: number
+  is_base: boolean
+  display_label: string | null
+  dimension: string
+  min_qty?: number | null
+  max_qty?: number | null
+  qty_step?: number | null
+}
+
 interface Props {
   items: QuoteItem[]
   className?: string
   label?: string
+  unitMeta?: { key: string; label: string | null; min: number; max: number | null; step: number; factor: number; dimension: string }
+  productUnits?: ProductUnit[]
+  sellUnitId?: string | null
 }
 
 
 const MAX_DISCOUNT_PCT = 30
 
-function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
+function PriceBreakdown({ currentPrice, requestedPrice, discountPct, unitLabel }: {
   currentPrice: number
   requestedPrice: string
   discountPct: string
+  unitLabel?: string
 }) {
   const target = requestedPrice ? parseFloat(requestedPrice) : null
   const pct = discountPct ? parseFloat(discountPct) : null
@@ -103,7 +123,7 @@ function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
       {!overLimit && saving != null && saving > 0 && (
         <div className="px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border-t border-green-100 dark:border-green-900/40 text-center">
           <p className="text-[10px] font-medium text-green-700 dark:text-green-400">
-            Potential saving of ₹{saving.toLocaleString('en-IN', { minimumFractionDigits: 2 })} per unit if approved
+            Potential saving of ₹{saving.toLocaleString('en-IN', { minimumFractionDigits: 2 })} per {unitLabel || 'unit'} if approved
           </p>
         </div>
       )}
@@ -118,11 +138,13 @@ function PriceBreakdown({ currentPrice, requestedPrice, discountPct }: {
 
 type FieldState = {
   quantity: number
+  quantityRaw: string
   unit: string
   unitMin: number
   unitMax: number | null
   unitStep: number
   unitFactor: number
+  unitDimension: string
   requested_price: string
   discount_pct: string
   notes: string
@@ -131,9 +153,11 @@ type FieldState = {
 }
 
 function resolveItemState(item: QuoteItem, f: FieldState) {
+  const unitFactor = f.unitFactor > 1 ? f.unitFactor : 1
   if (!item.variants?.length) {
+    const basePrice = item.currentPrice ?? null
     return {
-      currentPrice: item.currentPrice ?? null,
+      currentPrice: basePrice != null ? basePrice * unitFactor : null,
       sku: item.sku ?? null,
       stockStatus: item.stockStatus ?? null,
       description: item.description,
@@ -145,9 +169,10 @@ function resolveItemState(item: QuoteItem, f: FieldState) {
   const subVariant = variant?.sub_variants?.find(sv => sv.id === f.selectedSubVariantId) ?? null
   const rawPrice = subVariant?.price ?? variant?.price ?? null
   const discPct = item.businessDiscountPct ?? 0
-  const currentPrice = rawPrice != null
+  const basePrice = rawPrice != null
     ? (discPct > 0 ? applyDiscount(Number(rawPrice), discPct) : Number(rawPrice))
     : item.currentPrice ?? null
+  const currentPrice = basePrice != null ? basePrice * unitFactor : null
   const sku = subVariant?.sku || variant?.sku || item.sku || null
   const itemStockStatus = subVariant?.stock_status ?? variant?.stock_status ?? null
   const stockStatus: 'in' | 'out' | null = itemStockStatus != null ? (itemStockStatus !== 'Out of Stock' ? 'in' : 'out') : item.stockStatus ?? null
@@ -166,7 +191,7 @@ function itemHasInput(f: FieldState) {
   return !!(f.requested_price || f.discount_pct || f.notes)
 }
 
-export default function RequestQuoteButton({ items, className, label = 'Request Quote' }: Props) {
+export default function RequestQuoteButton({ items, className, label = 'Request Quote', unitMeta, productUnits = [], sellUnitId }: Props) {
   const { user } = useAuth()
   const { showToast } = useToast()
   const router = useRouter()
@@ -178,11 +203,13 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
   const [fields, setFields] = useState<FieldState[]>(() =>
     items.map(item => ({
       quantity: item.quantity || 1,
+      quantityRaw: String(item.quantity || 1),
       unit: item.unit || 'Nos',
       unitMin: item.unitMin ?? 1,
       unitMax: item.unitMax ?? null,
       unitStep: item.unitStep ?? 1,
       unitFactor: item.unitFactor ?? 1,
+      unitDimension: item.unitDimension ?? 'count',
       requested_price: '',
       discount_pct: '',
       notes: '',
@@ -191,6 +218,25 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
     }))
   )
   const [overallNotes, setOverallNotes] = useState('')
+
+  useEffect(() => {
+    if (!open || !unitMeta) return
+    setFields(prev => prev.map((f, idx) => {
+      if (idx !== activeIdx) return f
+      const newMin = unitMeta.min
+      return {
+        ...f,
+        unit: unitMeta.key,
+        unitMin: newMin,
+        unitMax: unitMeta.max,
+        unitStep: unitMeta.step,
+        unitFactor: unitMeta.factor,
+        unitDimension: unitMeta.dimension,
+        quantity: newMin,
+        quantityRaw: String(newMin),
+      }
+    }))
+  }, [unitMeta, open, activeIdx])
 
   if (!user?.isBusiness || user.approvalStatus !== 'approved') return null
 
@@ -209,15 +255,55 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
   }
 
   function updateVariantSelection(i: number, variantId: string, subVariantId: string) {
-    setFields(prev => prev.map((f, idx) =>
-      idx !== i ? f : { ...f, selectedVariantId: variantId, selectedSubVariantId: subVariantId }
-    ))
+    const resolvedUnit = (() => {
+      if (!productUnits.length) return null
+      // Determine sell_unit_id: check the variant in items (passed via sellUnitId at product level)
+      // For sub-variant products, the variant's sell_unit_id drives the default sell unit.
+      // We look up the unit by sell_unit_id first, then fall back to is_base.
+      const effectiveSellUnitId = sellUnitId ?? null
+      if (effectiveSellUnitId) {
+        const u = productUnits.find(u => u.id === effectiveSellUnitId)
+        if (u) return u
+      }
+      if (subVariantId) {
+        const u = productUnits.find(u => u.sub_variant_id === subVariantId && u.is_base)
+          ?? productUnits.find(u => u.sub_variant_id === subVariantId)
+        if (u) return u
+      }
+      if (variantId) {
+        const u = productUnits.find(u => u.variant_id === variantId && u.sub_variant_id === null && u.is_base)
+          ?? productUnits.find(u => u.variant_id === variantId && u.sub_variant_id === null)
+        if (u) return u
+      }
+      return productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
+        ?? null
+    })()
+    setFields(prev => prev.map((f, idx) => {
+      if (idx !== i) return f
+      return {
+        ...f,
+        selectedVariantId: variantId,
+        selectedSubVariantId: subVariantId,
+        ...(resolvedUnit ? {
+          unit: resolvedUnit.unit,
+          unitFactor: Number(resolvedUnit.factor),
+          unitDimension: resolvedUnit.dimension,
+          unitMin: resolvedUnit.min_qty != null ? Number(resolvedUnit.min_qty) : 1,
+          unitMax: resolvedUnit.max_qty != null ? Number(resolvedUnit.max_qty) : null,
+          unitStep: resolvedUnit.qty_step != null ? Number(resolvedUnit.qty_step) : (resolvedUnit.dimension === 'count' ? 1 : 0.001),
+          quantity: resolvedUnit.min_qty != null ? Number(resolvedUnit.min_qty) : 1,
+          quantityRaw: String(resolvedUnit.min_qty != null ? Number(resolvedUnit.min_qty) : 1),
+        } : {}),
+      }
+    }))
   }
 
   function handleOpen() {
     setFields(items.map(item => ({
       quantity: item.quantity || 1,
+      quantityRaw: String(item.quantity || 1),
       unit: item.unit || 'Nos',
+      unitDimension: item.unitDimension ?? 'count',
       unitMin: item.unitMin ?? 1,
       unitMax: item.unitMax ?? null,
       unitStep: item.unitStep ?? 1,
@@ -288,6 +374,15 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
   const activeItem = items[activeIdx]
   const activeField = fields[activeIdx]
   const activeResolved = resolveItemState(activeItem, activeField)
+
+  const hasOverLimit = fields.some((f, i) => {
+    const resolved = resolveItemState(items[i], f)
+    if (!resolved.currentPrice || !f.requested_price) return false
+    const target = parseFloat(f.requested_price)
+    if (isNaN(target)) return false
+    return target < applyDiscount(resolved.currentPrice, MAX_DISCOUNT_PCT)
+  })
+
   const activeVariant = activeItem.variants?.find(v => v.id === activeField.selectedVariantId) ?? null
   const activeSubVariants = activeVariant?.sub_variants?.filter(sv => sv.is_active !== false) ?? []
   const hasVariantSelector = (activeItem.variants?.length ?? 0) > 0
@@ -524,28 +619,25 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">
                         Quantity <span className="text-red-500">*</span>
                       </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          min={activeField.unitMin}
-                          max={activeField.unitMax ?? undefined}
-                          step={activeField.unitStep}
-                          value={activeField.quantity}
-                          onChange={e => updateField(activeIdx, 'quantity', e.target.value)}
-                          className="flex-1 px-3 py-[10px] text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-                        />
-                        <span className="inline-flex items-center px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-sm font-medium text-foreground-secondary whitespace-nowrap">
-                          {activeField.unit || 'Nos'}
-                        </span>
-                      </div>
+                      <QuantityInput
+                        dimension={activeField.unitDimension}
+                        quantity={activeField.quantity}
+                        quantityRaw={activeField.quantityRaw}
+                        unitLabel={activeField.unit || null}
+                        unitKey={activeField.unit || 'Nos'}
+                        effectiveStock={activeField.unitMax ?? 9999}
+                        qtyStep={activeField.unitStep}
+                        qtyMin={activeField.unitMin}
+                        qtyMax={activeField.unitMax ?? undefined}
+                        onChange={(qty, raw) => {
+                          setFields(prev => prev.map((f, idx) =>
+                            idx !== activeIdx ? f : { ...f, quantity: qty, quantityRaw: raw }
+                          ))
+                        }}
+                      />
                       {activeField.unitFactor > 1 && (
                         <p className="mt-1 text-[11px] text-foreground-muted">
                           = {Math.round(Number(activeField.quantity) * activeField.unitFactor)} pcs
-                        </p>
-                      )}
-                      {(activeField.unitMin > 1 || activeField.unitMax != null || activeField.unitStep !== 1) && (
-                        <p className="mt-0.5 text-[11px] text-foreground-muted">
-                          Min {activeField.unitMin}{activeField.unitMax != null ? ` · Max ${activeField.unitMax}` : ''}{activeField.unitStep !== 1 ? ` · Step ${activeField.unitStep}` : ''}
                         </p>
                       )}
                     </div>
@@ -557,7 +649,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                       </p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[11px] text-foreground-muted mb-1">₹ per unit</label>
+                          <label className="block text-[11px] text-foreground-muted mb-1">₹ per {activeField.unit || 'unit'}</label>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted text-sm">₹</span>
                             <input
@@ -566,7 +658,9 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                               step={0.01}
                               value={activeField.requested_price}
                               onChange={e => updateField(activeIdx, 'requested_price', e.target.value)}
-                              placeholder="e.g. 350.00"
+                              placeholder={activeResolved.currentPrice
+                                ? `e.g. ${(activeResolved.currentPrice * 0.9).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                                : 'e.g. 350.00'}
                               className="w-full pl-7 pr-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
                             />
                           </div>
@@ -593,6 +687,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                           currentPrice={activeResolved.currentPrice}
                           requestedPrice={activeField.requested_price}
                           discountPct={activeField.discount_pct}
+                          unitLabel={activeField.unit || undefined}
                         />
                       )}
                     </div>
@@ -648,10 +743,16 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                   </div>
 
                   {/* Footer inside right panel */}
-                  <div className="px-5 py-4 border-t border-border-default shrink-0 flex gap-3">
+                  <div className="px-5 py-4 border-t border-border-default shrink-0 space-y-2">
+                    {hasOverLimit && (
+                      <p className="text-xs text-red-500 dark:text-red-400 text-center">
+                        Target price exceeds the 30% discount limit — please adjust before submitting.
+                      </p>
+                    )}
+                    <div className="flex gap-3">
                     <button
                       onClick={handleSubmit}
-                      disabled={loading || !fields.some(itemHasInput)}
+                      disabled={loading || !fields.some(itemHasInput) || hasOverLimit}
                       className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
@@ -664,6 +765,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                     >
                       Cancel
                     </button>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -36,6 +36,7 @@ interface RFQItem {
   sub_variant_sku: string | null
   sub_variant_price: number | null
   sub_variant_mrp: number | null
+  unit_factor: number
 }
 
 interface RFQ {
@@ -86,29 +87,26 @@ function fmtTime(iso: string) {
 }
 
 function resolveItemMrp(item: RFQItem): number | null {
+  const unitFactor = item.unit_factor > 1 ? item.unit_factor : 1
   const rawMrp = item.sub_variant_mrp ?? item.variant_mrp ?? item.product_mrp ?? null
   if (rawMrp == null) return null
-  const mrp = Number(rawMrp)
+  const mrp = Number(rawMrp) * unitFactor
   // Detect Unbrako-style data: MRP column stores ex-GST value (equals price_ex_gst).
   // In that case convert to incl-GST so it's comparable to selling price.
   const rawPriceExGst = item.sub_variant_price ?? item.variant_price ?? item.base_price ?? null
-  // variant_price in DB is incl-GST; variant_price_ex_gst fields aren't in RFQItem — use product_price_ex_gst as fallback
-  // We detect: if mrp == product_price_ex_gst or variant is ex-gst by checking mrp < base_price
-  // Simpler: if mrp < (selling price / 1.18 * 0.99) it's likely already ex-GST anchor; convert it
-  const sellingInclGst = rawPriceExGst != null ? Number(rawPriceExGst) : null
+  const sellingInclGst = rawPriceExGst != null ? Number(rawPriceExGst) * unitFactor : null
   const gstRate = item.product_gst != null ? Number(item.product_gst) : 18
-  // If mrp == price_ex_gst (within rounding), it's stored as ex-GST — convert to incl-GST
   const priceExGstFromVariant = sellingInclGst != null ? sellingInclGst / (1 + gstRate / 100) : null
-  if (priceExGstFromVariant != null && Math.abs(mrp - priceExGstFromVariant) < 1) {
-    return mrp * (1 + gstRate / 100)
+  if (priceExGstFromVariant != null && Math.abs(Number(rawMrp) - priceExGstFromVariant / unitFactor) < 1) {
+    return Number(rawMrp) * (1 + gstRate / 100) * unitFactor
   }
   return mrp
 }
 
 function resolveItemSellingPrice(item: RFQItem): number | null {
-  // Regular retail customer price (incl. GST)
+  const unitFactor = item.unit_factor > 1 ? item.unit_factor : 1
   const raw = item.sub_variant_price ?? item.variant_price ?? item.base_price ?? null
-  return raw != null ? Number(raw) : null
+  return raw != null ? Number(raw) * unitFactor : null
 }
 
 function resolveItemPrice(item: RFQItem): number | null {
@@ -343,7 +341,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
           </div>
           <div className="shrink-0 flex flex-col items-end gap-2">
             {rfq.status === 'pending' && (
-              <>
+              <div className="flex items-center gap-2">
                 <button onClick={() => handleStatusChange('reviewed')} disabled={actionLoading}
                   className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60">
                   Mark Reviewed
@@ -352,7 +350,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                   className="px-4 py-2 border border-red-400 text-red-300 text-sm font-semibold rounded-lg hover:bg-red-900/30 transition-colors">
                   Reject
                 </button>
-              </>
+              </div>
             )}
             {(rfq.status === 'reviewed' || rfq.status === 'negotiating' || rfq.status === 'offer_accepted') && (
               <button onClick={() => setConfirmOpen(true)} disabled={converting}
