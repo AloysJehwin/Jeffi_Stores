@@ -121,7 +121,18 @@ export async function recordSent(params: {
         JSON.stringify(params.metadata ?? {}),
       ]
     )
-    return result.rows[0]?.id ?? null
+    const sentId = result.rows[0]?.id ?? null
+    if (sentId) {
+      await query(
+        `INSERT INTO campaign_send_counts (campaign_kind, user_id, send_count, last_sent_at)
+         VALUES ($1, $2, 1, NOW())
+         ON CONFLICT (campaign_kind, user_id) DO UPDATE
+           SET send_count   = campaign_send_counts.send_count + 1,
+               last_sent_at = NOW()`,
+        [params.campaignKind, params.userId]
+      )
+    }
+    return sentId
   } catch {
     return null
   }

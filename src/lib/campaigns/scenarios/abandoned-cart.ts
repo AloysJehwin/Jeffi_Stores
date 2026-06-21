@@ -25,13 +25,13 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
   description: 'Customer left items in cart without checking out',
   trigger: 'Fires when a logged-in customer adds items to their cart, then leaves the cart untouched for at least the campaign\'s delay (in hours). Sends at most once per cooldown window per user. Skipped if cart is empty or if user opted out of marketing.',
   defaultParams: {
-    lookbackDays: 7,
+    lookbackDays: 30,
     sendCooldownDays: 7,
     maxRecipientsPerSweep: 50,
     maxItemsPerEmail: 5,
   },
   paramSchema: {
-    lookbackDays:          { type: 'integer', min: 1, max: 30,  label: 'Lookback (days)',          description: 'Only consider carts updated in the last N days' },
+    lookbackDays:          { type: 'integer', min: 1, max: 90,  label: 'Lookback (days)',          description: 'Only consider carts updated in the last N days' },
     sendCooldownDays:      { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)', description: 'Skip users sent this campaign within N days' },
     maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',   description: 'Hard limit per sweep' },
     maxItemsPerEmail:      { type: 'integer', min: 1, max: 10,  label: 'Items shown in email',     description: 'Cap on cart items rendered in the email body' },

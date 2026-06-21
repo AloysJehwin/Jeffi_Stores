@@ -69,6 +69,7 @@ interface RecentSend {
   bounced_at: string | null
   user_email: string | null
   user_name: string | null
+  send_count: number
 }
 
 interface CouponOption {
@@ -796,7 +797,14 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                       <p className="text-sm text-foreground truncate">{s.user_name || s.user_email}</p>
                       <p className="text-[10px] text-foreground-muted">{new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
                     </div>
-                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {s.send_count > 1 && (
+                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                          #{s.send_count} sends
+                        </span>
+                      )}
+                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
+                    </div>
                   </div>
                 )
               })}
