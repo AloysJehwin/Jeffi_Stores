@@ -61,15 +61,46 @@ export async function POST(
       : (quotation.buyer_email || quotation.consignee_email || null)
 
     // Fetch unit factor for every quotation item (needed to compute effectiveQty = qty × factor for count-dimension units)
+    // Uses sold_unit_factor when pre-computed (RFQ→quotation path), otherwise resolves from product_units by
+    // buy_unit (manually created quotations) or unit (RFQ-converted items where buy_unit may be NULL).
     const unitFactorRows = await queryMany<any>(
       `SELECT
          qi.id AS item_id,
-         COALESCE(puv.factor, pup.factor, 1)::numeric AS factor,
-         COALESCE(puv.dimension, pup.dimension, 'count') AS dimension
+         CASE
+           WHEN qi.sold_unit_factor IS NOT NULL THEN qi.sold_unit_factor
+           ELSE COALESCE(
+             puv.factor,
+             pup.factor,
+             puuv.factor,
+             puup.factor,
+             pu_sv.factor,
+             pu_sp.factor,
+             1
+           )
+         END::numeric AS factor,
+         CASE
+           WHEN qi.sold_unit_factor IS NOT NULL THEN 'count'
+           ELSE COALESCE(
+             puv.dimension,
+             pup.dimension,
+             puuv.dimension,
+             puup.dimension,
+             pu_sv.dimension,
+             pu_sp.dimension,
+             'count'
+           )
+         END AS dimension
        FROM quotation_items qi
-       LEFT JOIN product_units puv ON puv.unit = qi.buy_unit AND puv.product_id = qi.product_id AND puv.variant_id = qi.variant_id
-       LEFT JOIN product_units pup ON pup.unit = qi.buy_unit AND pup.product_id = qi.product_id AND pup.variant_id IS NULL
+       LEFT JOIN product_units puv  ON puv.unit  = qi.buy_unit AND puv.product_id = qi.product_id AND puv.variant_id = qi.variant_id AND qi.buy_unit IS NOT NULL
+       LEFT JOIN product_units pup  ON pup.unit  = qi.buy_unit AND pup.product_id = qi.product_id AND pup.variant_id IS NULL         AND qi.buy_unit IS NOT NULL
          AND (qi.variant_id IS NULL OR puv.id IS NULL)
+       LEFT JOIN product_units puuv ON puuv.unit = qi.unit     AND puuv.product_id = qi.product_id AND puuv.variant_id = qi.variant_id AND qi.buy_unit IS NULL AND qi.sold_unit_factor IS NULL
+       LEFT JOIN product_units puup ON puup.unit = qi.unit     AND puup.product_id = qi.product_id AND puup.variant_id IS NULL         AND qi.buy_unit IS NULL AND qi.sold_unit_factor IS NULL
+         AND (qi.variant_id IS NULL OR puuv.id IS NULL)
+       LEFT JOIN product_variants pvar ON pvar.id = qi.variant_id
+       LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
+       LEFT JOIN products prod ON prod.id = qi.product_id AND qi.variant_id IS NULL
+       LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
        WHERE qi.quotation_id = $1`,
       [id]
     )
