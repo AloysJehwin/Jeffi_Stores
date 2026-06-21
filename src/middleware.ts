@@ -3,6 +3,24 @@ import type { NextRequest } from 'next/server'
 import { verifyToken } from './lib/jwt'
 import { getScopeForPath, hasScope } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
+import { jwtVerify } from 'jose'
+
+if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
+const BUSINESS_JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
+
+async function verifyBusinessToken(token: string): Promise<{ userId: string; email: string; approvalStatus: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, BUSINESS_JWT_SECRET)
+    if (payload.type !== 'business' || !payload.isBusiness) return null
+    return {
+      userId: payload.userId as string,
+      email: payload.email as string,
+      approvalStatus: (payload.approvalStatus as string) || 'pending',
+    }
+  } catch {
+    return null
+  }
+}
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -103,8 +121,8 @@ export async function middleware(request: NextRequest) {
       if (!token) {
         return NextResponse.redirect(buildRedirectUrl(request, '/signin'))
       }
-      const payload = await verifyToken(token)
-      if (!payload || !payload.isBusiness) {
+      const payload = await verifyBusinessToken(token)
+      if (!payload) {
         const res = NextResponse.redirect(buildRedirectUrl(request, '/signin'))
         res.cookies.delete('business_auth_token')
         return res
@@ -130,8 +148,8 @@ export async function middleware(request: NextRequest) {
       if (!token) {
         return NextResponse.redirect(buildRedirectUrl(request, '/business/signin'))
       }
-      const payload = await verifyToken(token)
-      if (!payload || !payload.isBusiness) {
+      const payload = await verifyBusinessToken(token)
+      if (!payload) {
         const res = NextResponse.redirect(buildRedirectUrl(request, '/business/signin'))
         res.cookies.delete('business_auth_token')
         return res
