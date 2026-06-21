@@ -511,20 +511,17 @@ export default function ProductActions({
           <div className="bg-surface rounded-lg p-6">
             {businessDiscountPct > 0 ? (
               <>
-                {/* MRP struck through as single reference */}
-                {effectiveMrp && effectiveMrp > effectivePrice && (
-                  <div className="mb-2">
-                    <span className="text-base text-foreground-muted line-through tabular-nums">
-                      MRP Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {/* Big orange = effective price */}
+                {/* Big orange = effective price, MRP inline struck through */}
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                   <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
+                  {effectiveMrp && effectiveMrp > effectivePrice && (
+                    <span className="text-xl text-foreground-muted line-through tabular-nums">
+                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
                 </div>
                 {/* Selling unit price + factor explanation on own line */}
                 {showPerBasePrice && (

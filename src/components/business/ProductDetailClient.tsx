@@ -321,13 +321,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             <div className="bg-surface rounded-lg p-4 sm:p-6 mb-6">
               {businessDiscountPct > 0 ? (
                 <>
-                  {mrp && mrp > displayPrice && (
-                    <div className="mb-2">
-                      <span className="text-base text-foreground-muted line-through tabular-nums">
-                        MRP Rs.&nbsp;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  )}
                   <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                     <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                       Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -335,6 +328,11 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                     <span className="text-sm text-foreground-secondary">
                       / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
                     </span>
+                    {mrp && mrp > displayPrice && (
+                      <span className="text-xl text-foreground-muted line-through tabular-nums">
+                        Rs.&nbsp;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    )}
                   </div>
                   {mrp && mrp > displayPrice && (
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
