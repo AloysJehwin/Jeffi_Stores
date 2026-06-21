@@ -116,6 +116,11 @@ export default function ProductCard({
                 </svg>
               </div>
             )}
+            {discountPct > 0 && (
+              <div className="absolute top-4 right-[-30px] w-36 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[10px] font-bold text-center py-1 shadow-md pointer-events-none select-none z-10">
+                {discountPct}% off
+              </div>
+            )}
 
             {shownDiscount > 0 && (
               <div className="absolute top-2 left-2 bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
