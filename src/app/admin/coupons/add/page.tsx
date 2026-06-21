@@ -33,8 +33,8 @@ async function createCoupon(formData: FormData) {
     throw new Error('Failed to create coupon — code may already exist')
   }
   revalidatePath('/admin/coupons')
-  const { headers: getHeaders } = await import('next/headers')
-  const host = (await getHeaders()).get('host') ?? ''
+  
+  const host = (await headers()).get('host') ?? ''
   redirect(ap('/admin/coupons', host))
 }
 

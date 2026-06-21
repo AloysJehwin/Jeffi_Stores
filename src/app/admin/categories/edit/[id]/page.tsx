@@ -50,8 +50,8 @@ async function updateCategory(categoryId: string, formData: FormData) {
   revalidatePath('/admin/products/add')
   revalidatePath('/admin/products/edit/[id]', 'page')
 
-  const { headers: getHeaders } = await import('next/headers')
-  const host = (await getHeaders()).get('host') ?? ''
+  
+  const host = (await headers()).get('host') ?? ''
   redirect(ap('/admin/categories', host))
 }
 
