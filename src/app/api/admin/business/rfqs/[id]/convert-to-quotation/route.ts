@@ -160,10 +160,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const effectiveExGst = effectivePriceInclGst / (1 + gstRate / 100)
 
       if (baseRateExGst > 0 && effectiveExGst < baseRateExGst) {
+        // Negotiated price is below MRP — back-calculate the discount %
         discountPct = Math.round((1 - effectiveExGst / baseRateExGst) * 100 * 100) / 100
+      } else if (baseRateExGst > 0) {
+        // Negotiated price is at or above MRP — use MRP as rate, show business discount
+        discountPct = businessDiscPct
       } else {
+        // No MRP on file — use effective price as rate, show business discount
         baseRateExGst = effectiveExGst
-        discountPct = 0
+        discountPct = businessDiscPct
       }
     } else {
       discountPct = businessDiscPct
