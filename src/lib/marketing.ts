@@ -85,11 +85,15 @@ export async function alreadySentForReference(
   userId: string,
   referenceId: string | null
 ): Promise<boolean> {
+  const timeFilter = referenceId === null
+    ? `AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`
+    : ''
   const row = await queryOne<{ id: string }>(
     `SELECT id FROM email_campaigns_sent
      WHERE campaign_kind = $1 AND user_id = $2
        AND COALESCE(reference_id, '') = COALESCE($3, '')
        AND unsubscribed_at IS NULL AND bounced_at IS NULL AND complained_at IS NULL
+       ${timeFilter}
      LIMIT 1`,
     [campaignKind, userId, referenceId]
   )
