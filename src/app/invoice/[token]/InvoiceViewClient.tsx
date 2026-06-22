@@ -156,8 +156,17 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
               <tbody className="divide-y divide-gray-100">
                 {items.map((item: any, i: number) => {
                   const itemDiscount = Number(item.discount_amount) || 0
-                  const grossTotal = Number(item.total_price) + itemDiscount
-                  const discPct = grossTotal > 0 && itemDiscount > 0 ? (itemDiscount / grossTotal) * 100 : 0
+                  const mrpVal = item.mrp != null ? Number(item.mrp) : null
+                  const qty = Number(item.quantity)
+                  let discPct = 0
+                  if (mrpVal != null && mrpVal > 0 && qty > 0) {
+                    const mrpTotal = mrpVal * qty
+                    const sellingTotal = Number(item.total_price)
+                    discPct = mrpTotal > sellingTotal ? ((mrpTotal - sellingTotal) / mrpTotal) * 100 : 0
+                  } else {
+                    const grossTotal = Number(item.total_price) + itemDiscount
+                    discPct = grossTotal > 0 && itemDiscount > 0 ? (itemDiscount / grossTotal) * 100 : 0
+                  }
                   const discLabel = discPct >= 0.01 ? `${discPct.toFixed(2)}%` : '—'
                   const unitExclGST = Number(item.taxable_amount) > 0 && Number(item.quantity) > 0
                     ? Number(item.taxable_amount) / Number(item.quantity)

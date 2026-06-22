@@ -120,6 +120,7 @@ export async function GET(
       unit_price: parseFloat(item.unit_price),
       total_price: parseFloat(item.total_price),
       discount_amount: parseFloat(item.discount_amount || '0'),
+      mrp: item.mrp != null ? parseFloat(item.mrp) : null,
       taxable_amount: parseFloat(item.taxable_amount || '0'),
       cgst_amount: parseFloat(item.cgst_amount || '0'),
       sgst_amount: parseFloat(item.sgst_amount || '0'),
@@ -233,7 +234,6 @@ export async function GET(
       },
     })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to generate invoice' }, { status: 500 })
   }
 }
@@ -278,7 +278,6 @@ export async function POST(
 
     return NextResponse.json({ success: true, invoiceNumber: updated?.invoice_number || null })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to generate invoice' }, { status: 500 })
   }
 }

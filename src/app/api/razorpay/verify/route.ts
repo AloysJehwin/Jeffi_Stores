@@ -108,15 +108,15 @@ async function commitDraft(args: {
     taxAmount = cartTaxAmount(cartItems)
   } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
     const product = await queryOne<any>(
-      `SELECT id, name, sku, gst_percentage, hsn_code FROM products WHERE id = $1`,
+      `SELECT id, name, sku, gst_percentage, hsn_code, mrp FROM products WHERE id = $1`,
       [draft.buyNowItem.productId]
     )
     if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     const variant = draft.buyNowItem.variantId
-      ? await queryOne<any>(`SELECT id, variant_name, sku FROM product_variants WHERE id = $1`, [draft.buyNowItem.variantId])
+      ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [draft.buyNowItem.variantId])
       : null
     const subVariant = draft.buyNowItem.subVariantId
-      ? await queryOne<any>(`SELECT id, sub_variant_name, sku FROM product_sub_variants WHERE id = $1`, [draft.buyNowItem.subVariantId])
+      ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [draft.buyNowItem.subVariantId])
       : null
     buyNowSnapshot = { product, variant, subVariant }
     subtotal = draft.buyNowItem.price * draft.buyNowItem.qty

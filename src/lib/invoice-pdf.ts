@@ -26,6 +26,7 @@ export interface InvoiceOrderItem {
   unit_price: number
   total_price: number
   discount_amount?: number
+  mrp?: number | null
   taxable_amount: number
   cgst_amount: number
   sgst_amount: number
@@ -389,8 +390,15 @@ export async function generateInvoicePDF(
         : `${parseFloat(String(item.quantity))} ${unitLabel}`
       const perLabel = unitLabel
 
-      const grossTotal = item.total_price + (item.discount_amount || 0)
-      const discPct = grossTotal > 0 && (item.discount_amount || 0) > 0 ? ((item.discount_amount || 0) / grossTotal) * 100 : 0
+      let discPct = 0
+      if (item.mrp != null && item.mrp > 0 && item.quantity > 0) {
+        const mrpTotal = item.mrp * item.quantity
+        const sellingTotal = item.total_price
+        discPct = mrpTotal > sellingTotal ? ((mrpTotal - sellingTotal) / mrpTotal) * 100 : 0
+      } else {
+        const grossTotal = item.total_price + (item.discount_amount || 0)
+        discPct = grossTotal > 0 && (item.discount_amount || 0) > 0 ? ((item.discount_amount || 0) / grossTotal) * 100 : 0
+      }
       const discLabel = discPct >= 0.01 ? `${discPct.toFixed(2)}%` : ''
 
       const rowData = [
