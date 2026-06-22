@@ -23,9 +23,10 @@ export interface CartLine {
     gst_percentage: string | number | null
     hsn_code: string | null
     category_id: string | null
+    mrp: number | null
   }
-  variant: { id: string; variant_name: string; sku: string; price: number | null; price_ex_gst: number | null } | null
-  sub_variant: { id: string; sub_variant_name: string; sku: string | null; price: number | null; price_ex_gst: number | null } | null
+  variant: { id: string; variant_name: string; sku: string; price: number | null; price_ex_gst: number | null; mrp: number | null } | null
+  sub_variant: { id: string; sub_variant_name: string; sku: string | null; price: number | null; price_ex_gst: number | null; mrp: number | null } | null
 }
 
 export async function loadActiveCart(userId: string): Promise<CartLine[]> {
@@ -37,18 +38,18 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
         'id', p.id, 'name', p.name, 'sku', p.sku,
         'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
         'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
-        'category_id', p.category_id
+        'category_id', p.category_id, 'mrp', p.mrp
       ) AS products,
       CASE WHEN ci.variant_id IS NOT NULL THEN
         json_build_object(
           'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
-          'price', pv.price, 'price_ex_gst', pv.price_ex_gst
+          'price', pv.price, 'price_ex_gst', pv.price_ex_gst, 'mrp', pv.mrp
         )
       ELSE NULL END AS variant,
       CASE WHEN ci.sub_variant_id IS NOT NULL THEN
         json_build_object(
           'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
-          'price', psv.price, 'price_ex_gst', psv.price_ex_gst
+          'price', psv.price, 'price_ex_gst', psv.price_ex_gst, 'mrp', psv.mrp
         )
       ELSE NULL END AS sub_variant
     FROM cart_items ci
@@ -345,9 +346,9 @@ export interface CartCommitInput extends CommitInput {
 export interface BuyNowCommitInput extends CommitInput {
   mode: 'buyNow'
   item: DraftBuyNowItem
-  product: { id: string; name: string; sku: string | null; gst_percentage: string | number | null; hsn_code: string | null }
-  variant: { id: string; variant_name: string; sku: string } | null
-  subVariant: { id: string; sub_variant_name: string; sku: string | null } | null
+  product: { id: string; name: string; sku: string | null; gst_percentage: string | number | null; hsn_code: string | null; mrp: number | null }
+  variant: { id: string; variant_name: string; sku: string; mrp: number | null } | null
+  subVariant: { id: string; sub_variant_name: string; sku: string | null; mrp: number | null } | null
   subtotal: number
   taxAmount: number
   appliedDiscount: number
@@ -401,6 +402,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
       gst: ReturnType<typeof calculateGST> | null
       buyMode: string
       buyUnit: string | null
+      mrp: number | null
     }> = []
 
     if (input.mode === 'cart') {
@@ -438,6 +440,10 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           gst,
           buyMode: item.buy_mode || 'unit',
           buyUnit: item.buy_unit || null,
+          mrp: item.sub_variant?.mrp != null ? Number(item.sub_variant.mrp)
+            : item.variant?.mrp != null ? Number(item.variant.mrp)
+            : item.products?.mrp != null ? Number(item.products.mrp)
+            : null,
         }
       })
     } else {
@@ -473,6 +479,10 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         gst,
         buyMode: i.buyMode || 'unit',
         buyUnit: i.buyUnit || null,
+        mrp: input.subVariant?.mrp != null ? Number(input.subVariant.mrp)
+          : input.variant?.mrp != null ? Number(input.variant.mrp)
+          : input.product?.mrp != null ? Number(input.product.mrp)
+          : null,
       }]
     }
 
@@ -529,8 +539,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         `INSERT INTO order_items (
           order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name,
           quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate,
-          taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+          taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
         [
           created.id, r.productId, r.variantId, r.subVariantId, r.productName, r.productSku, r.variantName,
           r.qty, r.unitPrice, r.itemTotal, Math.round(taxAmt * 100) / 100,
@@ -539,7 +549,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           r.gst ? r.gst.cgst : 0,
           r.gst ? r.gst.sgst : 0,
           r.gst ? r.gst.igst : 0,
-          r.buyMode, r.buyUnit,
+          r.buyMode, r.buyUnit, r.mrp ?? null,
         ]
       )
     }
