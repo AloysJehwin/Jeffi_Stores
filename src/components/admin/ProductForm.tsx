@@ -1594,7 +1594,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <AdminSelect
                                         value={variant.stock_status}
                                         onChange={(v) => updateVariant(index, 'stock_status', v)}
-                                        sm
+                                        compact
                                         className="w-28"
                                         options={[
                                           { value: 'In Stock', label: 'In Stock' },
