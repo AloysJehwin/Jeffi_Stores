@@ -47,6 +47,16 @@ function CheckoutPage() {
   const discountAmount = parseFloat(searchParams.get('discountAmount') || '0')
   const shippingCharge = searchParams.get('shippingCharge') ? parseFloat(searchParams.get('shippingCharge')!) : null
 
+  const businessDiscountAmount = !isBuyNow && user?.isBusiness && user.approvalStatus === 'approved'
+    ? Math.round(cartItems.reduce((sum, item) => {
+        const categoryId = item.products.category_id
+        const discountPct = categoryId ? (user.businessDiscountMap?.[categoryId] ?? 0) : 0
+        if (discountPct <= 0) return sum
+        const price = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        return sum + price * Number(item.quantity) * discountPct / 100
+      }, 0) * 100) / 100
+    : 0
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [address, setAddress] = useState<any>(null)
@@ -75,6 +85,27 @@ function CheckoutPage() {
     brandName: string | null
     imageUrl: string | null
   } | null>(null)
+
+  const [buyNowBusinessDiscount, setBuyNowBusinessDiscount] = useState(0)
+  useEffect(() => {
+    if (!isBuyNow || !buyNowItem) return
+    fetch('/api/business/discount-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+      credentials: 'include',
+      body: JSON.stringify({
+        mode: 'buyNow',
+        productId: buyNowItem.productId,
+        variantId: buyNowItem.variantId,
+        subVariantId: buyNowItem.subVariantId,
+        qty: buyNowItem.qty,
+        price: buyNowItem.price,
+      }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.businessDiscountAmount != null) setBuyNowBusinessDiscount(d.businessDiscountAmount) })
+      .catch(() => {})
+  }, [isBuyNow, buyNowItem])
 
   useEffect(() => {
     if (!authLoading && !user && authWasLoading.current) {
@@ -477,11 +508,12 @@ function CheckoutPage() {
     )
   }
 
+  const effectiveBusinessDiscount = isBuyNow ? buyNowBusinessDiscount : businessDiscountAmount
   const subtotal = isBuyNow
     ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
     : getCartTotal()
   const tax = isBuyNow ? 0 : getCartTax()
-  const finalTotal = Math.max(0, subtotal - discountAmount + (shippingCharge ?? 0))
+  const finalTotal = Math.max(0, subtotal - discountAmount - effectiveBusinessDiscount + (shippingCharge ?? 0))
   const displayItems = isBuyNow ? (buyNowItem ? [buyNowItem] : []) : cartItems
 
   return (
@@ -795,6 +827,12 @@ function CheckoutPage() {
                     <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                       <span>Coupon ({couponCode})</span>
                       <span>−₹{discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {effectiveBusinessDiscount > 0 && (
+                    <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
+                      <span>Business Discount</span>
+                      <span>−₹{effectiveBusinessDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   {shippingCharge != null && (
