@@ -488,37 +488,38 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
               )}
             </div>
 
-            {/* Pincode delivery check */}
-            <div className="mb-6 p-3 rounded-xl border border-border-default bg-surface-elevated">
-              <p className="text-xs font-semibold text-foreground-secondary mb-2 uppercase tracking-wide">Check Delivery</p>
-              <div className="flex gap-2">
-                <input
-                  ref={pincodeRef}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={pincode}
-                  onChange={e => { setPincode(e.target.value.replace(/\D/g, '')); setPincodeResult(null) }}
-                  onKeyDown={e => e.key === 'Enter' && checkPincode()}
-                  placeholder="Enter pincode"
-                  className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                <button
-                  onClick={checkPincode}
-                  disabled={pincodeChecking}
-                  className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-60"
-                >
-                  {pincodeChecking ? 'Checking…' : 'Check'}
-                </button>
-              </div>
-              {pincodeResult && (
-                <p className={`text-xs mt-2 font-medium ${pincodeResult.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {pincodeResult.ok ? '✓ ' : '✗ '}{pincodeResult.message}
-                </p>
-              )}
-            </div>
           </>
         )}
+
+        {/* Pincode delivery check — shown for all products */}
+        <div className="mb-6 p-3 rounded-xl border border-border-default bg-surface-elevated">
+          <p className="text-xs font-semibold text-foreground-secondary mb-2 uppercase tracking-wide">Check Delivery</p>
+          <div className="flex gap-2">
+            <input
+              ref={pincodeRef}
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={pincode}
+              onChange={e => { setPincode(e.target.value.replace(/\D/g, '')); setPincodeResult(null) }}
+              onKeyDown={e => e.key === 'Enter' && checkPincode()}
+              placeholder="Enter pincode"
+              className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            <button
+              onClick={checkPincode}
+              disabled={pincodeChecking}
+              className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-60"
+            >
+              {pincodeChecking ? 'Checking…' : 'Check'}
+            </button>
+          </div>
+          {pincodeResult && (
+            <p className={`text-xs mt-2 font-medium ${pincodeResult.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+              {pincodeResult.ok ? '✓ ' : '✗ '}{pincodeResult.message}
+            </p>
+          )}
+        </div>
 
         <ProductActions
           productId={product.id}
