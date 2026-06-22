@@ -82,6 +82,7 @@ function CheckoutReviewPage() {
     gstPercentage: number | null
     brandName: string | null
     imageUrl: string | null
+    businessDiscount: number
   } | null>(null)
 
   useEffect(() => {
@@ -140,6 +141,7 @@ function CheckoutReviewPage() {
             gstPercentage: d.gstPercentage != null ? Number(d.gstPercentage) : null,
             brandName: d.brandName || null,
             imageUrl: null,
+            businessDiscount: Number(d.businessDiscount) || 0,
           })
           const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
           fetch(imageUrl, { credentials: 'include' })
@@ -181,6 +183,7 @@ function CheckoutReviewPage() {
         gstPercentage: null,
         brandName: null,
         imageUrl: null,
+        businessDiscount: 0,
       })
 
       fetch(`/api/products/${productId}/primary-image`, { credentials: 'include' })
@@ -307,7 +310,8 @@ function CheckoutReviewPage() {
       .catch(() => {})
   }, [searchParams, cartSubtotal])
 
-  const finalTotal = Math.max(0, cartSubtotal - discountAmount + (shippingCharge ?? 0))
+  const buyNowBusinessDiscount = buyNowItem?.businessDiscount ?? 0
+  const finalTotal = Math.max(0, cartSubtotal - discountAmount - buyNowBusinessDiscount + (shippingCharge ?? 0))
 
   const handleProceedToCheckout = () => {
     if (!selectedAddress) {
@@ -657,6 +661,12 @@ function CheckoutReviewPage() {
                   <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                     <span>Coupon ({appliedCoupon.code})</span>
                     <span>−₹{appliedCoupon.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                {buyNowBusinessDiscount > 0 && (
+                  <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
+                    <span>Business Discount</span>
+                    <span>−₹{buyNowBusinessDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-foreground-secondary">
