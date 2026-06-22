@@ -772,7 +772,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
   }
 
-  const inputCls = 'w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
+  const inputCls = 'w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
@@ -805,7 +805,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               required
               value={productName}
               onChange={e => setProductName(e.target.value)}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Enter product name"
             />
           </div>
@@ -821,7 +821,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 name="sku"
                 value={sku}
                 onChange={e => { setSku(e.target.value.toUpperCase()); setSkuManuallyEdited(true) }}
-                className="flex-1 px-4 py-2 border border-border-default rounded-lg bg-surface text-foreground font-mono text-sm uppercase focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                className="flex-1 px-4 py-2.5 border border-border-default rounded-lg bg-surface text-foreground font-mono text-sm uppercase focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 placeholder="Auto-generated"
               />
               <button
@@ -855,7 +855,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               id="hsn_code"
               name="hsn_code"
               defaultValue={product?.hsn_code}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="e.g., 8531"
             />
             <p className="text-xs text-foreground-muted mt-1">Required for GST invoices</p>
@@ -872,7 +872,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               id="mpn"
               name="mpn"
               defaultValue={product?.mpn}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="e.g., TVS-M6X30"
             />
             <p className="text-xs text-foreground-muted mt-1">Used in Google Shopping feed</p>
@@ -890,7 +890,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               id="gtin"
               name="gtin"
               defaultValue={product?.gtin}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="EAN/UPC barcode number"
             />
             <p className="text-xs text-foreground-muted mt-1">Used in Google Shopping feed</p>
@@ -975,7 +975,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       setBasePrice('')
                     }
                   }}
-                  className="w-full px-4 py-2 bg-surface text-foreground border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 bg-surface text-foreground border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                   placeholder="From price catalog"
                 />
               </div>
@@ -992,7 +992,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 min="0"
                 value={mrp}
                 readOnly
-                className="w-full px-4 py-2 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
+                className="w-full px-4 py-2.5 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
                 placeholder="Auto-calculated"
               />
             </div>
@@ -1014,7 +1014,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 min="0"
                 value={basePrice}
                 readOnly
-                className="w-full px-4 py-2 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
+                className="w-full px-4 py-2.5 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
                 placeholder="Auto-calculated"
               />
               <p className="text-xs text-foreground-muted mt-1">MRP (Ex. GST) × (1 − Discount%) × (1 + GST%)</p>
@@ -1063,7 +1063,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     setDiscountPct('')
                   }
                 }}
-                className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 placeholder="0.00"
               />
               <p className="text-xs text-foreground-muted mt-1">Enter MRP (Ex. GST) + Discount % → selling price auto-fills for all variants.</p>
@@ -1081,7 +1081,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               min="0"
               value={costPrice}
               onChange={e => setCostPrice(e.target.value)}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Your purchase / landed cost"
             />
             <p className="text-xs text-foreground-muted mt-1">Used for P&amp;L gross margin — not shown to customers</p>
@@ -1123,7 +1123,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               min="0"
               value={salePrice}
               readOnly
-              className="w-full px-4 py-2 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
+              className="w-full px-4 py-2.5 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
               placeholder="Auto-calculated"
             />
           </div>
@@ -1196,15 +1196,15 @@ export default function ProductForm({ categories, brands, action, product, produ
             {['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube'].includes(productPackageType) && (
               <div className="grid grid-cols-3 gap-2 mt-2">
                 <div>
-                  <input type="number" id="length_cm" name="length_cm" step="0.1" min="0" defaultValue={product?.length_cm ?? ''} className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="L" />
+                  <input type="number" id="length_cm" name="length_cm" step="0.1" min="0" defaultValue={product?.length_cm ?? ''} className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="L" />
                   <p className="text-xs text-foreground-muted mt-1 text-center">Length</p>
                 </div>
                 <div>
-                  <input type="number" id="breadth_cm" name="breadth_cm" step="0.1" min="0" defaultValue={product?.breadth_cm ?? ''} className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="B" />
+                  <input type="number" id="breadth_cm" name="breadth_cm" step="0.1" min="0" defaultValue={product?.breadth_cm ?? ''} className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="B" />
                   <p className="text-xs text-foreground-muted mt-1 text-center">Breadth</p>
                 </div>
                 <div>
-                  <input type="number" id="height_cm" name="height_cm" step="0.1" min="0" defaultValue={product?.height_cm ?? ''} className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="H" />
+                  <input type="number" id="height_cm" name="height_cm" step="0.1" min="0" defaultValue={product?.height_cm ?? ''} className="w-full px-3 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="H" />
                   <p className="text-xs text-foreground-muted mt-1 text-center">Height</p>
                 </div>
               </div>
@@ -1230,7 +1230,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 rows={4}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                className="w-full px-4 py-2 pr-8 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 pr-8 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 placeholder="Enter product description"
               />
             </AIEnrichButton>
