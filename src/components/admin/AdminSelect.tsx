@@ -173,7 +173,8 @@ export default function AdminSelect({
           disabled={disabled}
           onClick={() => isOpen ? setIsOpen(false) : openDropdown()}
           onKeyDown={handleKeyDown}
-          className={`w-full bg-surface border rounded-lg text-left transition-all cursor-pointer flex items-center justify-between
+          className={`w-full bg-surface border text-left transition-all cursor-pointer flex items-center justify-between
+            ${compact || xs ? 'rounded' : 'rounded-lg'}
             ${compact ? 'px-2 py-0.5 text-xs gap-1' : xs ? 'px-1.5 py-1 text-xs gap-1' : sm ? 'px-2 py-1.5 text-sm gap-2' : 'px-4 py-2 text-sm gap-2'}
             ${isOpen ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-secondary hover:border-border-default'}
             ${error ? 'border-red-400 ring-red-500' : ''}

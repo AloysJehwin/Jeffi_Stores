@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
-import { Star, Check, X } from 'lucide-react'
+import { Star, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
 import Toggle from '@/components/ui/Toggle'
@@ -2191,8 +2191,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, stock_status: ed.stock || 'In Stock', sku: ed.sku || s.sku }) : s) }))
                                       }
                                       setSubVariantEditId(null); setSubVariantEditDraft(null)
-                                    }} className="text-green-500 hover:text-green-700 leading-none" aria-label="Save"><Check className="w-3.5 h-3.5" /></button>
-                                    <button type="button" onClick={() => { setSubVariantEditId(null); setSubVariantEditDraft(null) }} className="text-foreground-muted hover:text-foreground leading-none" aria-label="Cancel"><X className="w-3.5 h-3.5" /></button>
+                                    }} className="text-accent-600 hover:text-accent-700 text-xs font-medium leading-none">Save</button>
+                                    <button type="button" onClick={() => { setSubVariantEditId(null); setSubVariantEditDraft(null) }} className="text-foreground-muted hover:text-foreground text-xs font-medium leading-none">Cancel</button>
                                   </td>
                                 </>) : (<>
                                   <td className="py-1.5 pr-2">{sv.sub_variant_name}</td>
