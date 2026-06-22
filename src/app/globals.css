@@ -90,13 +90,6 @@
     color-scheme: dark;
   }
 
-  /* Uniform height for all form controls — selects, inputs, and the custom
-     AdminSelect button (py-2.5 + text-sm + border = ~40px) all align to h-10. */
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="hidden"]),
-  select {
-    height: 2.5rem; /* 40px = h-10 */
-    min-height: 2.5rem;
-  }
 
   /* Light mode: make shadow-sm more visible so cards stand out from page bg */
   :root .shadow-sm,
