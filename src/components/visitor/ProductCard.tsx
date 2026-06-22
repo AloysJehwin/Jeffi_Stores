@@ -19,11 +19,12 @@ interface ProductCardProps {
   primaryImage?: { image_url: string; thumbnail_url?: string } | null
   brandName?: string | null
   categoryName?: string | null
+  discountPct?: number
 }
 
 export default function ProductCard({
   id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
-  effectiveStock, primaryImage, brandName, categoryName,
+  effectiveStock, primaryImage, brandName, categoryName, discountPct = 0,
 }: ProductCardProps) {
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
@@ -145,41 +146,48 @@ export default function ProductCard({
               </div>
             )}
 
+            {/* Sale ribbon */}
+            {discountPct > 0 && (
+              <div className="absolute top-4 right-[-16px] w-20 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[8px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10">
+                SALE
+              </div>
+            )}
+
             {mrpDiscount > 0 && (
               <div className="absolute top-2 left-2 bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                 {mrpDiscount}% off
               </div>
             )}
-
-            {/* Wishlist + Share icons — top right */}
-            <div className="absolute top-2 right-2 flex flex-col gap-1.5">
-              <button
-                onClick={handleWishlist}
-                disabled={wishlistLoading}
-                aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-                className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-700/95 backdrop-blur-sm shadow flex items-center justify-center text-gray-600 dark:text-zinc-200 hover:text-red-500 dark:hover:text-red-400 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
-              >
-                <svg className={`w-4 h-4 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`} fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: isInWishlist ? '#ef4444' : undefined }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </button>
-              <button
-                onClick={handleShare}
-                aria-label="Share product"
-                className="w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-700/95 backdrop-blur-sm shadow flex items-center justify-center text-gray-600 dark:text-zinc-200 hover:text-accent-500 dark:hover:text-accent-400 transition-all hover:scale-110 active:scale-95"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                </svg>
-              </button>
-            </div>
           </div>
 
           {/* Info */}
           <div className="p-2.5 sm:p-5 flex flex-col flex-grow">
-            <h3 className="font-semibold text-sm sm:text-base text-foreground mb-1.5 sm:mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
-              {name}
-            </h3>
+            <div className="flex items-start justify-between gap-2 mb-1.5 sm:mb-2">
+              <h3 className="font-semibold text-sm sm:text-base text-foreground mb-1.5 sm:mb-2 group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem]">
+                {name}
+              </h3>
+              <div className="flex-shrink-0 flex items-center gap-1.5 mt-0.5">
+                <button
+                  onClick={handleWishlist}
+                  disabled={wishlistLoading}
+                  aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+                  className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-red-500 hover:border-red-300 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
+                >
+                  <svg className={`w-3.5 h-3.5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`} fill={isInWishlist ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: isInWishlist ? '#ef4444' : undefined }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleShare}
+                  aria-label="Share product"
+                  className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
             <div className="text-xs text-foreground-muted mb-2 sm:mb-3 space-y-0.5">
               {brandName && <div className="truncate">Brand: {brandName}</div>}
               {categoryName && <div className="truncate">Category: {categoryName}</div>}
@@ -187,11 +195,11 @@ export default function ProductCard({
             <div className="mt-auto">
               <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2 mb-0.5 sm:mb-1">
                 <span className="text-base sm:text-xl font-bold text-primary-600 dark:text-primary-400 leading-tight">
-                  {hasVariants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  {hasVariants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 {mrp && mrp > Number(displayPrice) && (
                   <span className="text-xs sm:text-sm text-foreground-muted line-through leading-tight">
-                    &#x20B9;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    &#x20B9;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 )}
               </div>
@@ -242,12 +250,12 @@ export default function ProductCard({
 
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                {hasVariants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                {hasVariants ? 'From ' : ''}&#x20B9;{Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               {mrp && mrp > Number(displayPrice) && (
                 <>
                   <span className="text-sm text-foreground-muted line-through">
-                    &#x20B9;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    &#x20B9;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   <span className="text-xs font-semibold bg-accent-500 text-white px-2 py-0.5 rounded-full">
                     {mrpDiscount}% off
