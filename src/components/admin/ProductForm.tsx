@@ -2137,7 +2137,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           {(subVariantsMap[variantPopupId] || []).map((sv: any) => {
                             const isEditingSv = subVariantEditId === sv.id
                             const ed = subVariantEditDraft
-                            const svInputCls = "px-1.5 py-1 border border-accent-500 rounded bg-surface text-foreground text-xs focus:ring-1 focus:ring-accent-500 w-16"
+                            const svInputCls = "px-1.5 py-1 border border-accent-500 rounded bg-surface text-foreground text-xs leading-none focus:ring-1 focus:ring-accent-500 w-16"
                             return (
                               <React.Fragment key={sv.id}>
                               <tr className="border-b border-border-default last:border-0">
