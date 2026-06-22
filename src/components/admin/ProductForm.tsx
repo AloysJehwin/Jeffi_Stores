@@ -1537,7 +1537,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <React.Fragment key={variant.id || index}>
                                 <tr className={`border-b border-border-default ${isExpanded ? 'bg-surface-secondary' : 'hover:bg-surface-secondary/40'}`}>
                                   <td className="py-2 px-3">
-                                    <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
+                                    <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1.5 h-[34px] border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
                                   </td>
                                   {variant.sub_variant_type_on ? (
                                     <td className="py-2 px-3" colSpan={4}>
@@ -1564,32 +1564,32 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         updated[index].price_ex_gst = ''; updated[index].price = ''
                                       }
                                       setVariants(updated)
-                                    }} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="From catalog" />
+                                    }} className="w-28 px-2 py-1.5 h-[34px] border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="From catalog" />
                                   </td>
                                   {/* Discount % — product-level read-only */}
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" max="100" readOnly value={discountPct || '0'} className="w-20 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" />
+                                    <input type="number" step="0.01" min="0" max="100" readOnly value={discountPct || '0'} className="w-20 px-2 py-1.5 h-[34px] border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" />
                                   </td>
                                   {/* MRP (incl. GST) — locked */}
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.mrp} readOnly className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" />
+                                    <input type="number" step="0.01" min="0" value={variant.mrp} readOnly className="w-28 px-2 py-1.5 h-[34px] border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" />
                                   </td>
                                   {/* Selling Price (incl. GST) — locked */}
                                   <td className="py-2 px-3">
                                     <div>
-                                      <input type="number" step="0.01" min="0" value={variant.price} readOnly className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" required />
+                                      <input type="number" step="0.01" min="0" value={variant.price} readOnly className="w-28 px-2 py-1.5 h-[34px] border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" required />
                                       {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
                                     </div>
                                   </td>
                                   {/* Selling Price (Ex. GST) — locked */}
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" />
+                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly className="w-28 px-2 py-1.5 h-[34px] border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" />
                                   </td>
                                     </>
                                   )}
                                   <td className="py-2 px-3">
                                     {variant.sub_variant_type_on ? (
-                                      <input type="text" value={sumSubVariantStock(subVariantsMap[variant.id || '']) > 0 ? 'In Stock' : 'Out of Stock'} readOnly className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" title="Derived from sub-variants" />
+                                      <input type="text" value={sumSubVariantStock(subVariantsMap[variant.id || '']) > 0 ? 'In Stock' : 'Out of Stock'} readOnly className="w-28 px-2 py-1.5 h-[34px] border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" title="Derived from sub-variants" />
                                     ) : (
                                       <AdminSelect
                                         value={variant.stock_status}
@@ -2137,7 +2137,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           {(subVariantsMap[variantPopupId] || []).map((sv: any) => {
                             const isEditingSv = subVariantEditId === sv.id
                             const ed = subVariantEditDraft
-                            const svInputCls = "px-1.5 py-1 border border-accent-500 rounded bg-surface text-foreground text-xs leading-none focus:ring-1 focus:ring-accent-500 w-16"
+                            const svInputCls = "px-1.5 py-1 h-[26px] border border-accent-500 rounded bg-surface text-foreground text-xs leading-none focus:ring-1 focus:ring-accent-500 w-16"
                             return (
                               <React.Fragment key={sv.id}>
                               <tr className="border-b border-border-default last:border-0">
