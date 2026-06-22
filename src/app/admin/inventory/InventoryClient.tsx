@@ -1271,17 +1271,16 @@ function StockTab() {
                               {isEditing ? (
                                 <div className="flex flex-col items-end gap-1">
                                   {editUnits.length > 1 && (
-                                    <select
+                                    <AdminSelect
                                       value={editUnitId}
-                                      onChange={e => setEditUnitId(e.target.value)}
-                                      className="w-28 px-2 py-1 rounded border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500"
-                                    >
-                                      {editUnits.map(u => (
-                                        <option key={u.id} value={u.id}>
-                                          {u.display_label || u.unit}{u.factor !== 1 ? ` (×${u.factor})` : ''}
-                                        </option>
-                                      ))}
-                                    </select>
+                                      onChange={v => setEditUnitId(v)}
+                                      compact
+                                      className="w-28"
+                                      options={editUnits.map(u => ({
+                                        value: u.id,
+                                        label: `${u.display_label || u.unit}${u.factor !== 1 ? ` (×${u.factor})` : ''}`,
+                                      }))}
+                                    />
                                   )}
                                   <input
                                     type="number"

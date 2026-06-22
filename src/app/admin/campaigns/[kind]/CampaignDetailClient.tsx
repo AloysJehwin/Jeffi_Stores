@@ -627,21 +627,20 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                         )}
                       </label>
                       {def.type === 'boolean' ? (
-                        <select
+                        <AdminSelect
                           value={isOverridden ? String(overrideVal) : ''}
-                          onChange={e => {
-                            const v = e.target.value
+                          onChange={v => {
                             const next = { ...form.parameters }
                             if (v === '') delete next[key]
                             else next[key] = v === 'true'
                             setForm({ ...form, parameters: next })
                           }}
-                          className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-                        >
-                          <option value="">Default ({String(defaultVal)})</option>
-                          <option value="true">true</option>
-                          <option value="false">false</option>
-                        </select>
+                          options={[
+                            { value: '', label: `Default (${String(defaultVal)})` },
+                            { value: 'true', label: 'true' },
+                            { value: 'false', label: 'false' },
+                          ]}
+                        />
                       ) : (
                         <input
                           type="number"
