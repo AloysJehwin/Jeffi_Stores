@@ -151,6 +151,9 @@ function CheckoutReviewPage() {
             brandName: d.brandName || null,
             imageUrl: null,
           })
+          if (d.businessDiscount != null && Number(d.businessDiscount) > 0) {
+            setBusinessDiscountAmount(Math.round(Number(d.businessDiscount) * 100) / 100)
+          }
           const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
           fetch(imageUrl, { credentials: 'include' })
             .then(r => r.json())

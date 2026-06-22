@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
+import { authenticateAnyUser } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
 import { verifyIntent } from '@/lib/checkout-intent'
 import { resolveBuyNowItem, loadActiveCart, cartSubtotal } from '@/lib/order-commit'
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   if (!intent) return NextResponse.json({ error: 'Invalid or expired intent' }, { status: 400 })
 
   if (intent.mode === 'cart') {
-    const auth = await authenticateUser(req)
+    const auth = await authenticateAnyUser(req)
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (intent.userId !== auth.userId) {
       return NextResponse.json({ error: 'Intent does not belong to this user' }, { status: 403 })
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
 
   // Compute business discount for authenticated users
   let businessDiscount = 0
-  const auth = await authenticateUser(req)
+  const auth = await authenticateAnyUser(req)
   if (auth && display?.category_id) {
     const bizMap = await getBusinessDiscountMap(auth.userId)
     const pct = bizMap[display.category_id] ?? 0
