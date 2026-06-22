@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, queryOne } from '@/lib/db'
 import { buildProductSearchClause, buildProductSearchRank, buildSearchRank } from '@/lib/search'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 
 const PAGE_SIZE = 21
 
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
           '[]'::json
         ) AS product_images,
         ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-        ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+        ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
         ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
