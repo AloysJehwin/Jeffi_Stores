@@ -41,12 +41,12 @@ export const VARIANT_MIN_PRICE_SQL = `
 
 export const VARIANT_MIN_PRICE_INCL_GST_SQL = `
   (SELECT MIN(price) FROM (
-    SELECT pv.price * (1 - COALESCE(p.discount_pct, 0) / 100.0) AS price
+    SELECT pv.price
     FROM product_variants pv
     WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
     UNION ALL
-    SELECT sv.price * (1 - COALESCE(p.discount_pct, 0) / 100.0) AS price
+    SELECT sv.price
     FROM product_sub_variants sv
     JOIN product_variants pv ON pv.id = sv.variant_id
     WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
@@ -120,8 +120,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       lowStockProducts,
       pendingOrders,
     }
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return {
       totalProducts: 0,
       totalOrders: 0,
