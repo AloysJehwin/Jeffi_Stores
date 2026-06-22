@@ -444,13 +444,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           </div>
         </div>
 
-        {product.brands && (
-          <div className="flex items-center gap-4 mb-4 text-sm">
-            <span className="text-foreground-secondary">
-              Brand: <span className="font-medium text-foreground">{product.brands.name}</span>
-            </span>
-          </div>
-        )}
 
         {/* Price & Stock — inline for non-variant products */}
         {!hasVariants && (
@@ -557,61 +550,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
 
 
         {/* Product Specifications */}
-        {(() => {
-          const primarySpecs = [
-            product.material    && { label: 'Material',    value: product.material },
-            product.finish      && { label: 'Finish',      value: product.finish },
-            product.size        && { label: 'Size',        value: product.size },
-            product.dimensions  && { label: 'Dimensions',  value: `${product.dimensions} cm` },
-            product.weight      && { label: 'Weight',      value: `${product.weight} kg` },
-            product.weight_grams && { label: 'Net Weight', value: `${product.weight_grams} g` },
-            (product.length_cm || product.breadth_cm || product.height_cm) && {
-              label: 'Package Dimensions',
-              value: [product.length_cm, product.breadth_cm, product.height_cm].filter(Boolean).join(' × ') + ' cm',
-            },
-            product.package_type && { label: 'Package Type', value: product.package_type },
-          ].filter(Boolean) as { label: string; value: string }[]
-
-          const generalSpecs = [
-            product.brands     && { label: 'Brand',        value: product.brands.name },
-            product.categories && { label: 'Category',     value: product.categories.name },
-            product.mpn        && { label: 'MPN',          value: product.mpn },
-            product.gtin       && { label: 'GTIN / EAN',   value: product.gtin },
-            product.hsn_code   && { label: 'HSN Code',     value: product.hsn_code },
-            product.gst_percentage != null && { label: 'GST', value: `${parseFloat(String(product.gst_percentage))}%` },
-          ].filter(Boolean) as { label: string; value: string }[]
-
-          if (primarySpecs.length === 0 && generalSpecs.length === 0) return null
-
-          return (
-            <div className="mt-8 pt-6 border-t border-border-default">
-              <h3 className="text-lg font-semibold text-foreground mb-4">Specifications</h3>
-              {primarySpecs.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 mb-6">
-                  {primarySpecs.map(({ label, value }) => (
-                    <div key={label}>
-                      <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
-                      <p className="font-semibold text-foreground text-sm">{value}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {generalSpecs.length > 0 && (
-                <>
-                  {primarySpecs.length > 0 && <div className="border-t border-border-default mb-6" />}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-                    {generalSpecs.map(({ label, value }) => (
-                      <div key={label}>
-                        <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
-                        <p className="font-semibold text-foreground text-sm">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )
-        })()}
       </div>
 
       <div className="order-3 lg:hidden">

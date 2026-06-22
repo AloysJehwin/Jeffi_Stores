@@ -370,17 +370,76 @@ export default async function ProductDetailPage({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 lg:items-start">
             <ProductDetailClient product={product} initialSkuParam={skuParam} />
           </div>
-
-          {/* Description */}
-          {product.description && (
-            <div className="border-t border-border-default p-4 sm:p-6 lg:p-8">
-              <h2 className="text-2xl font-bold text-foreground mb-4">Product Description</h2>
-              <p className="text-foreground-secondary leading-relaxed whitespace-pre-line">
-                {product.description}
-              </p>
-            </div>
-          )}
         </div>
+
+        {/* Specifications card */}
+        {(() => {
+          const p = product as any
+          const primarySpecs = [
+            p.brands       && { label: 'Brand',            value: p.brands.name },
+            p.sku          && { label: 'SKU',              value: p.sku },
+            p.material     && { label: 'Material',         value: p.material },
+            p.finish       && { label: 'Finish',           value: p.finish },
+            p.size         && { label: 'Size',             value: p.size },
+            p.dimensions   && { label: 'Dimensions',       value: `${p.dimensions} cm` },
+            p.weight       && { label: 'Weight',           value: `${p.weight} kg` },
+            p.weight_grams && { label: 'Net Weight',       value: `${p.weight_grams} g` },
+            (p.length_cm || p.breadth_cm || p.height_cm) && {
+              label: 'Package Dimensions',
+              value: [p.length_cm, p.breadth_cm, p.height_cm].filter(Boolean).join(' × ') + ' cm',
+            },
+            p.package_type && { label: 'Package Type',    value: p.package_type },
+          ].filter(Boolean) as { label: string; value: string }[]
+
+          const generalSpecs = [
+            p.categories   && { label: 'Category',        value: p.categories.name },
+            p.mpn          && { label: 'MPN',             value: p.mpn },
+            p.gtin         && { label: 'GTIN / EAN',      value: p.gtin },
+            p.hsn_code     && { label: 'HSN Code',        value: p.hsn_code },
+            p.gst_percentage != null && { label: 'GST',   value: `${parseFloat(String(p.gst_percentage))}%` },
+          ].filter(Boolean) as { label: string; value: string }[]
+
+          if (primarySpecs.length === 0 && generalSpecs.length === 0) return null
+
+          return (
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-8 mb-8">
+              <h2 className="text-xl font-bold text-foreground mb-6">Specifications</h2>
+              {primarySpecs.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5 mb-6">
+                  {primarySpecs.map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
+                      <p className="font-semibold text-foreground text-sm">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {generalSpecs.length > 0 && (
+                <>
+                  {primarySpecs.length > 0 && <div className="border-t border-border-default mb-6" />}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5">
+                    {generalSpecs.map(({ label, value }) => (
+                      <div key={label}>
+                        <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
+                        <p className="font-semibold text-foreground text-sm">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })()}
+
+        {/* Description */}
+        {product.description && (
+          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-8 mb-8">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Product Description</h2>
+            <p className="text-foreground-secondary leading-relaxed whitespace-pre-line">
+              {product.description}
+            </p>
+          </div>
+        )}
 
         {/* Product Reviews */}
         <ProductReviews productId={product.id} productName={product.name} />
