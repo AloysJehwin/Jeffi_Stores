@@ -89,6 +89,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tok
         tax_amount: parseFloat(order.tax_amount),
         total_amount: parseFloat(order.total_amount),
         discount_amount: parseFloat(order.discount_amount || '0'),
+        business_discount_amount: parseFloat(order.business_discount_amount || '0'),
         shipping_amount: parseFloat(order.shipping_amount || '0'),
         taxable_amount: parseFloat(order.taxable_amount || '0'),
         cgst_amount: parseFloat(order.cgst_amount || '0'),
