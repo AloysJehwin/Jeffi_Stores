@@ -97,6 +97,9 @@ export async function POST(request: NextRequest) {
       totalSgst += gst.sgst
       totalIgst += gst.igst
 
+      const mrpLineTotal = Math.round(effectiveQty * unitPrice * 100) / 100
+      const discountAmount = discPct > 0 ? Math.round((mrpLineTotal - lineTotal) * 100) / 100 : 0
+
       return {
         product_id: item.product_id || null,
         product_name: item.product_name || '',
@@ -111,6 +114,7 @@ export async function POST(request: NextRequest) {
         buy_mode: item.buy_mode || 'unit',
         unit_price: unitPrice,
         total_price: lineTotal,
+        discount_amount: discountAmount,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
         cgst_amount: Math.round(gst.cgst * 100) / 100,
         sgst_amount: Math.round(gst.sgst * 100) / 100,
@@ -180,12 +184,12 @@ export async function POST(request: NextRequest) {
             sale_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, buy_unit, buy_mode, unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,0,$14,$15,$16,$17,$18,$19)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
           [
             saleId, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name,
             item.hsn_code, item.gst_rate, item.quantity, item.buy_unit || null, item.buy_mode || 'unit',
-            item.unit_price,
+            item.unit_price, item.discount_amount,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
           ]
