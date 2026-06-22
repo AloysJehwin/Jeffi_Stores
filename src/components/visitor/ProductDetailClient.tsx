@@ -71,6 +71,17 @@ interface ProductDetailClientProps {
     discount_pct?: number | null
     weight?: number | null
     dimensions?: string | null
+    material?: string | null
+    finish?: string | null
+    size?: string | null
+    hsn_code?: string | null
+    mpn?: string | null
+    gtin?: string | null
+    weight_grams?: number | null
+    length_cm?: number | null
+    breadth_cm?: number | null
+    height_cm?: number | null
+    package_type?: string | null
     brands?: {
       id: string
       name: string
@@ -487,54 +498,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
               <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />
             </div>
 
-            <div className="mb-4">
-              {product.stock_status !== 'Out of Stock' ? (
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
-                  {product.stock_status === 'Low Stock' && (
-                    <span className="ml-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 px-2 py-0.5 rounded-full">
-                      Only a few left — order soon
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
-                  </div>
-                  {/* Notify me when back in stock */}
-                  {notifySubmitted ? (
-                    <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-3 py-2 rounded-lg">
-                      <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                      We&apos;ll email you when this is back in stock.
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="email"
-                        value={notifyEmail}
-                        onChange={e => setNotifyEmail(e.target.value)}
-                        placeholder="Enter your email"
-                        className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                      />
-                      <button
-                        onClick={handleNotifyMe}
-                        className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors"
-                      >
-                        Notify Me
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
           </>
         )}
 
@@ -607,35 +570,61 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
 
 
         {/* Product Specifications */}
-        <div className="mt-6 pt-6 border-t border-border-default">
-          <h3 className="font-semibold text-foreground mb-3">Product Specifications</h3>
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            {product.weight && (
-              <>
-                <dt className="text-foreground-secondary">Weight:</dt>
-                <dd className="font-medium text-foreground">{product.weight} kg</dd>
-              </>
-            )}
-            {product.dimensions && (
-              <>
-                <dt className="text-foreground-secondary">Dimensions:</dt>
-                <dd className="font-medium text-foreground">{product.dimensions} cm</dd>
-              </>
-            )}
-            {product.categories && (
-              <>
-                <dt className="text-foreground-secondary">Category:</dt>
-                <dd className="font-medium text-foreground">{product.categories.name}</dd>
-              </>
-            )}
-            {product.brands && (
-              <>
-                <dt className="text-foreground-secondary">Brand:</dt>
-                <dd className="font-medium text-foreground">{product.brands.name}</dd>
-              </>
-            )}
-          </dl>
-        </div>
+        {(() => {
+          const primarySpecs = [
+            product.material    && { label: 'Material',    value: product.material },
+            product.finish      && { label: 'Finish',      value: product.finish },
+            product.size        && { label: 'Size',        value: product.size },
+            product.dimensions  && { label: 'Dimensions',  value: `${product.dimensions} cm` },
+            product.weight      && { label: 'Weight',      value: `${product.weight} kg` },
+            product.weight_grams && { label: 'Net Weight', value: `${product.weight_grams} g` },
+            (product.length_cm || product.breadth_cm || product.height_cm) && {
+              label: 'Package Dimensions',
+              value: [product.length_cm, product.breadth_cm, product.height_cm].filter(Boolean).join(' × ') + ' cm',
+            },
+            product.package_type && { label: 'Package Type', value: product.package_type },
+          ].filter(Boolean) as { label: string; value: string }[]
+
+          const generalSpecs = [
+            product.brands     && { label: 'Brand',        value: product.brands.name },
+            product.categories && { label: 'Category',     value: product.categories.name },
+            product.mpn        && { label: 'MPN',          value: product.mpn },
+            product.gtin       && { label: 'GTIN / EAN',   value: product.gtin },
+            product.hsn_code   && { label: 'HSN Code',     value: product.hsn_code },
+            product.gst_percentage != null && { label: 'GST', value: `${parseFloat(String(product.gst_percentage))}%` },
+          ].filter(Boolean) as { label: string; value: string }[]
+
+          if (primarySpecs.length === 0 && generalSpecs.length === 0) return null
+
+          return (
+            <div className="mt-8 pt-6 border-t border-border-default">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Specifications</h3>
+              {primarySpecs.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 mb-6">
+                  {primarySpecs.map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
+                      <p className="font-semibold text-foreground text-sm">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {generalSpecs.length > 0 && (
+                <>
+                  {primarySpecs.length > 0 && <div className="border-t border-border-default mb-6" />}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                    {generalSpecs.map(({ label, value }) => (
+                      <div key={label}>
+                        <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
+                        <p className="font-semibold text-foreground text-sm">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       <div className="order-3 lg:hidden">
