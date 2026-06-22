@@ -6,6 +6,7 @@ import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/visitor/ProductCard'
+import CompareStrip from '@/components/visitor/CompareStrip'
 
 const PAGE_SIZE = 21
 
@@ -115,12 +116,12 @@ async function getProducts(searchParams: any) {
       COALESCE((SELECT COUNT(CASE WHEN pv.stock_status != 'Out of Stock' THEN 1 END)
       FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
       (SELECT MIN(price) FROM (
-        SELECT pv.price
+        SELECT pv.price * (1 - COALESCE(p.discount_pct, 0) / 100.0)
         FROM product_variants pv
         WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
         UNION ALL
-        SELECT sv.price
+        SELECT sv.price * (1 - COALESCE(p.discount_pct, 0) / 100.0)
         FROM product_sub_variants sv
         JOIN product_variants pv ON pv.id = sv.variant_id
         WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
@@ -420,6 +421,9 @@ export default async function ProductsPage({
               <SortDropdown />
             </div>
 
+            {/* Compare strip — shows selected products + Compare button */}
+            <CompareStrip />
+
             {/* Products Grid */}
             {products.length > 0 ? (
               <>
@@ -450,6 +454,7 @@ export default async function ProductsPage({
                         primaryImage={primaryImage}
                         brandName={product.brands?.name ?? null}
                         categoryName={product.categories?.name ?? null}
+                        discountPct={Number(product.discount_pct ?? 0)}
                       />
                     )
                   })}

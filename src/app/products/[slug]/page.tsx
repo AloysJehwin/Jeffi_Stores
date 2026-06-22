@@ -3,12 +3,13 @@ import Link from 'next/link'
 import { cache } from 'react'
 import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import ProductDetailClient from '@/components/visitor/ProductDetailClient'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ProductCard from '@/components/visitor/ProductCard'
 import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
+import PdpCompareSection from '@/components/visitor/PdpCompareSection'
 
 const getProductBySlug = cache(async (slug: string) => {
   return queryOne(`
@@ -52,7 +53,7 @@ const getProductBySlug = cache(async (slug: string) => {
          FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
         '[]'::json
       ) AS product_variants,
-      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
       COALESCE(
@@ -191,7 +192,7 @@ async function getRelatedProducts(productId: string, categoryId: string, product
       '[]'::json
     ) AS product_images,
     ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-    ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+    ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
     ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
   `
 
@@ -366,7 +367,7 @@ export default async function ProductDetailPage({
 
       <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         {/* Product Details */}
-        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-8">
+        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 lg:items-start">
             <ProductDetailClient product={product} initialSkuParam={skuParam} />
           </div>
@@ -376,27 +377,30 @@ export default async function ProductDetailPage({
         {(() => {
           const p = product as any
           const primarySpecs = [
-            p.brands       && { label: 'Brand',            value: p.brands.name },
-            p.sku          && { label: 'SKU',              value: p.sku },
-            p.material     && { label: 'Material',         value: p.material },
-            p.finish       && { label: 'Finish',           value: p.finish },
-            p.size         && { label: 'Size',             value: p.size },
-            p.dimensions   && { label: 'Dimensions',       value: `${p.dimensions} cm` },
-            p.weight       && { label: 'Weight',           value: `${p.weight} kg` },
-            p.weight_grams && { label: 'Net Weight',       value: `${p.weight_grams} g` },
+            p.brands            && { label: 'Brand',              value: p.brands.name },
+            p.sku               && { label: 'SKU',                value: p.sku },
+            p.material          && { label: 'Material',           value: p.material },
+            p.finish            && { label: 'Finish',             value: p.finish },
+            p.size              && { label: 'Size',               value: p.size },
+            p.variant_type      && { label: 'Variant Type',       value: p.variant_type },
+            p.sub_variant_type  && { label: 'Sub-Variant Type',   value: p.sub_variant_type },
+            p.dimensions        && { label: 'Dimensions',         value: `${p.dimensions} cm` },
+            p.weight != null    && { label: 'Weight',             value: p.weight_unit ? `${p.weight} ${p.weight_unit}` : `${p.weight} kg` },
+            p.weight_grams      && { label: 'Net Weight',         value: `${p.weight_grams} g` },
             (p.length_cm || p.breadth_cm || p.height_cm) && {
               label: 'Package Dimensions',
-              value: [p.length_cm, p.breadth_cm, p.height_cm].filter(Boolean).join(' × ') + ' cm',
+              value: [p.length_cm, p.breadth_cm, p.height_cm].filter((v: any) => v != null).join(' × ') + (p.length_unit ? ` ${p.length_unit}` : ' cm'),
             },
-            p.package_type && { label: 'Package Type',    value: p.package_type },
+            p.package_type      && { label: 'Package Type',      value: p.package_type },
           ].filter(Boolean) as { label: string; value: string }[]
 
           const generalSpecs = [
-            p.categories   && { label: 'Category',        value: p.categories.name },
-            p.mpn          && { label: 'MPN',             value: p.mpn },
-            p.gtin         && { label: 'GTIN / EAN',      value: p.gtin },
-            p.hsn_code     && { label: 'HSN Code',        value: p.hsn_code },
-            p.gst_percentage != null && { label: 'GST',   value: `${parseFloat(String(p.gst_percentage))}%` },
+            p.categories        && { label: 'Category',          value: p.categories.name },
+            p.mpn               && { label: 'MPN',               value: p.mpn },
+            p.gtin              && { label: 'GTIN / EAN',        value: p.gtin },
+            p.hsn_code          && { label: 'HSN Code',          value: p.hsn_code },
+            p.gst_percentage != null && { label: 'GST',          value: `${parseFloat(String(p.gst_percentage))}%` },
+            p.currency          && { label: 'Currency',          value: p.currency },
           ].filter(Boolean) as { label: string; value: string }[]
 
           if (primarySpecs.length === 0 && generalSpecs.length === 0) return null
@@ -428,6 +432,125 @@ export default async function ProductDetailPage({
                 </>
               )}
             </div>
+          )
+        })()}
+
+        {/* Features & Use Cases (AI-enriched) */}
+        {(() => {
+          const p = product as any
+          const hasFeatures = p.ai_features?.length > 0
+          const hasUseCases = p.ai_use_cases?.length > 0
+          const hasWhoUses = p.ai_who_uses_it
+          const hasApplication = p.ai_application
+
+          if (!hasFeatures && !hasUseCases && !hasWhoUses && !hasApplication) return null
+
+          return (
+            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-8 mb-8">
+              <h2 className="text-xl font-bold text-foreground mb-6">Features &amp; Use Cases</h2>
+              <div className="space-y-6">
+                {hasFeatures && (
+                  <div>
+                    <p className="text-xs text-foreground-muted mb-2 uppercase tracking-wide">Key Features</p>
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-1.5">
+                      {(p.ai_features as string[]).map((f: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-500" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {hasUseCases && (
+                  <>
+                    {hasFeatures && <div className="border-t border-border-default" />}
+                    <div>
+                      <p className="text-xs text-foreground-muted mb-2 uppercase tracking-wide">Use Cases</p>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-1.5">
+                        {(p.ai_use_cases as string[]).map((u: string, i: number) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-500" />
+                            {u}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                )}
+                {(hasWhoUses || hasApplication) && (
+                  <>
+                    {(hasFeatures || hasUseCases) && <div className="border-t border-border-default" />}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5">
+                      {hasWhoUses && (
+                        <div>
+                          <p className="text-xs text-foreground-muted mb-0.5">Who Uses It</p>
+                          <p className="font-semibold text-foreground text-sm">{p.ai_who_uses_it}</p>
+                        </div>
+                      )}
+                      {hasApplication && (
+                        <div>
+                          <p className="text-xs text-foreground-muted mb-0.5">Application</p>
+                          <p className="font-semibold text-foreground text-sm">{p.ai_application}</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Inline Compare Section */}
+        {relatedProducts.length >= 1 && (() => {
+          const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+          const displayPrice = product.has_variants && product.variant_min_price
+            ? Number(product.variant_min_price)
+            : Number(product.base_price)
+          const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+          return (
+            <PdpCompareSection
+              currentProduct={{
+                id: product.id,
+                name: product.name,
+                slug: product.slug,
+                price: displayPrice,
+                mrp,
+                image: primaryImage?.thumbnail_url || primaryImage?.image_url || null,
+                brandName: product.brands?.name || null,
+                categoryId: product.category_id || null,
+                material: product.material ?? null,
+                finish: product.finish ?? null,
+                variant_type: product.variant_type ?? null,
+                weight: product.weight ?? null,
+                weight_unit: product.weight_unit ?? null,
+                hsn_code: product.hsn_code ?? null,
+                gst_percentage: product.gst_percentage ?? null,
+              }}
+              relatedProducts={relatedProducts.slice(0, 2).map((rp: any) => {
+                const rImg = rp.product_images?.find((img: any) => img.is_primary) || rp.product_images?.[0]
+                const rPrice = rp.has_variants && rp.variant_min_price ? Number(rp.variant_min_price) : Number(rp.base_price)
+                const rMrp = rp.mrp ? Number(rp.mrp) : (rp.variant_min_mrp ? Number(rp.variant_min_mrp) : null)
+                return {
+                  id: rp.id,
+                  name: rp.name,
+                  slug: rp.slug,
+                  price: rPrice,
+                  mrp: rMrp,
+                  image: rImg?.thumbnail_url || rImg?.image_url || null,
+                  brandName: rp.brands?.name || null,
+                  categoryId: rp.category_id || null,
+                  material: rp.material ?? null,
+                  finish: rp.finish ?? null,
+                  variant_type: rp.variant_type ?? null,
+                  weight: rp.weight ?? null,
+                  weight_unit: rp.weight_unit ?? null,
+                  hsn_code: rp.hsn_code ?? null,
+                  gst_percentage: rp.gst_percentage ?? null,
+                }
+              })}
+            />
           )
         })()}
 
@@ -485,6 +608,7 @@ export default async function ProductDetailPage({
                     primaryImage={relatedPrimaryImage || null}
                     brandName={relatedProduct.brands?.name || null}
                     categoryName={relatedProduct.categories?.name || null}
+                    discountPct={Number(relatedProduct.discount_pct ?? 0)}
                   />
                 )
               })}

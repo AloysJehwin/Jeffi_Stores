@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 
 export async function GET(
   _request: NextRequest,
@@ -42,7 +42,7 @@ export async function GET(
           '[]'::json
         ) AS product_variants,
         ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-        ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+        ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
         COALESCE(
           (SELECT json_agg(
              json_build_object(
@@ -93,7 +93,6 @@ export async function GET(
 
     return NextResponse.json({ product })
   } catch (err) {
-    console.error('[route]', err)
-    return NextResponse.json({ error: 'Failed' }, { status: 500 })
+return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
