@@ -59,6 +59,7 @@ export async function GET(
       product_name: [it.product_name, it.variant_name].filter(Boolean).join(' — '),
       quantity: parseFloat(it.quantity),
       unit_price: parseFloat(it.unit_price),
+      discount_amount: parseFloat(it.discount_amount || '0') || undefined,
       total_price: parseFloat(it.total_price),
       taxable_amount: parseFloat(it.taxable_amount || '0'),
       cgst_amount: parseFloat(it.cgst_amount || '0'),

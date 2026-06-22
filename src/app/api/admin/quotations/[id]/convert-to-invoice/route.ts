@@ -22,7 +22,11 @@ export async function POST(
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'quotations:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const quotation = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [id])
+    const quotation = await queryOne<any>(
+      `SELECT q.*, EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = q.id) AS from_rfq
+       FROM quotations q WHERE q.id = $1`,
+      [id]
+    )
     if (!quotation) return NextResponse.json({ error: 'Quotation not found' }, { status: 404 })
     if (quotation.status !== 'final') {
       return NextResponse.json({ error: 'Only finalised quotations can be converted to an invoice' }, { status: 400 })
@@ -242,16 +246,17 @@ export async function POST(
           cgst_amount, sgst_amount, igst_amount, total_amount,
           needs_delivery, notes
         ) VALUES (
-          $1, $2, $3, $4, 'business',
-          $5, $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15, $16, $17,
-          $18, $19
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15, $16, $17, $18,
+          $19, $20
         ) RETURNING id, order_number`,
         [
           'OFF-' + Date.now(),
           orderStatus,
           isPaid ? 'paid' : 'unpaid',
           paymentMode,
+          quotation.from_rfq ? 'business' : 'offline',
           customerName,
           customerPhone,
           customerEmail,
