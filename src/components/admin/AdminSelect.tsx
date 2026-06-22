@@ -25,6 +25,7 @@ interface AdminSelectProps {
   className?: string
   compact?: boolean
   sm?: boolean
+  xs?: boolean
 }
 
 export default function AdminSelect({
@@ -43,6 +44,7 @@ export default function AdminSelect({
   className = '',
   compact = false,
   sm = false,
+  xs = false,
 }: AdminSelectProps) {
   const [internalValue, setInternalValue] = useState(defaultValue)
   const [isOpen, setIsOpen] = useState(false)
@@ -68,7 +70,7 @@ export default function AdminSelect({
   const openDropdown = useCallback(() => {
     if (disabled || !buttonRef.current) return
     const rect = buttonRef.current.getBoundingClientRect()
-    const rowH = compact ? 28 : sm ? 34 : 42
+    const rowH = compact ? 28 : xs ? 26 : sm ? 34 : 42
     const dropdownHeight = Math.min(options.length * rowH + 8, 280)
     const spaceBelow = window.innerHeight - rect.bottom
     const up = spaceBelow < dropdownHeight && rect.top > spaceBelow
@@ -77,7 +79,7 @@ export default function AdminSelect({
     setIsOpen(true)
     const idx = options.findIndex(o => o.value === currentValue)
     setHighlightedIndex(idx >= 0 ? idx : 0)
-  }, [disabled, compact, sm, options, currentValue])
+  }, [disabled, compact, xs, sm, options, currentValue])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -145,7 +147,7 @@ export default function AdminSelect({
     }
   }
 
-  const rowH = compact ? 28 : sm ? 34 : 42
+  const rowH = compact ? 28 : xs ? 26 : sm ? 34 : 42
   const maxDropdownH = Math.min(options.length * rowH + 8, 280)
 
   let lastGroup: string | undefined
@@ -172,7 +174,7 @@ export default function AdminSelect({
           onClick={() => isOpen ? setIsOpen(false) : openDropdown()}
           onKeyDown={handleKeyDown}
           className={`w-full bg-surface border rounded-lg text-left transition-all cursor-pointer flex items-center justify-between
-            ${compact ? 'px-2 py-0.5 text-xs gap-1' : sm ? 'px-2 py-1.5 text-sm gap-2' : 'px-4 py-2.5 text-sm gap-2'}
+            ${compact ? 'px-2 py-0.5 text-xs gap-1' : xs ? 'px-1.5 py-1 text-xs gap-1' : sm ? 'px-2 py-1.5 text-sm gap-2' : 'px-4 py-2 text-sm gap-2'}
             ${isOpen ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-secondary hover:border-border-default'}
             ${error ? 'border-red-400 ring-red-500' : ''}
             ${disabled ? 'opacity-50 cursor-not-allowed bg-surface-secondary' : ''}
@@ -182,7 +184,7 @@ export default function AdminSelect({
             {displayLabel}
           </span>
           <svg
-            className={`text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${compact ? 'w-3 h-3' : 'w-4 h-4'}`}
+            className={`text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${compact || xs ? 'w-3 h-3' : 'w-4 h-4'}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -210,7 +212,7 @@ export default function AdminSelect({
                 return (
                   <li key={`${option.value}-${index}`}>
                     {showGroupHeader && (
-                      <div className={`font-semibold text-foreground-muted uppercase tracking-wider bg-surface-secondary border-t border-border-default first:border-t-0 ${compact ? 'px-2.5 py-1 text-[9px]' : sm ? 'px-3 py-1 text-[10px]' : 'px-4 py-1.5 text-xs'}`}>
+                      <div className={`font-semibold text-foreground-muted uppercase tracking-wider bg-surface-secondary border-t border-border-default first:border-t-0 ${compact || xs ? 'px-2.5 py-1 text-[9px]' : sm ? 'px-3 py-1 text-[10px]' : 'px-4 py-1.5 text-xs'}`}>
                         {option.group}
                       </div>
                     )}
@@ -221,15 +223,15 @@ export default function AdminSelect({
                       onClick={() => handleSelect(option.value)}
                       onMouseEnter={() => setHighlightedIndex(index)}
                       className={`w-full text-left transition-colors flex items-center justify-between
-                        ${compact ? 'px-2.5 py-1 text-xs' : sm ? 'px-3 py-1.5 text-sm' : 'px-4 py-2.5 text-sm'}
-                        ${option.indent ? (compact ? 'pl-5' : sm ? 'pl-6' : 'pl-8') : ''}
+                        ${compact || xs ? 'px-2.5 py-1 text-xs' : sm ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm'}
+                        ${option.indent ? (compact || xs ? 'pl-5' : sm ? 'pl-6' : 'pl-8') : ''}
                         ${highlightedIndex === index ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : 'text-foreground-secondary'}
                         ${option.value === currentValue ? 'font-medium text-accent-600 dark:text-accent-400' : ''}
                       `}
                     >
                       <span>{option.label}</span>
                       {option.value === currentValue && (
-                        <svg className={`text-accent-500 shrink-0 ${compact ? 'w-3 h-3' : 'w-4 h-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <svg className={`text-accent-500 shrink-0 ${compact || xs ? 'w-3 h-3' : 'w-4 h-4'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                       )}

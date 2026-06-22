@@ -2168,7 +2168,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     <AdminSelect
                                       value={ed.stock}
                                       onChange={v => setSubVariantEditDraft(d => d && ({ ...d, stock: v }))}
-                                      compact
+                                      xs
                                       className="w-28"
                                       options={[
                                         { value: 'In Stock', label: 'In Stock' },
