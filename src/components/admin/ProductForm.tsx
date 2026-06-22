@@ -1136,17 +1136,17 @@ export default function ProductForm({ categories, brands, action, product, produ
                 <label htmlFor="stock_status" className="block text-sm font-medium text-foreground-secondary mb-2">
                   Stock Status *
                 </label>
-                <select
+                <AdminSelect
                   id="stock_status"
                   name="stock_status"
                   required={!hasVariants}
                   defaultValue={product?.stock_status || 'In Stock'}
-                  className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                >
-                  <option value="In Stock">In Stock</option>
-                  <option value="Low Stock">Low Stock</option>
-                  <option value="Out of Stock">Out of Stock</option>
-                </select>
+                  options={[
+                    { value: 'In Stock', label: 'In Stock' },
+                    { value: 'Low Stock', label: 'Low Stock' },
+                    { value: 'Out of Stock', label: 'Out of Stock' },
+                  ]}
+                />
                 <p className="text-xs text-foreground-muted mt-1">Availability shown to customers. Inventory quantity is managed separately.</p>
               </div>
             </>
@@ -1396,11 +1396,15 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   {variant.sub_variant_type_on ? (
                                     <input type="text" value={sumSubVariantStock(subVariantsMap[variant.id || '']) > 0 ? 'In Stock' : 'Out of Stock'} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} />
                                   ) : (
-                                    <select value={variant.stock_status} onChange={(e) => updateVariant(index, 'stock_status', e.target.value)} className={inputCls} required>
-                                      <option value="In Stock">In Stock</option>
-                                      <option value="Low Stock">Low Stock</option>
-                                      <option value="Out of Stock">Out of Stock</option>
-                                    </select>
+                                    <AdminSelect
+                                      value={variant.stock_status}
+                                      onChange={(v) => updateVariant(index, 'stock_status', v)}
+                                      options={[
+                                        { value: 'In Stock', label: 'In Stock' },
+                                        { value: 'Low Stock', label: 'Low Stock' },
+                                        { value: 'Out of Stock', label: 'Out of Stock' },
+                                      ]}
+                                    />
                                   )}
                                 </div>
                                 <div>
@@ -1587,11 +1591,17 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     {variant.sub_variant_type_on ? (
                                       <input type="text" value={sumSubVariantStock(subVariantsMap[variant.id || '']) > 0 ? 'In Stock' : 'Out of Stock'} readOnly className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" title="Derived from sub-variants" />
                                     ) : (
-                                      <select value={variant.stock_status} onChange={(e) => updateVariant(index, 'stock_status', e.target.value)} className="w-28 px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" required>
-                                        <option value="In Stock">In Stock</option>
-                                        <option value="Low Stock">Low Stock</option>
-                                        <option value="Out of Stock">Out of Stock</option>
-                                      </select>
+                                      <AdminSelect
+                                        value={variant.stock_status}
+                                        onChange={(v) => updateVariant(index, 'stock_status', v)}
+                                        sm
+                                        className="w-28"
+                                        options={[
+                                          { value: 'In Stock', label: 'In Stock' },
+                                          { value: 'Low Stock', label: 'Low Stock' },
+                                          { value: 'Out of Stock', label: 'Out of Stock' },
+                                        ]}
+                                      />
                                     )}
                                   </td>
                                   <td className="py-2 px-3">
@@ -2155,11 +2165,17 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   {/* Price (Ex. GST) — locked */}
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price_ex_gst} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
                                   <td className="py-1 pr-1">
-                                    <select value={ed.stock} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, stock: e.target.value }))} className={svInputCls}>
-                                      <option value="In Stock">In Stock</option>
-                                      <option value="Low Stock">Low Stock</option>
-                                      <option value="Out of Stock">Out of Stock</option>
-                                    </select>
+                                    <AdminSelect
+                                      value={ed.stock}
+                                      onChange={v => setSubVariantEditDraft(d => d && ({ ...d, stock: v }))}
+                                      compact
+                                      className="w-28"
+                                      options={[
+                                        { value: 'In Stock', label: 'In Stock' },
+                                        { value: 'Low Stock', label: 'Low Stock' },
+                                        { value: 'Out of Stock', label: 'Out of Stock' },
+                                      ]}
+                                    />
                                   </td>
                                   <td className="py-1 pr-1"><input type="text" value={ed.sku} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, sku: e.target.value }))} className={`${svInputCls} w-20`} /></td>
                                   <td className="py-1 pl-1 flex items-center gap-1">
