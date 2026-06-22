@@ -25,12 +25,17 @@ export async function GET(request: NextRequest) {
            oi.variant_name,
            oi.buy_unit,
            oi.quantity::numeric                                     AS raw_qty,
-           -- Match unit by variant_id first, fall back to product-level unit
+           -- Resolve factor via 5-level fallback so RFQ-converted items (buy_unit NULL)
+           -- still get the correct factor from oi.unit, sell_unit_id, or sold_unit_factor.
            (oi.quantity::numeric * COALESCE(
-             CASE WHEN COALESCE(puv.dimension, pup.dimension) = 'count'
-                  THEN COALESCE(puv.factor, pup.factor)
+             CASE WHEN COALESCE(puv.dimension, pup.dimension,
+                                puuv.dimension, puup.dimension,
+                                pu_sv.dimension, pu_sp.dimension) = 'count'
+                  THEN COALESCE(puv.factor, pup.factor,
+                                puuv.factor, puup.factor,
+                                pu_sv.factor, pu_sp.factor)
                   ELSE 1 END,
-             1
+             CASE WHEN oi.sold_unit_factor IS NOT NULL THEN oi.sold_unit_factor ELSE 1 END
            ))                                                      AS req_qty,
            -- Target the most-specific stock level; do NOT fall through to a broader
            -- level — a sub-variant with 0 stock must not inherit variant/product stock.
@@ -44,14 +49,17 @@ export async function GET(request: NextRequest) {
          LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
          LEFT JOIN product_variants     pv  ON pv.id  = oi.variant_id
          LEFT JOIN products             p   ON p.id   = oi.product_id
-         -- Variant-specific unit row (most precise)
-         LEFT JOIN product_units puv ON puv.unit = oi.buy_unit
-                                    AND puv.product_id = oi.product_id
-                                    AND puv.variant_id = oi.variant_id
-         -- Product-level fallback unit row
-         LEFT JOIN product_units pup ON pup.unit = oi.buy_unit
-                                    AND pup.product_id = oi.product_id
-                                    AND pup.variant_id IS NULL
+         LEFT JOIN product_variants     pvar ON pvar.id = oi.variant_id
+         LEFT JOIN products             prod ON prod.id = oi.product_id
+         -- buy_unit path (manually created invoices)
+         LEFT JOIN product_units puv  ON puv.unit  = oi.buy_unit AND puv.product_id = oi.product_id AND puv.variant_id = oi.variant_id AND oi.buy_unit IS NOT NULL
+         LEFT JOIN product_units pup  ON pup.unit  = oi.buy_unit AND pup.product_id = oi.product_id AND pup.variant_id IS NULL         AND oi.buy_unit IS NOT NULL
+         -- oi.unit fallback (RFQ-converted items where buy_unit is NULL)
+         LEFT JOIN product_units puuv ON puuv.unit = oi.unit      AND puuv.product_id = oi.product_id AND puuv.variant_id = oi.variant_id AND oi.buy_unit IS NULL AND oi.sold_unit_factor IS NULL
+         LEFT JOIN product_units puup ON puup.unit = oi.unit      AND puup.product_id = oi.product_id AND puup.variant_id IS NULL         AND oi.buy_unit IS NULL AND oi.sold_unit_factor IS NULL
+         -- sell_unit_id fallback (default selling unit from variant/product)
+         LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
+         LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id  AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
        ),
        draft_stock AS (
          SELECT
