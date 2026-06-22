@@ -213,7 +213,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                 value={customerSearch}
                 onChange={e => { setCustomerSearch(e.target.value); setShowSuggestions(true); syncUrl({ customer: e.target.value }) }}
                 onFocus={() => setShowSuggestions(true)}
-                className="w-full px-2 py-1.5 pr-9 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 placeholder:text-foreground-muted"
+                className="w-full px-2 py-2.5 pr-9 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 placeholder:text-foreground-muted"
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
