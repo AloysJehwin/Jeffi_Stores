@@ -46,20 +46,19 @@ export async function GET(request: NextRequest) {
            END::numeric                                            AS avail_qty,
            oi.product_id IS NOT NULL                               AS tracked
          FROM order_items oi
-         LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
-         LEFT JOIN product_variants     pv  ON pv.id  = oi.variant_id
-         LEFT JOIN products             p   ON p.id   = oi.product_id
+         LEFT JOIN product_sub_variants psv  ON psv.id  = oi.sub_variant_id
+         LEFT JOIN product_variants     pv   ON pv.id   = oi.variant_id
+         LEFT JOIN products             p    ON p.id    = oi.product_id
          LEFT JOIN product_variants     pvar ON pvar.id = oi.variant_id
-         LEFT JOIN products             prod ON prod.id = oi.product_id
          -- buy_unit path (manually created invoices)
          LEFT JOIN product_units puv  ON puv.unit  = oi.buy_unit AND puv.product_id = oi.product_id AND puv.variant_id = oi.variant_id AND oi.buy_unit IS NOT NULL
          LEFT JOIN product_units pup  ON pup.unit  = oi.buy_unit AND pup.product_id = oi.product_id AND pup.variant_id IS NULL         AND oi.buy_unit IS NOT NULL
          -- oi.unit fallback (RFQ-converted items where buy_unit is NULL)
-         LEFT JOIN product_units puuv ON puuv.unit = oi.unit      AND puuv.product_id = oi.product_id AND puuv.variant_id = oi.variant_id AND oi.buy_unit IS NULL AND oi.sold_unit_factor IS NULL
-         LEFT JOIN product_units puup ON puup.unit = oi.unit      AND puup.product_id = oi.product_id AND puup.variant_id IS NULL         AND oi.buy_unit IS NULL AND oi.sold_unit_factor IS NULL
-         -- sell_unit_id fallback (default selling unit from variant/product)
+         LEFT JOIN product_units puuv ON puuv.unit = oi.unit     AND puuv.product_id = oi.product_id AND puuv.variant_id = oi.variant_id AND oi.buy_unit IS NULL AND oi.sold_unit_factor IS NULL
+         LEFT JOIN product_units puup ON puup.unit = oi.unit     AND puup.product_id = oi.product_id AND puup.variant_id IS NULL         AND oi.buy_unit IS NULL AND oi.sold_unit_factor IS NULL
+         -- sell_unit_id fallback (default selling unit from variant/product); reuse p alias for products
          LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
-         LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id  AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
+         LEFT JOIN product_units pu_sp ON pu_sp.id = p.sell_unit_id    AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
        ),
        draft_stock AS (
          SELECT
