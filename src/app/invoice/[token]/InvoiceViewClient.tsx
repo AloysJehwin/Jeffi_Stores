@@ -48,6 +48,10 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
   const total = Number(order.total_amount) || 0
   const hasGst = cgst > 0 || sgst > 0 || igst > 0
 
+  const discount = Number(order.discount_amount) || 0
+  const bizDiscount = Number(order.business_discount_amount) || 0
+  const shipping = Number(order.shipping_amount) || 0
+
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -71,12 +75,24 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
               )}
             </div>
           </div>
+          {/* Download PDF button */}
           <button
             onClick={handleDownload}
             disabled={downloading}
-            className="shrink-0 self-start bg-white text-[#1a3a4a] font-semibold px-4 sm:px-5 py-2 rounded hover:bg-gray-100 disabled:opacity-60 text-sm whitespace-nowrap"
+            title="Download PDF"
+            className="shrink-0 self-start inline-flex items-center gap-2 px-4 py-2 rounded border border-white/30 bg-white/10 text-white text-sm font-semibold hover:bg-white/20 disabled:opacity-60 transition-colors"
           >
-            {downloading ? 'Downloading…' : 'Download PDF'}
+            {downloading ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+            Download PDF
           </button>
         </div>
 
@@ -125,7 +141,7 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
 
           {/* Items table */}
           <div className="overflow-x-auto rounded-lg border border-gray-200">
-            <table className="w-full text-sm min-w-[560px]">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="bg-[#1a3a4a] text-white">
                   <th className="text-left px-4 py-3 font-medium w-8">#</th>
@@ -133,20 +149,31 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
                   <th className="text-right px-4 py-3 font-medium">HSN</th>
                   <th className="text-right px-4 py-3 font-medium">Qty</th>
                   <th className="text-right px-4 py-3 font-medium">Rate</th>
+                  <th className="text-right px-4 py-3 font-medium">Disc.%</th>
                   <th className="text-right px-4 py-3 font-medium">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {items.map((item: any, i: number) => (
-                  <tr key={i} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
-                    <td className="px-4 py-3 text-gray-800 font-medium leading-snug">{item.product_name}</td>
-                    <td className="px-4 py-3 text-right text-gray-500 text-xs">{item.hsn_code || '—'}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">{item.quantity} {item.unit || ''}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">₹{fmt(item.unit_price)}</td>
-                    <td className="px-4 py-3 text-right text-gray-800 font-semibold">₹{fmt(item.total_price)}</td>
-                  </tr>
-                ))}
+                {items.map((item: any, i: number) => {
+                  const itemDiscount = Number(item.discount_amount) || 0
+                  const grossTotal = Number(item.total_price) + itemDiscount
+                  const discPct = grossTotal > 0 && itemDiscount > 0 ? (itemDiscount / grossTotal) * 100 : 0
+                  const discLabel = discPct >= 0.01 ? `${discPct.toFixed(2)}%` : '—'
+                  const unitExclGST = Number(item.taxable_amount) > 0 && Number(item.quantity) > 0
+                    ? Number(item.taxable_amount) / Number(item.quantity)
+                    : Number(item.unit_price)
+                  return (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
+                      <td className="px-4 py-3 text-gray-800 font-medium leading-snug">{item.product_name}</td>
+                      <td className="px-4 py-3 text-right text-gray-500 text-xs">{item.hsn_code || '—'}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">{item.quantity} {item.unit || ''}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">₹{fmt(unitExclGST)}</td>
+                      <td className="px-4 py-3 text-right text-gray-500 text-xs">{discLabel}</td>
+                      <td className="px-4 py-3 text-right text-gray-800 font-semibold">₹{fmt(item.total_price)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -154,6 +181,18 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
           {/* Totals */}
           <div className="flex justify-end">
             <div className="w-64 text-sm divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+              {discount > 0 && (
+                <div className="flex justify-between px-4 py-2.5 bg-gray-50">
+                  <span className="text-gray-500">Coupon Discount</span>
+                  <span className="text-green-600 font-medium">-₹{fmt(discount)}</span>
+                </div>
+              )}
+              {bizDiscount > 0 && (
+                <div className="flex justify-between px-4 py-2.5 bg-gray-50">
+                  <span className="text-gray-500">Business Discount</span>
+                  <span className="text-green-600 font-medium">-₹{fmt(bizDiscount)}</span>
+                </div>
+              )}
               {taxable > 0 && (
                 <div className="flex justify-between px-4 py-2.5 bg-gray-50">
                   <span className="text-gray-500">Taxable Amount</span>
@@ -176,6 +215,12 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
                 <div className="flex justify-between px-4 py-2 text-gray-500">
                   <span>IGST</span>
                   <span>₹{fmt(igst)}</span>
+                </div>
+              )}
+              {shipping > 0 && (
+                <div className="flex justify-between px-4 py-2 text-gray-500">
+                  <span>Shipping</span>
+                  <span>₹{fmt(shipping)}</span>
                 </div>
               )}
               <div className="flex justify-between px-4 py-3 bg-[#1a3a4a] text-white font-bold">

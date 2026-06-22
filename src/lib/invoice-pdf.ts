@@ -25,6 +25,7 @@ export interface InvoiceOrderItem {
   quantity: number
   unit_price: number
   total_price: number
+  discount_amount?: number
   taxable_amount: number
   cgst_amount: number
   sgst_amount: number
@@ -388,6 +389,10 @@ export async function generateInvoicePDF(
         : `${parseFloat(String(item.quantity))} ${unitLabel}`
       const perLabel = unitLabel
 
+      const grossTotal = item.total_price + (item.discount_amount || 0)
+      const discPct = grossTotal > 0 && (item.discount_amount || 0) > 0 ? ((item.discount_amount || 0) / grossTotal) * 100 : 0
+      const discLabel = discPct >= 0.01 ? `${discPct.toFixed(2)}%` : ''
+
       const rowData = [
         String(i + 1),
         item.product_name,
@@ -397,7 +402,7 @@ export async function generateInvoicePDF(
         fmt(item.unit_price),
         fmt(unitExcl),
         perLabel,
-        '',
+        discLabel,
         fmt(item.taxable_amount),
       ]
 
@@ -479,13 +484,24 @@ export async function generateInvoicePDF(
       y += rowH
     }
 
-    checkPageBreak(22)
+    checkPageBreak(26)
     const totalRowY = y
     drawHLine(doc, LM, R, y)
     y += 3
     doc.font(FB).fontSize(7).text('Total', LM + itemCols[0].w + 2, y + 3, { width: 40, align: 'right' })
-    doc.font(FB).fontSize(9).text(`Rs. ${fmt(order.total_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
-    y += 18
+    const totalStr = fmt(order.total_amount)
+    // Check if "Rs. X" fits on one line; if not, draw Rs. + amount stacked
+    doc.font(FB).fontSize(9)
+    const rsPrefix = 'Rs. '
+    const combinedW = doc.widthOfString(rsPrefix + totalStr)
+    if (combinedW <= amountColW - 6) {
+      doc.text(`Rs. ${totalStr}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      y += 22
+    } else {
+      doc.text('Rs.', amountColX + 2, y + 1, { width: amountColW - 4, align: 'right' })
+      doc.text(totalStr, amountColX + 2, y + 10, { width: amountColW - 4, align: 'right' })
+      y += 24
+    }
 
     drawRect(doc, LM, tableTop, pw, y - tableTop)
     let gridCx = LM
