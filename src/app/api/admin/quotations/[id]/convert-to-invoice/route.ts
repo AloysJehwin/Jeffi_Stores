@@ -117,11 +117,13 @@ export async function POST(
     const processedItems = qItems.map((item: any) => {
       const rawQty = parseFloat(item.quantity)
       const unitInfo = unitFactorMap.get(item.id)
-      const effectiveQty = (unitInfo?.dimension === 'count' && unitInfo.factor > 1)
-        ? rawQty * unitInfo.factor
-        : rawQty
+      const factor = unitInfo?.factor ?? 1
+      const isCountWithFactor = unitInfo?.dimension === 'count' && factor > 1
+      // base_quantity is rawQty × factor (for stock deduction); line amount uses rawQty at the
+      // per-selling-unit rate (rate already incorporates the factor from the quotation)
+      const baseQty = isCountWithFactor ? rawQty * factor : rawQty
       const rate = parseFloat(item.rate)
-      const exGstLineTotal = lineItemExGst(effectiveQty, rate, parseFloat(item.discount_pct) || 0)
+      const exGstLineTotal = lineItemExGst(rawQty, rate, parseFloat(item.discount_pct) || 0)
       const gstRate = parseFloat(item.gst_rate || '18')
 
       let cgst = 0, sgst = 0, igst = 0
@@ -145,6 +147,7 @@ export async function POST(
 
       const discountPct = parseFloat(item.discount_pct) || 0
       const discountedRate = rate * (1 - discountPct / 100)
+      const sellUnit = item.buy_unit || item.unit || null
 
       return {
         product_id: item.product_id || null,
@@ -156,6 +159,9 @@ export async function POST(
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: rawQty,
+        base_qty: baseQty,
+        sell_unit: sellUnit,
+        unit_factor: isCountWithFactor ? factor : null,
         buy_unit: item.buy_unit || null,
         buy_mode: 'unit',
         unit_price: Math.round(discountedRate * (1 + gstRate / 100) * 100) / 100,
@@ -195,19 +201,8 @@ export async function POST(
       const insufficientItems: string[] = []
       for (const item of processedItems) {
         if (!item.product_id) continue
-        // Resolve unit factor so check uses base-unit qty (same logic as deduction below)
-        const unitRow = await client.query<{ factor: string; dimension: string }>(
-          `SELECT COALESCE(puv.factor, pup.factor) AS factor,
-                  COALESCE(puv.dimension, pup.dimension) AS dimension
-           FROM (SELECT 1) x
-           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
-           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
-          [item.buy_unit, item.product_id, item.variant_id || null]
-        )
-        const u = unitRow.rows[0]
-        const baseQty = (u?.dimension === 'count' && u?.factor)
-          ? item.quantity * parseFloat(u.factor)
-          : item.quantity
+        // base_qty already resolved from unitFactorMap in processedItems (handles NULL buy_unit)
+        const baseQty = item.base_qty
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE',
@@ -299,14 +294,16 @@ export async function POST(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, buy_unit, buy_mode, unit_price, total_price,
-            taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+            taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount,
+            sold_unit, sold_unit_factor, base_quantity
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
           [
             newOrder.id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
             item.quantity, item.buy_unit || null, item.buy_mode || 'unit',
             item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
+            item.sell_unit, item.unit_factor, item.base_qty,
           ]
         )
       }
@@ -314,19 +311,8 @@ export async function POST(
       if (!saveAsDraft) {
         for (const item of processedItems) {
           if (!item.product_id) continue
-          // Resolve unit factor (prefer variant-scoped row) to get base-unit qty
-          const unitRow = await client.query<{ factor: string; dimension: string }>(
-            `SELECT COALESCE(puv.factor, pup.factor) AS factor,
-                    COALESCE(puv.dimension, pup.dimension) AS dimension
-             FROM (SELECT 1) x
-             LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
-             LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
-            [item.buy_unit, item.product_id, item.variant_id || null]
-          )
-          const u = unitRow.rows[0]
-          const qty = (u?.dimension === 'count' && u?.factor)
-            ? item.quantity * parseFloat(u.factor)
-            : item.quantity
+          // base_qty already resolved from unitFactorMap in processedItems (handles NULL buy_unit)
+          const qty = item.base_qty
           let stockBefore = 0
           if (item.sub_variant_id) {
             const row = await client.query<{ inventory_quantity: string }>(
