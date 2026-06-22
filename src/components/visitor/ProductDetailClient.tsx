@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
 
@@ -210,9 +210,57 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null; min: number; max: number | null; step: number; factor: number; dimension: string }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
+  const [pincode, setPincode] = useState('')
+  const [pincodeResult, setPincodeResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [pincodeChecking, setPincodeChecking] = useState(false)
+  const [notifyEmail, setNotifyEmail] = useState('')
+  const [notifySubmitted, setNotifySubmitted] = useState(false)
+  const pincodeRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
   const router = useRouter()
+
+  useEffect(() => {
+    if (user?.email) setNotifyEmail(user.email)
+  }, [user])
+
+  const checkPincode = useCallback(async () => {
+    const p = pincode.trim()
+    if (!/^\d{6}$/.test(p)) {
+      setPincodeResult({ ok: false, message: 'Enter a valid 6-digit pincode' })
+      return
+    }
+    setPincodeChecking(true)
+    setPincodeResult(null)
+    try {
+      const res = await fetch(`/api/delivery-check?pincode=${p}`)
+      const data = await res.json()
+      setPincodeResult({ ok: data.serviceable, message: data.message })
+    } catch {
+      setPincodeResult({ ok: false, message: 'Could not check delivery. Try again.' })
+    } finally {
+      setPincodeChecking(false)
+    }
+  }, [pincode])
+
+  const handleNotifyMe = useCallback(async () => {
+    const email = notifyEmail.trim()
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showToast('Enter a valid email address', 'error')
+      return
+    }
+    try {
+      await fetch('/api/notify-back-in-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: product.id, email }),
+        credentials: 'include',
+      })
+      setNotifySubmitted(true)
+    } catch {
+      showToast('Failed to save. Try again.', 'error')
+    }
+  }, [notifyEmail, product.id])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -392,23 +440,81 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
               <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4">
               {product.stock_status !== 'Out of Stock' ? (
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-green-700 dark:text-green-400 font-semibold">
-                    In Stock
-                  </span>
+                  <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  {product.stock_status === 'Low Stock' && (
+                    <span className="ml-1 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 px-2 py-0.5 rounded-full">
+                      Only a few left — order soon
+                    </span>
+                  )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
+                  </div>
+                  {/* Notify me when back in stock */}
+                  {notifySubmitted ? (
+                    <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-3 py-2 rounded-lg">
+                      <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                      We&apos;ll email you when this is back in stock.
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        value={notifyEmail}
+                        onChange={e => setNotifyEmail(e.target.value)}
+                        placeholder="Enter your email"
+                        className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                      <button
+                        onClick={handleNotifyMe}
+                        className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors"
+                      >
+                        Notify Me
+                      </button>
+                    </div>
+                  )}
                 </div>
+              )}
+            </div>
+
+            {/* Pincode delivery check */}
+            <div className="mb-6 p-3 rounded-xl border border-border-default bg-surface-elevated">
+              <p className="text-xs font-semibold text-foreground-secondary mb-2 uppercase tracking-wide">Check Delivery</p>
+              <div className="flex gap-2">
+                <input
+                  ref={pincodeRef}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={pincode}
+                  onChange={e => { setPincode(e.target.value.replace(/\D/g, '')); setPincodeResult(null) }}
+                  onKeyDown={e => e.key === 'Enter' && checkPincode()}
+                  placeholder="Enter pincode"
+                  className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <button
+                  onClick={checkPincode}
+                  disabled={pincodeChecking}
+                  className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-60"
+                >
+                  {pincodeChecking ? 'Checking…' : 'Check'}
+                </button>
+              </div>
+              {pincodeResult && (
+                <p className={`text-xs mt-2 font-medium ${pincodeResult.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {pincodeResult.ok ? '✓ ' : '✗ '}{pincodeResult.message}
+                </p>
               )}
             </div>
           </>
