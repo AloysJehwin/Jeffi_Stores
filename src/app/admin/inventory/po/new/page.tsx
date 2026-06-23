@@ -9,6 +9,29 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/admin-path'
 
+const PURCHASE_UNITS = [
+  { value: '', label: '— same as sell unit —' },
+  { value: 'Carton', label: 'Carton' },
+  { value: 'Box', label: 'Box' },
+  { value: 'Case', label: 'Case' },
+  { value: 'Bag', label: 'Bag' },
+  { value: 'Drum', label: 'Drum' },
+  { value: 'Pallet', label: 'Pallet' },
+  { value: 'Bundle', label: 'Bundle' },
+  { value: 'Roll', label: 'Roll' },
+  { value: 'Pack', label: 'Pack' },
+  { value: 'Dozen', label: 'Dozen (12)' },
+  { value: 'Gross', label: 'Gross (144)' },
+  { value: 'Sack', label: 'Sack' },
+  { value: 'Barrel', label: 'Barrel' },
+  { value: 'Tin', label: 'Tin' },
+  { value: 'Bottle', label: 'Bottle' },
+  { value: 'Tube', label: 'Tube' },
+  { value: 'Coil', label: 'Coil' },
+  { value: 'Set', label: 'Set' },
+  { value: 'Kit', label: 'Kit' },
+]
+
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const btnPrimary = 'px-4 py-2.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
@@ -387,16 +410,24 @@ export default function NewPOPage() {
                       <div className="bg-surface-secondary rounded-lg border border-border-default p-3 space-y-3">
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           <div>
-                            <label className={labelCls}>Purchase Unit (e.g. Carton)</label>
-                            <input type="text" value={it.purchase_unit}
-                              onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, purchase_unit: e.target.value }))}
-                              className={inputCls} placeholder="Carton, Box…" />
+                            <label className={labelCls}>Purchase Unit</label>
+                            <AdminSelect
+                              value={it.purchase_unit}
+                              onChange={v => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, purchase_unit: v }))}
+                              options={PURCHASE_UNITS}
+                            />
                           </div>
                           <div>
-                            <label className={labelCls}>{it.sell_unit_label || 'Units'} per purchase unit <span className="text-red-500">*</span></label>
+                            <label className={labelCls}>{it.sell_unit_label || 'Units'} per {it.purchase_unit || 'purchase unit'} <span className="text-red-500">*</span></label>
                             <input type="number" min="1" step="1" value={it.purchase_unit_factor}
                               onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, purchase_unit_factor: e.target.value }))}
                               className={inputCls} placeholder="200" />
+                            {factor > 0 && it.purchase_unit && (
+                              <p className="mt-1 text-xs text-foreground-muted">
+                                1 {it.purchase_unit} = {factor} {it.sell_unit_label || 'units'}
+                                {qty > 0 && <span className="ml-1 text-secondary-500 dark:text-secondary-300">→ {(qty * factor).toLocaleString('en-IN')} {it.sell_unit_label || 'units'} total</span>}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <label className={labelCls}>
