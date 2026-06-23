@@ -12,7 +12,7 @@ const { mockClientQuery, mockClientRelease, mockPoolConnect, mockPoolOn } = vi.h
 
 vi.mock('pg', () => {
   // Must use `function` so `new Pool(...)` works (arrow functions are not constructible)
-  function Pool() {
+  function Pool(this: any) {
     this.connect = mockPoolConnect
     this.on = mockPoolOn
   }
