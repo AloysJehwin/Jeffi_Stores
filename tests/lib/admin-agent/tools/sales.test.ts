@@ -1145,13 +1145,13 @@ describe('extract_quotation_lines_from_attachment', () => {
   })
 
   it('extracts text from PDF via pdf-parse when text is available', async () => {
-    const pdfParse = (await import('pdf-parse')).default as ReturnType<typeof vi.fn>
+    const pdfParse = ((await import('pdf-parse')) as any).default
     pdfParse.mockResolvedValueOnce({ text: 'Parsed PDF text' })
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1', mime_type: 'application/pdf', filename: 'doc.pdf',
       byte_size: 500, data: Buffer.from('%PDF'), extracted_text: null, expires_at: '2099-01-01',
     })
-    mockQuery.mockResolvedValue(undefined)
+    mockQuery.mockResolvedValue(undefined as any)
     const result = await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' }) as any
     expect(result.ok).toBe(true)
     expect(result.data.text).toBe('Parsed PDF text')
@@ -1160,14 +1160,14 @@ describe('extract_quotation_lines_from_attachment', () => {
   })
 
   it('falls back to vision OCR when pdf-parse yields empty text and OCR succeeds', async () => {
-    const pdfParse = (await import('pdf-parse')).default as ReturnType<typeof vi.fn>
+    const pdfParse = ((await import('pdf-parse')) as any).default
     pdfParse.mockResolvedValueOnce({ text: '   ' })
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1', mime_type: 'application/pdf', filename: 'scan.pdf',
       byte_size: 200, data: Buffer.from('%PDF'), extracted_text: null, expires_at: '2099-01-01',
     })
     mockOcrPdfPages.mockResolvedValueOnce({ ok: true, text: 'OCR text from PDF', pages: 3, model: 'gpt-4o' })
-    mockQuery.mockResolvedValue(undefined)
+    mockQuery.mockResolvedValue(undefined as any)
     const result = await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' }) as any
     expect(result.ok).toBe(true)
     expect(result.data.text).toBe('OCR text from PDF')
@@ -1176,7 +1176,7 @@ describe('extract_quotation_lines_from_attachment', () => {
   })
 
   it('returns err when pdf-parse yields empty and vision OCR fails', async () => {
-    const pdfParse = (await import('pdf-parse')).default as ReturnType<typeof vi.fn>
+    const pdfParse = ((await import('pdf-parse')) as any).default
     pdfParse.mockResolvedValueOnce({ text: '' })
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1', mime_type: 'application/pdf', filename: 'bad.pdf',
@@ -1190,7 +1190,7 @@ describe('extract_quotation_lines_from_attachment', () => {
   })
 
   it('returns err when pdf-parse throws and vision OCR also fails', async () => {
-    const pdfParse = (await import('pdf-parse')).default as ReturnType<typeof vi.fn>
+    const pdfParse = ((await import('pdf-parse')) as any).default
     pdfParse.mockRejectedValueOnce(new Error('corrupt PDF'))
     mockQueryOne.mockResolvedValueOnce({
       id: 'a1', mime_type: 'application/pdf', filename: 'corrupt.pdf',
@@ -1208,7 +1208,7 @@ describe('extract_quotation_lines_from_attachment', () => {
       byte_size: 2048, data: Buffer.from('img'), extracted_text: null, expires_at: '2099-01-01',
     })
     mockOcrImage.mockResolvedValueOnce({ ok: true, text: 'Image OCR text', model: 'gpt-4o' })
-    mockQuery.mockResolvedValue(undefined)
+    mockQuery.mockResolvedValue(undefined as any)
     const result = await getTool('extract_quotation_lines_from_attachment').handler({ attachment_id: 'a1' }) as any
     expect(result.ok).toBe(true)
     expect(result.data.text).toBe('Image OCR text')

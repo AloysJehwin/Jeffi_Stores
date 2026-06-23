@@ -177,7 +177,7 @@ describe('uploadGalleryImage', () => {
   })
 
   it('returns 0 for width when metadata.width is falsy', async () => {
-    const sharp = (await import('sharp')).default as ReturnType<typeof vi.fn>
+    const sharp = ((await import('sharp')) as any).default
     const instance = {
       rotate: vi.fn().mockReturnThis(),
       resize: vi.fn().mockReturnThis(),
