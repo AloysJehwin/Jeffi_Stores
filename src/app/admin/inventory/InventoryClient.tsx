@@ -161,7 +161,7 @@ function SuppliersTab() {
             value={search}
             onChange={handleSearchChange}
             placeholder="Name, GSTIN, contact..."
-            inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+            inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
           />
         </div>
         <div className="flex flex-col">
@@ -255,6 +255,7 @@ type POItem = {
   id: string; product_id: string; variant_id: string | null
   product_name: string; variant_name: string | null; sku: string | null
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
+  purchase_unit: string | null; purchase_unit_factor: string | null
 }
 
 function POTab({ initialPO }: { initialPO?: string }) {
@@ -351,6 +352,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
       ...it,
       receive_qty: String(Math.max(0, parseFloat(it.quantity) - parseFloat(it.quantity_received || '0'))),
       receive_cost: it.unit_cost,
+      purchase_unit_factor: parseFloat(it.purchase_unit_factor || '1'),
     }))
     setReceiveMode({ po: json.purchase_order })
     setReceiveItems(items)
@@ -363,6 +365,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
     const items = receiveItems.filter(it => parseFloat(it.receive_qty) > 0).map(it => ({
       po_item_id: it.id, product_id: it.product_id, variant_id: it.variant_id || null,
       quantity_received: parseFloat(it.receive_qty), unit_cost: parseFloat(it.receive_cost),
+      purchase_unit_factor: parseFloat(it.purchase_unit_factor || '1'),
     }))
     const res = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -510,6 +513,11 @@ function POTab({ initialPO }: { initialPO?: string }) {
                   <tr key={it.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 text-foreground">
                       <p className="font-medium">{it.product_name}{it.variant_name && <span className="text-foreground-secondary font-normal"> / {it.variant_name}</span>}</p>
+                      {it.purchase_unit && parseFloat(it.purchase_unit_factor || '1') > 1 && (
+                        <p className="text-xs text-foreground-muted mt-0.5">
+                          {it.purchase_unit} · ×{it.purchase_unit_factor} per unit
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">{it.sku || '—'}</td>
                     <td className="px-4 py-3 text-right text-foreground-secondary">{parseFloat(it.quantity)}</td>
@@ -557,12 +565,13 @@ function POTab({ initialPO }: { initialPO?: string }) {
             value={search}
             onChange={v => { setSearch(v); setPage(1) }}
             placeholder="PO number, supplier..."
-            inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+            inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
           />
         </div>
         <div className="w-44">
           <label className={labelCls}>Status</label>
           <AdminSelect
+            sm
             value={statusFilter}
             onChange={v => { setStatusFilter(v); setPage(1) }}
             placeholder="All statuses"
@@ -921,7 +930,7 @@ function StockTab() {
               <AdminTypeahead type="products" value={search}
                 onChange={v => { setSearch(v); setTxPage(1); syncUrl({ ledger_search: v }) }}
                 placeholder="Name, SKU..."
-                inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted" />
+                inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted" />
             </div>
             <div>
               <label className={labelCls}>From</label>
@@ -1132,12 +1141,13 @@ function StockTab() {
                 value={valSearch}
                 onChange={v => { setValSearch(v); setValPage(1); syncUrl({ val_search: v }) }}
                 placeholder="Name, SKU, variant..."
-                inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+                inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
               />
             </div>
             <div className="w-44">
               <label className={labelCls}>Category</label>
               <AdminSelect
+                sm
                 value={valCategory}
                 onChange={v => { setValCategory(v); setValPage(1); syncUrl({ val_category: v }) }}
                 placeholder="All categories"
@@ -1150,6 +1160,7 @@ function StockTab() {
             <div className="w-40">
               <label className={labelCls}>Brand</label>
               <AdminSelect
+                sm
                 value={valBrand}
                 onChange={v => { setValBrand(v); setValPage(1); syncUrl({ val_brand: v }) }}
                 placeholder="All brands"
@@ -1162,6 +1173,7 @@ function StockTab() {
             <div className="w-40">
               <label className={labelCls}>Stock status</label>
               <AdminSelect
+                sm
                 value={valStockStatus}
                 onChange={v => { setValStockStatus(v); setValPage(1); syncUrl({ val_stock: v }) }}
                 placeholder="All"
@@ -1178,7 +1190,7 @@ function StockTab() {
                 <span className={labelCls}>&nbsp;</span>
                 <button
                   onClick={() => { setValSearch(''); setValCategory(''); setValBrand(''); setValStockStatus(''); setValPage(1); syncUrl({ val_search: '', val_category: '', val_brand: '', val_stock: '' }) }}
-                  className="px-3 py-2.5 rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
                 >
                   Clear filters
                 </button>
@@ -1306,7 +1318,7 @@ function StockTab() {
                               )}
                             </td>
                             <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium whitespace-nowrap">
                                 {p.sell_unit_dimension === 'count'
                                   ? <>Pc{(p.sell_unit_label || p.sell_unit) && (p.sell_unit_label || p.sell_unit) !== 'pc' ? <span className="text-foreground-muted font-normal">/ {p.sell_unit_label || p.sell_unit}</span> : null}</>
                                   : (p.sell_unit_label || p.sell_unit || 'Pc')}

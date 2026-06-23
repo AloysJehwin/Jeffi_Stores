@@ -20,6 +20,12 @@ type POSearchMode = 'name' | 'sku' | 'category'
 type POLineItem = {
   id: string; product_id: string; variant_id: string; product_name: string
   sku: string; quantity: string; unit_cost: string; tax_rate: string; hsn_code: string; mrp: number
+  // purchase unit conversion
+  use_conversion: boolean
+  purchase_unit: string
+  purchase_unit_factor: string
+  line_total_incl_gst: string
+  gst_inclusive: boolean
 }
 
 type PickerProduct = {
@@ -28,7 +34,13 @@ type PickerProduct = {
 }
 
 function newPOLineItem(): POLineItem {
-  return { id: Math.random().toString(36).slice(2), product_id: '', variant_id: '', product_name: '', sku: '', quantity: '1', unit_cost: '', tax_rate: '0', hsn_code: '', mrp: 0 }
+  return {
+    id: Math.random().toString(36).slice(2),
+    product_id: '', variant_id: '', product_name: '', sku: '',
+    quantity: '1', unit_cost: '', tax_rate: '0', hsn_code: '', mrp: 0,
+    use_conversion: false, purchase_unit: '', purchase_unit_factor: '1',
+    line_total_incl_gst: '', gst_inclusive: true,
+  }
 }
 
 function decodePOLineItemId(encoded: string) {
@@ -150,14 +162,25 @@ export default function NewPOPage() {
     setSaving(true)
     const items = lineItems
       .filter(it => it.product_id && parseFloat(it.quantity) > 0)
-      .map(it => ({
-        product_id: it.product_id, variant_id: it.variant_id || null,
-        product_name: it.product_name, sku: it.sku,
-        quantity: parseFloat(it.quantity),
-        unit_cost: parseFloat(it.unit_cost) || 0,
-        tax_rate: parseFloat(it.tax_rate) || 0,
-        hsn_code: it.hsn_code,
-      }))
+      .map(it => {
+        const base = {
+          product_id: it.product_id, variant_id: it.variant_id || null,
+          product_name: it.product_name, sku: it.sku,
+          quantity: parseFloat(it.quantity),
+          tax_rate: parseFloat(it.tax_rate) || 0,
+          hsn_code: it.hsn_code,
+        }
+        if (it.use_conversion && it.line_total_incl_gst) {
+          return {
+            ...base,
+            purchase_unit: it.purchase_unit || null,
+            purchase_unit_factor: parseFloat(it.purchase_unit_factor) || 1,
+            line_total_incl_gst: parseFloat(it.line_total_incl_gst),
+            gst_inclusive: it.gst_inclusive,
+          }
+        }
+        return { ...base, unit_cost: parseFloat(it.unit_cost) || 0 }
+      })
     try {
       const res = await fetch('/api/admin/inventory/po', {
         method: 'POST',
@@ -173,8 +196,23 @@ export default function NewPOPage() {
     }
   }
 
-  const taxableValue = lineItems.reduce((s, it) => s + (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_cost) || 0), 0)
-  const cgst = lineItems.reduce((s, it) => s + (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_cost) || 0) * (parseFloat(it.tax_rate) || 0) / 200, 0)
+  const taxableValue = lineItems.reduce((s, it) => {
+    const gstRate = parseFloat(it.tax_rate) || 0
+    if (it.use_conversion && it.line_total_incl_gst) {
+      const inclGst = parseFloat(it.line_total_incl_gst) || 0
+      return s + (it.gst_inclusive ? inclGst / (1 + gstRate / 100) : inclGst)
+    }
+    return s + (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_cost) || 0)
+  }, 0)
+  const cgst = lineItems.reduce((s, it) => {
+    const gstRate = parseFloat(it.tax_rate) || 0
+    if (it.use_conversion && it.line_total_incl_gst) {
+      const inclGst = parseFloat(it.line_total_incl_gst) || 0
+      const exGst = it.gst_inclusive ? inclGst / (1 + gstRate / 100) : inclGst
+      return s + exGst * gstRate / 200
+    }
+    return s + (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_cost) || 0) * gstRate / 200
+  }, 0)
   const sgst = cgst
   const rawTotal = taxableValue + cgst + sgst
   const poTotal = Math.round(rawTotal)
@@ -334,18 +372,106 @@ export default function NewPOPage() {
                         options={[{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }]} />
                     </div>
                     <div>
-                      <label className={labelCls}>Quantity <span className="text-red-500">*</span></label>
+                      <label className={labelCls}>Qty (purchase units) <span className="text-red-500">*</span></label>
                       <input type="number" min="0.001" step="0.001" className={inputCls} value={it.quantity}
                         onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, quantity: e.target.value }))} />
                     </div>
-                    <div>
-                      <label className={labelCls}>Unit Cost (₹) <span className="text-red-500">*</span></label>
-                      <input type="number" min="0" step="0.01" className={inputCls} value={it.unit_cost}
-                        onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, unit_cost: e.target.value }))} />
-                    </div>
+                    {!it.use_conversion && (
+                      <div>
+                        <label className={labelCls}>Unit Cost (₹) <span className="text-red-500">*</span></label>
+                        <input type="number" min="0" step="0.01" className={inputCls} value={it.unit_cost}
+                          onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, unit_cost: e.target.value }))} />
+                      </div>
+                    )}
                   </div>
 
-                  {it.unit_cost && (
+                  {/* Purchase unit conversion toggle */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, use_conversion: !r.use_conversion }))}
+                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${it.use_conversion ? 'bg-secondary-500 dark:bg-secondary-400' : 'bg-border-default'}`}
+                      role="switch" aria-checked={it.use_conversion}
+                    >
+                      <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${it.use_conversion ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
+                    <span className="text-xs text-foreground-secondary font-medium">Purchase unit conversion</span>
+                  </div>
+
+                  {it.use_conversion && (() => {
+                    const gstRate = parseFloat(it.tax_rate) || 0
+                    const factor = parseFloat(it.purchase_unit_factor) || 1
+                    const qty = parseFloat(it.quantity) || 0
+                    const baseQty = qty * factor
+                    const lineInclGst = parseFloat(it.line_total_incl_gst) || 0
+                    const totalExGst = lineInclGst > 0
+                      ? (it.gst_inclusive ? lineInclGst / (1 + gstRate / 100) : lineInclGst)
+                      : 0
+                    const perPc = baseQty > 0 && totalExGst > 0 ? totalExGst / baseQty : 0
+                    const gstAmt = totalExGst * gstRate / 100
+                    return (
+                      <div className="bg-surface-secondary rounded-lg border border-border-default p-3 space-y-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className={labelCls}>Purchase Unit (e.g. Carton)</label>
+                            <input type="text" value={it.purchase_unit}
+                              onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, purchase_unit: e.target.value }))}
+                              className={inputCls} placeholder="Carton, Box…" />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Selling units per purchase unit <span className="text-red-500">*</span></label>
+                            <input type="number" min="1" step="1" value={it.purchase_unit_factor}
+                              onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, purchase_unit_factor: e.target.value }))}
+                              className={inputCls} placeholder="200" />
+                          </div>
+                          <div>
+                            <label className={labelCls}>
+                              Line total (₹) <span className="text-red-500">*</span>
+                              <span className="ml-1 text-foreground-muted normal-case font-normal">{it.gst_inclusive ? 'incl. GST' : 'excl. GST'}</span>
+                            </label>
+                            <input type="number" min="0" step="0.01" value={it.line_total_incl_gst}
+                              onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, line_total_incl_gst: e.target.value }))}
+                              className={inputCls} placeholder="0.00" />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, gst_inclusive: !r.gst_inclusive }))}
+                            className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${it.gst_inclusive ? 'bg-secondary-500 dark:bg-secondary-400' : 'bg-border-default'}`}
+                            role="switch" aria-checked={it.gst_inclusive}
+                          >
+                            <span className={`pointer-events-none inline-block h-3 w-3 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${it.gst_inclusive ? 'translate-x-3' : 'translate-x-0'}`} />
+                          </button>
+                          <span className="text-xs text-foreground-secondary">Amount includes GST</span>
+                        </div>
+
+                        {perPc > 0 && (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-border-default text-xs">
+                            <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
+                              <div className="text-foreground-muted mb-0.5">Base qty</div>
+                              <div className="font-semibold text-foreground">{baseQty.toLocaleString('en-IN')} pcs</div>
+                            </div>
+                            <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
+                              <div className="text-foreground-muted mb-0.5">Ex-GST total</div>
+                              <div className="font-semibold text-foreground">₹{fmtINR2(totalExGst)}</div>
+                            </div>
+                            <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
+                              <div className="text-foreground-muted mb-0.5">Per pc (ex-GST)</div>
+                              <div className="font-semibold text-secondary-600 dark:text-secondary-300">₹{fmtINR2(perPc)}</div>
+                            </div>
+                            <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
+                              <div className="text-foreground-muted mb-0.5">GST ({it.tax_rate}%)</div>
+                              <div className="font-semibold text-foreground">₹{fmtINR2(gstAmt)}</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {!it.use_conversion && it.unit_cost && (
                     <p className="text-xs text-foreground-secondary text-right">
                       Line total: <span className="font-semibold text-foreground">₹{fmtINR2((parseFloat(it.quantity) || 0) * (parseFloat(it.unit_cost) || 0) * (1 + (parseFloat(it.tax_rate) || 0) / 100))}</span>
                       {parseFloat(it.tax_rate) > 0 && <span className="ml-1 text-foreground-muted">(incl. {it.tax_rate}% GST)</span>}
@@ -369,7 +495,7 @@ export default function NewPOPage() {
             </button>
           )}
 
-          {lineItems.some(it => it.unit_cost) && (
+          {lineItems.some(it => it.unit_cost || (it.use_conversion && it.line_total_incl_gst)) && (
             <div className="border-t border-border-default pt-3 mt-3 flex justify-end">
               <div className="text-right space-y-1 min-w-[220px]">
                 <div className="flex justify-between text-xs text-foreground-secondary"><span>Taxable Value</span><span>₹{fmtINR2(taxableValue)}</span></div>
