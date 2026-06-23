@@ -198,6 +198,8 @@ describe('PATCH /api/admin/invoices/[id]', () => {
         query: vi.fn()
           // existing order_items
           .mockResolvedValueOnce({ rows: [] })
+          // unit row (buy_unit factor lookup)
+          .mockResolvedValueOnce({ rows: [{}] })
           // stock check for product
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
           // UPDATE orders
@@ -208,6 +210,8 @@ describe('PATCH /api/admin/invoices/[id]', () => {
           .mockResolvedValueOnce({ rows: [] })
           // INSERT order_item
           .mockResolvedValueOnce({ rows: [] })
+          // unit row2 (deduction factor lookup)
+          .mockResolvedValueOnce({ rows: [{}] })
           // stock deduction SELECT
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
           // stock deduction UPDATE
@@ -230,6 +234,8 @@ describe('PATCH /api/admin/invoices/[id]', () => {
         query: vi.fn()
           // existing order_items (none)
           .mockResolvedValueOnce({ rows: [] })
+          // unit row (buy_unit factor lookup)
+          .mockResolvedValueOnce({ rows: [{}] })
           // stock check — only 1 available, 2 needed
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: '1' }] })
           // UPDATE orders (draft)
@@ -260,13 +266,25 @@ describe('PATCH /api/admin/invoices/[id]', () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
         query: vi.fn()
+          // existing order_items
           .mockResolvedValueOnce({ rows: [] })
+          // unit row (buy_unit factor lookup)
+          .mockResolvedValueOnce({ rows: [{}] })
+          // stock check for product
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
+          // UPDATE orders
           .mockResolvedValueOnce({ rows: [] })
+          // UPDATE addresses
           .mockResolvedValueOnce({ rows: [] })
+          // DELETE order_items
           .mockResolvedValueOnce({ rows: [] })
+          // INSERT order_item
           .mockResolvedValueOnce({ rows: [] })
+          // unit row2 (deduction factor lookup)
+          .mockResolvedValueOnce({ rows: [{}] })
+          // stock deduction SELECT
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
+          // stock deduction UPDATE
           .mockResolvedValueOnce({ rows: [] }),
       }
       return fn(client)

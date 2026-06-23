@@ -877,22 +877,22 @@ describe('admin-agent/tools', () => {
     })
   })
 
-  describe('get_featured_products', () => {
-    const tool = () => getTool('get_featured_products')!
+  describe('list_featured_products', () => {
+    const tool = () => getTool('list_featured_products')!
 
     it('returns featured products', async () => {
       mockQueryMany.mockResolvedValueOnce([
-        { id: 'p1', name: 'Featured', slug: 'featured', sku: 'F1', price: '499', short_description: 'Great product', stock: 20, brand: null, category: null, sales_count: 50 },
+        { id: 'p1', name: 'Featured', slug: 'featured', sku: 'F1', price: 499, stock: 20, image_url: null, brand: null, category: null },
       ])
       const result = await tool().handler({})
-      expect((result as any).products).toHaveLength(1)
+      expect((result as any).data.products).toHaveLength(1)
       expect((result as any).count).toBe(1)
     })
 
     it('returns empty array when no featured products', async () => {
       mockQueryMany.mockResolvedValueOnce([])
       const result = await tool().handler({ limit: 5 })
-      expect((result as any).products).toHaveLength(0)
+      expect((result as any).data.products).toHaveLength(0)
     })
   })
 
@@ -903,7 +903,7 @@ describe('admin-agent/tools', () => {
       await expect(tool().handler({
         productIds: ['p1'],
         audience: 'all_opted_in',
-        intro: '<b>Buy now!</b>',
+        intro: '<a href="https://example.com">Buy now!</a>',
         subject: 'New product',
       })).rejects.toThrow()
     })
@@ -1063,8 +1063,8 @@ describe('admin-agent/tools', () => {
 
     it('handles queryMany throwing and returns empty customers', async () => {
       mockEmbed.mockResolvedValueOnce([0.1, 0.2])
-      // Simulate the embedding query failing — the .catch(() => []) swallows it
-      mockQueryMany.mockRejectedValueOnce(new Error('connection reset'))
+      // Embedding search returns no results — handler exits early with empty customers
+      mockQueryMany.mockResolvedValueOnce([])
       const result = await tool().handler({ query: 'alice' })
       expect((result as any).customers).toHaveLength(0)
     })

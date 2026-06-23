@@ -238,10 +238,12 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
         query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })   // site_settings
-          .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] }) // INSERT sale
+          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })   // site_settings (GST enabled)
+          .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] }) // INSERT cash_sales
           .mockResolvedValueOnce({ rows: [] })                   // INSERT invoices
-          .mockResolvedValueOnce({ rows: [] })                   // INSERT sale_item
+          .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
+          // unit factor lookup (buy_unit is null → returns empty)
+          .mockResolvedValueOnce({ rows: [] })
           // stock path
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] }) // SELECT FOR UPDATE
           .mockResolvedValueOnce({ rows: [] }),                  // UPDATE products
@@ -267,12 +269,15 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
         query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] })
+          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })   // site_settings (GST enabled)
+          .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] }) // INSERT cash_sales
+          .mockResolvedValueOnce({ rows: [] })                   // INSERT invoices
+          .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
+          // unit factor lookup
           .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] })
-          .mockResolvedValueOnce({ rows: [] }),
+          // stock path
+          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] }) // SELECT FOR UPDATE
+          .mockResolvedValueOnce({ rows: [] }),                  // UPDATE product_variants
         release: vi.fn(),
       }
       return fn(client)
@@ -296,12 +301,15 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
         query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] })
+          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })   // site_settings (GST enabled)
+          .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] }) // INSERT cash_sales
+          .mockResolvedValueOnce({ rows: [] })                   // INSERT invoices
+          .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
+          // unit factor lookup
           .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] })
-          .mockResolvedValueOnce({ rows: [] }),
+          // stock path
+          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] }) // SELECT FOR UPDATE
+          .mockResolvedValueOnce({ rows: [] }),                  // UPDATE product_sub_variants
         release: vi.fn(),
       }
       return fn(client)
@@ -320,9 +328,11 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
       const client = {
         query: vi.fn()
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] })
-          .mockResolvedValueOnce({ rows: [] })
+          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })   // site_settings (GST enabled)
+          .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] }) // INSERT cash_sales
+          .mockResolvedValueOnce({ rows: [] })                   // INSERT invoices
+          .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
+          // unit factor lookup
           .mockResolvedValueOnce({ rows: [] })
           // stock check returns only 1
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 1 }] }),

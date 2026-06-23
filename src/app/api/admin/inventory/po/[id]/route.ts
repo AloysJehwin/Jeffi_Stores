@@ -38,10 +38,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const items = await queryMany<any>(
       `SELECT poi.*,
               p.name AS product_name_current,
-              pv.variant_name
+              pv.variant_name,
+              COALESCE(vsu.display_label, vsu.unit, psu.display_label, psu.unit) AS sell_unit_label,
+              COALESCE(vsu.dimension, psu.dimension) AS sell_unit_dimension
        FROM purchase_order_items poi
        LEFT JOIN products p ON p.id = poi.product_id
        LEFT JOIN product_variants pv ON pv.id = poi.variant_id
+       LEFT JOIN product_units vsu ON vsu.id = pv.sell_unit_id
+       LEFT JOIN product_units psu ON psu.id = p.sell_unit_id
        WHERE poi.po_id = $1
        ORDER BY poi.id`,
       [id]

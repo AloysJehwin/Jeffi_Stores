@@ -25,6 +25,9 @@ vi.mock('@/lib/order-draft', () => ({
 vi.mock('@/lib/checkout-intent', () => ({
   verifyIntent: vi.fn().mockResolvedValue(null),
 }))
+vi.mock('@/lib/business-discount', () => ({
+  getBusinessDiscountMap: vi.fn().mockResolvedValue({}),
+}))
 vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }

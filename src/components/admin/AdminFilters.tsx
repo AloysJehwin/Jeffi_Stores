@@ -105,6 +105,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                 {filter.label}
               </label>
               <AdminSelect
+                sm
                 id={`filter-${filter.name}`}
                 value={searchParams.get(filter.name) || ''}
                 placeholder="All"
@@ -153,7 +154,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                       name={searchParam}
                       defaultValue={searchParams.get(searchParam) || ''}
                       placeholder={searchPlaceholder}
-                      className="w-full px-3 py-2 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+                      className="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
                     />
                     <button
                       type="submit"
@@ -173,7 +174,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
             <button
               type="button"
               onClick={handleClearAll}
-              className="px-3 py-2 text-sm font-medium text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-border-secondary transition-colors whitespace-nowrap"
+              className="px-3 py-1.5 text-sm font-medium text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-border-secondary transition-colors whitespace-nowrap"
             >
               Clear Filters
             </button>

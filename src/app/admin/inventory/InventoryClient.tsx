@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Toggle from '@/components/ui/Toggle'
@@ -256,6 +256,13 @@ type POItem = {
   product_name: string; variant_name: string | null; sku: string | null
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
   purchase_unit: string | null; purchase_unit_factor: string | null
+  sell_unit_label: string | null; sell_unit_dimension: string | null
+}
+
+/** For count-dimension products stock is always in pc; for others use sell_unit_label */
+function poBaseUnitLabel(it: Pick<POItem, 'sell_unit_label' | 'sell_unit_dimension'>): string {
+  if (!it.sell_unit_dimension || it.sell_unit_dimension === 'count') return 'pc'
+  return it.sell_unit_label || 'units'
 }
 
 function POTab({ initialPO }: { initialPO?: string }) {
@@ -348,12 +355,16 @@ function POTab({ initialPO }: { initialPO?: string }) {
   async function openReceive(id: string) {
     const res = await fetch(`/api/admin/inventory/po/${id}`)
     const json = await res.json()
-    const items = (json.items || []).map((it: POItem) => ({
-      ...it,
-      receive_qty: String(Math.max(0, parseFloat(it.quantity) - parseFloat(it.quantity_received || '0'))),
-      receive_cost: it.unit_cost,
-      purchase_unit_factor: parseFloat(it.purchase_unit_factor || '1'),
-    }))
+    const items = (json.items || []).map((it: POItem) => {
+      const factor = parseFloat(it.purchase_unit_factor || '1')
+      const remaining = Math.max(0, parseFloat(it.quantity) - parseFloat(it.quantity_received || '0'))
+      return {
+        ...it,
+        receive_qty: String(factor > 1 ? Math.round((remaining / factor) * 1000) / 1000 : remaining),
+        receive_cost: it.unit_cost,
+        purchase_unit_factor: factor,
+      }
+    })
     setReceiveMode({ po: json.purchase_order })
     setReceiveItems(items)
     setReceiveNotes('')
@@ -437,24 +448,48 @@ function POTab({ initialPO }: { initialPO?: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
-                {receiveItems.map((it, idx) => (
+                {receiveItems.map((it, idx) => {
+                  const factor = parseFloat(it.purchase_unit_factor || '1')
+                  const baseLabel = poBaseUnitLabel(it)
+                  const puLabel = it.purchase_unit || baseLabel
+                  const orderedInPu = factor > 1 ? Math.round((parseFloat(it.quantity) / factor) * 1000) / 1000 : parseFloat(it.quantity)
+                  const prevInPu = factor > 1 ? Math.round((parseFloat(it.quantity_received || '0') / factor) * 1000) / 1000 : parseFloat(it.quantity_received || '0')
+                  return (
                   <tr key={it.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 text-foreground">
                       <p className="font-medium">{it.product_name}{it.variant_name && <span className="text-foreground-secondary font-normal"> / {it.variant_name}</span>}</p>
                       {it.sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{it.sku}</p>}
+                      {it.purchase_unit && factor > 1 && (
+                        <p className="text-xs text-foreground-muted mt-0.5">1 {it.purchase_unit} = {factor} {baseLabel}</p>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right text-foreground-secondary">{parseFloat(it.quantity)}</td>
-                    <td className="px-4 py-3 text-right text-foreground-secondary">{parseFloat(it.quantity_received || '0')}</td>
-                    <td className="px-4 py-3 text-right">
-                      <input type="number" min="0" step="0.001" className="w-24 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
-                        onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_qty: e.target.value } : r))} />
+                    <td className="px-4 py-3 text-right text-foreground-secondary">
+                      {orderedInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right text-foreground-secondary">
+                      {prevInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
+                      <div className="inline-flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <input type="number" min="0" step="0.001" className="w-24 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
+                            onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_qty: e.target.value } : r))} />
+                          {puLabel && <span className="text-xs text-foreground-muted">{puLabel}</span>}
+                        </div>
+                        {factor > 1 && parseFloat(it.receive_qty) > 0 && (
+                          <span className="text-xs text-foreground-muted">
+                            = {Math.round(parseFloat(it.receive_qty) * factor * 1000) / 1000} {baseLabel}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
                       <input type="number" min="0" step="0.01" className="w-28 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_cost}
                         onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_cost: e.target.value } : r))} />
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -509,28 +544,39 @@ function POTab({ initialPO }: { initialPO?: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
-                {viewPO.items.map(it => (
+                {viewPO.items.map(it => {
+                  const factor = parseFloat(it.purchase_unit_factor || '1')
+                  const baseLabel = poBaseUnitLabel(it)
+                  const puLabel = it.purchase_unit || baseLabel
+                  const qtyInPu = factor > 1 ? Math.round((parseFloat(it.quantity) / factor) * 1000) / 1000 : parseFloat(it.quantity)
+                  const recvInPu = factor > 1 ? Math.round((parseFloat(it.quantity_received || '0') / factor) * 1000) / 1000 : parseFloat(it.quantity_received || '0')
+                  const recvFull = recvInPu >= qtyInPu
+                  const recvPartial = recvInPu > 0 && !recvFull
+                  return (
                   <tr key={it.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 text-foreground">
                       <p className="font-medium">{it.product_name}{it.variant_name && <span className="text-foreground-secondary font-normal"> / {it.variant_name}</span>}</p>
-                      {it.purchase_unit && parseFloat(it.purchase_unit_factor || '1') > 1 && (
+                      {it.purchase_unit && (
                         <p className="text-xs text-foreground-muted mt-0.5">
-                          {it.purchase_unit} · ×{it.purchase_unit_factor} per unit
+                          {factor > 1 ? `1 ${it.purchase_unit} = ${factor} ${baseLabel}` : it.purchase_unit}
                         </p>
                       )}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">{it.sku || '—'}</td>
-                    <td className="px-4 py-3 text-right text-foreground-secondary">{parseFloat(it.quantity)}</td>
+                    <td className="px-4 py-3 text-right text-foreground-secondary">
+                      {qtyInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
+                    </td>
                     <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(it.unit_cost))}</td>
                     <td className="px-4 py-3 text-right text-foreground-secondary hidden sm:table-cell">{it.tax_rate}%</td>
                     <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(it.total_cost))}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`text-xs font-medium ${parseFloat(it.quantity_received || '0') >= parseFloat(it.quantity) ? 'text-green-600 dark:text-green-400' : parseFloat(it.quantity_received || '0') > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-foreground-secondary'}`}>
-                        {parseFloat(it.quantity_received || '0')} / {parseFloat(it.quantity)}
+                      <span className={`text-xs font-medium ${recvFull ? 'text-green-600 dark:text-green-400' : recvPartial ? 'text-yellow-600 dark:text-yellow-400' : 'text-foreground-secondary'}`}>
+                        {recvInPu} / {qtyInPu}{puLabel && <span className="font-normal opacity-70 ml-1">{puLabel}</span>}
                       </span>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -1056,10 +1102,9 @@ function StockTab() {
                       }
 
                       return (
-                        <>
+                        <React.Fragment key={`group-${group.refId}`}>
                           {/* Group header row */}
                           <tr
-                            key={`group-${group.refId}`}
                             className="bg-surface-secondary/60 hover:bg-surface-secondary cursor-pointer transition-colors select-none"
                             onClick={() => toggleGroup(group.refId)}
                           >
@@ -1119,7 +1164,7 @@ function StockTab() {
                               </tr>
                             )
                           })}
-                        </>
+                        </React.Fragment>
                       )
                     })}
                   </tbody>

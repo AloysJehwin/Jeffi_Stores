@@ -70,8 +70,8 @@ describe('issueMfaTicket', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('verifyMfaTicket', () => {
-  const enrollPayload = { adminId: 'a1', username: 'alice', purpose: 'enroll' }
-  const verifyPayload = { adminId: 'a1', username: 'alice', purpose: 'verify' }
+  const enrollPayload = { adminId: 'a1', username: 'alice', purpose: 'enroll', type: 'mfa_ticket' }
+  const verifyPayload = { adminId: 'a1', username: 'alice', purpose: 'verify', type: 'mfa_ticket' }
 
   it('returns payload when purpose matches', async () => {
     mockMfaJwtVerify.mockResolvedValueOnce({ payload: enrollPayload })

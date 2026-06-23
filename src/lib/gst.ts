@@ -95,9 +95,15 @@ export function generateInvoiceNumber(prefix: string, fy: string, seq: number): 
 }
 
 export async function getNextInvoiceSequence(client: any, financialYear: string): Promise<number> {
+  // Take max across both tables — guards against orphaned orders.invoice_number with no invoices row
   const result = await client.query(
-    'SELECT COALESCE(MAX(sequence_number), 0) + 1 AS next_seq FROM invoices WHERE financial_year = $1',
-    [financialYear]
+    `SELECT GREATEST(
+       COALESCE((SELECT MAX(sequence_number) FROM invoices WHERE financial_year = $1), 0),
+       COALESCE((SELECT MAX(CAST(SPLIT_PART(invoice_number, '/', 3) AS INTEGER))
+                 FROM orders
+                 WHERE invoice_number LIKE $2), 0)
+     ) + 1 AS next_seq`,
+    [financialYear, `%/${financialYear}/%`]
   )
   return parseInt(result.rows[0].next_seq)
 }

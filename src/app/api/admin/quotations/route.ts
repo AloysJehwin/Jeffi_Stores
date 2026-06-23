@@ -5,6 +5,7 @@ import { query, queryMany, queryOne } from '@/lib/db'
 import { buildVectorSearchClause } from '@/lib/search'
 import { z } from 'zod'
 import { parseBody, zNonEmpty, zEmail } from '@/lib/validate'
+import { lineItemExGst } from '@/lib/pricing'
 
 function calcTotals(items: any[]) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     const computedItems = items.map((item: any) => ({
       ...item,
-      amount: Number(item.quantity) * Number(item.rate),
+      amount: Number(item.amount) || lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
     }))
     const totals = calcTotals(computedItems)
 

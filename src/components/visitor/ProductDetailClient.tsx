@@ -6,6 +6,7 @@ import ProductImageGallery from './ProductImageGallery'
 
 import ProductActions from './ProductActions'
 import BusinessPriceBadge from './BusinessPriceBadge'
+import RazorpayOffers from './RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
@@ -548,6 +549,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           sellUnitId={product.sell_unit_id ?? null}
         />
 
+        <RazorpayOffers />
 
         {/* Product Specifications */}
       </div>

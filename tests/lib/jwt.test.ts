@@ -109,7 +109,7 @@ describe('generateToken', () => {
   it('calls sign with the provided payload', async () => {
     const payload = { adminId: 'a1', username: 'alice', role: 'super_admin', scopes: ['products'] }
     await generateToken(payload)
-    expect(mockSign).toHaveBeenCalledWith(payload)
+    expect(mockSign).toHaveBeenCalledWith({ ...payload, type: 'admin_session' })
   })
 })
 
@@ -117,7 +117,7 @@ describe('generateToken', () => {
 
 describe('verifyToken', () => {
   it('returns parsed payload on valid token', async () => {
-    const fakePayload = { adminId: 'a1', username: 'alice', role: 'admin', scopes: [] }
+    const fakePayload = { adminId: 'a1', username: 'alice', role: 'admin', scopes: [], type: 'admin_session' }
     mockJwtVerify.mockResolvedValueOnce({ payload: fakePayload })
     const result = await verifyToken('valid.token')
     expect(result).toEqual(fakePayload)
@@ -152,6 +152,7 @@ describe('authenticateAdmin', () => {
     last_name: 'Smith',
     role: 'admin',
     scopes: ['products', 'orders'],
+    type: 'admin_session',
   }
 
   it('returns admin payload from Bearer header', async () => {
@@ -175,7 +176,7 @@ describe('authenticateAdmin', () => {
   })
 
   it('returns null when payload lacks adminId', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { username: 'bob', role: 'admin', scopes: [] } })
+    mockJwtVerify.mockResolvedValueOnce({ payload: { username: 'bob', role: 'admin', scopes: [], type: 'admin_session' } })
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await authenticateAdmin(req)
     expect(result).toBeNull()
@@ -189,7 +190,7 @@ describe('authenticateAdmin', () => {
   })
 
   it('includes scopes as empty array when not present in payload', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { adminId: 'a1', username: 'u', role: 'admin' } })
+    mockJwtVerify.mockResolvedValueOnce({ payload: { adminId: 'a1', username: 'u', role: 'admin', type: 'admin_session' } })
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await authenticateAdmin(req)
     expect(result?.scopes).toEqual([])
@@ -351,7 +352,7 @@ describe('authenticateAnyUser – portal routing', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('requireAdminScope', () => {
-  const adminPayload = { adminId: 'a1', username: 'alice', role: 'admin', scopes: ['products'] }
+  const adminPayload = { adminId: 'a1', username: 'alice', role: 'admin', scopes: ['products'], type: 'admin_session' }
 
   it('returns admin payload when scope is satisfied', async () => {
     mockJwtVerify.mockResolvedValueOnce({ payload: adminPayload })

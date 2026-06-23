@@ -232,12 +232,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const price = item.price_at_addition > 0
         ? item.price_at_addition
         : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-      const categoryId = item.products.category_id
-      const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-        ? (user.businessDiscountMap?.[categoryId] ?? 0)
-        : 0
-      const effectivePrice = discountPct > 0 ? price * (1 - discountPct / 100) : price
-      return total + effectivePrice * item.quantity
+      return total + price * item.quantity
     }, 0)
   }
 
@@ -246,13 +241,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const price = item.price_at_addition > 0
         ? item.price_at_addition
         : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-      const categoryId = item.products.category_id
-      const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-        ? (user.businessDiscountMap?.[categoryId] ?? 0)
-        : 0
-      const effectivePrice = discountPct > 0 ? price * (1 - discountPct / 100) : price
       const gstRate = item.products.gst_percentage || 0
-      const itemTotal = effectivePrice * item.quantity
+      const itemTotal = price * item.quantity
       const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))
       return tax + itemTax
     }, 0)

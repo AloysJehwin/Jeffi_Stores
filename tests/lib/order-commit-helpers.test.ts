@@ -40,6 +40,7 @@ function makeProduct(overrides: Partial<CartLine['products']> = {}): CartLine['p
     gst_percentage: '18',
     hsn_code: '8443',
     category_id: null,
+    mrp: null,
     ...overrides,
   }
 }
@@ -89,8 +90,8 @@ describe('cartLineUnitPrice', () => {
   it('prefers sub_variant.price_ex_gst over variant.price_ex_gst and product', () => {
     const line = makeCartLine({
       price_at_addition: 0,
-      variant: { id: 'v1', variant_name: 'Red', sku: 'V1', price: 1100, price_ex_gst: 932.2 },
-      sub_variant: { id: 'sv1', sub_variant_name: 'S', sku: 'SV1', price: 1200, price_ex_gst: 1016.95 },
+      variant: { id: 'v1', variant_name: 'Red', sku: 'V1', price: 1100, price_ex_gst: 932.2, mrp: null },
+      sub_variant: { id: 'sv1', sub_variant_name: 'S', sku: 'SV1', price: 1200, price_ex_gst: 1016.95, mrp: null },
       products: makeProduct({ price_ex_gst: 847.46 }),
     })
     expect(cartLineUnitPrice(line)).toBe(1016.95)

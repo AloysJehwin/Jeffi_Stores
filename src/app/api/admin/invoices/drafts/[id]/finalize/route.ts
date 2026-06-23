@@ -49,13 +49,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         // For count-dimension selling units (box, set, etc.), inventory is tracked in
         // individual pieces. Multiply ordered qty by factor to get pieces to deduct.
-        const unitRow = await client.query<{ factor: number; dimension: string }>(
-          `SELECT factor, dimension FROM product_units WHERE unit = $1 AND product_id = $2 LIMIT 1`,
-          [item.buy_unit, item.product_id]
+        // Prefer variant-scoped product_units row; fall back to product-level; fall back to sell_unit_id.
+        const unitRow = await client.query<{ factor: string; dimension: string }>(
+          `SELECT COALESCE(puv.factor, pup.factor, pu_sv.factor, pu_sp.factor)::text AS factor,
+                  COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension
+           FROM (SELECT 1) x
+           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3 AND $1 IS NOT NULL
+           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL AND $1 IS NOT NULL
+             AND ($3 IS NULL OR puv.id IS NULL)
+           LEFT JOIN product_variants pvar ON pvar.id = $3
+           LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL
+           LEFT JOIN products prod ON prod.id = $2 AND $3 IS NULL
+           LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL`,
+          [item.buy_unit || null, item.product_id, item.variant_id || null]
         )
         const unit = unitRow.rows[0]
         const effectiveQty = (unit?.dimension === 'count' && unit?.factor)
-          ? qty * parseFloat(unit.factor as any)
+          ? qty * parseFloat(unit.factor)
           : qty
 
         let stockBefore = 0

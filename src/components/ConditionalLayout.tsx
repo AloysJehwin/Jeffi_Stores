@@ -8,6 +8,8 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { ConfirmProvider } from '@/contexts/ConfirmContext'
+import { CompareProvider } from '@/contexts/CompareContext'
+import CompareBar from '@/components/visitor/CompareBar'
 import PageTracker from './visitor/PageTracker'
 import PolicyConsentGate from './PolicyConsentGate'
 
@@ -45,15 +47,18 @@ export default function ConditionalLayout({ children, isFormsSubdomain, isDocume
         <CartProvider>
           <ToastProvider>
             <ConfirmProvider>
-              <div className="flex flex-col min-h-screen bg-surface">
-                <PageTracker />
-                <Header />
-                <main className="flex-1 bg-surface pt-16 lg:pt-20">
-                  {children}
-                </main>
-                {showFooter && <Footer />}
-              </div>
-              <PolicyConsentGate />
+              <CompareProvider>
+                <div className="flex flex-col min-h-screen bg-surface">
+                  <PageTracker />
+                  <Header />
+                  <main className="flex-1 bg-surface pt-16 lg:pt-20">
+                    {children}
+                  </main>
+                  {showFooter && <Footer />}
+                </div>
+                <CompareBar />
+                <PolicyConsentGate />
+              </CompareProvider>
             </ConfirmProvider>
           </ToastProvider>
         </CartProvider>

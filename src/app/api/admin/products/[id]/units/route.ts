@@ -110,7 +110,11 @@ export async function POST(request: NextRequest, { params }: Params) {
           minQty, maxQty, qtyStep,
         ]
       )
-      return res.rows[0]
+      const row = res.rows[0]
+      if (isBase) {
+        await client.query(`UPDATE products SET sell_unit_id = $1 WHERE id = $2`, [row.id, id])
+      }
+      return row
     })
     return NextResponse.json({ unit: inserted })
   } catch (err: unknown) {

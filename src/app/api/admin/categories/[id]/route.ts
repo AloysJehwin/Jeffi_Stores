@@ -16,6 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     name, description, parent_id, display_order, sku_prefix,
     is_active, google_product_category, icon_name,
     return_allowed, return_window_days, replacement_allowed, replacement_window_days,
+    hero_image_mobile, hero_image_desktop,
   } = body
 
   if (!name?.trim()) return NextResponse.json({ error: 'name required' }, { status: 400 })
@@ -37,7 +38,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       name = $1, slug = $2, description = $3, parent_category_id = $4,
       sku_prefix = $5, display_order = $6, is_active = $7, google_product_category = $8,
       icon_name = $9, return_allowed = $10, return_window_days = $11,
-      replacement_allowed = $12, replacement_window_days = $13, updated_at = $14
+      replacement_allowed = $12, replacement_window_days = $13, updated_at = $14,
+      hero_image_mobile = COALESCE($16, hero_image_mobile),
+      hero_image_desktop = COALESCE($17, hero_image_desktop)
     WHERE id = $15`,
     [
       name.trim(), slug, description || null, parent_id || null,
@@ -46,6 +49,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       retAllowed, retDays,
       replAllowed, replDays,
       new Date().toISOString(), id,
+      hero_image_mobile || null,
+      hero_image_desktop || null,
     ]
   )
 

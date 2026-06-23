@@ -99,6 +99,24 @@
   }
 }
 
+/* ── Shared form field size tiers ─────────────────────────────────────────
+   Use these on <input>, <textarea>, and pair with AdminSelect size props:
+     .field-normal  →  AdminSelect (default)
+     .field-compact →  AdminSelect sm
+     .field-xs      →  AdminSelect xs
+   ──────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .field-normal {
+    @apply px-3 py-2 text-sm rounded-lg;
+  }
+  .field-compact {
+    @apply px-2 py-1.5 text-sm rounded-lg;
+  }
+  .field-xs {
+    @apply px-1.5 py-1 text-xs rounded h-[26px] leading-none;
+  }
+}
+
 /* Toast notification animation */
 @keyframes slide-in-right {
   from {
@@ -176,4 +194,18 @@
 @keyframes img-shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+
+@keyframes razorpay-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.razorpay-scroll {
+  display: flex;
+  width: max-content;
+  animation: razorpay-marquee 28s linear infinite;
+}
+.razorpay-scroll:hover {
+  animation-play-state: paused;
 }

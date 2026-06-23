@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getAllCategories } from '@/lib/queries'
 import { query, queryOne } from '@/lib/db'
 import CategoryForm from '@/components/admin/CategoryForm'
+import CategoryHeroImages from '@/components/admin/CategoryHeroImages'
 import { suggestIcon } from '@/lib/iconSuggest'
 import { ChevronLeft } from 'lucide-react'
 
@@ -86,6 +87,17 @@ export default async function EditCategoryPage({ params }: { params: Promise<{ i
         category={category}
         action={updateCategory.bind(null, id)}
       />
+
+      {/* Hero image management — only shown for parent categories */}
+      {!category.parent_category_id && (
+        <div className="mt-6">
+          <CategoryHeroImages
+            categoryId={id}
+            mobileImage={(category as any).hero_image_mobile ?? null}
+            desktopImage={(category as any).hero_image_desktop ?? null}
+          />
+        </div>
+      )}
     </div>
   )
 }

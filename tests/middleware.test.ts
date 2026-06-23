@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
+import { SignJWT } from 'jose'
 
 // ---------------------------------------------------------------------------
 // Mocks — vi.hoisted() ensures these are defined before vi.mock() factories run
@@ -56,6 +57,27 @@ function makeNextRequest(
     }
   }
   return req
+}
+
+/** Mint a real Jose JWT for the business portal.
+ *  verifyBusinessToken in middleware.ts calls jwtVerify directly (not the
+ *  mocked verifyToken), so tests that exercise the business token path must
+ *  supply a properly-signed JWT instead of relying on the mock. */
+async function mintBusinessJwt(
+  claims: Record<string, unknown> = {}
+): Promise<string> {
+  const secret = new TextEncoder().encode(process.env.JWT_SECRET!)
+  return new SignJWT({
+    type: 'business',
+    isBusiness: true,
+    userId: 'biz-001',
+    email: 'biz@example.com',
+    approvalStatus: 'approved',
+    ...claims,
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setExpirationTime('1h')
+    .sign(secret)
 }
 
 const ADMIN_PAYLOAD = {
@@ -228,11 +250,11 @@ describe('middleware', () => {
     })
 
     it('rewrites to /business/* when token is valid and approved', async () => {
-      mockVerifyToken.mockResolvedValue(BIZ_PAYLOAD)
+      const token = await mintBusinessJwt({ approvalStatus: 'approved' })
 
       const req = makeNextRequest('https://business.jeffistores.in/products', {
         host: 'business.jeffistores.in',
-        cookies: { business_auth_token: 'valid.biz.token' },
+        cookies: { business_auth_token: token },
       })
       const res = await middleware(req)
       expect(res.status).not.toBe(307)
@@ -240,11 +262,11 @@ describe('middleware', () => {
     })
 
     it('redirects to /pending when approvalStatus is pending', async () => {
-      mockVerifyToken.mockResolvedValue({ ...BIZ_PAYLOAD, approvalStatus: 'pending' })
+      const token = await mintBusinessJwt({ approvalStatus: 'pending' })
 
       const req = makeNextRequest('https://business.jeffistores.in/products', {
         host: 'business.jeffistores.in',
-        cookies: { business_auth_token: 'pending.biz.token' },
+        cookies: { business_auth_token: token },
       })
       const res = await middleware(req)
       expect(res.status).toBe(307)
@@ -306,10 +328,10 @@ describe('middleware', () => {
     })
 
     it('redirects to /business/pending when approvalStatus is pending', async () => {
-      mockVerifyToken.mockResolvedValue({ ...BIZ_PAYLOAD, approvalStatus: 'pending' })
+      const token = await mintBusinessJwt({ approvalStatus: 'pending' })
       const req = makeNextRequest('http://localhost/business/products', {
         headers: { 'x-forwarded-host': 'localhost' },
-        cookies: { business_auth_token: 'pending-token' },
+        cookies: { business_auth_token: token },
       })
       const res = await middleware(req)
       expect(res.status).toBe(307)

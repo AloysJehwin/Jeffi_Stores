@@ -17,7 +17,7 @@ vi.mock('@/lib/gst', () => ({
   getNextInvoiceSequence: vi.fn().mockResolvedValue(1),
 }))
 vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn() }))
-vi.mock('@/lib/email', () => ({ sendInvoiceFinalizedEmail: vi.fn() }))
+vi.mock('@/lib/email', () => ({ sendInvoiceFinalizedEmail: vi.fn(), sendOrderStatusUpdate: vi.fn() }))
 vi.mock('@/lib/invoice', () => ({ generateOrderInvoice: vi.fn() }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ import { POST } from '@/app/api/admin/invoices/drafts/[id]/finalize/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction } from '@/lib/db'
-import { sendInvoiceFinalizedEmail } from '@/lib/email'
+import { sendInvoiceFinalizedEmail, sendOrderStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice } from '@/lib/invoice'
 
 const mockAuth = vi.mocked(authenticateAdmin)
@@ -34,6 +34,7 @@ const mockHasScope = vi.mocked(hasScope)
 const mockQueryOne = vi.mocked(queryOne)
 const mockWithTransaction = vi.mocked(withTransaction)
 const mockSendEmail = vi.mocked(sendInvoiceFinalizedEmail)
+const mockSendOrderStatusUpdate = vi.mocked(sendOrderStatusUpdate)
 const mockGenerateInvoice = vi.mocked(generateOrderInvoice)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -55,7 +56,7 @@ const draftOrder = {
   order_number: 'ORD-001',
 }
 
-const confirmedOrder = { ...draftOrder, status: 'confirmed' }
+const confirmedOrder = { ...draftOrder, status: 'confirmed', source: 'online' }
 
 // Build a mock DB client whose query() responses are driven by SQL content.
 // itemsRows: the rows returned for SELECT * FROM order_items
@@ -145,7 +146,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
   it('returns 400 when order is already finalized', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockResolvedValueOnce({ ...draftOrder, status: 'processing' })
+    mockQueryOne.mockResolvedValueOnce({ ...draftOrder, status: 'invoiced' })
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(400)
     expect((await res.json()).error).toBe('Invoice is already finalized')
@@ -416,6 +417,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     })
     setupTx(client)
     mockGenerateInvoice.mockResolvedValueOnce(undefined as any)
+    mockSendOrderStatusUpdate.mockResolvedValueOnce(undefined as any)
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
     expect(mockGenerateInvoice).toHaveBeenCalledWith('order-123')

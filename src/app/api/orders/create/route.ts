@@ -53,20 +53,22 @@ export async function POST(request: NextRequest) {
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
           'stock_status', p.stock_status, 'inventory_quantity', p.inventory_quantity,
-          'category_id', p.category_id
+          'category_id', p.category_id, 'discount_pct', p.discount_pct
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'price_ex_gst', pv.price_ex_gst,
-            'stock_status', pv.stock_status, 'inventory_quantity', pv.inventory_quantity
+            'stock_status', pv.stock_status, 'inventory_quantity', pv.inventory_quantity,
+            'discount_pct', pv.discount_pct
           )
         ELSE NULL END AS variant,
         CASE WHEN ci.sub_variant_id IS NOT NULL THEN
           json_build_object(
             'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
             'price', psv.price, 'price_ex_gst', psv.price_ex_gst,
-            'stock_status', psv.stock_status, 'inventory_quantity', psv.inventory_quantity
+            'stock_status', psv.stock_status, 'inventory_quantity', psv.inventory_quantity,
+            'discount_pct', psv.discount_pct
           )
         ELSE NULL END AS sub_variant
       FROM cart_items ci
@@ -81,11 +83,9 @@ export async function POST(request: NextRequest) {
     }
 
     const subtotal: number = cartItems.reduce((sum: number, item: any) => {
-      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
-        return sum + (parseFloat(item.price_at_addition) * parseFloat(item.quantity))
-      }
-      const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
-      return sum + (parseFloat(price) * parseFloat(item.quantity))
+      const pia = parseFloat(item.price_at_addition)
+      const price = (pia > 0) ? pia : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+      return sum + (price * parseFloat(item.quantity))
     }, 0)
 
     const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
@@ -101,9 +101,9 @@ export async function POST(request: NextRequest) {
         const catId = (item as any).products?.category_id
         const pct = catId ? (bizDiscountMap[catId] ?? 0) : 0
         if (pct > 0) {
-          const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-          const linePrice = isCustomQty
-            ? parseFloat(item.price_at_addition)
+          const _pia = parseFloat(item.price_at_addition)
+          const linePrice = (_pia > 0)
+            ? _pia
             : parseFloat((item as any).sub_variant?.price ?? (item as any).variant?.price ?? (item as any).products.base_price)
           businessDiscountAmount += linePrice * parseFloat(item.quantity) * pct / 100
         }
@@ -112,9 +112,9 @@ export async function POST(request: NextRequest) {
     }
 
     const taxAmount = cartItems.reduce((sum: number, item: any) => {
-      const lineTotal = item.buy_mode === 'weight' || item.buy_mode === 'length'
-        ? parseFloat(item.price_at_addition) * parseFloat(item.quantity)
-        : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * parseFloat(item.quantity)
+      const _pia2 = parseFloat(item.price_at_addition)
+      const _p = (_pia2 > 0) ? _pia2 : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+      const lineTotal = _p * parseFloat(item.quantity)
       const gstRate = parseFloat(item.products.gst_percentage || '0')
       return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
     }, 0)
@@ -181,9 +181,9 @@ export async function POST(request: NextRequest) {
       }
 
       const itemsWithGST = cartItems.map((item: any) => {
-        const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-        const unitPrice = isCustomQty
-          ? parseFloat(item.price_at_addition)
+        const _pia3 = parseFloat(item.price_at_addition)
+        const unitPrice = (_pia3 > 0)
+          ? _pia3
           : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
         const qty = parseFloat(item.quantity)
         const gstRate = parseFloat(item.products.gst_percentage || '0')
@@ -287,9 +287,23 @@ export async function POST(request: NextRequest) {
 
       for (const { item, unitPrice, gstRate, itemTotal, gst, itemTax } of itemsWithGST) {
         const tax = isGSTEnabled && gst ? gst.totalTax : (itemTax || 0)
+        const catId = (item as any).products?.category_id
+        const bizPct = catId ? (bizDiscountMap[catId] ?? 0) : 0
+        const itemBizDiscount = bizPct > 0 ? Math.round(itemTotal * bizPct / 100 * 100) / 100 : 0
+
+        // Product-level discount: discount_pct lives on the product and applies to all variants
+        const variantDiscPct = Number((item as any).products?.discount_pct ?? 0)
+        const mrpUnitPrice = variantDiscPct > 0 ? unitPrice / (1 - variantDiscPct / 100) : unitPrice
+        const itemProductDiscount = variantDiscPct > 0 ? Math.round((mrpUnitPrice - unitPrice) * parseFloat(item.quantity) * 100) / 100 : 0
+
+        const totalItemDiscount = Math.round((itemBizDiscount + itemProductDiscount) * 100) / 100
+        const itemMrp = item.sub_variant?.mrp != null ? Number(item.sub_variant.mrp)
+          : item.variant?.mrp != null ? Number(item.variant.mrp)
+          : item.products?.mrp != null ? Number(item.products.mrp)
+          : null
         await client.query(
-          `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+          `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
           [createdOrder.id, item.product_id, item.variant?.id || null,
            item.sub_variant?.id || null,
            item.sub_variant
@@ -299,7 +313,7 @@ export async function POST(request: NextRequest) {
            item.sub_variant
              ? `${item.variant?.variant_name ? item.variant.variant_name + ' / ' : ''}${item.sub_variant.sub_variant_name}`
              : (item.variant?.variant_name || null),
-           item.quantity, unitPrice, itemTotal, Math.round(tax * 100) / 100,
+           item.quantity, unitPrice, itemTotal, totalItemDiscount, Math.round(tax * 100) / 100,
            isGSTEnabled ? (item.products.hsn_code || null) : null,
            isGSTEnabled ? gstRate : null,
            isGSTEnabled && gst ? gst.taxableAmount : 0,
@@ -307,7 +321,8 @@ export async function POST(request: NextRequest) {
            isGSTEnabled && gst ? gst.sgst : 0,
            isGSTEnabled && gst ? gst.igst : 0,
            item.buy_mode || 'unit',
-           item.buy_unit || null]
+           item.buy_unit || null,
+           itemMrp]
         )
       }
 
@@ -331,9 +346,9 @@ export async function POST(request: NextRequest) {
     })
 
     const orderItems = cartItems.map((item: any) => {
-      const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-      const unitPrice = isCustomQty
-        ? parseFloat(item.price_at_addition)
+      const _pia4 = parseFloat(item.price_at_addition)
+      const unitPrice = (_pia4 > 0)
+        ? _pia4
         : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
       return {
         order_id: order.id,

@@ -43,7 +43,7 @@ type POSearchMode = 'name' | 'sku' | 'category'
 type POLineItem = {
   id: string; product_id: string; variant_id: string; product_name: string
   sku: string; quantity: string; tax_rate: string; hsn_code: string; mrp: number
-  sell_unit_label: string
+  sell_unit_label: string; sell_unit_dimension: string
   purchase_unit: string
   purchase_unit_factor: string
   line_total_incl_gst: string
@@ -53,7 +53,7 @@ type POLineItem = {
 type PickerProduct = {
   product_id: string; variant_id: string | null; name: string; variant_name: string | null
   sku: string; base_price: number | null; gst_percentage: number | null; hsn_code: string | null; mrp: number | null
-  sell_unit_label: string | null
+  sell_unit_label: string | null; sell_unit_dimension: string | null
 }
 
 function newPOLineItem(): POLineItem {
@@ -61,21 +61,28 @@ function newPOLineItem(): POLineItem {
     id: Math.random().toString(36).slice(2),
     product_id: '', variant_id: '', product_name: '', sku: '',
     quantity: '1', tax_rate: '0', hsn_code: '', mrp: 0,
-    sell_unit_label: '',
+    sell_unit_label: '', sell_unit_dimension: '',
     purchase_unit: '', purchase_unit_factor: '1',
     line_total_incl_gst: '', gst_inclusive: true,
   }
 }
 
 function decodePOLineItemId(encoded: string) {
-  const [product_id, variant_id_raw, , gst_raw, hsn_raw, , sell_unit_label_raw] = encoded.split('|')
+  const [product_id, variant_id_raw, , gst_raw, hsn_raw, , sell_unit_label_raw, sell_unit_dimension_raw] = encoded.split('|')
   return {
     product_id,
     variant_id: variant_id_raw || '',
     tax_rate: gst_raw ? String(Math.round(parseFloat(gst_raw))) : '0',
     hsn_code: hsn_raw || '',
     sell_unit_label: sell_unit_label_raw || '',
+    sell_unit_dimension: sell_unit_dimension_raw || '',
   }
+}
+
+/** Stock is always in pc for count-dimension products; use sell_unit_label for others */
+function poLineBaseLabel(it: Pick<POLineItem, 'sell_unit_label' | 'sell_unit_dimension'>): string {
+  if (!it.sell_unit_dimension || it.sell_unit_dimension === 'count') return 'pc'
+  return it.sell_unit_label || 'units'
 }
 
 function fmtINR2(n: number) {
@@ -171,6 +178,7 @@ export default function NewPOPage() {
       hsn_code: p.hsn_code || '',
       mrp: Number(p.mrp) || 0,
       sell_unit_label: p.sell_unit_label || '',
+      sell_unit_dimension: p.sell_unit_dimension || '',
     }
     setLineItems(mergeOrReplaceLineItem(pickerItemId, populated))
     setPickerOpen(false)
@@ -342,7 +350,7 @@ export default function NewPOPage() {
                           onSelect={s => {
                             const d = decodePOLineItemId(s.id)
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
-                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label }
+                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label, sell_unit_dimension: d.sell_unit_dimension }
                             setLineItems(mergeOrReplaceLineItem(it.id, populated))
                           }}
                           inputClassName={inputCls} placeholder="Search by product name..." />
@@ -353,7 +361,7 @@ export default function NewPOPage() {
                           onSelect={s => {
                             const d = decodePOLineItemId(s.id)
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
-                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label }
+                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label, sell_unit_dimension: d.sell_unit_dimension }
                             setLineItems(mergeOrReplaceLineItem(it.id, populated))
                           }}
                           inputClassName={inputCls + ' font-mono'} placeholder="e.g. JFS-1234" />
@@ -389,7 +397,7 @@ export default function NewPOPage() {
                         options={[{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }]} />
                     </div>
                     <div>
-                      <label className={labelCls}>Qty ({it.purchase_unit || it.sell_unit_label || 'units'}) <span className="text-red-500">*</span></label>
+                      <label className={labelCls}>Qty ({it.purchase_unit || poLineBaseLabel(it)}) <span className="text-red-500">*</span></label>
                       <input type="number" min="0.001" step="0.001" className={inputCls} value={it.quantity}
                         onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, quantity: e.target.value }))} />
                     </div>
@@ -418,14 +426,14 @@ export default function NewPOPage() {
                             />
                           </div>
                           <div>
-                            <label className={labelCls}>{it.sell_unit_label || 'Units'} per {it.purchase_unit || 'purchase unit'} <span className="text-red-500">*</span></label>
+                            <label className={labelCls}>{poLineBaseLabel(it)} per {it.purchase_unit || 'purchase unit'} <span className="text-red-500">*</span></label>
                             <input type="number" min="1" step="1" value={it.purchase_unit_factor}
                               onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, purchase_unit_factor: e.target.value }))}
                               className={inputCls} placeholder="200" />
                             {factor > 0 && it.purchase_unit && (
                               <p className="mt-1 text-xs text-foreground-muted">
-                                1 {it.purchase_unit} = {factor} {it.sell_unit_label || 'units'}
-                                {qty > 0 && <span className="ml-1 text-secondary-500 dark:text-secondary-300">→ {(qty * factor).toLocaleString('en-IN')} {it.sell_unit_label || 'units'} total</span>}
+                                1 {it.purchase_unit} = {factor} {poLineBaseLabel(it)}
+                                {qty > 0 && <span className="ml-1 text-secondary-500 dark:text-secondary-300">→ {(qty * factor).toLocaleString('en-IN')} {poLineBaseLabel(it)} total</span>}
                               </p>
                             )}
                           </div>
@@ -456,14 +464,14 @@ export default function NewPOPage() {
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-border-default text-xs">
                             <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
                               <div className="text-foreground-muted mb-0.5">Base qty</div>
-                              <div className="font-semibold text-foreground">{baseQty.toLocaleString('en-IN')} {it.sell_unit_label || 'pcs'}</div>
+                              <div className="font-semibold text-foreground">{baseQty.toLocaleString('en-IN')} {poLineBaseLabel(it)}</div>
                             </div>
                             <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
                               <div className="text-foreground-muted mb-0.5">Ex-GST total</div>
                               <div className="font-semibold text-foreground">₹{fmtINR2(totalExGst)}</div>
                             </div>
                             <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
-                              <div className="text-foreground-muted mb-0.5">Per {it.sell_unit_label || 'pc'} (ex-GST)</div>
+                              <div className="text-foreground-muted mb-0.5">Per {poLineBaseLabel(it)} (ex-GST)</div>
                               <div className="font-semibold text-secondary-600 dark:text-secondary-300">₹{fmtINR2(perPc)}</div>
                             </div>
                             <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
