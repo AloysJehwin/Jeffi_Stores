@@ -8,11 +8,12 @@ vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne: vi.fn() }))
 // reEmbed imports these dynamically — mock them
 vi.mock('@/lib/rag', () => ({ embed: vi.fn() }))
+const mockPoolInstance = vi.hoisted(() => ({
+  query: vi.fn().mockResolvedValue({}),
+  end: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('pg', () => ({
-  Pool: vi.fn().mockImplementation(() => ({
-    query: vi.fn().mockResolvedValue({}),
-    end: vi.fn().mockResolvedValue(undefined),
-  })),
+  Pool: vi.fn(function () { return mockPoolInstance }),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -180,5 +181,88 @@ describe('POST /api/admin/catalog-enrichment/bulk-approve', () => {
     const res = await POST(makeRequest({ ids: 'not-an-array' }))
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/no ids/i)
+  })
+
+  it('reEmbed succeeds and increments embedded count when product has all AI fields', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    mockQueryMany.mockResolvedValue([sampleRows[0]] as any)
+    mockQuery.mockResolvedValue(undefined as any)
+
+    const { queryOne } = await import('@/lib/db')
+    const { embed } = await import('@/lib/rag')
+    vi.mocked(queryOne).mockResolvedValue({
+      id: 'prod-1',
+      name: 'Bolt M20',
+      sku: 'BOLT-M20',
+      description: 'A structural bolt',
+      ai_description: 'AI description of bolt',
+      ai_product_type: 'Fastener',
+      ai_application: 'Construction',
+      ai_who_uses_it: 'Engineers',
+      ai_use_cases: ['fastening', 'assembly'],
+      ai_keywords: ['bolt', 'fastener'],
+      ai_features: ['stainless steel'],
+      ai_search_tags: ['bolt', 'm20'],
+    })
+    vi.mocked(embed).mockResolvedValue([0.1, 0.2, 0.3])
+
+    const res = await POST(makeRequest({ ids: ['log-1'] }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.embedded).toBe(1)
+    expect(body.action).toBe('approved')
+  })
+
+  it('reEmbed succeeds when product has null optional AI fields (hits fallback branches)', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    mockQueryMany.mockResolvedValue([sampleRows[1]] as any)
+    mockQuery.mockResolvedValue(undefined as any)
+
+    const { queryOne } = await import('@/lib/db')
+    const { embed } = await import('@/lib/rag')
+    vi.mocked(queryOne).mockResolvedValue({
+      id: 'prod-2',
+      name: 'Nut M10',
+      sku: null,
+      description: null,
+      ai_description: null,
+      ai_product_type: null,
+      ai_application: null,
+      ai_who_uses_it: null,
+      ai_use_cases: null,
+      ai_keywords: null,
+      ai_features: null,
+      ai_search_tags: null,
+    })
+    vi.mocked(embed).mockResolvedValue([0.4, 0.5, 0.6])
+
+    const res = await POST(makeRequest({ ids: ['log-2'] }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.embedded).toBe(1)
+  })
+
+  it('reEmbed catches errors and returns embedded:0', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    mockQueryMany.mockResolvedValue([sampleRows[0]] as any)
+    mockQuery.mockResolvedValue(undefined as any)
+
+    const { queryOne } = await import('@/lib/db')
+    const { embed } = await import('@/lib/rag')
+    vi.mocked(queryOne).mockResolvedValue({
+      id: 'prod-1', name: 'Bolt', sku: 'B1', description: 'desc',
+      ai_description: null, ai_product_type: null, ai_application: null,
+      ai_who_uses_it: null, ai_use_cases: [], ai_keywords: [],
+      ai_features: [], ai_search_tags: [],
+    })
+    vi.mocked(embed).mockRejectedValue(new Error('embed failed'))
+
+    const res = await POST(makeRequest({ ids: ['log-1'] }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.embedded).toBe(0)
   })
 })
