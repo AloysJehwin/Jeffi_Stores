@@ -13,11 +13,19 @@ const poItemSchema = z.object({
   variant_id: zUuid.nullish(),
   sub_variant_id: zUuid.nullish(),
   quantity: z.coerce.number().positive(),
-  unit_cost: zCurrency,
+  unit_cost: zCurrency.optional(),
   tax_rate: z.coerce.number().min(0).default(0),
   product_name: z.string().nullish(),
   sku: z.string().nullish(),
-})
+  // purchase unit conversion (optional)
+  purchase_unit: z.string().max(50).nullish(),
+  purchase_unit_factor: z.coerce.number().positive().default(1),
+  line_total_incl_gst: zCurrency.nullish(),
+  gst_inclusive: z.boolean().default(true),
+}).refine(
+  d => d.unit_cost != null || d.line_total_incl_gst != null,
+  { message: 'Either unit_cost or line_total_incl_gst is required' }
+)
 
 const createPOSchema = z.object({
   supplier_id: zUuid,
@@ -109,13 +117,30 @@ export async function POST(request: NextRequest) {
 
     let subtotal = 0
     let taxAmount = 0
-    for (const item of items) {
-      const qty = item.quantity
-      const cost = item.unit_cost
-      const tax = item.tax_rate ?? 0
-      subtotal += qty * cost
-      taxAmount += qty * cost * (tax / 100)
-    }
+    const resolvedItems = items.map(item => {
+      const factor = item.purchase_unit_factor ?? 1
+      const baseQty = item.quantity * factor
+      const gstRate = item.tax_rate ?? 0
+
+      let unitCost: number
+      let lineTotalInclGst: number | null = item.line_total_incl_gst ?? null
+
+      if (lineTotalInclGst != null) {
+        const totalExGst = item.gst_inclusive
+          ? lineTotalInclGst / (1 + gstRate / 100)
+          : lineTotalInclGst
+        unitCost = totalExGst / baseQty
+      } else {
+        unitCost = item.unit_cost!
+      }
+
+      const lineExGst = unitCost * baseQty
+      const lineTax = lineExGst * (gstRate / 100)
+      subtotal += lineExGst
+      taxAmount += lineTax
+
+      return { ...item, resolvedUnitCost: unitCost, baseQty, factor }
+    })
     const totalAmount = subtotal + taxAmount
 
     const po = await queryOne<{ id: string }>(
@@ -129,17 +154,24 @@ export async function POST(request: NextRequest) {
        Math.round(totalAmount * 100) / 100]
     )
 
-    for (const item of items) {
-      const qty = item.quantity
-      const cost = item.unit_cost
+    for (const item of resolvedItems) {
+      const { resolvedUnitCost, baseQty, factor } = item
       const tax = item.tax_rate ?? 0
-      const total = Math.round(qty * cost * (1 + tax / 100) * 100) / 100
+      const total = Math.round(baseQty * resolvedUnitCost * (1 + tax / 100) * 100) / 100
       await query(
-        `INSERT INTO purchase_order_items (po_id, product_id, variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `INSERT INTO purchase_order_items
+           (po_id, product_id, variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost,
+            purchase_unit, purchase_unit_factor, line_total_incl_gst, gst_inclusive)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [po?.id, item.product_id, item.variant_id || null,
          item.product_name, item.sku || null,
-         qty, cost, tax, total]
+         baseQty,
+         Math.round(resolvedUnitCost * 1000000) / 1000000,
+         tax, total,
+         item.purchase_unit || null,
+         factor,
+         item.line_total_incl_gst ?? null,
+         item.gst_inclusive ?? true]
       )
     }
 

@@ -19,6 +19,7 @@ const postSchema = z.object({
         sub_variant_id: zUuid.nullish(),
         quantity_received: z.coerce.number().positive(),
         unit_cost: z.coerce.number().min(0),
+        purchase_unit_factor: z.coerce.number().positive().default(1),
       })
     )
     .min(1, 'At least one item is required'),
@@ -60,7 +61,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     let receivedAmount = 0
     for (const item of items) {
-      const qty = item.quantity_received
+      const factor = item.purchase_unit_factor ?? 1
+      const qty = item.quantity_received * factor
       const cost = item.unit_cost
       if (qty > 0) receivedAmount += qty * cost
     }
@@ -79,7 +81,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const grnId = grnRow.rows[0].id
 
       for (const item of items) {
-        const qtyReceived = item.quantity_received
+        const factor = item.purchase_unit_factor ?? 1
+        // quantity_received is in purchase units; convert to base units for stock
+        const qtyReceived = item.quantity_received * factor
         if (qtyReceived <= 0) continue
 
         const unitCost = item.unit_cost
@@ -89,9 +93,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const subVariantId = item.sub_variant_id || null
 
         await client.query(
-          `INSERT INTO grn_items (grn_id, po_item_id, product_id, variant_id, quantity_received, unit_cost)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
-          [grnId, poItemId, productId, variantId, qtyReceived, unitCost]
+          `INSERT INTO grn_items (grn_id, po_item_id, product_id, variant_id, quantity_received, unit_cost, purchase_unit_factor)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [grnId, poItemId, productId, variantId, qtyReceived, unitCost, factor]
         )
 
         await updateWeightedAvgCost(client, { productId, variantId, qtyReceived, unitCost })
