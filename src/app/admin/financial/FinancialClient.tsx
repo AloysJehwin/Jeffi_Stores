@@ -736,6 +736,20 @@ function PayablesTab({ initialData }: { initialData: any }) {
 
 // ── P&L ───────────────────────────────────────────────────────────────────────
 
+function SourceBar({ online, business, cashSale, offline }: { online: number; business: number; cashSale: number; offline: number }) {
+  const total = online + business + cashSale + offline
+  if (total <= 0) return null
+  const pct = (n: number) => Math.round((n / total) * 100)
+  return (
+    <div className="flex h-1.5 rounded-full overflow-hidden w-full gap-px" title={`Online ${pct(online)}% · Business ${pct(business)}% · Cash ${pct(cashSale)}% · Offline ${pct(offline)}%`}>
+      {online > 0    && <div className="bg-blue-500"    style={{ width: `${pct(online)}%` }} />}
+      {business > 0  && <div className="bg-purple-500"  style={{ width: `${pct(business)}%` }} />}
+      {cashSale > 0  && <div className="bg-green-500"   style={{ width: `${pct(cashSale)}%` }} />}
+      {offline > 0   && <div className="bg-orange-400"  style={{ width: `${pct(offline)}%` }} />}
+    </div>
+  )
+}
+
 function PLTab({ initialData }: { initialData: any }) {
   const now = new Date()
   const fyStart = now.getMonth() >= 3 ? `${now.getFullYear()}-04-01` : `${now.getFullYear() - 1}-04-01`
@@ -778,27 +792,46 @@ function PLTab({ initialData }: { initialData: any }) {
         <Skeleton rows={6} />
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <SummaryCard label="Revenue" value={formatINR(data.totals.revenue)} sub={`${data.totals.order_count} orders`} />
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <SummaryCard label="Gross Revenue" value={formatINR(data.totals.revenue)} sub={`${data.totals.order_count} orders`} />
+            <SummaryCard label="Refunds" value={formatINR(data.totals.refunds)} />
+            <SummaryCard label="Net Revenue" value={formatINR(data.totals.net_revenue)} />
+            <SummaryCard label="Gross Margin" value={`${data.totals.gross_margin_pct}%`} />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <SummaryCard label="COGS" value={formatINR(data.totals.cogs)} />
             <SummaryCard label="Gross Profit" value={formatINR(data.totals.gross_profit)} />
-            <SummaryCard label="Gross Margin" value={`${data.totals.gross_margin_pct}%`} />
-            <SummaryCard label="GST Collected" value={formatINR(data.totals.tax_collected)} />
+            <SummaryCard label="Op. Expenses" value={formatINR(data.totals.operating_expenses)} />
+            <SummaryCard label="Op. Profit" value={formatINR(data.totals.operating_profit)} />
+          </div>
+
+          {/* Source legend */}
+          <div className="flex flex-wrap gap-3 text-xs text-foreground-secondary">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" />Online</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-purple-500 inline-block" />Business</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" />Cash Sale</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-orange-400 inline-block" />Offline</span>
           </div>
 
           {data.monthly.length === 0 ? (
             <p className="text-foreground-secondary text-sm text-center py-10">No paid orders in this period</p>
           ) : (
             <>
-              <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+              {/* Desktop table */}
+              <div className="hidden lg:block overflow-x-auto rounded-xl border border-border-default">
                 <table className="w-full text-sm">
                   <thead className="bg-surface-secondary">
                     <tr>
                       <th className={thCls}>Month</th>
                       <th className={thRight}>Revenue</th>
+                      <th className={thRight}>Refunds</th>
+                      <th className={thRight}>Net Rev.</th>
                       <th className={thRight}>COGS</th>
                       <th className={thRight}>Gross Profit</th>
                       <th className={thCls}>Margin</th>
+                      <th className={thRight}>Op. Exp.</th>
+                      <th className={thRight}>Op. Profit</th>
                       <th className={thRight}>GST</th>
                       <th className={thRight}>Orders</th>
                     </tr>
@@ -806,13 +839,18 @@ function PLTab({ initialData }: { initialData: any }) {
                   <tbody className="divide-y divide-border-default">
                     {data.monthly.map((m: any) => (
                       <tr key={m.month} className="hover:bg-surface-secondary/40 transition-colors">
-                        <td className="px-4 py-3 font-medium text-foreground">
-                          {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                        <td className="px-4 py-3 font-medium text-foreground min-w-[110px]">
+                          <div>{new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</div>
+                          <div className="mt-1 w-24">
+                            <SourceBar online={m.revenue_online} business={m.revenue_business} cashSale={m.revenue_cash_sale} offline={m.revenue_offline} />
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right text-foreground">{formatINR(m.revenue)}</td>
+                        <td className="px-4 py-3 text-right text-red-600 dark:text-red-400 text-xs">{m.refunds > 0 ? `-${formatINR(m.refunds)}` : '—'}</td>
+                        <td className="px-4 py-3 text-right text-foreground font-medium">{formatINR(m.net_revenue)}</td>
                         <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(m.cogs)}</td>
                         <td className="px-4 py-3 text-right text-foreground">{formatINR(m.gross_profit)}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 min-w-[100px]">
                           <div className="flex items-center gap-2">
                             <div className="flex-1 bg-surface-secondary rounded-full h-2 overflow-hidden">
                               <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(m.gross_margin_pct, 100)}%` }} />
@@ -820,7 +858,11 @@ function PLTab({ initialData }: { initialData: any }) {
                             <span className="text-xs text-foreground-secondary w-10 text-right">{m.gross_margin_pct}%</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(m.tax_collected)}</td>
+                        <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(m.operating_expenses)}</td>
+                        <td className={`px-4 py-3 text-right font-semibold ${m.operating_profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {formatINR(m.operating_profit)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-foreground-secondary text-xs">{formatINR(m.tax_collected)}</td>
                         <td className="px-4 py-3 text-right text-foreground-secondary">{m.order_count}</td>
                       </tr>
                     ))}
@@ -828,7 +870,8 @@ function PLTab({ initialData }: { initialData: any }) {
                 </table>
               </div>
 
-              <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+              {/* Mobile cards */}
+              <div className="lg:hidden rounded-xl border border-border-default divide-y divide-border-default">
                 {data.monthly.map((m: any) => (
                   <div key={m.month} className="p-4 space-y-2">
                     <div className="flex items-center justify-between gap-2">
@@ -837,29 +880,21 @@ function PLTab({ initialData }: { initialData: any }) {
                       </p>
                       <span className="text-xs text-foreground-secondary">{m.order_count} orders</span>
                     </div>
+                    <SourceBar online={m.revenue_online} business={m.revenue_business} cashSale={m.revenue_cash_sale} offline={m.revenue_offline} />
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-foreground-secondary">Revenue</span>
-                        <span className="font-medium text-foreground">{formatINR(m.revenue)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground-secondary">COGS</span>
-                        <span className="text-foreground-secondary">{formatINR(m.cogs)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground-secondary">Gross Profit</span>
-                        <span className="font-medium text-foreground">{formatINR(m.gross_profit)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground-secondary">GST</span>
-                        <span className="text-foreground-secondary">{formatINR(m.tax_collected)}</span>
-                      </div>
+                      <div className="flex justify-between"><span className="text-foreground-secondary">Revenue</span><span className="font-medium text-foreground">{formatINR(m.revenue)}</span></div>
+                      <div className="flex justify-between"><span className="text-foreground-secondary">Refunds</span><span className="text-red-500">{m.refunds > 0 ? `-${formatINR(m.refunds)}` : '—'}</span></div>
+                      <div className="flex justify-between"><span className="text-foreground-secondary">Net Revenue</span><span className="font-medium text-foreground">{formatINR(m.net_revenue)}</span></div>
+                      <div className="flex justify-between"><span className="text-foreground-secondary">COGS</span><span className="text-foreground-secondary">{formatINR(m.cogs)}</span></div>
+                      <div className="flex justify-between"><span className="text-foreground-secondary">Gross Profit</span><span className="font-medium text-foreground">{formatINR(m.gross_profit)}</span></div>
+                      <div className="flex justify-between"><span className="text-foreground-secondary">Op. Expenses</span><span className="text-foreground-secondary">{formatINR(m.operating_expenses)}</span></div>
+                      <div className="flex justify-between col-span-2"><span className="text-foreground-secondary">Op. Profit</span><span className={`font-semibold ${m.operating_profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{formatINR(m.operating_profit)}</span></div>
                     </div>
                     <div className="flex items-center gap-2 pt-0.5">
                       <div className="flex-1 bg-surface-secondary rounded-full h-1.5 overflow-hidden">
                         <div className="h-full bg-green-500 rounded-full" style={{ width: `${Math.min(m.gross_margin_pct, 100)}%` }} />
                       </div>
-                      <span className="text-xs text-foreground-secondary w-10 text-right">{m.gross_margin_pct}%</span>
+                      <span className="text-xs text-foreground-secondary w-12 text-right">{m.gross_margin_pct}% margin</span>
                     </div>
                   </div>
                 ))}
@@ -894,6 +929,17 @@ function CashflowTab({ initialData }: { initialData: any }) {
     setLoading(false)
   }
 
+  const totals = data?.monthly?.reduce(
+    (acc: any, m: any) => ({
+      cash_in: acc.cash_in + m.cash_in,
+      po_payments: acc.po_payments + m.po_payments,
+      refunds_out: acc.refunds_out + m.refunds_out,
+      cash_out: acc.cash_out + m.cash_out,
+      net: acc.net + m.net,
+    }),
+    { cash_in: 0, po_payments: 0, refunds_out: 0, cash_out: 0, net: 0 }
+  )
+
   return (
     <div className="space-y-5">
       <div className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
@@ -918,13 +964,33 @@ function CashflowTab({ initialData }: { initialData: any }) {
         <p className="text-foreground-secondary text-sm text-center py-10">No transactions in this period</p>
       ) : (
         <>
-          <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+          {/* Summary bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <SummaryCard label="Total Cash In" value={formatINR(totals.cash_in)} />
+            <SummaryCard label="PO Payments" value={formatINR(totals.po_payments)} />
+            <SummaryCard label="Refunds Issued" value={formatINR(totals.refunds_out)} />
+            <SummaryCard label="Total Cash Out" value={formatINR(totals.cash_out)} />
+            <SummaryCard label="Net" value={formatINR(totals.net)} />
+          </div>
+
+          {/* Source legend */}
+          <div className="flex flex-wrap gap-3 text-xs text-foreground-secondary">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" />Online</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-purple-500 inline-block" />Business</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" />Cash Sale</span>
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-orange-400 inline-block" />Offline</span>
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden lg:block overflow-x-auto rounded-xl border border-border-default">
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary">
                 <tr>
                   <th className={thCls}>Month</th>
                   <th className={thRight}>Cash In</th>
-                  <th className={thRight}>Cash Out</th>
+                  <th className={thRight}>PO Payments</th>
+                  <th className={thRight}>Refunds Out</th>
+                  <th className={thRight}>Total Out</th>
                   <th className={thRight}>Net</th>
                   <th className={thRight}>Running Balance</th>
                 </tr>
@@ -932,10 +998,15 @@ function CashflowTab({ initialData }: { initialData: any }) {
               <tbody className="divide-y divide-border-default">
                 {data.monthly.map((m: any) => (
                   <tr key={m.month} className="hover:bg-surface-secondary/40 transition-colors">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
+                    <td className="px-4 py-3 font-medium text-foreground min-w-[110px]">
+                      <div>{new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</div>
+                      <div className="mt-1 w-24">
+                        <SourceBar online={m.cash_in_online} business={m.cash_in_business} cashSale={m.cash_in_cash_sale} offline={m.cash_in_offline} />
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right text-green-600 dark:text-green-400 font-medium">{formatINR(m.cash_in)}</td>
+                    <td className="px-4 py-3 text-right text-foreground-secondary">{m.po_payments > 0 ? formatINR(m.po_payments) : '—'}</td>
+                    <td className="px-4 py-3 text-right text-foreground-secondary">{m.refunds_out > 0 ? formatINR(m.refunds_out) : '—'}</td>
                     <td className="px-4 py-3 text-right text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</td>
                     <td className={`px-4 py-3 text-right font-medium ${m.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {m.net >= 0 ? '+' : ''}{formatINR(m.net)}
@@ -949,29 +1020,25 @@ function CashflowTab({ initialData }: { initialData: any }) {
             </table>
           </div>
 
-          <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+          {/* Mobile cards */}
+          <div className="lg:hidden rounded-xl border border-border-default divide-y divide-border-default">
             {data.monthly.map((m: any) => (
               <div key={m.month} className="p-4 space-y-2">
                 <p className="font-medium text-foreground text-sm">
                   {new Date(m.month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
                 </p>
+                <SourceBar online={m.cash_in_online} business={m.cash_in_business} cashSale={m.cash_in_cash_sale} offline={m.cash_in_offline} />
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-foreground-secondary">Cash In</span>
-                    <span className="font-medium text-green-600 dark:text-green-400">{formatINR(m.cash_in)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-secondary">Cash Out</span>
-                    <span className="text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-secondary">Net</span>
+                  <div className="flex justify-between"><span className="text-foreground-secondary">Cash In</span><span className="font-medium text-green-600 dark:text-green-400">{formatINR(m.cash_in)}</span></div>
+                  <div className="flex justify-between"><span className="text-foreground-secondary">PO Payments</span><span className="text-foreground-secondary">{m.po_payments > 0 ? formatINR(m.po_payments) : '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-foreground-secondary">Refunds Out</span><span className="text-foreground-secondary">{m.refunds_out > 0 ? formatINR(m.refunds_out) : '—'}</span></div>
+                  <div className="flex justify-between"><span className="text-foreground-secondary">Total Out</span><span className="text-red-600 dark:text-red-400">{formatINR(m.cash_out)}</span></div>
+                  <div className="flex justify-between"><span className="text-foreground-secondary">Net</span>
                     <span className={`font-medium ${m.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {m.net >= 0 ? '+' : ''}{formatINR(m.net)}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground-secondary">Balance</span>
+                  <div className="flex justify-between"><span className="text-foreground-secondary">Balance</span>
                     <span className={`font-semibold ${m.running_balance >= 0 ? 'text-foreground' : 'text-red-600 dark:text-red-400'}`}>
                       {formatINR(m.running_balance)}
                     </span>
@@ -1052,11 +1119,11 @@ function TransactionsTab({ initialData }: { initialData: any }) {
             <DatePicker className="w-36" value={to} onChange={setTo} />
           </div>
           <div className="w-36">
-            <AdminSelect label="Type" value={type} onChange={setType} options={TYPE_OPTIONS} />
+            <AdminSelect label="Type" value={type} onChange={setType} options={TYPE_OPTIONS} sm />
           </div>
           <div className="flex-1 min-w-[180px]">
             <label className={labelCls}>Search party / ref</label>
-            <input className={inputCls} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRefresh()} placeholder="Supplier, customer, ref..." />
+            <input className={inputCls.replace('py-2.5', 'py-1.5')} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRefresh()} placeholder="Supplier, customer, ref..." />
           </div>
           <div className="flex gap-2 pb-0.5">
             <button className={btnPrimary} onClick={handleRefresh}>{loading ? 'Loading…' : 'Refresh'}</button>
