@@ -320,11 +320,11 @@ export async function generateInvoicePDF(
 
     const itemCols = [
       { label: 'Sl\nNo.', w: 22, align: 'center' as const },
-      { label: 'Description of Goods', w: 140, align: 'left' as const },
+      { label: 'Description of Goods', w: 192, align: 'left' as const },
       { label: 'HSN/SAC', w: 52, align: 'center' as const },
       { label: 'GST\nRate', w: 36, align: 'center' as const },
       { label: 'Quantity', w: 52, align: 'center' as const },
-      { label: 'Rate\n(Incl. of Tax)', w: 114, align: 'right' as const },
+      { label: 'Rate\n(Incl. of Tax)', w: 62, align: 'right' as const },
       { label: 'per', w: 30, align: 'center' as const },
       { label: 'Disc. %', w: 38, align: 'center' as const },
       { label: 'Amount', w: 62, align: 'right' as const },
@@ -416,7 +416,6 @@ export async function generateInvoicePDF(
         `${item.gst_rate} %`,
         qtyLabel,
         fmt(rateInclTax),
-        perLabel,
         perLabel,
         discLabel,
         fmt(item.taxable_amount),
