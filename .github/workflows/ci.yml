@@ -452,6 +452,29 @@ jobs:
               add_dimension_to_product_units.sql
               product_level_units.sql
               drop_legacy_weight_length_columns.sql
+              add_sell_unit_id_drop_is_sell_default.sql
+              add_unit_columns_to_inventory_transactions.sql
+              add_sub_variant_id_to_product_units.sql
+              add_fractional_inventory.sql
+              add_default_pc_unit.sql
+              add_po_conversion.sql
+              drop_wholeprice_ex_gst.sql
+              drop_site_settings_audit.sql
+              fix_cart_items_unique_constraint.sql
+              stock_quantity_to_status_enum.sql
+              create_rfq_messages.sql
+              add_mrp_to_order_items.sql
+              add_back_in_stock_notify.sql
+              add_buy_unit_to_sale_tables.sql
+              add_buy_unit_to_quotation_items.sql
+              add_campaign_send_counts.sql
+              add_category_hero_images.sql
+              add_status_to_invoices.sql
+              add_user_policy_acceptance.sql
+              add_business_discount_amount_to_orders.sql
+              backfill_order_items_mrp_from_quotation.sql
+              backfill_variant_sell_unit_id.sql
+              add_service_accounts.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')
